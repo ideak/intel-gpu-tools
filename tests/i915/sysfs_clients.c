@@ -24,6 +24,17 @@
 #include "igt_sysfs.h"
 #include "ioctl_wrappers.h"
 
+#define __require_within_epsilon(x, ref, tol_up, tol_down) \
+	igt_require_f((double)(x) <= (1.0 + (tol_up)) * (double)(ref) && \
+		      (double)(x) >= (1.0 - (tol_down)) * (double)(ref), \
+		      "'%s' != '%s' (%.3f not within +%.1f%%/-%.1f%% tolerance of %.3f)\n",\
+#x, #ref, (double)(x), \
+		      (tol_up) * 100.0, (tol_down) * 100.0, \
+		      (double)(ref))
+
+#define require_within_epsilon(x, ref, tolerance) \
+	__require_within_epsilon(x, ref, tolerance / 100., tolerance / 100.)
+
 #define __assert_within_epsilon(x, ref, tol_up, tol_down) \
 	igt_assert_f((double)(x) <= (1.0 + (tol_up)) * (double)(ref) && \
 		     (double)(x) >= (1.0 - (tol_down)) * (double)(ref), \
@@ -597,13 +608,13 @@ __split(int i915, int clients, const struct intel_execution_engine2 *e, int f,
 	/* Check that each client received their target runtime */
 	for (i = 0; i < ARRAY_SIZE(client); i++) {
 		const struct client *c = &client[i];
-		double t = 100 - c->f;
+		double t = (100 - c->f) / 5.; /* 20% tolerance for smallest */
 
 		igt_debug("active[%02d]: target runtime %'"PRIu64"ns, %.1f%%\n",
 			 c->f, c->active[1],
 			 c->active[1] * 100. / total[1]);
 
-		assert_within_epsilon(c->active[1], c->f * total[1] / 100., t);
+		require_within_epsilon(c->active[1], c->f * total[1] / 100., t);
 	}
 
 	/* Validate each client reported their share of the total runtime */
