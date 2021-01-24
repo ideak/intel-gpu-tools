@@ -357,6 +357,24 @@ busy_one(int i915, int clients, const struct intel_execution_engine2 *e)
 	igt_info("idle: %'"PRIu64"ns\n", idle);
 	igt_assert(idle >= active);
 
+	/* Check monotocity of idling */
+	for (int pass = 0; pass < 5; pass++) {
+		old = idle;
+
+		igt_spin_reset(spin);
+		gem_execbuf(i915, &spin->execbuf);
+		igt_spin_busywait_until_started(spin);
+		usleep(1); /* let the system process the tasklets */
+		active = read_runtime(me, e->class);
+		igt_info("idle->active[%d]: %'"PRIu64"ns\n", pass, active);
+		igt_assert(active >= old);
+		gem_quiescent_gpu(i915);
+
+		idle = read_runtime(me, e->class);
+		igt_info("active->idle[%d]: %'"PRIu64"ns\n", pass, idle);
+		igt_assert(idle >= active);
+	}
+
 	gem_context_destroy(i915, spin->execbuf.rsvd1);
 
 	/* And finally after the executing context is no more */
