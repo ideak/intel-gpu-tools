@@ -328,19 +328,22 @@ busy_one(int i915, int clients, const struct intel_execution_engine2 *e)
 			    gem_context_clone_with_engines(i915, 0),
 			    .engine = e->flags,
 			    .flags = IGT_SPIN_POLL_RUN);
-
-	igt_nsec_elapsed(memset(&tv, 0, sizeof(tv)));
 	igt_spin_busywait_until_started(spin);
+	usleep(10); /* kick the tasklets */
 
-	old = 0;
+	/* Compensate for discrepancies in execution latencies */
+	idle = old = read_runtime(me, e->class);
+	igt_nsec_elapsed(memset(&tv, 0, sizeof(tv)));
+
 	for (int pass = 0; pass <= 10; pass++) {
 		usleep(1500 >> pass);
-		delay = igt_nsec_elapsed(&tv);
+		delay = igt_nsec_elapsed(&tv) + idle;
 		igt_debug("delay: %'"PRIu64"ns\n", delay);
 
 		/* Check that we accumulate the runtime, while active */
 		active = read_runtime(me, e->class);
-		igt_info("active1[%d]: %'"PRIu64"ns\n", pass, active);
+		igt_info("active1[%d]: %'"PRIu64"ns (%'"PRIu64"ns)\n",
+			 pass, active, delay);
 		igt_assert(active > old); /* monotonic */
 		assert_within_epsilon(active, delay, 20);
 
@@ -366,17 +369,19 @@ busy_one(int i915, int clients, const struct intel_execution_engine2 *e)
 	spin->execbuf.rsvd1 = 0;
 	gem_execbuf(i915, &spin->execbuf);
 	igt_spin_busywait_until_started(spin);
-	igt_nsec_elapsed(memset(&tv, 0, sizeof(tv)));
+	usleep(10); /* kick the tasklets */
 
+	igt_nsec_elapsed(memset(&tv, 0, sizeof(tv)));
+	idle = read_runtime(me, e->class);
 	for (int pass = 0; pass <= 10; pass++) {
 		usleep(1000 >> pass);
 		delay = igt_nsec_elapsed(&tv) + idle;
 		igt_debug("delay: %'"PRIu64"ns\n", delay);
 
-		/* Check that we accumulate the runtime, while active */
 		active = read_runtime(me, e->class);
-		igt_info("active0[%d]: %'"PRIu64"ns\n", pass, active);
-		igt_assert(active > old); /* monotonic */
+		igt_info("active0[%d]: %'"PRIu64"ns (%'"PRIu64"ns)\n",
+			 pass, active, delay);
+		igt_assert(active > old);
 		assert_within_epsilon(active, delay, 20);
 
 		old = active;
