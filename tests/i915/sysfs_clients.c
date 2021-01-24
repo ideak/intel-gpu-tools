@@ -345,14 +345,16 @@ busy_one(int i915, int clients, const struct intel_execution_engine2 *e)
 	/* Compensate for discrepancies in execution latencies */
 	idle = old = read_runtime(me, e->class);
 	igt_nsec_elapsed(memset(&tv, 0, sizeof(tv)));
-
 	for (int pass = 0; pass <= 10; pass++) {
 		usleep(1500 >> pass);
-		delay = igt_nsec_elapsed(&tv) + idle;
-		igt_debug("delay: %'"PRIu64"ns\n", delay);
 
 		/* Check that we accumulate the runtime, while active */
+		delay = igt_nsec_elapsed(&tv);
 		active = read_runtime(me, e->class);
+		delay += igt_nsec_elapsed(&tv);
+		delay /= 2; /* use the centre point of the read_runtime() */
+		delay += idle; /* tare */
+
 		igt_info("active1[%d]: %'"PRIu64"ns (%'"PRIu64"ns)\n",
 			 pass, active, delay);
 		igt_assert(active > old); /* monotonic */
@@ -400,14 +402,18 @@ busy_one(int i915, int clients, const struct intel_execution_engine2 *e)
 	igt_spin_busywait_until_started(spin);
 	usleep(10); /* kick the tasklets */
 
+	idle = old = read_runtime(me, e->class);
 	igt_nsec_elapsed(memset(&tv, 0, sizeof(tv)));
-	idle = read_runtime(me, e->class);
 	for (int pass = 0; pass <= 10; pass++) {
 		usleep(1000 >> pass);
-		delay = igt_nsec_elapsed(&tv) + idle;
-		igt_debug("delay: %'"PRIu64"ns\n", delay);
 
+		/* Check that we accumulate the runtime, while active */
+		delay = igt_nsec_elapsed(&tv);
 		active = read_runtime(me, e->class);
+		delay += igt_nsec_elapsed(&tv);
+		delay /= 2; /* use the centre point of the read_runtime() */
+		delay += idle; /* tare */
+
 		igt_info("active0[%d]: %'"PRIu64"ns (%'"PRIu64"ns)\n",
 			 pass, active, delay);
 		igt_assert(active > old);
