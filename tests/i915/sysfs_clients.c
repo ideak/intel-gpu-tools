@@ -724,9 +724,10 @@ static void __fair(int i915, int clients,
 	 * the clients, we would expect the variance to be modelled
 	 * by a drunken walk; ergo sqrt(num_timeslices).
 	 */
-	threshold = sqrt(1e9 * duration / timeslice_duration_ns * (extra - count));
+	threshold = sqrt(1e9 * duration / timeslice_duration_ns);
 	threshold *= timeslice_duration_ns;
-	threshold *= 2; /* CI safety factor before crying wolf */
+	threshold *= extra > count; /* timeslicing active? */
+	threshold *= 3; /* CI safety factor before crying wolf */
 	threshold += 5e6; /* tolerance for 5ms measuring error */
 
 	expect = 1e9 * count * duration / extra;
