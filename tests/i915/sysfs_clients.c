@@ -62,11 +62,13 @@
 
 static void strterm(char *s, int len)
 {
-	igt_assert(len > 0);
-
-	s[len] = '\0';
-	if (s[len - 1] == '\n')
-		s[len - 1] = '\0';
+	if (len < 0) {
+		*s = '\0';
+	} else {
+		s[len] = '\0';
+		if (s[len - 1] == '\n')
+			s[len - 1] = '\0';
+	}
 }
 
 static void pidname(int i915, int clients)
@@ -78,7 +80,6 @@ static void pidname(int i915, int clients)
 	long count;
 	pid_t pid;
 	DIR *dir;
-	int len;
 
 	dir = fdopendir(dup(clients));
 	igt_assert(dir);
@@ -90,13 +91,11 @@ static void pidname(int i915, int clients)
 			continue;
 
 		snprintf(buf, sizeof(buf), "%s/name", de->d_name);
-		len = igt_sysfs_read(clients, buf, buf, sizeof(buf) - 1);
-		igt_assert_f(len > 0, "failed to open '%s/name'\n", de->d_name);
-		strterm(buf, len);
+		strterm(buf, igt_sysfs_read(clients, buf, buf, sizeof(buf) - 1));
 		igt_debug("%s: %s\n", de->d_name, buf);
 
 		/* Ignore closed clients created by drm_driver_open() */
-		if (*buf == '<')
+		if (*buf == '\0' || *buf == '<')
 			continue;
 
 		close(me);
