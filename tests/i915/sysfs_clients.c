@@ -9,6 +9,7 @@
 #include <fcntl.h>
 #include <inttypes.h>
 #include <math.h>
+#include <sched.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -221,7 +222,7 @@ static void create(int i915, int clients)
 
 	/* Cleanup delayed behind rcu */
 	igt_until_timeout(30) {
-		usleep(0);
+		sched_yield();
 		if (count_clients(clients) == 1)
 			break;
 		usleep(10000);
