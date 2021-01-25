@@ -656,19 +656,24 @@ static void process_dynamic_subtest_output(const char *piglit_name,
 					     dynend);
 
 			/*
-			 * If a dynamic subsubtest is considered incomplete we
-			 * need to check parent's status first, to be sure that
-			 * the binary hasn't aborted (exit code). If it has
-			 * aborted then we have to attribute this status to our
-			 * subsubtest.
+			 * If a dynamic subsubtest is considered
+			 * incomplete we need to check parent's status
+			 * first, to be sure that the binary hasn't
+			 * aborted or stopped gracefully (exit
+			 * code). If it has aborted then we have to
+			 * attribute this status to our subsubtest.
 			 */
 			if (!strcmp(dynresulttext, "incomplete")) {
 				struct json_object *parent_subtest;
 
 				if (json_object_object_get_ex(tests, piglit_name, &parent_subtest) &&
-				    json_object_object_get_ex(parent_subtest, "result", &parent_subtest) &&
-				    !strcmp(json_object_get_string(parent_subtest), "abort"))
-					dynresulttext = "abort";
+				    json_object_object_get_ex(parent_subtest, "result", &parent_subtest)) {
+					const char *resulttext = json_object_get_string(parent_subtest);
+
+					if (!strcmp(resulttext, "abort") ||
+					    !strcmp(resulttext, "notrun"))
+						dynresulttext = resulttext;
+				}
 			}
 
 			set_result(current_dynamic_test, dynresulttext);
