@@ -50,11 +50,15 @@ static void read_and_discard_sysfs_entries(int path_fd, int indent)
 		if (!strcmp(dirent->d_name, ".") ||
 		    !strcmp(dirent->d_name, ".."))
 			continue;
+
 		if (dirent->d_type == DT_DIR) {
-			int sub_fd = -1;
-			igt_assert((sub_fd =
-				    openat(path_fd, dirent->d_name, O_RDONLY |
-					   O_DIRECTORY)) > 0);
+			int sub_fd;
+
+			sub_fd = openat(path_fd, dirent->d_name,
+					O_RDONLY | O_DIRECTORY);
+			if (sub_fd < 0)
+				continue;
+
 			igt_debug("%sEntering subdir %s\n", tabs, dirent->d_name);
 			read_and_discard_sysfs_entries(sub_fd, indent + 1);
 			close(sub_fd);
