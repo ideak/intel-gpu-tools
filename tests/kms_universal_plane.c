@@ -758,26 +758,32 @@ run_tests_for_pipe(data_t *data, enum pipe pipe)
 		igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
 	}
 
+	igt_describe("Check the switching between different primary plane fbs with CRTC off");
 	igt_subtest_f("universal-plane-pipe-%s-functional",
 		      kmstest_pipe_name(pipe))
 		for_each_valid_output_on_pipe(&data->display, pipe, output)
 			functional_test_pipe(data, pipe, output);
 
+	igt_describe("Test for scale-up or scale-down using universal plane API without covering CRTC");
 	igt_subtest_f("universal-plane-pipe-%s-sanity",
 		      kmstest_pipe_name(pipe))
 		for_each_valid_output_on_pipe(&data->display, pipe, output)
 			sanity_test_pipe(data, pipe, output);
 
+	igt_describe("Check pageflips while primary plane is disabled before IOCTL or between IOCTL"
+			" and pageflip execution");
 	igt_subtest_f("disable-primary-vs-flip-pipe-%s",
 		      kmstest_pipe_name(pipe))
 		for_each_valid_output_on_pipe(&data->display, pipe, output)
 			pageflip_test_pipe(data, pipe, output);
 
+	igt_describe("Check for cursor leaks after performing cursor operations");
 	igt_subtest_f("cursor-fb-leak-pipe-%s",
 		      kmstest_pipe_name(pipe))
 		for_each_valid_output_on_pipe(&data->display, pipe, output)
 			cursor_leak_test_pipe(data, pipe, output);
 
+	igt_describe("Check if pageflip succeeds in windowed setting");
 	igt_subtest_f("universal-plane-gen9-features-pipe-%s",
 		      kmstest_pipe_name(pipe))
 		for_each_valid_output_on_pipe(&data->display, pipe, output)
