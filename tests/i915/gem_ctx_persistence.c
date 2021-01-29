@@ -1082,6 +1082,9 @@ static void many_contexts(int i915)
 	spin = igt_spin_new(i915, .flags = IGT_SPIN_NO_PREEMPTION);
 	igt_spin_end(spin);
 
+	gem_sync(i915, spin->handle);
+	igt_spin_reset(spin);
+
 	igt_until_timeout(30) {
 		__for_each_physical_engine(i915, e) {
 			uint32_t ctx;
@@ -1089,7 +1092,6 @@ static void many_contexts(int i915)
 			ctx = gem_context_clone_with_engines(i915, 0);
 			gem_context_set_persistence(i915, ctx, false);
 
-			igt_spin_reset(spin);
 			spin->execbuf.rsvd1 = ctx;
 			spin->execbuf.flags &= ~63;
 			spin->execbuf.flags |= e->flags;
@@ -1097,6 +1099,7 @@ static void many_contexts(int i915)
 			gem_context_destroy(i915, ctx);
 		}
 	}
+	igt_debugfs_dump(i915, "i915_engine_info");
 	igt_assert_eq(gem_wait(i915, spin->handle, &timeout), 0);
 
 	/* And check we can still submit to the default context -- no bans! */
