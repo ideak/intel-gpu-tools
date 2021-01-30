@@ -53,7 +53,7 @@ void (*test_to_run)(void) = NULL;
 	exec_total++; \
 }
 
-static void fake_test(void)
+__noreturn static void fake_test(void)
 {
 	char test[] = "test";
 	char *argv_run[] = { test };

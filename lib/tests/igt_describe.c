@@ -34,7 +34,7 @@ char *fake_argv[] = {prog, fake_arg};
 int fake_argc = ARRAY_SIZE(fake_argv);
 
 IGT_TEST_DESCRIPTION("the top level description");
-static void fake_main(void)
+__noreturn static void fake_main(void)
 {
 	igt_subtest_init(fake_argc, fake_argv);
 

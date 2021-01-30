@@ -44,7 +44,7 @@ struct igt_vc4_bo {
 
 static jmp_buf jmp;
 
-static void __attribute__((noreturn)) sigtrap(int sig)
+__noreturn static void sigtrap(int sig)
 {
 	longjmp(jmp, sig);
 }

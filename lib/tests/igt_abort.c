@@ -31,7 +31,7 @@ char test[] = "test";
 char *fake_argv[] = { test };
 int fake_argc = ARRAY_SIZE(fake_argv);
 
-static void fake_simple_test(void)
+__noreturn static void fake_simple_test(void)
 {
 	igt_simple_init(fake_argc, fake_argv);
 
@@ -40,7 +40,7 @@ static void fake_simple_test(void)
 	exit(0); /* unreachable */
 }
 
-static void fake_fixture_test(void)
+__noreturn static void fake_fixture_test(void)
 {
 	igt_subtest_init(fake_argc, fake_argv);
 
@@ -51,7 +51,7 @@ static void fake_fixture_test(void)
 	exit(0); /* unreachable */
 }
 
-static void fake_outside_fixture_test(void)
+__noreturn static void fake_outside_fixture_test(void)
 {
 	igt_subtest_init(fake_argc, fake_argv);
 
@@ -60,7 +60,7 @@ static void fake_outside_fixture_test(void)
 	exit(0); /* unreachable */
 }
 
-static void fake_subtest_test(void)
+__noreturn static void fake_subtest_test(void)
 {
 	igt_subtest_init(fake_argc, fake_argv);
 
@@ -76,7 +76,7 @@ static void fake_subtest_test(void)
 	exit(0); /* unreachable */
 }
 
-static void fake_dynamic_test(void)
+__noreturn static void fake_dynamic_test(void)
 {
 	igt_subtest_init(fake_argc, fake_argv);
 
@@ -97,7 +97,7 @@ static void fake_dynamic_test(void)
 	exit(0); /* unreachable */
 }
 
-static void fake_outside_dynamic_test(void)
+__noreturn static void fake_outside_dynamic_test(void)
 {
 	igt_subtest_init(fake_argc, fake_argv);
 

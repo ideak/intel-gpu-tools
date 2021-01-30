@@ -40,7 +40,7 @@ bool list_subtests;
 bool in_fixture;
 bool in_subtest;
 
-static void fake_test(void)
+__noreturn static void fake_test(void)
 {
 	char test[] = "test";
 	char list[] = "--list-subtests";

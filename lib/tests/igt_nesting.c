@@ -30,7 +30,7 @@ char test[] = "test";
 char *fake_argv[] = { test };
 int fake_argc = ARRAY_SIZE(fake_argv);
 
-static void all_valid_simple_test(void)
+__noreturn static void all_valid_simple_test(void)
 {
 	igt_simple_init(fake_argc, fake_argv);
 
@@ -40,7 +40,7 @@ static void all_valid_simple_test(void)
 	igt_exit();
 }
 
-static void all_valid(void)
+__noreturn static void all_valid(void)
 {
 	igt_subtest_init(fake_argc, fake_argv);
 
@@ -87,7 +87,7 @@ static void all_valid(void)
 	igt_exit();
 }
 
-static void invalid_subtest_in_simple_test(void)
+__noreturn static void invalid_subtest_in_simple_test(void)
 {
 	igt_simple_init(fake_argc, fake_argv);
 
@@ -97,7 +97,7 @@ static void invalid_subtest_in_simple_test(void)
 	igt_exit();
 }
 
-static void invalid_subtest_group_in_simple_test(void)
+__noreturn static void invalid_subtest_group_in_simple_test(void)
 {
 	igt_simple_init(fake_argc, fake_argv);
 
@@ -107,7 +107,7 @@ static void invalid_subtest_group_in_simple_test(void)
 	igt_exit();
 }
 
-static void invalid_subtest_with_dynamic_in_simple_test(void)
+__noreturn static void invalid_subtest_with_dynamic_in_simple_test(void)
 {
 	igt_simple_init(fake_argc, fake_argv);
 
@@ -117,7 +117,7 @@ static void invalid_subtest_with_dynamic_in_simple_test(void)
 	igt_exit();
 }
 
-static void invalid_dynamic_in_simple_test(void)
+__noreturn static void invalid_dynamic_in_simple_test(void)
 {
 	igt_simple_init(fake_argc, fake_argv);
 
@@ -127,7 +127,7 @@ static void invalid_dynamic_in_simple_test(void)
 	igt_exit();
 }
 
-static void invalid_fixture_in_fixture(void)
+__noreturn static void invalid_fixture_in_fixture(void)
 {
 	igt_subtest_init(fake_argc, fake_argv);
 
@@ -139,7 +139,7 @@ static void invalid_fixture_in_fixture(void)
 	igt_exit();
 }
 
-static void invalid_subtest_in_subtest(void)
+__noreturn static void invalid_subtest_in_subtest(void)
 {
 	igt_subtest_init(fake_argc, fake_argv);
 
@@ -151,7 +151,7 @@ static void invalid_subtest_in_subtest(void)
 	igt_exit();
 }
 
-static void invalid_top_level_dynamic(void)
+__noreturn static void invalid_top_level_dynamic(void)
 {
 	igt_subtest_init(fake_argc, fake_argv);
 
@@ -161,7 +161,7 @@ static void invalid_top_level_dynamic(void)
 	igt_exit();
 }
 
-static void invalid_dynamic_in_regular_subtest(void)
+__noreturn static void invalid_dynamic_in_regular_subtest(void)
 {
 	igt_subtest_init(fake_argc, fake_argv);
 
@@ -173,7 +173,7 @@ static void invalid_dynamic_in_regular_subtest(void)
 	igt_exit();
 }
 
-static void invalid_fixture_in_subtest(void)
+__noreturn static void invalid_fixture_in_subtest(void)
 {
 	igt_subtest_init(fake_argc, fake_argv);
 
@@ -185,7 +185,7 @@ static void invalid_fixture_in_subtest(void)
 	igt_exit();
 }
 
-static void invalid_top_level_skip(void)
+__noreturn static void invalid_top_level_skip(void)
 {
 	igt_subtest_init(fake_argc, fake_argv);
 
@@ -194,7 +194,7 @@ static void invalid_top_level_skip(void)
 	igt_exit();
 }
 
-static void invalid_top_level_assert(void)
+__noreturn static void invalid_top_level_assert(void)
 {
 	igt_subtest_init(fake_argc, fake_argv);
 
@@ -203,7 +203,7 @@ static void invalid_top_level_assert(void)
 	igt_exit();
 }
 
-static void invalid_dynamic_in_dynamic(void)
+__noreturn static void invalid_dynamic_in_dynamic(void)
 {
 	igt_subtest_init(fake_argc, fake_argv);
 

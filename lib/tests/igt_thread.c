@@ -49,7 +49,8 @@ static void *require_thread(void *data)
 	return NULL;
 }
 
-static void one_subtest_fail(void) {
+__noreturn static void one_subtest_fail(void)
+{
 	igt_subtest_init(fake_argc, fake_argv);
 
 	igt_subtest("subtest-a") {
@@ -67,7 +68,8 @@ static void one_subtest_fail(void) {
 	igt_exit();
 }
 
-static void one_dynamic_fail(void) {
+__noreturn static void one_dynamic_fail(void)
+{
 	igt_subtest_init(fake_argc, fake_argv);
 
 	igt_subtest_with_dynamic("dynamic-container") {
@@ -87,7 +89,7 @@ static void one_dynamic_fail(void) {
 	igt_exit();
 }
 
-static void simple_success(void) {
+__noreturn static void simple_success(void) {
 	pthread_t thread;
 
 	igt_simple_init(fake_argc, fake_argv);
@@ -98,7 +100,8 @@ static void simple_success(void) {
 	igt_exit();
 }
 
-static void simple_failure(void) {
+__noreturn static void simple_failure(void)
+{
 	pthread_t thread;
 
 	igt_simple_init(fake_argc, fake_argv);
@@ -109,7 +112,8 @@ static void simple_failure(void) {
 	igt_exit();
 }
 
-static void require_non_main_thread(void) {
+__noreturn static void require_non_main_thread(void)
+{
 	pthread_t thread;
 
 	igt_simple_init(fake_argc, fake_argv);

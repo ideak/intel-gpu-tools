@@ -542,7 +542,7 @@ int update_display(bool probe)
 
 #define dump_resource(res) if (res) dump_##res()
 
-static void __attribute__((noreturn)) cleanup_and_exit(int ret)
+__noreturn static void cleanup_and_exit(int ret)
 {
 	close(drm_fd);
 	exit(ret);

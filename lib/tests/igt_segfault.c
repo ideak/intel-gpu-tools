@@ -54,7 +54,7 @@ static void crashme(void)
 	raise(SIGSEGV);
 }
 
-static void fake_test(void)
+__noreturn static void fake_test(void)
 {
 	char prog[] = "test";
 	char *fake_argv[] = { prog };

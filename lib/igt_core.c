@@ -1376,8 +1376,7 @@ bool __igt_enter_dynamic_container(void)
 	return true;
 }
 
-static void exit_subtest(const char *) __attribute__((noreturn));
-static void exit_subtest(const char *result)
+__noreturn static void exit_subtest(const char *result)
 {
 	struct timespec now;
 	const char *subtest_text = in_dynamic_subtest ? "Dynamic subtest" : "Subtest";
@@ -1610,7 +1609,7 @@ void igt_fail(int exitcode)
  * Since out test runner (piglit) does support fatal test exit codes, we
  * implement the default behaviour by waiting endlessly.
  */
-void  __attribute__((noreturn)) igt_fatal_error(void)
+void igt_fatal_error(void)
 {
 	if (igt_check_boolean_env_var("IGT_REBOOT_ON_FATAL_ERROR", false)) {
 		igt_warn("FATAL ERROR - REBOOTING\n");
@@ -2825,7 +2824,7 @@ out:
 }
 
 static const char *timeout_op;
-static void __attribute__((noreturn)) igt_alarm_handler(int signal)
+__noreturn static void igt_alarm_handler(int signal)
 {
 	if (timeout_op)
 		igt_info("Timed out: %s\n", timeout_op);

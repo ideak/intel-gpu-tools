@@ -278,7 +278,7 @@ static void *thread_clear(void *data)
 
 static jmp_buf sigjmp;
 
-static void sigprobe(int sig)
+__noreturn static void sigprobe(int sig)
 {
 	longjmp(sigjmp, sig);
 }

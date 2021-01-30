@@ -230,14 +230,14 @@ static void accuracy(data_t *data, int fd, int nchildren)
 	int n;
 
 	memset(&vbl, 0, sizeof(vbl));
-	vbl.request.type = DRM_VBLANK_RELATIVE;
+	vbl.request.type = _DRM_VBLANK_RELATIVE;
 	vbl.request.type |= pipe_id_flag;
 	vbl.request.sequence = 1;
 	igt_assert_eq(wait_vblank(fd, &vbl), 0);
 
 	target = vbl.reply.sequence + total;
 	for (n = 0; n < total; n++) {
-		vbl.request.type = DRM_VBLANK_RELATIVE;
+		vbl.request.type = _DRM_VBLANK_RELATIVE;
 		vbl.request.type |= pipe_id_flag;
 		vbl.request.sequence = 1;
 		igt_assert_eq(wait_vblank(fd, &vbl), 0);
@@ -247,7 +247,7 @@ static void accuracy(data_t *data, int fd, int nchildren)
 		vbl.request.sequence = target;
 		igt_assert_eq(wait_vblank(fd, &vbl), 0);
 	}
-	vbl.request.type = DRM_VBLANK_RELATIVE;
+	vbl.request.type = _DRM_VBLANK_RELATIVE;
 	vbl.request.type |= pipe_id_flag;
 	vbl.request.sequence = 0;
 	igt_assert_eq(wait_vblank(fd, &vbl), 0);
@@ -268,7 +268,7 @@ static void vblank_query(data_t *data, int fd, int nchildren)
 	unsigned long sq, count = 0;
 
 	memset(&vbl, 0, sizeof(vbl));
-	vbl.request.type = DRM_VBLANK_RELATIVE;
+	vbl.request.type = _DRM_VBLANK_RELATIVE;
 	vbl.request.type |= pipe_id_flag;
 	vbl.request.sequence = 0;
 	igt_assert_eq(wait_vblank(fd, &vbl), 0);
@@ -277,7 +277,7 @@ static void vblank_query(data_t *data, int fd, int nchildren)
 
 	clock_gettime(CLOCK_MONOTONIC, &start);
 	do {
-		vbl.request.type = DRM_VBLANK_RELATIVE;
+		vbl.request.type = _DRM_VBLANK_RELATIVE;
 		vbl.request.type |= pipe_id_flag;
 		vbl.request.sequence = 0;
 		igt_assert_eq(wait_vblank(fd, &vbl), 0);
@@ -297,7 +297,7 @@ static void vblank_wait(data_t *data, int fd, int nchildren)
 	unsigned long sq, count = 0;
 
 	memset(&vbl, 0, sizeof(vbl));
-	vbl.request.type = DRM_VBLANK_RELATIVE;
+	vbl.request.type = _DRM_VBLANK_RELATIVE;
 	vbl.request.type |= pipe_id_flag;
 	vbl.request.sequence = 0;
 	igt_assert_eq(wait_vblank(fd, &vbl), 0);
@@ -306,7 +306,7 @@ static void vblank_wait(data_t *data, int fd, int nchildren)
 
 	clock_gettime(CLOCK_MONOTONIC, &start);
 	do {
-		vbl.request.type = DRM_VBLANK_RELATIVE;
+		vbl.request.type = _DRM_VBLANK_RELATIVE;
 		vbl.request.type |= pipe_id_flag;
 		vbl.request.sequence = 1;
 		igt_assert_eq(wait_vblank(fd, &vbl), 0);
@@ -367,7 +367,7 @@ static void vblank_ts_cont(data_t *data, int fd, int nchildren)
 	if (data->flags & (MODESET | DPMS)) {
 		/* Attempting to do a vblank while disabled should return -EINVAL */
 		memset(&vbl, 0, sizeof(vbl));
-		vbl.request.type = DRM_VBLANK_RELATIVE;
+		vbl.request.type = _DRM_VBLANK_RELATIVE;
 		vbl.request.type |= kmstest_get_vbl_flag(data->pipe);
 		igt_assert_eq(wait_vblank(fd, &vbl), -EINVAL);
 	}
@@ -476,7 +476,7 @@ static void invalid_subtest(data_t *data, int fd)
 
 	/* First check all is well with a simple query */
 	memset(&vbl, 0, sizeof(vbl));
-	vbl.request.type = DRM_VBLANK_RELATIVE;
+	vbl.request.type = _DRM_VBLANK_RELATIVE;
 	igt_assert_eq(wait_vblank(fd, &vbl), 0);
 
 	valid_flags = (_DRM_VBLANK_TYPES_MASK |

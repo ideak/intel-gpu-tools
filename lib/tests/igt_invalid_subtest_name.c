@@ -29,7 +29,7 @@
 
 #include "igt_tests_common.h"
 
-static void invalid_subtest_name(void)
+__noreturn static void invalid_subtest_name(void)
 {
 	char prog[] = "igt_no_exit";
 	char *fake_argv[] = {prog};
@@ -44,7 +44,7 @@ static void invalid_subtest_name(void)
 	igt_exit();
 }
 
-static void nonexisting_subtest(void)
+__noreturn static void nonexisting_subtest(void)
 {
 	char prog[] = "igt_no_exit";
 	char arg1[] = "--run-subtest";

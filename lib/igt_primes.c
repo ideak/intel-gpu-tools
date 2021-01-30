@@ -64,19 +64,9 @@ static inline unsigned long __bit__(unsigned long nr)
 	return 1UL << (nr % BITS_PER_LONG);
 }
 
-static inline void set_bit(unsigned long nr, unsigned long *addr)
-{
-	addr[nr / BITS_PER_LONG] |= __bit__(nr);
-}
-
 static inline void clear_bit(unsigned long nr, unsigned long *addr)
 {
 	addr[nr / BITS_PER_LONG] &= ~__bit__(nr);
-}
-
-static inline bool test_bit(unsigned long nr, const unsigned long *addr)
-{
-	return addr[nr / BITS_PER_LONG] & __bit__(nr);
 }
 
 static unsigned long

@@ -448,11 +448,11 @@ plane_immutable_zpos(igt_display_t *display, igt_pipe_t *pipe,
 	for (int i = 0; i < n_planes - 1; i++) {
 		igt_plane_t *plane_lower, *plane_upper;
 
-		if (plane_ptr[i] != NULL)
-			plane_lower = plane_ptr[i];
-		else
+		if (plane_ptr[i] == NULL)
 			continue;
 
+		plane_lower = plane_ptr[i];
+		plane_upper = NULL;
 		while (i  < (n_planes - 1)) {
 			if (plane_ptr[i + 1] != NULL) {
 				plane_upper = plane_ptr[i + 1];
@@ -462,9 +462,11 @@ plane_immutable_zpos(igt_display_t *display, igt_pipe_t *pipe,
 				continue;
 			}
 		}
+		if (!plane_upper)
+			continue;
 
 		if ((plane_upper->type == DRM_PLANE_TYPE_CURSOR) ||
-			(plane_lower->type == DRM_PLANE_TYPE_CURSOR))
+		    (plane_lower->type == DRM_PLANE_TYPE_CURSOR))
 				continue;
 
 		igt_plane_set_position(plane_lower, 0, 0);

@@ -29,7 +29,7 @@
 
 #include "igt_tests_common.h"
 
-static void dynamic_subtest_in_normal_subtest(void)
+__noreturn static void dynamic_subtest_in_normal_subtest(void)
 {
 	char prog[] = "igt_no_exit";
 	char *fake_argv[] = {prog};
@@ -46,7 +46,7 @@ static void dynamic_subtest_in_normal_subtest(void)
 	igt_exit();
 }
 
-static void invalid_dynamic_subtest_name(void)
+__noreturn static void invalid_dynamic_subtest_name(void)
 {
 	char prog[] = "igt_no_exit";
 	char *fake_argv[] = {prog};
@@ -63,7 +63,7 @@ static void invalid_dynamic_subtest_name(void)
 	igt_exit();
 }
 
-static void dynamic_subtest_in_toplevel(void)
+__noreturn static void dynamic_subtest_in_toplevel(void)
 {
 	char prog[] = "igt_no_exit";
 	char *fake_argv[] = {prog};
@@ -78,7 +78,7 @@ static void dynamic_subtest_in_toplevel(void)
 	igt_exit();
 }
 
-static void subtest_itself_failing(void)
+__noreturn static void subtest_itself_failing(void)
 {
 	char prog[] = "igt_no_exit";
 	char *fake_argv[] = {prog};
@@ -93,7 +93,7 @@ static void subtest_itself_failing(void)
 	igt_exit();
 }
 
-static void subtest_itself_skipping(void)
+__noreturn static void subtest_itself_skipping(void)
 {
 	char prog[] = "igt_no_exit";
 	char *fake_argv[] = {prog};
@@ -108,7 +108,7 @@ static void subtest_itself_skipping(void)
 	igt_exit();
 }
 
-static void dynamic_subtest_failure_leads_to_fail(void)
+__noreturn static void dynamic_subtest_failure_leads_to_fail(void)
 {
 	char prog[] = "igt_no_exit";
 	char *fake_argv[] = {prog};
@@ -125,7 +125,7 @@ static void dynamic_subtest_failure_leads_to_fail(void)
 	igt_exit();
 }
 
-static void no_dynamic_subtests_entered_leads_to_skip(void)
+__noreturn static void no_dynamic_subtests_entered_leads_to_skip(void)
 {
 	char prog[] = "igt_no_exit";
 	char *fake_argv[] = {prog};

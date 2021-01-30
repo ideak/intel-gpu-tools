@@ -43,7 +43,7 @@ static int opt_handler(int option, int option_index, void *input)
 	return 0;
 }
 
-static void fake_test(void)
+__noreturn static void fake_test(void)
 {
 	char test_name[] = "test";
 	char *argv[] = { test_name };

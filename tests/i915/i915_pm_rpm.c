@@ -1483,7 +1483,7 @@ static void pci_d3_state_subtest(void)
 	}
 }
 
-static void __attribute__((noreturn)) stay_subtest(void)
+__noreturn static void stay_subtest(void)
 {
 	disable_all_screens_and_wait(&ms_data);
 

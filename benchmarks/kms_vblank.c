@@ -55,7 +55,7 @@ static int crtc0_active(int fd)
 	union drm_wait_vblank vbl;
 
 	memset(&vbl, 0, sizeof(vbl));
-	vbl.request.type = DRM_VBLANK_RELATIVE;
+	vbl.request.type = _DRM_VBLANK_RELATIVE;
 	return drmIoctl(fd, DRM_IOCTL_WAIT_VBLANK, &vbl) == 0;
 }
 
@@ -74,14 +74,14 @@ static void vblank_query(int fd, int busy)
 		drmIoctl(fd, DRM_IOCTL_WAIT_VBLANK, &vbl);
 	}
 
-	vbl.request.type = DRM_VBLANK_RELATIVE;
+	vbl.request.type = _DRM_VBLANK_RELATIVE;
 	vbl.request.sequence = 0;
 	drmIoctl(fd, DRM_IOCTL_WAIT_VBLANK, &vbl);
 	seq = vbl.reply.sequence;
 
 	clock_gettime(CLOCK_MONOTONIC, &start);
 	do {
-		vbl.request.type = DRM_VBLANK_RELATIVE;
+		vbl.request.type = _DRM_VBLANK_RELATIVE;
 		vbl.request.sequence = 0;
 		drmIoctl(fd, DRM_IOCTL_WAIT_VBLANK, &vbl);
 		count++;
@@ -108,7 +108,7 @@ static void vblank_event(int fd, int busy)
 		drmIoctl(fd, DRM_IOCTL_WAIT_VBLANK, &vbl);
 	}
 
-	vbl.request.type = DRM_VBLANK_RELATIVE;
+	vbl.request.type = _DRM_VBLANK_RELATIVE;
 	vbl.request.sequence = 0;
 	drmIoctl(fd, DRM_IOCTL_WAIT_VBLANK, &vbl);
 	seq = vbl.reply.sequence;

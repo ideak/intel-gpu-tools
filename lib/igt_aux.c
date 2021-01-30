@@ -276,7 +276,7 @@ bool __igt_sigiter_continue(struct __igt_sigiter *iter, bool enable)
 
 static struct igt_helper_process signal_helper;
 long long int sig_stat;
-static void __attribute__((noreturn)) signal_helper_process(pid_t pid)
+__noreturn static void signal_helper_process(pid_t pid)
 {
 	/* Interrupt the parent process at 500Hz, just to be annoying */
 	while (1) {
@@ -391,7 +391,7 @@ void igt_resume_signal_helper(void)
 }
 
 static struct igt_helper_process shrink_helper;
-static void __attribute__((noreturn)) shrink_helper_process(int fd, pid_t pid)
+__noreturn static void shrink_helper_process(int fd, pid_t pid)
 {
 	while (1) {
 		igt_drop_caches_set(fd, DROP_SHRINK_ALL);
@@ -449,7 +449,7 @@ static void show_kernel_stack(pid_t pid)
 }
 
 static struct igt_helper_process hang_detector;
-static void __attribute__((noreturn))
+__noreturn static void
 hang_detector_process(int fd, pid_t pid, dev_t rdev)
 {
 	struct udev_monitor *mon =
@@ -496,7 +496,7 @@ hang_detector_process(int fd, pid_t pid, dev_t rdev)
 	exit(0);
 }
 
-static void sig_abort(int sig)
+__noreturn static void sig_abort(int sig)
 {
 	errno = 0; /* inside a signal, last errno reporting is confusing */
 	igt_assert(!"GPU hung");

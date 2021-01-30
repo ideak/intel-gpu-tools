@@ -380,8 +380,7 @@ void igt_force_gpu_reset(int drm_fd)
 
 /* GPU abusers */
 static struct igt_helper_process hang_helper;
-static void __attribute__((noreturn))
-hang_helper_process(pid_t pid, int fd)
+__noreturn static void hang_helper_process(pid_t pid, int fd)
 {
 	while (1) {
 		if (kill(pid, 0)) /* Parent has died, so must we. */

@@ -51,7 +51,7 @@ IGT_TEST_DESCRIPTION("Checks that the kernel reports EFAULT when trying to use"
 
 static jmp_buf jmp;
 
-static void __attribute__((noreturn)) sigtrap(int sig)
+__noreturn static void sigtrap(int sig)
 {
 	siglongjmp(jmp, sig);
 }

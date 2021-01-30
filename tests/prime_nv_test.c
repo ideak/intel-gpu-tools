@@ -190,7 +190,7 @@ static void test_nv_write_i915_gtt_mmap_read(void)
 /* test drm_intel_bo_map doesn't work properly,
    this tries to map the backing shmem fd, which doesn't exist
    for these objects */
-static void test_i915_import_cpu_mmap(void)
+__noreturn static void test_i915_import_cpu_mmap(void)
 {
 	drm_intel_bo *test_intel_bo;
 	int prime_fd;

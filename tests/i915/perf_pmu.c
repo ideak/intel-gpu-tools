@@ -1092,7 +1092,7 @@ event_wait(int gem_fd, const struct intel_execution_engine2 *e)
 			for (;;) {
 				union drm_wait_vblank vbl = { };
 
-				vbl.request.type = DRM_VBLANK_RELATIVE;
+				vbl.request.type = _DRM_VBLANK_RELATIVE;
 				vbl.request.type |= pipe_id_flag;
 				vbl.request.sequence = 1;
 				igt_assert_eq(wait_vblank(gem_fd, &vbl), 0);

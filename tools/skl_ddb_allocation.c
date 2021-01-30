@@ -140,15 +140,6 @@ static inline uint16_t skl_ddb_entry_size(const struct skl_ddb_entry *entry)
 	return entry->end - entry->start;
 }
 
-static inline bool skl_ddb_entry_equal(const struct skl_ddb_entry *e1,
-				       const struct skl_ddb_entry *e2)
-{
-	if (e1->start == e2->start && e1->end == e2->end)
-		return true;
-
-	return false;
-}
-
 struct skl_ddb_allocation {
 	struct skl_ddb_entry plane[I915_MAX_PIPES][I915_MAX_PLANES];
 	struct skl_ddb_entry cursor[I915_MAX_PIPES];

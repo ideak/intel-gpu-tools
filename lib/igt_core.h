@@ -79,6 +79,9 @@
 #define igt_assume(e) BUILD_BUG_ON_INVALID(e)
 #endif
 
+#define __noreturn __attribute__((noreturn))
+#define __maybe_unused __attribute__((unused))
+
 extern const char* __igt_test_description __attribute__((weak));
 extern bool __igt_plain_output;
 extern char *igt_frame_dump_path;
@@ -133,7 +136,7 @@ struct _GKeyFile *igt_load_igtrc(void);
 
 bool __igt_fixture(void);
 void __igt_fixture_complete(void);
-void __igt_fixture_end(void) __attribute__((noreturn));
+__noreturn void __igt_fixture_end(void);
 /**
  * igt_fixture:
  *
@@ -489,31 +492,29 @@ void igt_simple_init_parse_opts(int *argc, char **argv,
 	__attribute__((constructor)) \
 	static void igt_tokencat(__igt_constructor_l, __LINE__)(void)
 
-__attribute__((format(printf, 1, 2)))
-void igt_skip(const char *f, ...) __attribute__((noreturn));
-__attribute__((format(printf, 5, 6)))
+__noreturn __attribute__((format(printf, 1, 2)))
+void igt_skip(const char *f, ...);
+__noreturn __attribute__((format(printf, 5, 6)))
 void __igt_skip_check(const char *file, const int line,
 		      const char *func, const char *check,
-		      const char *format, ...) __attribute__((noreturn));
+		      const char *format, ...);
 #define igt_skip_check(E, F...) \
 	__igt_skip_check(__FILE__, __LINE__, __func__, E, F)
 void igt_success(void);
 
 bool igt_can_fail(void);
 
-void igt_fail(int exitcode) __attribute__((noreturn));
-__attribute__((format(printf, 6, 7)))
+__noreturn void igt_fail(int exitcode);
+__noreturn __attribute__((format(printf, 6, 7)))
 void __igt_fail_assert(const char *domain, const char *file,
 		       const int line, const char *func, const char *assertion,
-		       const char *format, ...)
-	__attribute__((noreturn));
-__attribute__((format(printf, 6, 7)))
-void __igt_abort(const char *domain, const char *file, const int line,
-		 const char *func, const char *expression,
-		 const char *f, ...)
-	__attribute__((noreturn));
-void igt_exit(void) __attribute__((noreturn));
-void igt_fatal_error(void) __attribute__((noreturn));
+		       const char *format, ...);
+__noreturn __attribute__((format(printf, 6, 7)))
+void __igt_abort(const char *domain, const char *file,
+		 const int line, const char *func, const char *expression,
+		 const char *f, ...);
+__noreturn void igt_exit(void);
+__noreturn void igt_fatal_error(void);
 
 /**
  * igt_ignore_warn:

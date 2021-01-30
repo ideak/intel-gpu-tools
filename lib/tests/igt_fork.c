@@ -38,7 +38,7 @@ char test[] = "test";
 char *fake_argv[] = { test };
 int fake_argc = ARRAY_SIZE(fake_argv);
 
-static void igt_fork_vs_skip(void)
+__noreturn static void igt_fork_vs_skip(void)
 {
 	igt_simple_init(fake_argc, fake_argv);
 
@@ -51,7 +51,7 @@ static void igt_fork_vs_skip(void)
 	igt_exit();
 }
 
-static void igt_fork_vs_assert(void)
+__noreturn static void igt_fork_vs_assert(void)
 {
 	igt_simple_init(fake_argc, fake_argv);
 
@@ -64,7 +64,7 @@ static void igt_fork_vs_assert(void)
 	igt_exit();
 }
 
-static void igt_fork_leak(void)
+__noreturn static void igt_fork_leak(void)
 {
 	igt_simple_init(fake_argc, fake_argv);
 
@@ -75,7 +75,7 @@ static void igt_fork_leak(void)
 	igt_exit();
 }
 
-static void plain_fork_leak(void)
+__noreturn static void plain_fork_leak(void)
 {
 	int pid;
 
@@ -93,7 +93,7 @@ static void plain_fork_leak(void)
 	igt_exit();
 }
 
-static void igt_fork_timeout_leak(void)
+__noreturn static void igt_fork_timeout_leak(void)
 {
 	igt_simple_init(fake_argc, fake_argv);
 
@@ -106,7 +106,7 @@ static void igt_fork_timeout_leak(void)
 	igt_exit();
 }
 
-static void subtest_leak(void)
+__noreturn static void subtest_leak(void)
 {
 	pid_t *children =
 		mmap(0, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);

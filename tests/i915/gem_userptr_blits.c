@@ -55,8 +55,6 @@
 #include <pthread.h>
 #include <time.h>
 
-#include <linux/memfd.h>
-
 #include "drm.h"
 #include "i915_drm.h"
 
@@ -1550,7 +1548,8 @@ static void test_readonly(int i915)
 }
 
 static jmp_buf sigjmp;
-static void sigjmp_handler(int sig)
+
+__noreturn static void sigjmp_handler(int sig)
 {
 	siglongjmp(sigjmp, sig);
 }
