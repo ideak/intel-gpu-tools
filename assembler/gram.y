@@ -36,6 +36,8 @@
 #include "brw_eu.h"
 #include "gen8_instruction.h"
 
+#pragma GCC diagnostic ignored "-Wformat-nonliteral"
+
 #define DEFAULT_EXECSIZE (ffs(program_defaults.execute_size) - 1)
 #define DEFAULT_DSTREGION -1
 

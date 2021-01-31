@@ -46,7 +46,7 @@ extern int errors;
 #define WARN_ALL	(1 << 31)
 extern unsigned int warning_flags;
 
-extern char *input_filename;
+extern const char *input_filename;
 
 extern struct brw_context genasm_context;
 extern struct brw_compile genasm_compile;

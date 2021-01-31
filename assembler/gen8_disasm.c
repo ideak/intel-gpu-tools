@@ -31,6 +31,8 @@
 #include "brw_defines.h"
 #include "gen8_instruction.h"
 
+#pragma GCC diagnostic ignored "-Wformat-nonliteral"
+
 static const struct opcode_desc *m_opcode = opcode_descs;
 
 static const char *const m_conditional_modifier[16] = {

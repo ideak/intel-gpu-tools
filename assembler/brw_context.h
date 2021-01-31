@@ -62,7 +62,7 @@ brw_init_context(struct brw_context *brw, int gen);
 
 /* brw_disasm.c */
 struct opcode_desc {
-    char    *name;
+    const char    *name;
     int	    nsrc;
     int	    ndst;
 };

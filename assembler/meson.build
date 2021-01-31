@@ -18,6 +18,7 @@ assembler_warnflags = [
 	'-Wno-old-style-definition',
 	'-Wno-redundant-decls',
 	'-Wno-shadow',
+	'-Wno-incompatible-pointer-types-discards-qualifiers',
 ]
 assembler_args = []
 foreach flag : assembler_warnflags

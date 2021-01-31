@@ -7,7 +7,7 @@
 
 #include "string.h"
 int saved_state = 0;
-extern char *input_filename;
+extern const char *input_filename;
 
 /* Locations */
 int yycolumn = 1;

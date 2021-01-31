@@ -36,6 +36,8 @@ _CRTIMP int _vscprintf(const char *format, va_list argptr);
 
 #include "ralloc.h"
 
+#pragma GCC diagnostic ignored "-Wformat-nonliteral"
+
 #ifndef va_copy
 #ifdef __va_copy
 #define va_copy(dest, src) __va_copy((dest), (src))
