@@ -484,6 +484,94 @@ static void open_vm(int fd)
 	igt_assert_eq(intel_allocator_close(ahnd[n-1]), true);
 }
 
+/* Simple execbuf which uses allocator, non-fork mode */
+static void execbuf_with_allocator(int fd)
+{
+	struct drm_i915_gem_execbuffer2 execbuf;
+	struct drm_i915_gem_exec_object2 object[3];
+	uint64_t ahnd, sz = 4096, gtt_size;
+	unsigned int flags = EXEC_OBJECT_PINNED;
+	uint32_t *ptr, batch[32], copied;
+	int gen = intel_gen(intel_get_drm_devid(fd));
+	int i;
+	const uint32_t magic = 0x900df00d;
+
+	igt_require(gem_uses_full_ppgtt(fd));
+
+	gtt_size = gem_aperture_size(fd);
+	if ((gtt_size - 1) >> 32)
+		flags |= EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+
+	ahnd = intel_allocator_open(fd, 0, INTEL_ALLOCATOR_SIMPLE);
+
+	memset(object, 0, sizeof(object));
+
+	/* i == 0 (src), i == 1 (dst), i == 2 (batch) */
+	for (i = 0; i < ARRAY_SIZE(object); i++) {
+		uint64_t offset;
+
+		object[i].handle = gem_create(fd, sz);
+		offset = intel_allocator_alloc(ahnd, object[i].handle, sz, 0);
+		object[i].offset = CANONICAL(offset);
+
+		object[i].flags = flags;
+		if (i == 1)
+			object[i].flags |= EXEC_OBJECT_WRITE;
+	}
+
+	/* Prepare src data */
+	ptr = gem_mmap__device_coherent(fd, object[0].handle, 0, sz, PROT_WRITE);
+	ptr[0] = magic;
+	gem_munmap(ptr, sz);
+
+	/* Blit src -> dst */
+	i = 0;
+	batch[i++] = XY_SRC_COPY_BLT_CMD |
+		  XY_SRC_COPY_BLT_WRITE_ALPHA |
+		  XY_SRC_COPY_BLT_WRITE_RGB;
+	if (gen >= 8)
+		batch[i - 1] |= 8;
+	else
+		batch[i - 1] |= 6;
+
+	batch[i++] = (3 << 24) | (0xcc << 16) | 4;
+	batch[i++] = 0;
+	batch[i++] = (1 << 16) | 4;
+	batch[i++] = object[1].offset;
+	if (gen >= 8)
+		batch[i++] = object[1].offset >> 32;
+	batch[i++] = 0;
+	batch[i++] = 4;
+	batch[i++] = object[0].offset;
+	if (gen >= 8)
+		batch[i++] = object[0].offset >> 32;
+	batch[i++] = MI_BATCH_BUFFER_END;
+	batch[i++] = MI_NOOP;
+
+	gem_write(fd, object[2].handle, 0, batch, i * sizeof(batch[0]));
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffers_ptr = to_user_pointer(object);
+	execbuf.buffer_count = 3;
+	if (gen >= 6)
+		execbuf.flags = I915_EXEC_BLT;
+	gem_execbuf(fd, &execbuf);
+	gem_sync(fd, object[1].handle);
+
+	/* Check dst data */
+	ptr = gem_mmap__device_coherent(fd, object[1].handle, 0, sz, PROT_READ);
+	copied = ptr[0];
+	gem_munmap(ptr, sz);
+
+	for (i = 0; i < ARRAY_SIZE(object); i++) {
+		igt_assert(intel_allocator_free(ahnd, object[i].handle));
+		gem_close(fd, object[i].handle);
+	}
+
+	igt_assert(copied == magic);
+	igt_assert(intel_allocator_close(ahnd) == true);
+}
+
 struct allocators {
 	const char *name;
 	uint8_t type;
@@ -567,6 +655,9 @@ igt_main
 
 	igt_subtest_f("open-vm")
 		open_vm(fd);
+
+	igt_subtest_f("execbuf-with-allocator")
+		execbuf_with_allocator(fd);
 
 	igt_fixture
 		close(fd);
