@@ -1933,6 +1933,7 @@ print_clients_header(struct clients *clients, int lines,
 }
 
 static bool numeric_clients;
+static bool filter_idle;
 
 static int
 print_client(struct client *c, struct engines *engines, double t, int lines,
@@ -1942,6 +1943,9 @@ print_client(struct client *c, struct engines *engines, double t, int lines,
 	unsigned int i;
 
 	if (output_mode == INTERACTIVE) {
+		if (filter_idle && !c->total_runtime)
+			return lines;
+
 		lines++;
 
 		printf("%6u %17s ", c->pid, c->print_name);
@@ -2117,6 +2121,9 @@ static void process_stdin(unsigned int timeout_us)
 			break;
 		case '1':
 			class_view ^= true;
+			break;
+		case 'i':
+			filter_idle ^= true;
 			break;
 		case 'n':
 			numeric_clients ^= true;
