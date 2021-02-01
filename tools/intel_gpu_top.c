@@ -1461,6 +1461,41 @@ static bool print_groups(struct cnt_group **groups)
 	return print_data;
 }
 
+static int __attribute__ ((format(__printf__, 6, 7)))
+print_header_token(const char *cont, int lines, int con_w, int con_h, int *rem,
+		   const char *fmt, ...)
+{
+	const char *indent = "\n   ";
+	char buf[256];
+	va_list args;
+	int ret;
+
+	if (lines >= con_h)
+		return lines;
+
+	va_start(args, fmt);
+	ret = vsnprintf(buf, sizeof(buf), fmt, args);
+	assert(ret < sizeof(buf));
+	va_end(args);
+
+	ret = (cont ? strlen(cont) : 0) + strlen(buf);
+	*rem -= ret;
+	if (*rem < 0) {
+		if (++lines >= con_h)
+			return lines;
+
+		*rem = con_w - ret - strlen(indent);
+		cont = indent;
+	}
+
+	if (cont)
+		ret = printf("%s%s", cont, buf);
+	else
+		ret = printf("%s", buf);
+
+	return lines;
+}
+
 static const char *header_msg;
 
 static int
@@ -1540,22 +1575,42 @@ print_header(const struct igt_device_card *card,
 	*consumed = print_groups(groups);
 
 	if (output_mode == INTERACTIVE) {
+		int rem = con_w;
+
 		printf("\033[H\033[J");
 
-		if (lines++ < con_h)
-			printf("intel-gpu-top: %s @ %s\n",
-			       codename, card->card);
-		if (lines++ < con_h) {
-			printf("%s/%s MHz; %s%% RC6; ",
-			       freq_items[1].buf, freq_items[0].buf,
-			       rc6_items[0].buf);
-			if (engines->r_gpu.present) {
-				printf("%s/%s W; ",
-				       power_items[0].buf,
-				       power_items[1].buf);
-			}
-			printf("%s irqs/s\n", irq_items[0].buf);
+		lines = print_header_token(NULL, lines, con_w, con_h, &rem,
+					   "intel-gpu-top:");
+
+		lines = print_header_token(" ", lines, con_w, con_h, &rem,
+					   "%s", codename);
+
+		lines = print_header_token(" @ ", lines, con_w, con_h, &rem,
+					   "%s", card->card);
+
+		lines = print_header_token(" - ", lines, con_w, con_h, &rem,
+					   "%s/%s MHz",
+					   freq_items[1].buf,
+					   freq_items[0].buf);
+
+		lines = print_header_token("; ", lines, con_w, con_h, &rem,
+					   "%s%% RC6",
+					   rc6_items[0].buf);
+
+		if (engines->r_gpu.present) {
+			lines = print_header_token("; ", lines, con_w, con_h,
+						   &rem,
+						   "%s/%s W",
+						   power_items[0].buf,
+						   power_items[1].buf);
 		}
+
+		lines = print_header_token("; ", lines, con_w, con_h, &rem,
+					   "%s irqs/s",
+					   irq_items[0].buf);
+
+		if (lines++ < con_h)
+			printf("\n");
 
 		if (lines++ < con_h) {
 			if (header_msg) {
