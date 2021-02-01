@@ -303,10 +303,8 @@ static unsigned long recycle_client(int i915, int clients)
 	return client;
 }
 
-static void recycle(int i915, int clients)
+static void recycle(int i915, int clients, int nchildren)
 {
-	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
-
 	/*
 	 * As we open and close clients, we do not expect to reuse old ids,
 	 * i.e. we use a cyclic ida. This reduces the likelihood of userspace
@@ -315,7 +313,7 @@ static void recycle(int i915, int clients)
 	 */
 	igt_assert(my_id(clients, getpid()));
 
-	igt_fork(child, 2 * ncpus) {
+	igt_fork(child, nchildren) {
 		unsigned long client, last;
 
 		/* Reopen the directory fd for each client */
@@ -1044,7 +1042,10 @@ igt_main
 		create(i915, clients);
 
 	igt_subtest("recycle")
-		recycle(i915, clients);
+		recycle(i915, clients, 1);
+
+	igt_subtest("recycle-many")
+		recycle(i915, clients, 2 * sysconf(_SC_NPROCESSORS_ONLN));
 
 	igt_subtest_group
 		test_busy(i915, clients);
