@@ -174,9 +174,12 @@ static void test_flip_to_scaled(data_t *data, uint32_t index, enum pipe pipe,
 	for (int i = 0; i < output->config.connector->count_modes; i++) {
 		if (output->config.connector->modes[i].hdisplay == data->attemptmodewidth &&
 		   output->config.connector->modes[i].vdisplay == data->attemptmodeheight) {
+			if (modetoset &&
+			    modetoset->vrefresh < output->config.connector->modes[i].vrefresh)
+				continue;
+
 			modetoset = &output->config.connector->modes[i];
-			break;
-		   }
+		}
 	}
 
 	if (!modetoset)
