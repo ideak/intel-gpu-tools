@@ -209,6 +209,36 @@ static void simple_bb(struct buf_ops *bops, bool use_context)
 	intel_bb_destroy(ibb);
 }
 
+static void bb_with_allocator(struct buf_ops *bops)
+{
+	int i915 = buf_ops_get_fd(bops);
+	struct intel_bb *ibb;
+	struct intel_buf *src, *dst;
+	uint32_t ctx = 0;
+
+	igt_require(gem_uses_full_ppgtt(i915));
+
+	ibb = intel_bb_create_with_allocator(i915, ctx, PAGE_SIZE,
+					     INTEL_ALLOCATOR_SIMPLE);
+	if (debug_bb)
+		intel_bb_set_debug(ibb, true);
+
+	src = intel_buf_create(bops, 4096/32, 32, 8, 0, I915_TILING_NONE,
+			       I915_COMPRESSION_NONE);
+	dst = intel_buf_create(bops, 4096/32, 32, 8, 0, I915_TILING_NONE,
+			       I915_COMPRESSION_NONE);
+
+	intel_bb_add_intel_buf(ibb, src, false);
+	intel_bb_add_intel_buf(ibb, dst, true);
+	intel_bb_copy_intel_buf(ibb, dst, src, 4096);
+	intel_bb_remove_intel_buf(ibb, src);
+	intel_bb_remove_intel_buf(ibb, dst);
+
+	intel_buf_destroy(src);
+	intel_buf_destroy(dst);
+	intel_bb_destroy(ibb);
+}
+
 /*
  * Make sure we lead to realloc in the intel_bb.
  */
@@ -1420,6 +1450,9 @@ igt_main_args("dpib", NULL, help_str, opt_handler, NULL)
 
 	igt_subtest("simple-bb-ctx")
 		simple_bb(bops, true);
+
+	igt_subtest("bb-with-allocator")
+		bb_with_allocator(bops);
 
 	igt_subtest("lot-of-buffers")
 		lot_of_buffers(bops);
