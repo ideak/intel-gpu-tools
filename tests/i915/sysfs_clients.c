@@ -237,7 +237,7 @@ static const char *find_client(int clients, pid_t pid, char *buf)
 	DIR *dir = fdopendir(dup(clients));
 
 	/* Reading a dir as it changes does not appear to be stable, SEP */
-	for (int pass = 0; pass < 3; pass++) {
+	for (int pass = 0; pass < 5; pass++) {
 		struct dirent *de;
 
 		rewinddir(dir);
@@ -254,6 +254,7 @@ static const char *find_client(int clients, pid_t pid, char *buf)
 			strncpy(buf, de->d_name, BUFSZ);
 			goto out;
 		}
+		usleep(100);
 	}
 	*buf = '\0';
 out:
