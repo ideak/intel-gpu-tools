@@ -75,6 +75,7 @@ struct igt_list_head {
 void IGT_INIT_LIST_HEAD(struct igt_list_head *head);
 void igt_list_add(struct igt_list_head *elem, struct igt_list_head *head);
 void igt_list_del(struct igt_list_head *elem);
+void igt_list_del_init(struct igt_list_head *elem);
 void igt_list_move(struct igt_list_head *elem, struct igt_list_head *list);
 void igt_list_move_tail(struct igt_list_head *elem, struct igt_list_head *list);
 int igt_list_length(const struct igt_list_head *head);

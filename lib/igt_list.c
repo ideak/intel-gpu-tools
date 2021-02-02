@@ -46,6 +46,12 @@ void igt_list_del(struct igt_list_head *elem)
 	elem->prev = NULL;
 }
 
+void igt_list_del_init(struct igt_list_head *elem)
+{
+	igt_list_del(elem);
+	IGT_INIT_LIST_HEAD(elem);
+}
+
 void igt_list_move(struct igt_list_head *elem, struct igt_list_head *list)
 {
 	igt_list_del(elem);
