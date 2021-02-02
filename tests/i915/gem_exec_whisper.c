@@ -194,7 +194,7 @@ static void whisper(int fd, unsigned engine, unsigned flags)
 	int nchild;
 
 	if (flags & PRIORITY) {
-		igt_require(gem_scheduler_has_priority(fd));
+		igt_require(gem_scheduler_enabled(fd));
 		igt_require(gem_scheduler_has_ctx_priority(fd));
 	}
 
