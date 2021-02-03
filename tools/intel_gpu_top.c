@@ -959,6 +959,24 @@ static int client_id_cmp(const void *_a, const void *_b)
 	return (int)b->id - a->id;
 }
 
+static int client_pid_cmp(const void *_a, const void *_b)
+{
+	const struct client *a = _a;
+	const struct client *b = _b;
+	int pid_a, pid_b;
+
+	pid_a = a->status == ALIVE ? a->pid : INT_MAX;
+	pid_b = b->status == ALIVE ? b->pid : INT_MAX;
+
+	pid_b -= pid_a;
+	if (pid_b > 0)
+		return -1;
+	if (pid_b < 0)
+		return 1;
+
+	return (int)a->id - b->id;
+}
+
 static int (*client_cmp)(const void *, const void *) = client_last_cmp;
 
 static void sort_clients(struct clients *clients)
@@ -2094,21 +2112,22 @@ static void interactive_stdin(void)
 
 static void select_client_sort(void)
 {
+	struct {
+		int (*cmp)(const void *, const void *);
+		const char *msg;
+	} cmp[] = {
+		{ client_last_cmp, "Sorting clients by current GPU usage." },
+		{ client_total_cmp, "Sorting clients by accummulated GPU usage." },
+		{ client_pid_cmp, "Sorting clients by pid." },
+		{ client_id_cmp, "Sorting clients by sysfs id." },
+	};
 	static unsigned int client_sort;
 
-	switch (++client_sort % 3) {
-	case 0:
-		client_cmp = client_last_cmp;
-		header_msg = "Sorting clients by current GPU usage.";
-		break;
-	case 1:
-		client_cmp = client_total_cmp;
-		header_msg = "Sorting clients by accummulated GPU usage.";
-		break;
-	case 2:
-		client_cmp = client_id_cmp;
-		header_msg = "Sorting clients by sysfs id.";
-	}
+	if (++client_sort >= ARRAY_SIZE(cmp))
+		client_sort = 0;
+
+	client_cmp = cmp[client_sort].cmp;
+	header_msg = cmp[client_sort].msg;
 }
 
 static void process_stdin(unsigned int timeout_us)

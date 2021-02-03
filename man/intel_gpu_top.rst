@@ -56,7 +56,7 @@ Supported keys:
     'q'    Exit from the tool.
     '1'    Toggle between aggregated engine class and physical engine mode.
     'n'    Toggle display of numeric client busyness overlay.
-    's'    Toggle between sort modes (runtime, total runtime, client id).
+    's'    Toggle between sort modes (runtime, total runtime, pid, client id).
     'i'    Toggle display of clients which used no GPU time.
 
 DEVICE SELECTION
