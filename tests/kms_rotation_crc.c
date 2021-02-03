@@ -201,10 +201,14 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 	/* create the pipe_crc object for this pipe */
 	igt_pipe_crc_free(data->pipe_crc);
 
-	igt_display_commit2(display, COMMIT_ATOMIC);
+	/* defer crtc cleanup + crtc active for later on amd - not valid
+	 * to enable CRTC without a plane active
+	 */
+	if (!is_amdgpu_device(data->gfx_fd))
+		igt_display_commit2(display, COMMIT_ATOMIC);
 	data->pipe_crc = igt_pipe_crc_new(data->gfx_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
 
-	if (start_crc)
+	if (!is_amdgpu_device(data->gfx_fd) && start_crc)
 		igt_pipe_crc_start(data->pipe_crc);
 }
 
@@ -289,10 +293,16 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 			igt_plane_set_position(plane, data->pos_x, data->pos_y);
 		igt_display_commit2(display, COMMIT_ATOMIC);
 
-		igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc,
-					 &data->crc_rect[data->output_crc_in_use][rect].flip_crc);
-
-		igt_remove_fb(data->gfx_fd, &data->fb_flip);
+		if (is_i915_device(data->gfx_fd)) {
+			igt_pipe_crc_get_current(
+				display->drm_fd, data->pipe_crc,
+				&data->crc_rect[data->output_crc_in_use][rect].flip_crc);
+			igt_remove_fb(data->gfx_fd, &data->fb_flip);
+		} else if (is_amdgpu_device(data->gfx_fd)) {
+			igt_pipe_crc_collect_crc(
+				data->pipe_crc,
+				&data->crc_rect[data->output_crc_in_use][rect].flip_crc);
+		}
 
 		/*
 		* Create a reference CRC for a software-rotated fb.
@@ -306,9 +316,14 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 			igt_plane_set_position(plane, data->pos_x, data->pos_y);
 		igt_display_commit2(display, COMMIT_ATOMIC);
 
-		igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc,
-					 &data->crc_rect[data->output_crc_in_use][rect].ref_crc);
-
+		if (is_i915_device(data->gfx_fd)) {
+			igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc,
+					&data->crc_rect[data->output_crc_in_use][rect].ref_crc);
+		} else if (is_amdgpu_device(data->gfx_fd)) {
+			igt_pipe_crc_collect_crc(data->pipe_crc,
+					&data->crc_rect[data->output_crc_in_use][rect].ref_crc);
+			igt_remove_fb(data->gfx_fd, &data->fb_flip);
+		}
 		data->crc_rect[data->output_crc_in_use][rect].valid = true;
 	}
 
@@ -366,7 +381,10 @@ static void test_single_case(data_t *data, enum pipe pipe,
 	igt_assert_eq(ret, 0);
 
 	/* Check CRC */
-	igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc, &crc_output);
+	if (is_i915_device(data->gfx_fd))
+		igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc, &crc_output);
+	else if (is_amdgpu_device(data->gfx_fd))
+		igt_pipe_crc_collect_crc(data->pipe_crc, &crc_output);
 	igt_assert_crc_equal(&data->crc_rect[data->output_crc_in_use][rect].ref_crc,
 			     &crc_output);
 
@@ -390,7 +408,10 @@ static void test_single_case(data_t *data, enum pipe pipe,
 			igt_assert_eq(ret, 0);
 		}
 		kmstest_wait_for_pageflip(data->gfx_fd);
-		igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc, &crc_output);
+		if (is_i915_device(data->gfx_fd))
+			igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc, &crc_output);
+		else if (is_amdgpu_device(data->gfx_fd))
+			igt_pipe_crc_collect_crc(data->pipe_crc, &crc_output);
 		igt_assert_crc_equal(&data->crc_rect[data->output_crc_in_use][rect].flip_crc,
 				     &crc_output);
 	}
@@ -425,6 +446,10 @@ static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_form
 	igt_output_t *output;
 	enum pipe pipe;
 	int pipe_count = 0, connected_outputs = 0;
+
+	if (is_amdgpu_device(data->gfx_fd))
+		igt_require(plane_type != DRM_PLANE_TYPE_OVERLAY &&
+					plane_type != DRM_PLANE_TYPE_CURSOR);
 
 	if (plane_type == DRM_PLANE_TYPE_CURSOR)
 		igt_require(display->has_cursor_plane);
@@ -466,7 +491,7 @@ static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_form
 		for (c = 0; c < num_rectangle_types; c++)
 			data->crc_rect[data->output_crc_in_use][c].valid = false;
 
-		if (IS_CHERRYVIEW(data->devid) && pipe != PIPE_B)
+		if (is_i915_device(data->gfx_fd) && IS_CHERRYVIEW(data->devid) && pipe != PIPE_B)
 			continue;
 
 		/* restricting the execution to 2 pipes to reduce execution time*/
@@ -488,8 +513,9 @@ static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_form
 				continue;
 
 			/* Only support partial covering primary plane on gen9+ */
-			if (plane_type == DRM_PLANE_TYPE_PRIMARY &&
-			    intel_gen(intel_get_drm_devid(data->gfx_fd)) < 9) {
+			if (is_amdgpu_device(data->gfx_fd) ||
+				(plane_type == DRM_PLANE_TYPE_PRIMARY &&
+			    intel_gen(intel_get_drm_devid(data->gfx_fd)) < 9)) {
 				if (i != rectangle)
 					continue;
 				else
@@ -519,7 +545,9 @@ static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_form
 						 data->override_fmt, test_bad_format);
 			}
 		}
-		igt_pipe_crc_stop(data->pipe_crc);
+		if (is_i915_device(data->gfx_fd)) {
+			igt_pipe_crc_stop(data->pipe_crc);
+		}
 	}
 }
 
@@ -897,9 +925,11 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 	int gen = 0;
 
 	igt_fixture {
-		data.gfx_fd = drm_open_driver_master(DRIVER_INTEL);
-		data.devid = intel_get_drm_devid(data.gfx_fd);
-		gen = intel_gen(data.devid);
+		data.gfx_fd = drm_open_driver_master(DRIVER_INTEL | DRIVER_AMDGPU);
+		if (is_i915_device(data.gfx_fd)) {
+			data.devid = intel_get_drm_devid(data.gfx_fd);
+			gen = intel_gen(data.devid);
+		}
 
 		kmstest_set_vt_graphics_mode();
 
@@ -914,9 +944,19 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 		igt_subtest_f("%s-rotation-%s",
 			      plane_test_str(subtest->plane),
 			      rot_test_str(subtest->rot)) {
-			igt_require(!(subtest->rot &
-				    (IGT_ROTATION_90 | IGT_ROTATION_270)) ||
-				    gen >= 9);
+			if (is_i915_device(data.gfx_fd)) {
+				igt_require(!(subtest->rot &
+					    (IGT_ROTATION_90 | IGT_ROTATION_270)) ||
+					    gen >= 9);
+			} else if (is_amdgpu_device(data.gfx_fd)) {
+				data.override_fmt = DRM_FORMAT_XRGB8888;
+				if (subtest->rot & (IGT_ROTATION_90 | IGT_ROTATION_270))
+					data.override_tiling = AMD_FMT_MOD |
+						AMD_FMT_MOD_SET(TILE, AMD_FMT_MOD_TILE_GFX9_64K_S) |
+						AMD_FMT_MOD_SET(TILE_VERSION, AMD_FMT_MOD_TILE_VER_GFX9);
+				else
+					data.override_tiling = LOCAL_DRM_FORMAT_MOD_NONE;
+			}
 			data.rotation = subtest->rot;
 			test_plane_rotation(&data, subtest->plane, false);
 		}

@@ -24,8 +24,20 @@
 #define IGT_AMD_H
 
 #include <stdint.h>
+#include "igt_fb.h"
 
 uint32_t igt_amd_create_bo(int fd, uint64_t size);
 void *igt_amd_mmap_bo(int fd, uint32_t handle, uint64_t size, int prot);
-
+unsigned int igt_amd_compute_offset(unsigned int* swizzle_pattern,
+				       unsigned int x, unsigned int y);
+unsigned int igt_amd_fb_get_blk_size_table_idx(unsigned int bpp);
+void igt_amd_fb_calculate_tile_dimension(unsigned int bpp,
+				       unsigned int *width, unsigned int *height);
+uint32_t igt_amd_fb_tiled_offset(unsigned int bpp, unsigned int x_input,
+				       unsigned int y_input, unsigned int width_input);
+void igt_amd_fb_to_tiled(struct igt_fb *dst, void *dst_buf, struct igt_fb *src,
+				       void *src_buf, unsigned int plane);
+void igt_amd_fb_convert_plane_to_tiled(struct igt_fb *dst, void *dst_buf,
+				       struct igt_fb *src, void *src_buf);
+bool igt_amd_is_tiled(uint64_t modifier);
 #endif /* IGT_AMD_H */

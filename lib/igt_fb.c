@@ -671,6 +671,17 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 		 * so the easiest way is to align the luma stride to 256.
 		 */
 		return ALIGN(min_stride, 256);
+	} else if (fb->modifier != LOCAL_DRM_FORMAT_MOD_NONE && is_amdgpu_device(fb->fd)) {
+		/*
+		 * For amdgpu device with tiling mode
+		 */
+		unsigned int tile_width, tile_height;
+
+		igt_amd_fb_calculate_tile_dimension(fb->plane_bpp[plane],
+				     &tile_width, &tile_height);
+		tile_width *= (fb->plane_bpp[plane] / 8);
+
+		return ALIGN(min_stride, tile_width);
 	} else if (is_gen12_ccs_cc_plane(fb, plane)) {
 		/* clear color always fixed to 64 bytes */
 		return 64;
@@ -711,6 +722,18 @@ static uint64_t calc_plane_size(struct igt_fb *fb, int plane)
 		size = roundup_power_of_two(size);
 
 		return size;
+	} else if (fb->modifier != LOCAL_DRM_FORMAT_MOD_NONE && is_amdgpu_device(fb->fd)) {
+		/*
+		 * For amdgpu device with tiling mode
+		 */
+		unsigned int tile_width, tile_height;
+
+		igt_amd_fb_calculate_tile_dimension(fb->plane_bpp[plane],
+				     &tile_width, &tile_height);
+		tile_height *= (fb->plane_bpp[plane] / 8);
+
+		return (uint64_t) fb->strides[plane] *
+			ALIGN(fb->plane_height[plane], tile_height);
 	} else if (is_gen12_ccs_plane(fb, plane)) {
 		/* The AUX CCS surface must be page aligned */
 		return (uint64_t)fb->strides[plane] *
@@ -2353,6 +2376,12 @@ static void free_linear_mapping(struct fb_blit_upload *blit)
 		vc4_fb_convert_plane_to_tiled(fb, map, &linear->fb, &linear->map);
 
 		munmap(map, fb->size);
+	} else if (igt_amd_is_tiled(fb->modifier)) {
+		void *map = igt_amd_mmap_bo(fd, fb->gem_handle, fb->size, PROT_WRITE);
+
+		igt_amd_fb_convert_plane_to_tiled(fb, map, &linear->fb, linear->map);
+
+		munmap(map, fb->size);
 	} else {
 		gem_munmap(linear->map, linear->fb.size);
 		gem_set_domain(fd, linear->fb.gem_handle,
@@ -2419,6 +2448,10 @@ static void setup_linear_mapping(struct fb_blit_upload *blit)
 		vc4_fb_convert_plane_from_tiled(&linear->fb, &linear->map, fb, map);
 
 		munmap(map, fb->size);
+	} else if (igt_amd_is_tiled(fb->modifier)) {
+		linear->map = igt_amd_mmap_bo(fd, linear->fb.gem_handle,
+					      linear->fb.size,
+					      PROT_READ | PROT_WRITE);
 	} else {
 		/* Copy fb content to linear BO */
 		gem_set_domain(fd, linear->fb.gem_handle,
@@ -3625,7 +3658,8 @@ cairo_surface_t *igt_get_cairo_surface(int fd, struct igt_fb *fb)
 		if (use_convert(fb))
 			create_cairo_surface__convert(fd, fb);
 		else if (use_blitter(fb) || use_enginecopy(fb) ||
-			 igt_vc4_is_tiled(fb->modifier))
+			 igt_vc4_is_tiled(fb->modifier) ||
+			 igt_amd_is_tiled(fb->modifier))
 			create_cairo_surface__gpu(fd, fb);
 		else
 			create_cairo_surface__gtt(fd, fb);
