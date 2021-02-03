@@ -899,71 +899,6 @@ read_client_sysfs(char *buf, int bufsize, const char *sysfs_root,
 	return __read_client_field(*client_root, field, buf, bufsize);
 }
 
-static void scan_clients(struct clients *clients)
-{
-	struct dirent *dent;
-	struct client *c;
-	unsigned int id;
-	int tmp;
-	DIR *d;
-
-	if (!clients)
-		return;
-
-	for_each_client(clients, c, tmp) {
-		assert(c->status != PROBE);
-		if (c->status == ALIVE)
-			c->status = PROBE;
-		else
-			break; /* Free block at the end of array. */
-	}
-
-	d = opendir(clients->sysfs_root);
-	if (!d)
-		return;
-
-	while ((dent = readdir(d)) != NULL) {
-		char name[24], pid[24];
-		int ret, root = -1, *pr;
-
-		if (dent->d_type != DT_DIR)
-			continue;
-		if (!isdigit(dent->d_name[0]))
-			continue;
-
-		id = atoi(dent->d_name);
-
-		c = find_client(clients, PROBE, id);
-
-		if (c)
-			pr = &c->sysfs_root;
-		else
-			pr = &root;
-
-		ret = read_client_sysfs(name, sizeof(name), clients->sysfs_root,
-					id, "name", pr);
-		ret |= read_client_sysfs(pid, sizeof(pid), clients->sysfs_root,
-					id, "pid", pr);
-		if (!ret) {
-			if (!c)
-				add_client(clients, id, atoi(pid), name, root);
-			else
-				update_client(c, atoi(pid), name);
-		} else if (c) {
-			c->status = PROBE; /* Will be deleted below. */
-		}
-	}
-
-	closedir(d);
-
-	for_each_client(clients, c, tmp) {
-		if (c->status == PROBE)
-			free_client(c);
-		else if (c->status == FREE)
-			break;
-	}
-}
-
 static int client_last_cmp(const void *_a, const void *_b)
 {
 	const struct client *a = _a;
@@ -1060,6 +995,72 @@ static void sort_clients(struct clients *clients)
 	}
 }
 
+static void scan_clients(struct clients *clients)
+{
+	struct dirent *dent;
+	struct client *c;
+	unsigned int id;
+	int tmp;
+	DIR *d;
+
+	if (!clients)
+		return;
+
+	for_each_client(clients, c, tmp) {
+		assert(c->status != PROBE);
+		if (c->status == ALIVE)
+			c->status = PROBE;
+		else
+			break; /* Free block at the end of array. */
+	}
+
+	d = opendir(clients->sysfs_root);
+	if (!d)
+		return;
+
+	while ((dent = readdir(d)) != NULL) {
+		char name[24], pid[24];
+		int ret, root = -1, *pr;
+
+		if (dent->d_type != DT_DIR)
+			continue;
+		if (!isdigit(dent->d_name[0]))
+			continue;
+
+		id = atoi(dent->d_name);
+
+		c = find_client(clients, PROBE, id);
+
+		if (c)
+			pr = &c->sysfs_root;
+		else
+			pr = &root;
+
+		ret = read_client_sysfs(name, sizeof(name), clients->sysfs_root,
+					id, "name", pr);
+		ret |= read_client_sysfs(pid, sizeof(pid), clients->sysfs_root,
+					id, "pid", pr);
+		if (!ret) {
+			if (!c)
+				add_client(clients, id, atoi(pid), name, root);
+			else
+				update_client(c, atoi(pid), name);
+		} else if (c) {
+			c->status = PROBE; /* Will be deleted below. */
+		}
+	}
+
+	closedir(d);
+
+	for_each_client(clients, c, tmp) {
+		if (c->status == PROBE)
+			free_client(c);
+		else if (c->status == FREE)
+			break;
+	}
+
+	sort_clients(clients);
+}
 
 static const char *bars[] = { " ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█" };
 
@@ -2305,7 +2306,6 @@ int main(int argc, char **argv)
 		t = (double)(engines->ts.cur - engines->ts.prev) / 1e9;
 
 		scan_clients(clients);
-		sort_clients(clients);
 
 		if (stop_top)
 			break;
