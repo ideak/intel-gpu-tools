@@ -1444,6 +1444,8 @@ static bool print_groups(struct cnt_group **groups)
 	return print_data;
 }
 
+static const char *header_msg;
+
 static int
 print_header(const struct igt_device_card *card,
 	     const char *codename,
@@ -1536,6 +1538,15 @@ print_header(const struct igt_device_card *card,
 				       power_items[1].buf);
 			}
 			printf("%s irqs/s\n", irq_items[0].buf);
+		}
+
+		if (lines++ < con_h) {
+			if (header_msg) {
+				printf(" >>> %s\n", header_msg);
+				header_msg = NULL;
+			} else {
+				printf("\n");
+			}
 		}
 	}
 
@@ -2088,12 +2099,15 @@ static void select_client_sort(void)
 	switch (++client_sort % 3) {
 	case 0:
 		client_cmp = client_last_cmp;
+		header_msg = "Sorting clients by current GPU usage.";
 		break;
 	case 1:
 		client_cmp = client_total_cmp;
+		header_msg = "Sorting clients by accummulated GPU usage.";
 		break;
 	case 2:
 		client_cmp = client_id_cmp;
+		header_msg = "Sorting clients by sysfs id.";
 	}
 }
 
@@ -2122,9 +2136,17 @@ static void process_stdin(unsigned int timeout_us)
 			break;
 		case '1':
 			class_view ^= true;
+			if (class_view)
+				header_msg = "Aggregating engine classes.";
+			else
+				header_msg = "Showing physical engines.";
 			break;
 		case 'i':
 			filter_idle ^= true;
+			if (filter_idle)
+				header_msg = "Hiding inactive clients.";
+			else
+				header_msg = "Showing inactive clients.";
 			break;
 		case 'n':
 			numeric_clients ^= true;
