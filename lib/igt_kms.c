@@ -4190,6 +4190,20 @@ void igt_output_set_writeback_fb(igt_output_t *output, struct igt_fb *fb)
 					  (ptrdiff_t)&output->writeback_out_fence_fd);
 }
 
+static int __igt_vblank_wait(int drm_fd, int crtc_offset, int count)
+{
+	drmVBlank wait_vbl;
+	uint32_t pipe_id_flag;
+
+	memset(&wait_vbl, 0, sizeof(wait_vbl));
+	pipe_id_flag = kmstest_get_vbl_flag(crtc_offset);
+
+	wait_vbl.request.type = DRM_VBLANK_RELATIVE | pipe_id_flag;
+	wait_vbl.request.sequence = count;
+
+	return drmWaitVBlank(drm_fd, &wait_vbl);
+}
+
 /**
  * igt_wait_for_vblank_count:
  * @drm_fd: A drm file descriptor
@@ -4209,17 +4223,7 @@ void igt_output_set_writeback_fb(igt_output_t *output, struct igt_fb *fb)
  */
 void igt_wait_for_vblank_count(int drm_fd, int crtc_offset, int count)
 {
-	drmVBlank wait_vbl;
-	uint32_t pipe_id_flag;
-
-	memset(&wait_vbl, 0, sizeof(wait_vbl));
-	pipe_id_flag = kmstest_get_vbl_flag(crtc_offset);
-
-	wait_vbl.request.type = DRM_VBLANK_RELATIVE;
-	wait_vbl.request.type |= pipe_id_flag;
-	wait_vbl.request.sequence = count;
-
-	igt_assert(drmWaitVBlank(drm_fd, &wait_vbl) == 0);
+	igt_assert(__igt_vblank_wait(drm_fd, crtc_offset, count) == 0);
 }
 
 /**
@@ -4233,7 +4237,7 @@ void igt_wait_for_vblank_count(int drm_fd, int crtc_offset, int count)
  */
 void igt_wait_for_vblank(int drm_fd, int crtc_offset)
 {
-	igt_wait_for_vblank_count(drm_fd, crtc_offset, 1);
+	igt_assert(__igt_vblank_wait(drm_fd, crtc_offset, 1) == 0);
 }
 
 /**
