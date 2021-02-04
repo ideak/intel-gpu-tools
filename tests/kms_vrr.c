@@ -170,7 +170,7 @@ static void set_vrr_on_pipe(data_t *data, enum pipe pipe, bool enabled)
 {
 	igt_pipe_set_prop_value(&data->display, pipe, IGT_CRTC_VRR_ENABLED,
 				enabled);
-	igt_display_commit_atomic(&data->display, 0, NULL);
+	igt_display_commit2(&data->display, COMMIT_ATOMIC);
 }
 
 /* Prepare the display for testing on the given pipe. */
@@ -208,22 +208,7 @@ static void prepare_test(data_t *data, igt_output_t *output, enum pipe pipe)
 	 */
 	igt_pipe_set_prop_value(&data->display, pipe, IGT_CRTC_VRR_ENABLED, 0);
 
-	igt_display_commit_atomic(&data->display,
-				  DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
-}
-
-/* Waits for the vblank interval. Returns the vblank timestamp in ns. */
-static uint64_t
-wait_for_vblank(data_t *data, enum pipe pipe)
-{
-	drmVBlank vbl = {};
-
-	vbl.request.type = kmstest_get_vbl_flag(pipe);
-	vbl.request.type |= DRM_VBLANK_RELATIVE | DRM_VBLANK_EVENT;
-	vbl.request.sequence = 1;
-	drmWaitVBlank(data->drm_fd, &vbl);
-
-	return get_kernel_event_ns(data, DRM_EVENT_VBLANK);
+	igt_display_commit2(&data->display, COMMIT_ATOMIC);
 }
 
 /* Performs an atomic non-blocking page-flip on a pipe. */
@@ -260,17 +245,18 @@ static uint32_t
 flip_and_measure(data_t *data, igt_output_t *output, enum pipe pipe,
 		 uint64_t rate_ns, uint64_t duration_ns)
 {
-	uint64_t start_ns, last_event_ns;
+	uint64_t start_ns, last_event_ns, target_ns;
 	uint32_t total_flip = 0, total_pass = 0;
 	bool front = false;
 	vtest_ns_t vtest_ns = get_test_rate_ns(data, output);
 
-	/* Align with the vblank region to speed up convergence. */
-	last_event_ns = wait_for_vblank(data, pipe);
-	start_ns = get_time_ns();
+	/* Align with the flip completion event to speed up convergence. */
+	do_flip(data, &data->fb0);
+	start_ns = last_event_ns = target_ns = get_kernel_event_ns(data,
+							DRM_EVENT_FLIP_COMPLETE);
 
 	for (;;) {
-		uint64_t now_ns, event_ns, wait_ns, target_ns;
+		uint64_t event_ns, wait_ns;
 		int64_t diff_ns;
 
 		front = !front;
@@ -291,14 +277,10 @@ flip_and_measure(data_t *data, igt_output_t *output, enum pipe pipe,
 		 * difference between 144Hz and 143Hz which should give this
 		 * enough accuracy for most use cases.
 		 */
-		if (rate_ns <= vtest_ns.min && rate_ns >= vtest_ns.max)
+		if ((rate_ns < vtest_ns.min) && (rate_ns >= vtest_ns.max))
 			diff_ns = rate_ns;
-		else if (rate_ns > vtest_ns.min)
-			diff_ns = vtest_ns.min;
-		else if (rate_ns < vtest_ns.max)
-			diff_ns = vtest_ns.max;
 		else
-			diff_ns = rate_ns;
+			diff_ns = vtest_ns.max;
 		diff_ns -= event_ns - last_event_ns;
 
 		if (llabs(diff_ns) < 50000ll)
@@ -307,24 +289,24 @@ flip_and_measure(data_t *data, igt_output_t *output, enum pipe pipe,
 		last_event_ns = event_ns;
 		total_flip += 1;
 
-		now_ns = get_time_ns();
-		if (now_ns - start_ns > duration_ns)
+		if (event_ns - start_ns > duration_ns)
 			break;
 
 		/*
 		 * Burn CPU until next timestamp, sleeping isn't accurate enough.
-		 * It's worth noting that the target timestamp is based on absolute
-		 * timestamp rather than a delta to avoid accumulation errors.
+		 * The target timestamp is based on the delta b/w event timestamps
+		 * and whatever the time left to reach the expected refresh rate.
 		 */
-		diff_ns = now_ns - start_ns;
+		diff_ns = event_ns - target_ns;
 		wait_ns = ((diff_ns + rate_ns - 1) / rate_ns) * rate_ns;
-		target_ns = start_ns + wait_ns - 10;
+		wait_ns -= diff_ns;
+		target_ns = event_ns + wait_ns;
 
-		while (get_time_ns() < target_ns);
+		while (get_time_ns() < target_ns - 10);
 	}
 
-	igt_info("Completed %u flips, %u were in threshold for %"PRIu64"ns.\n",
-		 total_flip, total_pass, rate_ns);
+	igt_info("Completed %u flips, %u were in threshold for (%llu Hz) %"PRIu64"ns.\n",
+		 total_flip, total_pass, (NSECS_PER_SEC/rate_ns), rate_ns);
 
 	return total_flip ? ((total_pass * 100) / total_flip) : 0;
 }
@@ -338,8 +320,8 @@ test_basic(data_t *data, enum pipe pipe, igt_output_t *output, uint32_t flags)
 	range_t range = get_vrr_range(data, output);
 	uint64_t rate = vtest_ns.mid;
 
-	igt_info("VRR Test execution on %s, PIPE_%s\n",
-		 output->name, kmstest_pipe_name(pipe));
+	igt_info("VRR Test execution on %s, PIPE_%s with VRR range: (%u-%u) Hz\n",
+		 output->name, kmstest_pipe_name(pipe), range.min, range.max);
 
 	prepare_test(data, output, pipe);
 
@@ -376,40 +358,43 @@ test_basic(data_t *data, enum pipe pipe, igt_output_t *output, uint32_t flags)
 	 * if refresh_rate is 50Hz:
 	 *      Flip will happen right away so returned refresh rate is 50Hz.
 	 * if refresh_rate < 40Hz:
-	 *      Flip should happen at the vmax so the returned refresh rate
-	 *      would be 40Hz.
+	 *      As the driver will terminate the vblank at Vmax, the expected
+	 *      refresh rate could be:
+	 *      	(Vmax + time left for the next flip + Vmin)
+	 *
+	 *      And it is very difficult to generalize, at least 1/3 rd of the
+	 *      flips should be at Vmin (60 Hz) is expected.
 	 */
 	if (flags & TEST_FLIPLINE) {
-		rate = rate_from_refresh(range.min - 5);
-		result = flip_and_measure(data, output, pipe, rate, TEST_DURATION_NS);
-		igt_assert_f(result > 75,
-			     "Refresh rate %"PRIu64"ns: Target VRR on threshold not reached, result was %u%%\n",
-			     rate, result);
-
 		rate = rate_from_refresh(range.max + 5);
 		result = flip_and_measure(data, output, pipe, rate, TEST_DURATION_NS);
 		igt_assert_f(result > 75,
-			     "Refresh rate %"PRIu64"ns: Target VRR on threshold not reached, result was %u%%\n",
-			     rate, result);
+			     "Refresh rate (%u Hz) %"PRIu64"ns: Target VRR on threshold not reached, result was %u%%\n",
+			     (range.max + 5), rate, result);
+
+		rate = rate_from_refresh(range.min - 5);
+		result = flip_and_measure(data, output, pipe, rate, TEST_DURATION_NS);
+		igt_assert_f(result > 35,
+			     "Refresh rate (%u Hz) %"PRIu64"ns: Target VRR on threshold not reached, result was %u%%\n",
+			     (range.min - 5), rate, result);
 	}
 
 	rate = vtest_ns.mid;
 	result = flip_and_measure(data, output, pipe, rate, TEST_DURATION_NS);
 	igt_assert_f(result > 75,
-		     "Refresh rate %"PRIu64"ns: Target VRR on threshold not reached, result was %u%%\n",
-		     rate, result);
+		     "Refresh rate (%u Hz) %"PRIu64"ns: Target VRR on threshold not reached, result was %u%%\n",
+		     ((range.max + range.min) / 2), rate, result);
 
 	set_vrr_on_pipe(data, pipe, 0);
 	result = flip_and_measure(data, output, pipe, rate, TEST_DURATION_NS);
 	igt_assert_f(result < 10,
-		     "Refresh rate %"PRIu64"ns: Target VRR off threshold exceeded, result was %u%%\n",
-		     rate, result);
+		     "Refresh rate (%u Hz) %"PRIu64"ns: Target VRR off threshold exceeded, result was %u%%\n",
+		     ((range.max + range.min) / 2), rate, result);
 
 	/* Clean-up */
 	igt_plane_set_fb(data->primary, NULL);
 	igt_output_set_pipe(output, PIPE_NONE);
-	igt_display_commit_atomic(&data->display,
-				  DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
+	igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
 	igt_remove_fb(data->drm_fd, &data->fb1);
 	igt_remove_fb(data->drm_fd, &data->fb0);
