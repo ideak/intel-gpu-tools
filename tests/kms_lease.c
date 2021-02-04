@@ -356,8 +356,8 @@ static void page_flip_implicit_plane(data_t *data)
 	display = &data->master.display;
 	pipe = crtc_id_to_pipe(display, data->crtc_id);
 
-	igt_wait_for_vblank_count(data->master.fd,
-			display->pipes[pipe].crtc_offset, 1);
+	igt_wait_for_vblank(data->master.fd,
+			display->pipes[pipe].crtc_offset);
 
 	do_or_die(drmModePageFlip(mcl.fd, data->crtc_id,
 			      data->master.primary_fb.fb_id,
@@ -369,8 +369,8 @@ static void page_flip_implicit_plane(data_t *data)
 
 	pipe = crtc_id_to_pipe(display, data->crtc_id);
 
-	igt_wait_for_vblank_count(data->master.fd,
-			display->pipes[pipe].crtc_offset, 1);
+	igt_wait_for_vblank(data->master.fd,
+			display->pipes[pipe].crtc_offset);
 
 	igt_assert_eq(drmModePageFlip(mcl.fd, data->crtc_id,
 				      data->master.primary_fb.fb_id,
