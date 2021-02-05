@@ -1098,10 +1098,9 @@ print_percentage_bar(double percent, int max_len, bool numeric)
 
 	assert(max_len > 0);
 
-	bar_len = ceil(percent * len / 100.0);
-	if (bar_len > len)
-		bar_len = len;
-	bar_len *= w;
+	bar_len = ceil(w * percent * len / 100.0);
+	if (bar_len > w * len)
+		bar_len = w * len;
 
 	putchar('|');
 
