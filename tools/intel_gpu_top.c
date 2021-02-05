@@ -1972,7 +1972,7 @@ print_client(struct client *c, struct engines *engines, double t, int lines,
 	unsigned int i;
 
 	if (output_mode == INTERACTIVE) {
-		if (filter_idle && !c->total_runtime)
+		if (filter_idle && (!c->total_runtime || c->samples < 2))
 			return lines;
 
 		lines++;
