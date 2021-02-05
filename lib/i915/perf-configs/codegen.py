@@ -150,11 +150,17 @@ class Gen:
         self.ops["<<"]       = (2, self.emit_lshft)
         self.ops[">>"]       = (2, self.emit_rshft)
         self.ops["AND"]      = (2, self.emit_and)
+        self.ops["UGTE"]     = (2, self.emit_ugte)
+        self.ops["UGT"]      = (2, self.emit_ugt)
+        self.ops["ULTE"]     = (2, self.emit_ulte)
+        self.ops["ULT"]      = (2, self.emit_ult)
 
         self.exp_ops = {}
         #                 (n operands, splicer)
         self.exp_ops["AND"]  = (2, self.splice_bitwise_and)
         self.exp_ops["UGTE"] = (2, self.splice_ugte)
+        self.exp_ops["UGT"]  = (2, self.splice_ugt)
+        self.exp_ops["ULTE"] = (2, self.splice_ulte)
         self.exp_ops["ULT"]  = (2, self.splice_ult)
         self.exp_ops["&&"]   = (2, self.splice_logical_and)
 
@@ -238,6 +244,22 @@ class Gen:
         self.c("uint64_t tmp{0} = {1} & {2};".format(tmp_id, args[1], args[0]))
         return tmp_id + 1
 
+    def emit_ulte(self, tmp_id, args):
+        self.c("uint64_t tmp{0} = {1} <= {2};".format(tmp_id, args[1], args[0]))
+        return tmp_id + 1
+
+    def emit_ult(self, tmp_id, args):
+        self.c("uint64_t tmp{0} = {1} < {2};".format(tmp_id, args[1], args[0]))
+        return tmp_id + 1
+
+    def emit_ugte(self, tmp_id, args):
+        self.c("uint64_t tmp{0} = {1} >= {2};".format(tmp_id, args[1], args[0]))
+        return tmp_id + 1
+
+    def emit_ugt(self, tmp_id, args):
+        self.c("uint64_t tmp{0} = {1} > {2};".format(tmp_id, args[1], args[0]))
+        return tmp_id + 1
+
     def brkt(self, subexp):
         if " " in subexp:
             return "(" + subexp + ")"
@@ -250,11 +272,17 @@ class Gen:
     def splice_logical_and(self, args):
         return self.brkt(args[1]) + " && " + self.brkt(args[0])
 
+    def splice_ulte(self, args):
+        return self.brkt(args[1]) + " <= " + self.brkt(args[0])
+
     def splice_ult(self, args):
         return self.brkt(args[1]) + " < " + self.brkt(args[0])
 
     def splice_ugte(self, args):
         return self.brkt(args[1]) + " >= " + self.brkt(args[0])
+
+    def splice_ugt(self, args):
+        return self.brkt(args[1]) + " > " + self.brkt(args[0])
 
     def resolve_variable(self, name, set):
         if name in self.hw_vars:
