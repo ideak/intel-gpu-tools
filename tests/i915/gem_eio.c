@@ -375,9 +375,47 @@ static void __test_banned(int fd)
 		     count);
 }
 
+static void set_heartbeat(int i915, int interval)
+{
+	int fd, engines;
+	DIR *dir;
+
+	fd = igt_sysfs_open(i915);
+	if (fd < 0)
+		return;
+
+	engines = openat(fd, "engine", O_RDONLY | O_DIRECTORY);
+	close(fd);
+	if (engines < 0)
+		return;
+
+	dir = fdopendir(engines);
+	for (struct dirent *de; (de = readdir(dir)); ) {
+		if (de->d_type != DT_DIR)
+			continue;
+
+		fd = openat(engines, de->d_name, O_DIRECTORY | O_RDONLY);
+		if (fd < 0)
+			continue;
+
+		igt_sysfs_printf(fd, "heartbeat_interval_ms", "%d", interval);
+		close(fd);
+	}
+	closedir(dir);
+}
+
+static int reopen_device(int i915)
+{
+	i915 = gem_reopen_driver(i915);
+	igt_require_gem(i915);
+	set_heartbeat(i915, 250); /* require gem restores defaults */
+
+	return i915;
+}
+
 static void test_banned(int fd)
 {
-	fd = gem_reopen_driver(fd);
+	fd = reopen_device(fd);
 	__test_banned(fd);
 	close(fd);
 }
@@ -388,8 +426,7 @@ static void test_wait(int fd, unsigned int flags, unsigned int wait)
 {
 	igt_spin_t *hang;
 
-	fd = gem_reopen_driver(fd);
-	igt_require_gem(fd);
+	fd = reopen_device(fd);
 
 	/*
 	 * If the request we wait on completes due to a hang (even for
@@ -419,10 +456,8 @@ static void test_suspend(int fd, int state)
 	/* Do a suspend first so that we don't skip inside the test */
 	igt_system_suspend_autoresume(state, SUSPEND_TEST_DEVICES);
 
-	fd = gem_reopen_driver(fd);
-	igt_require_gem(fd);
-
 	/* Check we can suspend when the driver is already wedged */
+	fd = reopen_device(fd);
 	igt_require(i915_reset_control(fd, false));
 	manual_hang(fd);
 
@@ -453,8 +488,7 @@ static void test_inflight(int fd, unsigned int wait)
 		struct drm_i915_gem_execbuffer2 execbuf;
 		igt_spin_t *hang;
 
-		fd = gem_reopen_driver(parent_fd);
-		igt_require_gem(fd);
+		fd = reopen_device(parent_fd);
 
 		memset(obj, 0, sizeof(obj));
 		obj[0].flags = EXEC_OBJECT_WRITE;
@@ -513,8 +547,7 @@ static void test_inflight_suspend(int fd)
 	max = min(max - 1, ARRAY_SIZE(fence));
 	igt_debug("Using %d inflight batches\n", max);
 
-	fd = gem_reopen_driver(fd);
-	igt_require_gem(fd);
+	fd = reopen_device(fd);
 	igt_require(gem_has_exec_fence(fd));
 	igt_require(i915_reset_control(fd, false));
 
@@ -588,8 +621,7 @@ static void test_inflight_contexts(int fd, unsigned int wait)
 		uint32_t ctx[64];
 		int fence[64];
 
-		fd = gem_reopen_driver(parent_fd);
-		igt_require_gem(fd);
+		fd = reopen_device(parent_fd);
 
 		for (unsigned int n = 0; n < ARRAY_SIZE(ctx); n++)
 			ctx[n] = context_create_safe(fd);
@@ -651,11 +683,9 @@ static void test_inflight_external(int fd)
 	uint32_t fence;
 	IGT_CORK_FENCE(cork);
 
+	fd = reopen_device(fd);
 	igt_require_sw_sync();
 	igt_require(gem_has_exec_fence(fd));
-
-	fd = gem_reopen_driver(fd);
-	igt_require_gem(fd);
 
 	fence = igt_cork_plug(&cork, fd);
 
@@ -705,11 +735,8 @@ static void test_inflight_internal(int fd, unsigned int wait)
 	unsigned nfence = 0;
 	igt_spin_t *hang;
 
+	fd = reopen_device(fd);
 	igt_require(gem_has_exec_fence(fd));
-
-	fd = gem_reopen_driver(fd);
-	igt_require_gem(fd);
-
 	igt_require(i915_reset_control(fd, false));
 	hang = spin_sync(fd, 0, 0);
 
@@ -909,35 +936,6 @@ static void test_kms(int i915, igt_display_t *dpy)
 	*shared = 1;
 	igt_waitchildren();
 	munmap(shared, 4096);
-}
-
-static void set_heartbeat(int i915, int interval)
-{
-	int fd, engines;
-	DIR *dir;
-
-	fd = igt_sysfs_open(i915);
-	if (fd < 0)
-		return;
-
-	engines = openat(fd, "engine", O_RDONLY | O_DIRECTORY);
-	close(fd);
-	if (engines < 0)
-		return;
-
-	dir = fdopendir(engines);
-	for (struct dirent *de; (de = readdir(dir)); ) {
-		if (de->d_type != DT_DIR)
-			continue;
-
-		fd = openat(engines, de->d_name, O_DIRECTORY | O_RDONLY);
-		if (fd < 0)
-			continue;
-
-		igt_sysfs_printf(fd, "heartbeat_interval_ms", "%d", interval);
-		close(fd);
-	}
-	closedir(dir);
 }
 
 static int fd = -1;
