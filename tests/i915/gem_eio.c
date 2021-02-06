@@ -415,11 +415,11 @@ static void test_wait(int fd, unsigned int flags, unsigned int wait)
 
 static void test_suspend(int fd, int state)
 {
-	fd = gem_reopen_driver(fd);
-	igt_require_gem(fd);
-
 	/* Do a suspend first so that we don't skip inside the test */
 	igt_system_suspend_autoresume(state, SUSPEND_TEST_DEVICES);
+
+	fd = gem_reopen_driver(fd);
+	igt_require_gem(fd);
 
 	/* Check we can suspend when the driver is already wedged */
 	igt_require(i915_reset_control(fd, false));
@@ -503,6 +503,9 @@ static void test_inflight_suspend(int fd)
 	int fence[64]; /* mostly conservative estimate of ring size */
 	igt_spin_t *hang;
 	int max;
+
+	/* Do a suspend first so that we don't skip inside the test */
+	igt_system_suspend_autoresume(SUSPEND_STATE_MEM, SUSPEND_TEST_DEVICES);
 
 	max = gem_measure_ring_inflight(fd, -1, 0);
 	igt_require(max > 1);
