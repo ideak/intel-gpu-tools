@@ -49,7 +49,10 @@ static void store_all(int i915)
 		.write_domain = I915_GEM_DOMAIN_RENDER,
 	};
 	struct drm_i915_gem_exec_object2 obj[2] = {
-		{ .handle = gem_create(i915, sizeof(engines)) },
+		{
+			.handle = gem_create(i915, sizeof(engines)),
+			.flags = EXEC_OBJECT_WRITE,
+		},
 		{
 			.handle = gem_create(i915, sz),
 			.relocation_count = 1,
