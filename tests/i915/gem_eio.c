@@ -27,17 +27,18 @@
  *
  */
 
-#include <sched.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
+#include <dirent.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
-#include <errno.h>
-#include <sys/ioctl.h>
+#include <sched.h>
 #include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/ioctl.h>
 #include <time.h>
+#include <unistd.h>
 
 #include <drm.h>
 
@@ -910,6 +911,35 @@ static void test_kms(int i915, igt_display_t *dpy)
 	munmap(shared, 4096);
 }
 
+static void set_heartbeat(int i915, int interval)
+{
+	int fd, engines;
+	DIR *dir;
+
+	fd = igt_sysfs_open(i915);
+	if (fd < 0)
+		return;
+
+	engines = openat(fd, "engine", O_RDONLY | O_DIRECTORY);
+	close(fd);
+	if (engines < 0)
+		return;
+
+	dir = fdopendir(engines);
+	for (struct dirent *de; (de = readdir(dir)); ) {
+		if (de->d_type != DT_DIR)
+			continue;
+
+		fd = openat(engines, de->d_name, O_DIRECTORY | O_RDONLY);
+		if (fd < 0)
+			continue;
+
+		igt_sysfs_printf(fd, "heartbeat_interval_ms", "%d", interval);
+		close(fd);
+	}
+	closedir(dir);
+}
+
 static int fd = -1;
 
 static void
@@ -929,6 +959,7 @@ igt_main
 		igt_require_gem(fd);
 
 		igt_allow_hang(fd, 0, 0);
+		set_heartbeat(fd, 250);
 
 		igt_require(i915_reset_control(fd, true));
 		igt_force_gpu_reset(fd);
