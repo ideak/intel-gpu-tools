@@ -1008,37 +1008,33 @@ static int monitor_output(pid_t child,
 					     get_cmdline(siginfo.ssi_pid, comm, sizeof(comm)),
 					     siginfo.ssi_pid,
 					     strsignal(siginfo.ssi_signo));
+				}
 
-					if (siginfo.ssi_signo == SIGHUP) {
-						/*
-						 * If taken down with
-						 * SIGHUP, arrange the
-						 * current test to be
-						 * marked as notrun
-						 * instead of
-						 * incomplete. For
-						 * other signals we
-						 * don't need to do
-						 * anything, the lack
-						 * of a completion
-						 * marker of any kind
-						 * in the logs will
-						 * mark those tests as
-						 * incomplete. Note
-						 * that since we set
-						 * 'aborting' to true
-						 * we're going to skip
-						 * all other journal
-						 * writes later.
-						 */
+				if (siginfo.ssi_signo == SIGHUP) {
+					/*
+					 * If taken down with SIGHUP,
+					 * arrange the current test to
+					 * be marked as notrun instead
+					 * of incomplete. For other
+					 * signals we don't need to do
+					 * anything, the lack of a
+					 * completion marker of any
+					 * kind in the logs will mark
+					 * those tests as
+					 * incomplete. Note that since
+					 * we set 'aborting' to true
+					 * we're going to skip all
+					 * other journal writes later.
+					 */
 
+					if (settings->log_level >= LOG_LEVEL_NORMAL)
 						outf("Exiting gracefully, currently running test will have a 'notrun' result\n");
-						dprintf(outputs[_F_JOURNAL], "%s%d (%.3fs)\n",
-							EXECUTOR_EXIT,
-							-SIGHUP, 0.0);
-						if (settings->sync)
-							fdatasync(outputs[_F_JOURNAL]);
-					}
+
+					dprintf(outputs[_F_JOURNAL], "%s%d (%.3fs)\n",
+						EXECUTOR_EXIT,
+						-SIGHUP, 0.0);
+					if (settings->sync)
+						fdatasync(outputs[_F_JOURNAL]);
 				}
 
 				aborting = true;
