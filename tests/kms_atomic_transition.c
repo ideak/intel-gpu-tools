@@ -995,7 +995,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 
 	igt_subtest("plane-primary-toggle-with-vblank-wait")
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
-			if (pipe_count >= 2 && !data.extended)
+			if (pipe_count == 2 * count && !data.extended)
 				break;
 			pipe_count++;
 			run_primary_test(&data, pipe, output);
@@ -1004,7 +1004,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 
 	igt_subtest_with_dynamic("plane-all-transition") {
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
-			if (pipe_count >= 2 && !data.extended)
+			if (pipe_count == 2 * count && !data.extended)
 				break;
 			pipe_count++;
 			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
@@ -1014,7 +1014,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 
 	igt_subtest_with_dynamic("plane-all-transition-fencing") {
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
-			if (pipe_count >= 2 && !data.extended)
+			if (pipe_count == 2 * count && !data.extended)
 				break;
 			pipe_count++;
 			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
@@ -1024,7 +1024,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 
 	igt_subtest_with_dynamic("plane-all-transition-nonblocking") {
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
-			if (pipe_count >= 2 && !data.extended)
+			if (pipe_count == 2 * count && !data.extended)
 				break;
 			pipe_count++;
 			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
@@ -1034,7 +1034,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 
 	igt_subtest_with_dynamic("plane-all-transition-nonblocking-fencing") {
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
-			if (pipe_count >= 2 && !data.extended)
+			if (pipe_count == 2 * count && !data.extended)
 				break;
 			pipe_count++;
 			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
@@ -1044,7 +1044,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 
 	igt_subtest_with_dynamic("plane-use-after-nonblocking-unbind") {
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
-			if (pipe_count >= 2 && !data.extended)
+			if (pipe_count == 2 * count && !data.extended)
 				break;
 			pipe_count++;
 			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
@@ -1054,7 +1054,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 
 	igt_subtest_with_dynamic("plane-use-after-nonblocking-unbind-fencing") {
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
-			if (pipe_count >= 2 && !data.extended)
+			if (pipe_count == 2 * count && !data.extended)
 				break;
 			pipe_count++;
 			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
@@ -1069,7 +1069,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 	 */
 	igt_subtest_with_dynamic("plane-all-modeset-transition")
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
-			if (pipe_count >= 2 && !data.extended)
+			if (pipe_count == 2 * count && !data.extended)
 				break;
 			pipe_count++;
 			if (output_is_internal_panel(output))
@@ -1081,7 +1081,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 
 	igt_subtest_with_dynamic("plane-all-modeset-transition-fencing")
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
-			if (pipe_count >= 2 && !data.extended)
+			if (pipe_count == 2 * count && !data.extended)
 				break;
 			pipe_count++;
 			if (output_is_internal_panel(output))
@@ -1093,7 +1093,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 
 	igt_subtest_with_dynamic("plane-all-modeset-transition-internal-panels") {
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
-			if (pipe_count >= 2 && !data.extended)
+			if (pipe_count == 2 * count && !data.extended)
 				break;
 			pipe_count++;
 			if (!output_is_internal_panel(output))
@@ -1106,7 +1106,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 
 	igt_subtest_with_dynamic("plane-all-modeset-transition-fencing-internal-panels") {
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
-			if (pipe_count >= 2 && !data.extended)
+			if (pipe_count == 2 * count && !data.extended)
 				break;
 			pipe_count++;
 			if (!output_is_internal_panel(output))
@@ -1119,7 +1119,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 
 	igt_subtest("plane-toggle-modeset-transition")
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
-			if (pipe_count >= 2 && !data.extended)
+			if (pipe_count == 2 * count && !data.extended)
 				break;
 			pipe_count++;
 			run_transition_test(&data, pipe, output, TRANSITION_MODESET_DISABLE, false, false);
