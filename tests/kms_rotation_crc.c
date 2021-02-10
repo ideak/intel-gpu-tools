@@ -424,12 +424,15 @@ static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_form
 	drmModeModeInfo *mode;
 	igt_output_t *output;
 	enum pipe pipe;
-	int pipe_count = 0;
+	int pipe_count = 0, connected_outputs = 0;
 
 	if (plane_type == DRM_PLANE_TYPE_CURSOR)
 		igt_require(display->has_cursor_plane);
 
 	igt_display_require_output(display);
+
+	for_each_connected_output(&data->display, output)
+		connected_outputs++;
 
 	for_each_pipe_with_valid_output(display, pipe, output) {
 		igt_plane_t *plane;
@@ -467,7 +470,7 @@ static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_form
 			continue;
 
 		/* restricting the execution to 2 pipes to reduce execution time*/
-		if (pipe_count == 2 && !data->extended)
+		if (pipe_count == 2 * connected_outputs && !data->extended)
 			break;
 		pipe_count++;
 
