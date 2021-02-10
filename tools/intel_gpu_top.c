@@ -979,17 +979,18 @@ static int client_pid_cmp(const void *_a, const void *_b)
 
 static int (*client_cmp)(const void *, const void *) = client_last_cmp;
 
-static void sort_clients(struct clients *clients)
+static struct clients *sort_clients(struct clients *clients,
+				    int (*cmp)(const void *, const void *))
 {
 	unsigned int active, free;
 	struct client *c;
 	int tmp;
 
 	if (!clients)
-		return;
+		return clients;
 
 	qsort(clients->client, clients->num_clients, sizeof(*clients->client),
-	      client_cmp);
+	      cmp);
 
 	/* Trim excessive array space. */
 	active = 0;
@@ -1011,9 +1012,98 @@ static void sort_clients(struct clients *clients)
 						  sizeof(*c));
 		}
 	}
+
+	return clients;
 }
 
-static void scan_clients(struct clients *clients)
+static bool aggregate_pids = true;
+
+static struct clients *display_clients(struct clients *clients)
+{
+	struct client *ac, *c, *cp = NULL;
+	struct clients *aggregated;
+	int tmp, num = 0;
+
+	if (!aggregate_pids)
+		goto out;
+
+	/* Sort by pid first to make it easy to aggregate while walking. */
+	sort_clients(clients, client_pid_cmp);
+
+	aggregated = calloc(1, sizeof(*clients));
+	assert(aggregated);
+
+	ac = calloc(clients->num_clients, sizeof(*c));
+	assert(ac);
+
+	aggregated->num_classes = clients->num_classes;
+	aggregated->class = clients->class;
+	aggregated->client = ac;
+
+	for_each_client(clients, c, tmp) {
+		unsigned int i;
+
+		if (c->status == FREE)
+			break;
+
+		assert(c->status == ALIVE);
+
+		if ((cp && c->pid != cp->pid) || !cp) {
+			ac = &aggregated->client[num++];
+
+			/* New pid. */
+			ac->clients = aggregated;
+			ac->status = ALIVE;
+			ac->id = -c->pid;
+			ac->pid = c->pid;
+			ac->busy_root = -1;
+			ac->sysfs_root = -1;
+			strcpy(ac->name, c->name);
+			strcpy(ac->print_name, c->print_name);
+			ac->engines = c->engines;
+			ac->val = calloc(clients->num_classes,
+					 sizeof(ac->val[0]));
+			assert(ac->val);
+			ac->samples = 1;
+		}
+
+		cp = c;
+
+		if (c->samples < 2)
+			continue;
+
+		ac->samples = 2; /* All what matters for display. */
+		ac->total_runtime += c->total_runtime;
+		ac->last_runtime += c->last_runtime;
+
+		for (i = 0; i < clients->num_classes; i++)
+			ac->val[i] += c->val[i];
+	}
+
+	aggregated->num_clients = num;
+	aggregated->active_clients = num;
+
+	clients = aggregated;
+
+out:
+	return sort_clients(clients, client_cmp);
+}
+
+static void free_clients(struct clients *clients)
+{
+	struct client *c;
+	unsigned int tmp;
+
+	for_each_client(clients, c, tmp) {
+		free(c->val);
+		free(c->last);
+	}
+
+	free(clients->client);
+	free(clients);
+}
+
+static struct clients *scan_clients(struct clients *clients)
 {
 	struct dirent *dent;
 	struct client *c;
@@ -1022,7 +1112,7 @@ static void scan_clients(struct clients *clients)
 	DIR *d;
 
 	if (!clients)
-		return;
+		return clients;
 
 	for_each_client(clients, c, tmp) {
 		assert(c->status != PROBE);
@@ -1034,7 +1124,7 @@ static void scan_clients(struct clients *clients)
 
 	d = opendir(clients->sysfs_root);
 	if (!d)
-		return;
+		return clients;
 
 	while ((dent = readdir(d)) != NULL) {
 		char name[24], pid[24];
@@ -1077,7 +1167,7 @@ static void scan_clients(struct clients *clients)
 			break;
 	}
 
-	sort_clients(clients);
+	return display_clients(clients);
 }
 
 static const char *bars[] = { " ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█" };
@@ -2177,11 +2267,16 @@ static void select_client_sort(void)
 	};
 	static unsigned int client_sort;
 
+bump:
 	if (++client_sort >= ARRAY_SIZE(cmp))
 		client_sort = 0;
 
 	client_cmp = cmp[client_sort].cmp;
 	header_msg = cmp[client_sort].msg;
+
+	/* Sort by client id makes no sense with pid aggregation. */
+	if (aggregate_pids && client_cmp == client_id_cmp)
+		goto bump;
 }
 
 static void process_stdin(unsigned int timeout_us)
@@ -2226,6 +2321,13 @@ static void process_stdin(unsigned int timeout_us)
 			break;
 		case 's':
 			select_client_sort();
+			break;
+		case 'H':
+			aggregate_pids ^= true;
+			if (aggregate_pids)
+				header_msg = "Aggregating clients.";
+			else
+				header_msg = "Showing individual clients.";
 			break;
 		};
 	}
@@ -2378,6 +2480,7 @@ int main(int argc, char **argv)
 	codename = igt_device_get_pretty_name(&card, false);
 
 	while (!stop_top) {
+		struct clients *disp_clients;
 		bool consumed = false;
 		int j, lines = 0;
 		struct winsize ws;
@@ -2400,7 +2503,7 @@ int main(int argc, char **argv)
 		pmu_sample(engines);
 		t = (double)(engines->ts.cur - engines->ts.prev) / 1e9;
 
-		scan_clients(clients);
+		disp_clients = scan_clients(clients);
 
 		if (stop_top)
 			break;
@@ -2416,14 +2519,14 @@ int main(int argc, char **argv)
 
 			lines = print_engines(engines, t, lines, con_w, con_h);
 
-			if (clients) {
+			if (disp_clients) {
 				int class_w;
 
-				lines = print_clients_header(clients, lines,
+				lines = print_clients_header(disp_clients, lines,
 							     con_w, con_h,
 							     &class_w);
 
-				for_each_client(clients, c, j) {
+				for_each_client(disp_clients, c, j) {
 					assert(c->status != PROBE);
 					if (c->status != ALIVE)
 						break; /* Active clients are first in the array. */
@@ -2437,8 +2540,9 @@ int main(int argc, char **argv)
 							     &class_w);
 				}
 
-				lines = print_clients_footer(clients, t, lines,
-							     con_w, con_h);
+				lines = print_clients_footer(disp_clients, t,
+							     lines, con_w,
+							     con_h);
 			}
 
 			pops->close_struct();
@@ -2446,6 +2550,9 @@ int main(int argc, char **argv)
 
 		if (stop_top)
 			break;
+
+		if (disp_clients != clients)
+			free_clients(disp_clients);
 
 		if (output_mode == INTERACTIVE)
 			process_stdin(period_us);
