@@ -1097,6 +1097,13 @@ static void dump_edp(struct context *context,
 				break;
 			}
 		}
+
+		if (context->bdb->version >= 224) {
+			u16 rate = edp->edp_fast_link_training_rate[i];
+
+			printf("\t\teDP fast link training data rate: %g Gbps (0x%02x)\n",
+			       rate / 5000.0f, rate);
+		}
 	}
 }
 
