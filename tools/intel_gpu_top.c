@@ -2279,19 +2279,31 @@ bump:
 		goto bump;
 }
 
-static void process_stdin(unsigned int timeout_us)
+static bool in_help;
+
+static void process_help_stdin(void)
 {
-	struct pollfd p = { .fd = 0, .events = POLLIN };
-	int ret;
-
-	ret = poll(&p, 1, timeout_us / 1000);
-	if (ret <= 0) {
-		if (ret < 0)
-			stop_top = true;
-		return;
-	}
-
 	for (;;) {
+		int ret;
+		char c;
+
+		ret = read(0, &c, 1);
+		if (ret <= 0)
+			break;
+
+		switch (c) {
+		case 'q':
+		case 'h':
+			in_help = false;
+			break;
+		};
+	}
+}
+
+static void process_normal_stdin(void)
+{
+	for (;;) {
+		int ret;
 		char c;
 
 		ret = read(0, &c, 1);
@@ -2322,6 +2334,9 @@ static void process_stdin(unsigned int timeout_us)
 		case 's':
 			select_client_sort();
 			break;
+		case 'h':
+			in_help = true;
+			break;
 		case 'H':
 			aggregate_pids ^= true;
 			if (aggregate_pids)
@@ -2331,6 +2346,38 @@ static void process_stdin(unsigned int timeout_us)
 			break;
 		};
 	}
+}
+
+static void process_stdin(unsigned int timeout_us)
+{
+	struct pollfd p = { .fd = 0, .events = POLLIN };
+	int ret;
+
+	ret = poll(&p, 1, timeout_us / 1000);
+	if (ret <= 0) {
+		if (ret < 0)
+			stop_top = true;
+		return;
+	}
+
+	if (in_help)
+		process_help_stdin();
+	else
+		process_normal_stdin();
+}
+
+static void show_help_screen(void)
+{
+	printf(
+"Help for interactive commands:\n\n"
+"    '1'    Toggle between aggregated engine class and physical engine mode.\n"
+"    'n'    Toggle display of numeric client busyness overlay.\n"
+"    's'    Toggle between sort modes (runtime, total runtime, pid, client id).\n"
+"    'i'    Toggle display of clients which used no GPU time.\n"
+"    'H'    Toggle between per PID aggregation and individual clients.\n"
+"\n"
+"    'h' or 'q'    Exit interactive help.\n"
+"\n");
 }
 
 int main(int argc, char **argv)
@@ -2514,6 +2561,11 @@ int main(int argc, char **argv)
 			lines = print_header(&card, codename, engines,
 					     t, lines, con_w, con_h,
 					     &consumed);
+
+			if (in_help) {
+				show_help_screen();
+				break;
+			}
 
 			lines = print_imc(engines, t, lines, con_w, con_h);
 
