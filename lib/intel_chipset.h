@@ -76,6 +76,7 @@ struct intel_device_info {
 	bool is_tigerlake : 1;
 	bool is_rocketlake : 1;
 	bool is_dg1 : 1;
+	bool is_alderlake_s : 1;
 	const char *codename;
 };
 
@@ -176,6 +177,7 @@ void intel_check_pch(void);
 #define IS_TIGERLAKE(devid)	(intel_get_device_info(devid)->is_tigerlake)
 #define IS_ROCKETLAKE(devid)	(intel_get_device_info(devid)->is_rocketlake)
 #define IS_DG1(devid)		(intel_get_device_info(devid)->is_dg1)
+#define IS_ALDERLAKE_S(devid)	(intel_get_device_info(devid)->is_alderlake_s)
 
 #define IS_GEN(devid, x)	(intel_get_device_info(devid)->gen & (1u << ((x)-1)))
 #define AT_LEAST_GEN(devid, x)	(intel_get_device_info(devid)->gen & -(1u << ((x)-1)))
