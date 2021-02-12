@@ -35,7 +35,7 @@ IGT_TEST_DESCRIPTION("Test HDR metadata interfaces and bpc switch");
 
 /* DRM HDR definitions. Not in the UAPI header, unfortunately. */
 enum hdmi_metadata_type {
-	HDMI_STATIC_METADATA_TYPE1 = 1,
+	HDMI_STATIC_METADATA_TYPE1 = 0,
 };
 
 enum hdmi_eotf {
