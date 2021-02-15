@@ -444,6 +444,7 @@ igt_media_spinfunc_t igt_get_media_spinfunc(int devid);
 struct intel_bb {
 	uint64_t allocator_handle;
 	uint8_t allocator_type;
+	enum allocator_strategy allocator_strategy;
 
 	int i915;
 	unsigned int gen;
@@ -488,8 +489,13 @@ struct intel_bb {
 	int32_t refcount;
 };
 
-struct intel_bb *intel_bb_create_full(int i915, uint32_t ctx, uint32_t size,
-				      uint8_t allocator_type);
+struct intel_bb *
+intel_bb_create_full(int i915, uint32_t ctx, uint32_t size,
+		     uint64_t start, uint64_t end,
+		     uint8_t allocator_type, enum allocator_strategy strategy);
+struct intel_bb *
+intel_bb_create_with_allocator(int i915, uint32_t ctx,
+			       uint32_t size, uint8_t allocator_type);
 struct intel_bb *intel_bb_create(int i915, uint32_t size);
 struct intel_bb *
 intel_bb_create_with_context(int i915, uint32_t ctx, uint32_t size);
