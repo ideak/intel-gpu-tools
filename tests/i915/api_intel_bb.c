@@ -142,6 +142,33 @@ static void reset_bb(struct buf_ops *bops)
 	intel_bb_destroy(ibb);
 }
 
+static void purge_bb(struct buf_ops *bops)
+{
+	int i915 = buf_ops_get_fd(bops);
+	struct intel_buf *buf;
+	struct intel_bb *ibb;
+	uint64_t offset0, offset1;
+
+	buf = intel_buf_create(bops, 512, 512, 32, 0, I915_TILING_NONE,
+			       I915_COMPRESSION_NONE);
+	ibb = intel_bb_create(i915, 4096);
+	intel_bb_set_debug(ibb, true);
+
+	intel_bb_add_intel_buf(ibb, buf, false);
+	offset0 = buf->addr.offset;
+
+	intel_bb_reset(ibb, true);
+	buf->addr.offset = INTEL_BUF_INVALID_ADDRESS;
+
+	intel_bb_add_intel_buf(ibb, buf, false);
+	offset1 = buf->addr.offset;
+
+	igt_assert(offset0 == offset1);
+
+	intel_buf_destroy(buf);
+	intel_bb_destroy(ibb);
+}
+
 static void simple_bb(struct buf_ops *bops, bool use_context)
 {
 	int i915 = buf_ops_get_fd(bops);
@@ -1384,6 +1411,9 @@ igt_main_args("dpib", NULL, help_str, opt_handler, NULL)
 	igt_describe("Ensure reset is possible on fresh bb");
 	igt_subtest("reset-bb")
 		reset_bb(bops);
+
+	igt_subtest_f("purge-bb")
+		purge_bb(bops);
 
 	igt_subtest("simple-bb")
 		simple_bb(bops, false);
