@@ -407,7 +407,7 @@ static void __many_active(int i915, unsigned engine, unsigned long count)
 
 static void many_active(int i915, unsigned engine)
 {
-	const uint64_t max = gem_aperture_size(i915) / 2;
+	const uint64_t max = 2048;
 	unsigned long count = 256;
 
 	igt_until_timeout(2) {
@@ -421,7 +421,7 @@ static void many_active(int i915, unsigned engine)
 		__many_active(i915, engine, count);
 
 		count <<= 1;
-		if (count * 8 >= max)
+		if (count >= max)
 			break;
 	}
 }
