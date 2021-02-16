@@ -7,6 +7,7 @@ if libdrm_amdgpu.found()
 			  'amd_bypass',
 			  'amd_color',
 			  'amd_cs_nop',
+			  'amd_info',
 			  'amd_prime',
 			]
 	amdgpu_deps += libdrm_amdgpu

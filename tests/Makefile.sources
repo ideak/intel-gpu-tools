@@ -9,6 +9,7 @@ AMDGPU_TESTS = \
 	amdgpu/amd_bypass \
 	amdgpu/amd_color \
 	amdgpu/amd_cs_nop \
+	amdgpu/amd_info \
 	amdgpu/amd_prime \
 	amdgpu/amd_abm \
 	$(NULL)

@@ -176,20 +176,6 @@ static void amdgpu_command_submission_copy_linear_helper(unsigned ip_type);
 #              define PACKET3_DMA_DATA_CMD_DAIC    (1 << 29)
 #              define PACKET3_DMA_DATA_CMD_RAW_WAIT  (1 << 30)
 
-static void amdgpu_query_info_test(void)
-{
-	struct amdgpu_gpu_info gpu_info = {};
-	uint32_t version, feature;
-	int r;
-
-	r = amdgpu_query_gpu_info(device, &gpu_info);
-	igt_assert_eq(r, 0);
-
-	r = amdgpu_query_firmware_version(device, AMDGPU_INFO_FW_VCE, 0,
-					  0, &version, &feature);
-	igt_assert_eq(r, 0);
-}
-
 static amdgpu_bo_handle gpu_mem_alloc(amdgpu_device_handle device_handle,
 				      uint64_t size,
 				      uint64_t alignment,
@@ -1396,9 +1382,6 @@ igt_main
 		igt_info("Initialized amdgpu, driver version %d.%d\n",
 			 major, minor);
 	}
-
-	igt_subtest("query-info")
-		amdgpu_query_info_test();
 
 	igt_subtest("memory-alloc")
 		amdgpu_memory_alloc();
