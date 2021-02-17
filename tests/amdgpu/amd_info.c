@@ -34,14 +34,13 @@ static void query_firmware_version_test(void)
 {
 	struct amdgpu_gpu_info gpu_info = {};
 	uint32_t version, feature;
-	int r;
 
-	r = amdgpu_query_gpu_info(dev, &gpu_info);
-	igt_assert_eq(r, 0);
+	igt_assert_f(amdgpu_query_gpu_info(dev, &gpu_info) == 0,
+		     "Failed to query the gpu information\n");
 
-	r = amdgpu_query_firmware_version(dev, AMDGPU_INFO_FW_VCE, 0, 0,
-					  &version, &feature);
-	igt_assert_eq(r, 0);
+	igt_assert_f(amdgpu_query_firmware_version(dev, AMDGPU_INFO_FW_VCE, 0,
+						   0, &version, &feature) == 0,
+		     "Failed to query the firmware version\n");
 }
 
 IGT_TEST_DESCRIPTION("Test the consistency of the data provided through the "
