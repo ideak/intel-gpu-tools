@@ -135,6 +135,8 @@ struct chamelium {
 	int port_count;
 };
 
+bool igt_chamelium_allow_fsm_handling = true;
+
 static struct chamelium *cleanup_instance;
 
 static void chamelium_do_calculate_fb_crc(cairo_surface_t *fb_surface,
@@ -327,7 +329,7 @@ static xmlrpc_value *__chamelium_rpc_va(struct chamelium *chamelium,
 	 * to handle the chamelium attempting FSM, we have to fork into another
 	 * thread and have that handle hotplugging displays
 	 */
-	if (fsm_port) {
+	if (fsm_port && igt_chamelium_allow_fsm_handling) {
 		monitor_args.chamelium = chamelium;
 		monitor_args.port = fsm_port;
 		monitor_args.mon = igt_watch_uevents();
@@ -355,7 +357,7 @@ static xmlrpc_value *__chamelium_rpc_va(struct chamelium *chamelium,
 		/* i2c error, let's try to retry */
 	}
 
-	if (fsm_port) {
+	if (fsm_port && igt_chamelium_allow_fsm_handling) {
 		pthread_cancel(fsm_thread_id);
 		pthread_join(fsm_thread_id, NULL);
 		igt_cleanup_uevents(monitor_args.mon);
