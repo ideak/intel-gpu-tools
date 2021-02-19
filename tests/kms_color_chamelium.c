@@ -734,6 +734,8 @@ igt_main
 		igt_display_require(&data.display, data.drm_fd);
 		igt_require(data.display.is_atomic);
 
+		igt_chamelium_allow_fsm_handling = false;
+
 		/* we need to initalize chamelium after igt_display_require */
 		data.chamelium = chamelium_init(data.drm_fd);
 		igt_require(data.chamelium);
