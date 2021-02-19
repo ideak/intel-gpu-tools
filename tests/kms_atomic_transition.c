@@ -993,6 +993,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 			count++;
 	}
 
+	igt_describe("Check toggling of primary plane with vblank");
 	igt_subtest("plane-primary-toggle-with-vblank-wait")
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			if (pipe_count == 2 * count && !data.extended)
@@ -1002,6 +1003,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 
 		}
 
+	igt_describe("Transition test for all plane combinations");
 	igt_subtest_with_dynamic("plane-all-transition") {
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			if (pipe_count == 2 * count && !data.extended)
@@ -1012,6 +1014,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 		}
 	}
 
+	igt_describe("Transition test for all plane combinations with fencing commit");
 	igt_subtest_with_dynamic("plane-all-transition-fencing") {
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			if (pipe_count == 2 * count && !data.extended)
@@ -1022,6 +1025,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 		}
 	}
 
+	igt_describe("Transition test for all plane combinations with nonblocking commit");
 	igt_subtest_with_dynamic("plane-all-transition-nonblocking") {
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			if (pipe_count == 2 * count && !data.extended)
@@ -1032,6 +1036,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 		}
 	}
 
+	igt_describe("Transition test for all plane combinations with nonblocking and fencing commit");
 	igt_subtest_with_dynamic("plane-all-transition-nonblocking-fencing") {
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			if (pipe_count == 2 * count && !data.extended)
@@ -1042,6 +1047,8 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 		}
 	}
 
+	igt_describe("Transition test with non blocking commit and make sure commit of disabled plane has "
+		       "to complete before atomic commit on that plane");
 	igt_subtest_with_dynamic("plane-use-after-nonblocking-unbind") {
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			if (pipe_count == 2 * count && !data.extended)
@@ -1052,6 +1059,8 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 		}
 	}
 
+	igt_describe("Transition test with non blocking and fencing commit and make sure commit of "
+		       "disabled plane has to complete before atomic commit on that plane");
 	igt_subtest_with_dynamic("plane-use-after-nonblocking-unbind-fencing") {
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			if (pipe_count == 2 * count && !data.extended)
@@ -1067,6 +1076,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 	 * number of combinations, to avoid long runtimes due to modesets on
 	 * panels with long power cycle delays.
 	 */
+	igt_describe("Modeset test for all plane combinations");
 	igt_subtest_with_dynamic("plane-all-modeset-transition")
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			if (pipe_count == 2 * count && !data.extended)
@@ -1079,6 +1089,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 				run_transition_test(&data, pipe, output, TRANSITION_MODESET, false, false);
 		}
 
+	igt_describe("Modeset test for all plane combinations with fencing commit");
 	igt_subtest_with_dynamic("plane-all-modeset-transition-fencing")
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			if (pipe_count == 2 * count && !data.extended)
@@ -1091,6 +1102,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 				run_transition_test(&data, pipe, output, TRANSITION_MODESET, false, true);
 		}
 
+	igt_describe("Modeset test for all plane combinations on internal panels");
 	igt_subtest_with_dynamic("plane-all-modeset-transition-internal-panels") {
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			if (pipe_count == 2 * count && !data.extended)
@@ -1104,6 +1116,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 		}
 	}
 
+	igt_describe("Modeset test for all plane combinations on internal panels with fencing commit");
 	igt_subtest_with_dynamic("plane-all-modeset-transition-fencing-internal-panels") {
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			if (pipe_count == 2 * count && !data.extended)
@@ -1117,6 +1130,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 		}
 	}
 
+	igt_describe("Check toggling and modeset transition on plane");
 	igt_subtest("plane-toggle-modeset-transition")
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			if (pipe_count == 2 * count && !data.extended)
@@ -1125,6 +1139,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 			run_transition_test(&data, pipe, output, TRANSITION_MODESET_DISABLE, false, false);
 		}
 
+	igt_describe("Modeset transition tests for combinations of crtc enabled");
 	igt_subtest_with_dynamic("modeset-transition") {
 		for (i = 1; i <= count; i++) {
 			igt_dynamic_f("%ix-outputs", i)
@@ -1132,6 +1147,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 		}
 	}
 
+	igt_describe("Modeset transition tests for combinations of crtc enabled with nonblocking commit");
 	igt_subtest_with_dynamic("modeset-transition-nonblocking") {
 		for (i = 1; i <= count; i++) {
 			igt_dynamic_f("%ix-outputs", i)
@@ -1139,6 +1155,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 		}
 	}
 
+	igt_describe("Modeset transition tests for combinations of crtc enabled with fencing commit");
 	igt_subtest_with_dynamic("modeset-transition-fencing") {
 		for (i = 1; i <= count; i++) {
 			igt_dynamic_f("%ix-outputs", i)
@@ -1146,6 +1163,8 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 		}
 	}
 
+	igt_describe("Modeset transition tests for combinations of crtc enabled with nonblocking &"
+		       " fencing commit");
 	igt_subtest_with_dynamic("modeset-transition-nonblocking-fencing") {
 		for (i = 1; i <= count; i++) {
 			igt_dynamic_f("%ix-outputs", i)
