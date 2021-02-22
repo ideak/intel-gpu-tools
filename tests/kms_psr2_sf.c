@@ -560,9 +560,6 @@ igt_main
 					       data.debugfs_fd, PSR_MODE_2),
 			      "Sink does not support PSR2\n");
 
-		igt_require_f(psr2_selective_fetch_check(data.debugfs_fd),
-			      "PSR2 selective fetch not enabled\n");
-
 		data.bufmgr = drm_intel_bufmgr_gem_init(data.drm_fd, 4096);
 		igt_assert(data.bufmgr);
 		drm_intel_bufmgr_gem_enable_reuse(data.bufmgr);
@@ -571,7 +568,7 @@ igt_main
 
 		/* Test if PSR2 can be enabled */
 		igt_require_f(psr_enable(data.drm_fd,
-					 data.debugfs_fd, PSR_MODE_2),
+					 data.debugfs_fd, PSR_MODE_2_SEL_FETCH),
 			      "Error enabling PSR2\n");
 
 		data.damage_area_count = MAX_DAMAGE_AREAS;
@@ -579,6 +576,11 @@ igt_main
 		data.test_plane_id = DRM_PLANE_TYPE_PRIMARY;
 		prepare(&data);
 		r = psr_wait_entry(data.debugfs_fd, PSR_MODE_2);
+		if (!r)
+			psr_print_debugfs(data.debugfs_fd);
+
+		igt_require_f(psr2_selective_fetch_check(data.debugfs_fd),
+			      "PSR2 selective fetch not enabled\n");
 		cleanup(&data);
 		if (!r)
 			psr_print_debugfs(data.debugfs_fd);

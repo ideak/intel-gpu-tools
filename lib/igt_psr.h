@@ -32,7 +32,8 @@
 
 enum psr_mode {
 	PSR_MODE_1,
-	PSR_MODE_2
+	PSR_MODE_2,
+	PSR_MODE_2_SEL_FETCH,
 };
 
 bool psr_disabled_check(int debugfs_fd);

@@ -158,6 +158,9 @@ static bool psr_set(int device, int debugfs_fd, int mode)
 		case PSR_MODE_2:
 			debug_val = "0x2";
 			break;
+		case PSR_MODE_2_SEL_FETCH:
+			debug_val = "0x4";
+			break;
 		default:
 			/* Disables PSR */
 			debug_val = "0x1";
