@@ -567,8 +567,8 @@ static void capture_format_crcs_packed(data_t *data, enum pipe pipe,
 	prepare_format_color(data, pipe, plane, format, modifier,
 			     width, height, encoding, range, &black, fb, true);
 
-	igt_display_commit_atomic(&data->display, DRM_MODE_ATOMIC_ALLOW_MODESET,
-				  NULL);
+	igt_display_commit2(&data->display, data->display.is_atomic ?
+			    COMMIT_ATOMIC : COMMIT_UNIVERSAL);
 
 	igt_remove_fb(data->drm_fd, &old_fb);
 
