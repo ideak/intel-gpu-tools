@@ -658,9 +658,16 @@ void igt_kselftests(const char *module_name,
 	igt_kselftest_get_tests(tst.kmod, filter, &tests);
 	igt_subtest_with_dynamic(filter ?: "all") {
 		igt_list_for_each_entry_safe(tl, tn, &tests, link) {
+			unsigned long taints;
+
 			igt_dynamic_f("%s", unfilter(filter, tl->name))
 				igt_kselftest_execute(&tst, tl, options, result);
 			free(tl);
+
+			if (igt_kernel_tainted(&taints)) {
+				igt_info("Kernel tainted, not executing more selftests.\n");
+				break;
+			}
 		}
 	}
 
