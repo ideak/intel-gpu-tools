@@ -351,7 +351,7 @@ void cea_sad_init_pcm(struct cea_sad *sad, int channels,
 const struct cea_vsdb *cea_vsdb_get_hdmi_default(size_t *size)
 {
 	/* We'll generate a VSDB with 2 extension fields. */
-	static char raw[CEA_VSDB_HDMI_MIN_SIZE + 2] = {0};
+	static char raw[CEA_VSDB_HDMI_MIN_SIZE + 3] = {0};
 	struct cea_vsdb *vsdb;
 	struct hdmi_vsdb *hdmi;
 
