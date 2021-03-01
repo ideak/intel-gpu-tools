@@ -51,6 +51,7 @@ typedef struct data {
 	igt_plane_t *primary;
 	igt_fb_t fb0;
 	igt_fb_t fb1;
+	range_t range;
 } data_t;
 
 typedef struct vtest_ns {
@@ -116,13 +117,13 @@ static uint64_t rate_from_refresh(uint64_t refresh)
  *  - if max range is grater than the current mode vfreq, consider
  *       current mode vfreq as the max range.
  */
-static range_t get_vrr_range(data_t *data, igt_output_t *output)
+static range_t
+get_vrr_range(data_t *data, igt_output_t *output, uint32_t curr_vrefresh)
 {
 	char buf[256];
 	char *start_loc;
 	int fd, res;
 	range_t range;
-	drmModeModeInfo *mode = igt_output_get_mode(output);
 
 	fd = igt_debugfs_connector_dir(data->drm_fd, output->name, O_RDONLY);
 	igt_assert(fd >= 0);
@@ -134,23 +135,21 @@ static range_t get_vrr_range(data_t *data, igt_output_t *output)
 
 	igt_assert(start_loc = strstr(buf, "Min: "));
 	igt_assert_eq(sscanf(start_loc, "Min: %u", &range.min), 1);
-	igt_require(mode->vrefresh > range.min);
+	igt_require(curr_vrefresh > range.min);
 
 	igt_assert(start_loc = strstr(buf, "Max: "));
 	igt_assert_eq(sscanf(start_loc, "Max: %u", &range.max), 1);
 
-	range.max = (mode->vrefresh < range.max) ? mode->vrefresh : range.max;
+	range.max = (curr_vrefresh < range.max) ? curr_vrefresh : range.max;
 
 	return range;
 }
 
 /* Returns vrr test frequency for min, mid & max range. */
-static vtest_ns_t get_test_rate_ns(data_t *data, igt_output_t *output)
+static vtest_ns_t get_test_rate_ns(range_t range)
 {
-	range_t range;
 	vtest_ns_t vtest_ns;
 
-	range = get_vrr_range(data, output);
 	vtest_ns.min = rate_from_refresh(range.min);
 	vtest_ns.mid = rate_from_refresh(((range.max + range.min) / 2));
 	vtest_ns.max = rate_from_refresh(range.max);
@@ -198,6 +197,9 @@ static void prepare_test(data_t *data, igt_output_t *output, enum pipe pipe)
 			1.00, 0.00, 0.00);
 
 	igt_put_cairo_ctx(cr);
+
+	/* Capture VRR range */
+	data->range = get_vrr_range(data, output, mode.vrefresh);
 
 	/* Take care of any required modesetting before the test begins. */
 	data->primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
@@ -248,7 +250,7 @@ flip_and_measure(data_t *data, igt_output_t *output, enum pipe pipe,
 	uint64_t start_ns, last_event_ns, target_ns;
 	uint32_t total_flip = 0, total_pass = 0;
 	bool front = false;
-	vtest_ns_t vtest_ns = get_test_rate_ns(data, output);
+	vtest_ns_t vtest_ns = get_test_rate_ns(data->range);
 
 	/* Align with the flip completion event to speed up convergence. */
 	do_flip(data, &data->fb0);
@@ -316,14 +318,17 @@ static void
 test_basic(data_t *data, enum pipe pipe, igt_output_t *output, uint32_t flags)
 {
 	uint32_t result;
-	vtest_ns_t vtest_ns = get_test_rate_ns(data, output);
-	range_t range = get_vrr_range(data, output);
-	uint64_t rate = vtest_ns.mid;
+	vtest_ns_t vtest_ns;
+	range_t range;
+	uint64_t rate;
+
+	prepare_test(data, output, pipe);
+	range = data->range;
+	vtest_ns = get_test_rate_ns(range);
+	rate = vtest_ns.mid;
 
 	igt_info("VRR Test execution on %s, PIPE_%s with VRR range: (%u-%u) Hz\n",
 		 output->name, kmstest_pipe_name(pipe), range.min, range.max);
-
-	prepare_test(data, output, pipe);
 
 	set_vrr_on_pipe(data, pipe, 1);
 
