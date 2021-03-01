@@ -33,6 +33,13 @@
  */
 #define TEST_DURATION_NS (5000000000ull)
 
+#define DRM_MODE_FMT    "\"%s\": %d %d %d %d %d %d %d %d %d %d 0x%x 0x%x"
+#define DRM_MODE_ARG(m) \
+	(m)->name, (m)->vrefresh, (m)->clock, \
+	(m)->hdisplay, (m)->hsync_start, (m)->hsync_end, (m)->htotal, \
+	(m)->vdisplay, (m)->vsync_start, (m)->vsync_end, (m)->vtotal, \
+	(m)->type, (m)->flags
+
 enum {
 	TEST_NONE = 0,
 	TEST_DPMS = 1 << 0,
@@ -112,13 +119,31 @@ static uint64_t rate_from_refresh(uint64_t refresh)
 	return NSECS_PER_SEC / refresh;
 }
 
-/* Read min and max vrr range from the connector debugfs.
- *  - min range should be less than the current mode vfreq
- *  - if max range is grater than the current mode vfreq, consider
- *       current mode vfreq as the max range.
+/* Instead of running on default mode, loop through the connector modes
+ * and find the mode with max refresh rate to exercise full vrr range.
  */
+static drmModeModeInfo
+output_mode_with_maxrate(igt_output_t *output, unsigned int vrr_max)
+{
+	int i;
+	drmModeConnectorPtr connector = output->config.connector;
+	drmModeModeInfo mode = *igt_output_get_mode(output);
+
+	igt_debug("Default Mode " DRM_MODE_FMT "\n", DRM_MODE_ARG(&mode));
+
+	for (i = 0; i < connector->count_modes; i++)
+		if (connector->modes[i].vrefresh > mode.vrefresh &&
+		    connector->modes[i].vrefresh <= vrr_max)
+			mode = connector->modes[i];
+
+	igt_debug("Override Mode " DRM_MODE_FMT "\n", DRM_MODE_ARG(&mode));
+
+	return mode;
+}
+
+/* Read min and max vrr range from the connector debugfs. */
 static range_t
-get_vrr_range(data_t *data, igt_output_t *output, uint32_t curr_vrefresh)
+get_vrr_range(data_t *data, igt_output_t *output)
 {
 	char buf[256];
 	char *start_loc;
@@ -135,12 +160,9 @@ get_vrr_range(data_t *data, igt_output_t *output, uint32_t curr_vrefresh)
 
 	igt_assert(start_loc = strstr(buf, "Min: "));
 	igt_assert_eq(sscanf(start_loc, "Min: %u", &range.min), 1);
-	igt_require(curr_vrefresh > range.min);
 
 	igt_assert(start_loc = strstr(buf, "Max: "));
 	igt_assert_eq(sscanf(start_loc, "Max: %u", &range.max), 1);
-
-	range.max = (curr_vrefresh < range.max) ? curr_vrefresh : range.max;
 
 	return range;
 }
@@ -175,12 +197,24 @@ static void set_vrr_on_pipe(data_t *data, enum pipe pipe, bool enabled)
 /* Prepare the display for testing on the given pipe. */
 static void prepare_test(data_t *data, igt_output_t *output, enum pipe pipe)
 {
-	drmModeModeInfo mode = *igt_output_get_mode(output);
+	drmModeModeInfo mode;
 	cairo_t *cr;
 
 	/* Reset output */
 	igt_display_reset(&data->display);
 	igt_output_set_pipe(output, pipe);
+
+	/* Capture VRR range */
+	data->range = get_vrr_range(data, output);
+
+	/* Override mode with max vrefresh.
+	 *   - vrr_min range should be less than the override mode vrefresh.
+	 *   - Limit the vrr_max range with the override mode vrefresh.
+	 */
+	mode = output_mode_with_maxrate(output, data->range.max);
+	igt_require(mode.vrefresh > data->range.min);
+	data->range.max = mode.vrefresh;
+	igt_output_override_mode(output, &mode);
 
 	/* Prepare resources */
 	igt_create_color_fb(data->drm_fd, mode.hdisplay, mode.vdisplay,
@@ -197,9 +231,6 @@ static void prepare_test(data_t *data, igt_output_t *output, enum pipe pipe)
 			1.00, 0.00, 0.00);
 
 	igt_put_cairo_ctx(cr);
-
-	/* Capture VRR range */
-	data->range = get_vrr_range(data, output, mode.vrefresh);
 
 	/* Take care of any required modesetting before the test begins. */
 	data->primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
@@ -270,6 +301,9 @@ flip_and_measure(data_t *data, igt_output_t *output, enum pipe pipe,
 		 * that same frame.
 		 */
 		event_ns = get_kernel_event_ns(data, DRM_EVENT_FLIP_COMPLETE);
+
+		igt_debug("event_ns - last_event_ns: %"PRIu64"\n",
+						(event_ns - last_event_ns));
 
 		/*
 		 * Check if the difference between the two flip timestamps
@@ -363,12 +397,8 @@ test_basic(data_t *data, enum pipe pipe, igt_output_t *output, uint32_t flags)
 	 * if refresh_rate is 50Hz:
 	 *      Flip will happen right away so returned refresh rate is 50Hz.
 	 * if refresh_rate < 40Hz:
-	 *      As the driver will terminate the vblank at Vmax, the expected
-	 *      refresh rate could be:
-	 *      	(Vmax + time left for the next flip + Vmin)
-	 *
-	 *      And it is very difficult to generalize, at least 1/3 rd of the
-	 *      flips should be at Vmin (60 Hz) is expected.
+	 *      h/w will terminate the vblank at Vmax which is obvious.
+	 *      So, for now we can safely ignore the lower refresh rates
 	 */
 	if (flags & TEST_FLIPLINE) {
 		rate = rate_from_refresh(range.max + 5);
@@ -376,12 +406,6 @@ test_basic(data_t *data, enum pipe pipe, igt_output_t *output, uint32_t flags)
 		igt_assert_f(result > 75,
 			     "Refresh rate (%u Hz) %"PRIu64"ns: Target VRR on threshold not reached, result was %u%%\n",
 			     (range.max + 5), rate, result);
-
-		rate = rate_from_refresh(range.min - 5);
-		result = flip_and_measure(data, output, pipe, rate, TEST_DURATION_NS);
-		igt_assert_f(result > 35,
-			     "Refresh rate (%u Hz) %"PRIu64"ns: Target VRR on threshold not reached, result was %u%%\n",
-			     (range.min - 5), rate, result);
 	}
 
 	rate = vtest_ns.mid;
@@ -399,6 +423,7 @@ test_basic(data_t *data, enum pipe pipe, igt_output_t *output, uint32_t flags)
 	/* Clean-up */
 	igt_plane_set_fb(data->primary, NULL);
 	igt_output_set_pipe(output, PIPE_NONE);
+	igt_output_override_mode(output, NULL);
 	igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
 	igt_remove_fb(data->drm_fd, &data->fb1);
