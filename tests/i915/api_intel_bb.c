@@ -36,6 +36,7 @@
 #include <glib.h>
 #include <zlib.h>
 #include "intel_bufops.h"
+#include "i915/gem_vm.h"
 
 #define PAGE_SIZE 4096
 
@@ -236,6 +237,107 @@ static void bb_with_allocator(struct buf_ops *bops)
 
 	intel_buf_destroy(src);
 	intel_buf_destroy(dst);
+	intel_bb_destroy(ibb);
+}
+
+static void bb_with_vm(struct buf_ops *bops)
+{
+	int i915 = buf_ops_get_fd(bops);
+	struct drm_i915_gem_context_param arg = {
+		.param = I915_CONTEXT_PARAM_VM,
+	};
+	struct intel_bb *ibb;
+	struct intel_buf *src, *dst, *gap;
+	uint32_t ctx = 0, vm_id1, vm_id2;
+	uint64_t prev_vm, vm;
+	uint64_t src_addr[5], dst_addr[5];
+
+	igt_require(gem_uses_full_ppgtt(i915));
+
+	ibb = intel_bb_create_with_allocator(i915, ctx, PAGE_SIZE,
+					     INTEL_ALLOCATOR_SIMPLE);
+	if (debug_bb)
+		intel_bb_set_debug(ibb, true);
+
+	src = intel_buf_create(bops, 4096/32, 32, 8, 0, I915_TILING_NONE,
+			       I915_COMPRESSION_NONE);
+	dst = intel_buf_create(bops, 4096/32, 32, 8, 0, I915_TILING_NONE,
+			       I915_COMPRESSION_NONE);
+	gap = intel_buf_create(bops, 4096, 128, 8, 0, I915_TILING_NONE,
+			       I915_COMPRESSION_NONE);
+
+	/* vm for second blit */
+	vm_id1 = gem_vm_create(i915);
+
+	/* Get vm_id for default vm */
+	arg.ctx_id = ctx;
+	gem_context_get_param(i915, &arg);
+	vm_id2 = arg.value;
+
+	igt_debug("Vm_id1: %u\n", vm_id1);
+	igt_debug("Vm_id2: %u\n", vm_id2);
+
+	/* First blit without set calling setparam */
+	intel_bb_copy_intel_buf(ibb, dst, src, 4096);
+	src_addr[0] = src->addr.offset;
+	dst_addr[0] = dst->addr.offset;
+	igt_debug("step1: src: 0x%llx, dst: 0x%llx\n",
+		  (long long) src_addr[0], (long long) dst_addr[0]);
+
+	/* Open new allocator with vm_id */
+	vm = intel_allocator_open_vm(i915, vm_id1, INTEL_ALLOCATOR_SIMPLE);
+	prev_vm = intel_bb_assign_vm(ibb, vm, vm_id1);
+
+	intel_bb_add_intel_buf(ibb, gap, false);
+	intel_bb_copy_intel_buf(ibb, dst, src, 4096);
+	src_addr[1] = src->addr.offset;
+	dst_addr[1] = dst->addr.offset;
+	igt_debug("step2: src: 0x%llx, dst: 0x%llx\n",
+		  (long long) src_addr[1], (long long) dst_addr[1]);
+
+	/* Back with default vm */
+	intel_bb_assign_vm(ibb, prev_vm, vm_id2);
+	intel_bb_add_intel_buf(ibb, gap, false);
+	intel_bb_copy_intel_buf(ibb, dst, src, 4096);
+	src_addr[2] = src->addr.offset;
+	dst_addr[2] = dst->addr.offset;
+	igt_debug("step3: src: 0x%llx, dst: 0x%llx\n",
+		  (long long) src_addr[2], (long long) dst_addr[2]);
+
+	/* And exchange one more time */
+	intel_bb_assign_vm(ibb, vm, vm_id1);
+	intel_bb_copy_intel_buf(ibb, dst, src, 4096);
+	src_addr[3] = src->addr.offset;
+	dst_addr[3] = dst->addr.offset;
+	igt_debug("step4: src: 0x%llx, dst: 0x%llx\n",
+		  (long long) src_addr[3], (long long) dst_addr[3]);
+
+	/* Back with default vm */
+	gem_vm_destroy(i915, vm_id1);
+	gem_vm_destroy(i915, vm_id2);
+	intel_bb_assign_vm(ibb, prev_vm, 0);
+
+	/* We can close it after assign previous vm to ibb */
+	intel_allocator_close(vm);
+
+	/* Try default vm still works */
+	intel_bb_copy_intel_buf(ibb, dst, src, 4096);
+	src_addr[4] = src->addr.offset;
+	dst_addr[4] = dst->addr.offset;
+	igt_debug("step5: src: 0x%llx, dst: 0x%llx\n",
+		  (long long) src_addr[4], (long long) dst_addr[4]);
+
+	/* Addresses should match for vm and prev_vm blits */
+	igt_assert_eq(src_addr[0], src_addr[2]);
+	igt_assert_eq(dst_addr[0], dst_addr[2]);
+	igt_assert_eq(src_addr[1], src_addr[3]);
+	igt_assert_eq(dst_addr[1], dst_addr[3]);
+	igt_assert_eq(src_addr[2], src_addr[4]);
+	igt_assert_eq(dst_addr[2], dst_addr[4]);
+
+	intel_buf_destroy(src);
+	intel_buf_destroy(dst);
+	intel_buf_destroy(gap);
 	intel_bb_destroy(ibb);
 }
 
@@ -1454,6 +1556,9 @@ igt_main_args("dpib", NULL, help_str, opt_handler, NULL)
 
 	igt_subtest("bb-with-allocator")
 		bb_with_allocator(bops);
+
+	igt_subtest("bb-with-vm")
+		bb_with_vm(bops);
 
 	igt_subtest("lot-of-buffers")
 		lot_of_buffers(bops);
