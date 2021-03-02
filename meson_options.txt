@@ -50,3 +50,7 @@ option('use_rpath',
        type : 'boolean',
        value : false,
        description : 'Set runpath on installed executables for libigt.so')
+
+option('srcdir',
+       type : 'string',
+       description : 'Override the source code path embedded inside target binaries (optional)')
