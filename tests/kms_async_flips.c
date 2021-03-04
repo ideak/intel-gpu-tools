@@ -52,6 +52,11 @@ typedef struct {
 	drmModeConnectorPtr connector;
 	unsigned long flip_timestamp_us;
 	double flip_interval;
+	igt_pipe_crc_t *pipe_crc;
+	igt_crc_t ref_crc;
+	int flip_count;
+	int frame_count;
+	bool flip_pending;
 } data_t;
 
 static drmModeConnectorPtr find_connector_for_modeset(data_t *data)
@@ -379,6 +384,142 @@ static void test_init(data_t *data)
 	drmModeFreeResources(res);
 }
 
+static void queue_vblank(data_t *data)
+{
+	drmVBlank wait_vbl = {
+		.request.type = DRM_VBLANK_RELATIVE | DRM_VBLANK_EVENT |
+			kmstest_get_pipe_from_crtc_id(data->drm_fd, data->crtc_id),
+		.request.sequence = 1,
+		.request.signal = (long)data,
+	};
+
+	igt_assert(drmIoctl(data->drm_fd, DRM_IOCTL_WAIT_VBLANK, &wait_vbl) == 0);
+}
+
+static void vblank_handler_crc(int fd_, unsigned int sequence, unsigned int tv_sec,
+			       unsigned int tv_usec, void *_data)
+{
+	data_t *data = _data;
+	igt_crc_t crc;
+
+	data->frame_count++;
+
+	igt_pipe_crc_get_single(data->pipe_crc, &crc);
+	igt_assert_crc_equal(&data->ref_crc, &crc);
+
+	/* check again next vblank */
+	queue_vblank(data);
+}
+
+static void flip_handler_crc(int fd_, unsigned int sequence, unsigned int tv_sec,
+			     unsigned int tv_usec, void *_data)
+{
+	data_t *data = _data;
+
+	data->flip_pending = false;
+	data->flip_count++;
+}
+
+static void wait_events_crc(data_t *data)
+{
+	drmEventContext evctx = {
+		.version = 2,
+		.vblank_handler = vblank_handler_crc,
+		.page_flip_handler = flip_handler_crc,
+	};
+
+	while (data->flip_pending) {
+		struct pollfd pfd = {
+			.fd = data->drm_fd,
+			.events = POLLIN,
+		};
+		int ret;
+
+		ret = poll(&pfd, 1, 2000);
+
+		switch (ret) {
+		case 0:
+			igt_assert_f(0, "Flip Timeout\n");
+			break;
+		case 1:
+			ret = drmHandleEvent(data->drm_fd, &evctx);
+			igt_assert(ret == 0);
+			break;
+		default:
+			/* unexpected */
+			igt_assert(0);
+		}
+	}
+}
+
+static unsigned int clock_ms(void)
+{
+	struct timespec ts;
+
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+
+	return ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
+static void paint_fb(int fd, struct igt_fb *fb, uint32_t color)
+{
+	igt_draw_rect_fb(fd, NULL, 0, fb,
+			 gem_has_mappable_ggtt(fd) ?
+			 IGT_DRAW_MMAP_GTT : IGT_DRAW_MMAP_WC,
+			 0, 0, 1, fb->height, color);
+}
+
+static void test_crc(data_t *data)
+{
+	unsigned int frame = 0;
+	unsigned int start;
+	int ret;
+
+	data->flip_count = 0;
+	data->frame_count = 0;
+	data->flip_pending = false;
+
+	igt_draw_fill_fb(data->drm_fd, &data->bufs[frame], 0xff0000ff);
+	igt_draw_fill_fb(data->drm_fd, &data->bufs[!frame], 0xff0000ff);
+
+	ret = drmModeSetCrtc(data->drm_fd, data->crtc_id, data->bufs[frame].fb_id, 0, 0,
+			     &data->connector->connector_id, 1, &data->connector->modes[0]);
+	igt_assert_eq(ret, 0);
+
+	data->pipe_crc = igt_pipe_crc_new(data->drm_fd,
+					  kmstest_get_pipe_from_crtc_id(data->drm_fd, data->crtc_id),
+					  INTEL_PIPE_CRC_SOURCE_AUTO);
+
+	igt_pipe_crc_start(data->pipe_crc);
+	igt_pipe_crc_get_single(data->pipe_crc, &data->ref_crc);
+
+	queue_vblank(data);
+
+	start = clock_ms();
+
+	while (clock_ms() - start < 2000) {
+		/* fill the next fb with the expected color */
+		paint_fb(data->drm_fd, &data->bufs[frame], 0xff0000ff);
+
+		data->flip_pending = true;
+		ret = drmModePageFlip(data->drm_fd, data->crtc_id, data->bufs[frame].fb_id,
+				      DRM_MODE_PAGE_FLIP_ASYNC | DRM_MODE_PAGE_FLIP_EVENT, data);
+		igt_assert_eq(ret, 0);
+
+		wait_events_crc(data);
+
+		/* clobber the previous fb which should no longer be scanned out */
+		frame = !frame;
+		paint_fb(data->drm_fd, &data->bufs[frame], rand());
+	}
+
+	igt_pipe_crc_stop(data->pipe_crc);
+	igt_pipe_crc_free(data->pipe_crc);
+
+	/* make sure we got at a reasonable number of async flips done */
+	igt_assert_lt(data->frame_count * 2, data->flip_count);
+}
+
 igt_main
 {
 	static data_t data;
@@ -418,6 +559,10 @@ igt_main
 		igt_describe("Negative case to verify if changes in fb are rejected from kernel as expected");
 		igt_subtest("invalid-async-flip")
 			test_invalid(&data);
+
+		igt_describe("Use CRC to verify async flip scans out the correct framebuffer");
+		igt_subtest("crc")
+			test_crc(&data);
 
 		igt_fixture {
 			for (i = 0; i < ARRAY_SIZE(data.bufs); i++)
