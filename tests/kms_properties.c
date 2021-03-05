@@ -735,35 +735,51 @@ igt_main
 		igt_display_require(&display, display.drm_fd);
 	}
 
+	igt_describe("Tests plane properties with legacy commit");
 	igt_subtest("plane-properties-legacy")
 		plane_properties(&display, false);
 
+	igt_describe("Tests plane properties with atomic commit");
 	igt_subtest("plane-properties-atomic")
 		plane_properties(&display, true);
 
+	igt_describe("Tests crtc properties with legacy commit");
 	igt_subtest("crtc-properties-legacy")
 		crtc_properties(&display, false);
 
+	igt_describe("Tests crtc properties with atomic commit");
 	igt_subtest("crtc-properties-atomic")
 		crtc_properties(&display, true);
 
+	igt_describe("Tests connector properties with legacy commit");
 	igt_subtest("connector-properties-legacy")
 		connector_properties(&display, false);
 
+	igt_describe("Tests connector properties with atomic commit");
 	igt_subtest("connector-properties-atomic")
 		connector_properties(&display, true);
+
+	igt_describe("Checks each property of any type with combination of mode object with legacy "
+		     "commit and make sure only valid properties are set to mode object else "
+		     "return with relevant error");
 
 	igt_subtest("invalid-properties-legacy")
 		invalid_properties(&display, false);
 
+	igt_describe("Checks each property of any type with combination of mode object with atomic "
+		     "commit and make sure only valid properties are set to mode object else "
+		     "return with relevant error");
+
 	igt_subtest("invalid-properties-atomic")
 		invalid_properties(&display, true);
 
+	igt_describe("Test validates the properties of all planes, crtc and connectors with atomic commit");
 	igt_subtest("get_properties-sanity-atomic") {
 		igt_skip_on(!display.is_atomic);
 		get_prop_sanity(&display, true);
 	}
 
+	igt_describe("Test validates the properties of all planes, crtc and connectors with legacy commit");
 	igt_subtest("get_properties-sanity-non-atomic") {
 		if (display.is_atomic)
 			igt_assert_eq(drmSetClientCap(display.drm_fd, DRM_CLIENT_CAP_ATOMIC, 0), 0);
