@@ -884,6 +884,7 @@ static void test_plane_rotation_exhaust_fences(data_t *data,
 	int i;
 
 	igt_require(igt_plane_has_prop(plane, IGT_PLANE_ROTATION));
+	igt_require(gem_available_fences(display->drm_fd) > 0);
 
 	prepare_crtc(data, output, pipe, plane, false);
 
