@@ -288,6 +288,45 @@ static void parallel_one(int fd, uint8_t type)
 	igt_assert_eq(intel_allocator_close(ahnd), true);
 }
 
+static void standalone(int fd)
+{
+	uint64_t ahnd, offset, size = 4096;
+	uint32_t handle = 1, child_handle = 2;
+	uint64_t *shared;
+
+	shared = mmap(0, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+
+	intel_allocator_multiprocess_start();
+
+	ahnd = intel_allocator_open(fd, 0, INTEL_ALLOCATOR_SIMPLE);
+	offset = intel_allocator_alloc(ahnd, handle, size, 0);
+
+	igt_fork(child, 2) {
+		/*
+		 * Use standalone allocator for child 1, detach from parent,
+		 * child 2 use allocator from parent.
+		 */
+		if (child == 1)
+			intel_allocator_init();
+
+		ahnd = intel_allocator_open(fd, 0, INTEL_ALLOCATOR_SIMPLE);
+		shared[child] = intel_allocator_alloc(ahnd, child_handle, size, 0);
+
+		intel_allocator_free(ahnd, child_handle);
+		intel_allocator_close(ahnd);
+	}
+	igt_waitchildren();
+	igt_assert_eq(offset, shared[1]);
+	igt_assert_neq(offset, shared[2]);
+
+	intel_allocator_free(ahnd, handle);
+	igt_assert_eq(intel_allocator_close(ahnd), true);
+
+	intel_allocator_multiprocess_stop();
+
+	munmap(shared, 4096);
+}
+
 #define SIMPLE_GROUP_ALLOCS 8
 static void __simple_allocs(int fd)
 {
@@ -625,6 +664,9 @@ igt_main
 			}
 		}
 	}
+
+	igt_subtest_f("standalone")
+		standalone(fd);
 
 	igt_subtest_f("fork-simple-once")
 		fork_simple_once(fd);
