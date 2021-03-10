@@ -223,7 +223,14 @@ static void test_bpc_switch_on_output(data_t *data, igt_output_t *output,
 			data->h = afb.height;
 		}
 
-		igt_plane_set_fb(data->primary, NULL);
+		/*
+		 * amdgpu requires a primary plane when the CRTC is enabled.
+		 * However, some older Intel hardware (hsw) have scaling
+		 * requirements that are not met by the plane, so remove it
+		 * for non-AMD devices.
+		 */
+		if (!is_amdgpu_device(data->fd))
+			igt_plane_set_fb(data->primary, NULL);
 
 		/*
 		 * i915 driver doesn't expose max bpc as debugfs entry,
