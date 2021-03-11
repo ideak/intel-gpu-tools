@@ -45,7 +45,7 @@ poll_write_bo_test(int fd, int poll_flag)
 	int dmabuf_fd = prime_handle_to_fd(fd, handle);
 	struct pollfd p = {
 		.fd = dmabuf_fd,
-		.events = POLLIN,
+		.events = poll_flag,
 	};
 	struct drm_vc4_wait_bo wait = {
 		.handle = handle,
