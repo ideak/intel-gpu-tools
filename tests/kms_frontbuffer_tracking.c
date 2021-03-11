@@ -3411,10 +3411,11 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 		    (t.feature & FEATURE_FBC) == 0)
 			continue;
 
-		igt_subtest_f("%s-%s-%s-fliptrack",
+		igt_subtest_f("%s-%s-%s-fliptrack-%s",
 			      feature_str(t.feature),
 			      pipes_str(t.pipes),
-			      fbs_str(t.fbs))
+			      fbs_str(t.fbs),
+			      igt_draw_get_method_name(t.method))
 			fliptrack_subtest(&t, FLIP_PAGEFLIP);
 	TEST_MODE_ITER_END
 
@@ -3479,7 +3480,9 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 		    t.method != IGT_DRAW_MMAP_GTT)
 			continue;
 
-		igt_subtest_f("%s-farfromfence", feature_str(t.feature))
+		igt_subtest_f("%s-farfromfence-%s",
+			      feature_str(t.feature),
+			      igt_draw_get_method_name(t.method))
 			farfromfence_subtest(&t);
 	TEST_MODE_ITER_END
 
