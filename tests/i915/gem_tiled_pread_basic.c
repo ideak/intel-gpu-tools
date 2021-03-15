@@ -128,6 +128,7 @@ igt_simple_main
 	igt_require(gem_available_fences(fd) > 0);
 	handle = create_bo(fd);
 	igt_require(gem_get_tiling(fd, handle, &tiling, &swizzle));
+	gem_require_pread_pwrite(fd);
 
 	devid = intel_get_drm_devid(fd);
 

@@ -284,6 +284,7 @@ igt_main
 		data.drm_fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(data.drm_fd);
 		gem_require_blitter(data.drm_fd);
+		gem_require_pread_pwrite(data.drm_fd);
 
 		data.devid = intel_get_drm_devid(data.drm_fd);
 		data.bops = buf_ops_create(data.drm_fd);

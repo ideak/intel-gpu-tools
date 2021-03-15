@@ -211,6 +211,9 @@ static void all(int fd, struct intel_execution_engine2 *engine, unsigned flags)
 	if (flags & CONTEXTS)
 		gem_require_contexts(fd);
 
+	if (flags & USERPTR)
+		gem_require_pread_pwrite(fd);
+
 	if (flags & FDS) {
 		igt_require(gen > 5);
 		igt_require(igt_allow_unlimited_files());

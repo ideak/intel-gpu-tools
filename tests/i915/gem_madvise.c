@@ -155,6 +155,7 @@ dontneed_before_pwrite(void)
 	uint32_t bbe = MI_BATCH_BUFFER_END;
 	uint32_t handle;
 
+	gem_require_pread_pwrite(fd);
 	handle = gem_create(fd, OBJECT_SIZE);
 	gem_madvise(fd, handle, I915_MADV_DONTNEED);
 
@@ -171,6 +172,7 @@ dontneed_before_exec(void)
 	struct drm_i915_gem_exec_object2 exec;
 	uint32_t buf[] = { MI_BATCH_BUFFER_END, 0 };
 
+	gem_require_pread_pwrite(fd);
 	memset(&execbuf, 0, sizeof(execbuf));
 	memset(&exec, 0, sizeof(exec));
 

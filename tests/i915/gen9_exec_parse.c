@@ -1235,8 +1235,10 @@ igt_main
 			   -EINVAL);
 	}
 
-	igt_subtest("batch-invalid-length")
+	igt_subtest("batch-invalid-length") {
+		gem_require_pread_pwrite(i915);
 		test_invalid_length(i915, handle);
+	}
 
 	igt_subtest("basic-rejected")
 		test_rejected(i915, handle, false);

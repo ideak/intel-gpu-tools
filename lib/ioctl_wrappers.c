@@ -56,6 +56,7 @@
 #include "igt_debugfs.h"
 #include "igt_sysfs.h"
 #include "config.h"
+#include "i915/gem_mman.h"
 
 #ifdef HAVE_VALGRIND
 #include <valgrind/valgrind.h>
@@ -324,6 +325,70 @@ void gem_close(int fd, uint32_t handle)
 	do_ioctl(fd, DRM_IOCTL_GEM_CLOSE, &close_bo);
 }
 
+static bool is_cache_coherent(int fd, uint32_t handle)
+{
+	return gem_get_caching(fd, handle) != I915_CACHING_NONE;
+}
+
+static void mmap_write(int fd, uint32_t handle, uint64_t offset,
+		       const void *buf, uint64_t length)
+{
+	void *map = NULL;
+
+	if (!length)
+		return;
+
+	if (is_cache_coherent(fd, handle)) {
+		/* offset arg for mmap functions must be 0 */
+		map = __gem_mmap__cpu_coherent(fd, handle, 0, offset + length,
+					       PROT_READ | PROT_WRITE);
+		if (map)
+			gem_set_domain(fd, handle,
+				       I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+	}
+
+	if (!map) {
+		map = __gem_mmap_offset__wc(fd, handle, 0, offset + length,
+					    PROT_READ | PROT_WRITE);
+		if (!map)
+			map = gem_mmap__wc(fd, handle, 0, offset + length,
+					   PROT_READ | PROT_WRITE);
+		gem_set_domain(fd, handle,
+			       I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
+	}
+
+	memcpy(map + offset, buf, length);
+	munmap(map, offset + length);
+}
+
+static void mmap_read(int fd, uint32_t handle, uint64_t offset, void *buf, uint64_t length)
+{
+	void *map = NULL;
+
+	if (!length)
+		return;
+
+	if (gem_has_llc(fd) || is_cache_coherent(fd, handle)) {
+		/* offset arg for mmap functions must be 0 */
+		map = __gem_mmap__cpu_coherent(fd, handle, 0,
+					       offset + length, PROT_READ);
+		if (map)
+			gem_set_domain(fd, handle, I915_GEM_DOMAIN_CPU, 0);
+	}
+
+	if (!map) {
+		map = __gem_mmap_offset__wc(fd, handle, 0, offset + length,
+					    PROT_READ);
+		if (!map)
+			map = gem_mmap__wc(fd, handle, 0, offset + length,
+					   PROT_READ);
+		gem_set_domain(fd, handle, I915_GEM_DOMAIN_WC, 0);
+	}
+
+	memcpy(buf, map + offset, length);
+	munmap(map, offset + length);
+}
+
 int __gem_write(int fd, uint32_t handle, uint64_t offset, const void *buf, uint64_t length)
 {
 	struct drm_i915_gem_pwrite gem_pwrite;
@@ -349,12 +414,18 @@ int __gem_write(int fd, uint32_t handle, uint64_t offset, const void *buf, uint6
  * @buf: pointer to the data to write into the buffer
  * @length: size of the subrange
  *
- * This wraps the PWRITE ioctl, which is to upload a linear data to a subrange
- * of a gem buffer object.
+ * Method to write to a gem object. Uses the PWRITE ioctl when it is
+ * available, else it uses mmap + memcpy to upload linear data to a
+ * subrange of a gem buffer object.
  */
 void gem_write(int fd, uint32_t handle, uint64_t offset, const void *buf, uint64_t length)
 {
-	igt_assert_eq(__gem_write(fd, handle, offset, buf, length), 0);
+	int ret = __gem_write(fd, handle, offset, buf, length);
+
+	igt_assert(ret == 0 || ret == -EOPNOTSUPP);
+
+	if (ret == -EOPNOTSUPP)
+		mmap_write(fd, handle, offset, buf, length);
 }
 
 int __gem_read(int fd, uint32_t handle, uint64_t offset, void *buf, uint64_t length)
@@ -381,12 +452,64 @@ int __gem_read(int fd, uint32_t handle, uint64_t offset, void *buf, uint64_t len
  * @buf: pointer to the data to read into
  * @length: size of the subrange
  *
- * This wraps the PREAD ioctl, which is to download a linear data to a subrange
- * of a gem buffer object.
+ * Method to read from a gem object. Uses the PREAD ioctl when it is
+ * available, else it uses mmap + memcpy to download linear data from a
+ * subrange of a gem buffer object.
  */
 void gem_read(int fd, uint32_t handle, uint64_t offset, void *buf, uint64_t length)
 {
-	igt_assert_eq(__gem_read(fd, handle, offset, buf, length), 0);
+	int ret = __gem_read(fd, handle, offset, buf, length);
+
+	igt_assert(ret == 0 || ret == -EOPNOTSUPP);
+
+	if (ret == -EOPNOTSUPP)
+		mmap_read(fd, handle, offset, buf, length);
+}
+
+/**
+ * gem_has_pwrite
+ * @fd: open i915 drm file descriptor
+ *
+ * Feature test macro to query whether pwrite ioctl is supported
+ */
+bool gem_has_pwrite(int fd)
+{
+	uint32_t handle = gem_create(fd, 4096);
+	int buf, ret;
+
+	ret = __gem_write(fd, handle, 0, &buf, sizeof(buf));
+	gem_close(fd, handle);
+
+	return ret != -EOPNOTSUPP;
+}
+
+/**
+ * gem_has_pread
+ * @fd: open i915 drm file descriptor
+ *
+ * Feature test macro to query whether pread ioctl is supported
+ */
+bool gem_has_pread(int fd)
+{
+	uint32_t handle = gem_create(fd, 4096);
+	int buf, ret;
+
+	ret = __gem_read(fd, handle, 0, &buf, sizeof(buf));
+	gem_close(fd, handle);
+
+	return ret != -EOPNOTSUPP;
+}
+
+/**
+ * gem_require_pread_pwrite
+ * @fd: open i915 drm file descriptor
+ *
+ * Feature test macro to query whether pread/pwrite ioctls are supported
+ * and skip if they are not
+ */
+void gem_require_pread_pwrite(int fd)
+{
+	igt_require(gem_has_pread(fd) && gem_has_pwrite(fd));
 }
 
 int __gem_set_domain(int fd, uint32_t handle, uint32_t read, uint32_t write)

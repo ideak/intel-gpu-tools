@@ -280,6 +280,7 @@ igt_main
 		igt_require_gem(fd);
 		gem_require_mappable_ggtt(fd);
 		gem_require_blitter(fd);
+		gem_require_pread_pwrite(fd);
 
 		bops = buf_ops_create(fd);
 

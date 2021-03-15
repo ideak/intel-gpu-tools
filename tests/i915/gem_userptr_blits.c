@@ -1120,6 +1120,7 @@ static int test_forbidden_ops(int fd)
 	uint32_t handle;
 	void *ptr;
 
+	gem_require_pread_pwrite(fd);
 	igt_assert(posix_memalign(&ptr, PAGE_SIZE, PAGE_SIZE) == 0);
 	gem_userptr(fd, ptr, PAGE_SIZE, 0, userptr_flags, &handle);
 
@@ -1648,6 +1649,7 @@ static void test_readonly_pwrite(int i915)
 	 */
 
 	igt_require(igt_setup_clflush());
+	gem_require_pread_pwrite(i915);
 
 	sz = 16 << 12;
 	pages = mmap(NULL, sz, PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);

@@ -300,6 +300,7 @@ igt_main_args("s:", NULL, help_str, opt_handler, NULL)
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
+		gem_require_pread_pwrite(fd);
 
 		dst = gem_create(fd, object_size);
 		src = malloc(object_size);

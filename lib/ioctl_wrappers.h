@@ -71,6 +71,9 @@ int __gem_write(int fd, uint32_t handle, uint64_t offset, const void *buf, uint6
 void gem_write(int fd, uint32_t handle, uint64_t offset,  const void *buf, uint64_t length);
 int __gem_read(int fd, uint32_t handle, uint64_t offset, void *buf, uint64_t length);
 void gem_read(int fd, uint32_t handle, uint64_t offset, void *buf, uint64_t length);
+bool gem_has_pwrite(int fd);
+bool gem_has_pread(int fd);
+void gem_require_pread_pwrite(int fd);
 int __gem_set_domain(int fd, uint32_t handle, uint32_t read, uint32_t write);
 void gem_set_domain(int fd, uint32_t handle, uint32_t read, uint32_t write);
 int gem_wait(int fd, uint32_t handle, int64_t *timeout_ns);

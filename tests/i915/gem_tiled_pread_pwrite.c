@@ -114,6 +114,7 @@ igt_simple_main
 	
 	fd = drm_open_driver(DRIVER_INTEL);
 	igt_require(gem_available_fences(fd) > 0);
+	gem_require_pread_pwrite(fd);
 
 	count = gem_available_fences(fd) + 1;
 	intel_require_memory(2 * count, sizeof(linear), CHECK_RAM);
