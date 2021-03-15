@@ -49,5 +49,6 @@ void gem_require_blitter(int i915);
 unsigned int gem_submission_measure(int i915, unsigned int engine);
 
 void gem_test_engine(int fd, unsigned int engine);
+bool gem_has_relocations(int fd);
 
 #endif /* GEM_SUBMISSION_H */

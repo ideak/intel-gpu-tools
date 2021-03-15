@@ -398,3 +398,33 @@ unsigned int gem_submission_measure(int i915, unsigned int engine)
 
 	return size;
 }
+
+/**
+ * gem_has_relocations:
+ * @fd: opened i915 drm file descriptor
+ *
+ * Feature test macro to query whether kernel allows for generation to
+ * use relocations.
+ *
+ * Returns: true if we can use relocations, otherwise false
+ */
+
+bool gem_has_relocations(int i915)
+{
+	struct drm_i915_gem_relocation_entry reloc = {};
+	struct drm_i915_gem_exec_object2 obj = {
+		.handle = gem_create(i915, 4096),
+		.relocs_ptr = to_user_pointer(&reloc),
+		.relocation_count = 1,
+	};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&obj),
+		.buffer_count = 1,
+	};
+	bool has_relocs;
+
+	has_relocs = __gem_execbuf(i915, &execbuf) == -ENOENT;
+	gem_close(i915, obj.handle);
+
+	return has_relocs;
+}
