@@ -147,6 +147,7 @@ static bool cursor_visible(data_t *data, int x, int y)
 static void restore_image(data_t *data)
 {
 	cairo_t *cr;
+	igt_display_t *display = &data->display;
 
 	/* rendercopy stripped in igt using cairo */
 	cr = igt_get_cairo_ctx(data->drm_fd,
@@ -157,6 +158,8 @@ static void restore_image(data_t *data)
 	cairo_fill(cr);
 	igt_put_cairo_ctx(cr);
 	igt_dirty_fb(data->drm_fd, &data->primary_fb[FRONTBUFFER]);
+	igt_wait_for_vblank(data->drm_fd,
+			    display->pipes[data->pipe].crtc_offset);
 }
 
 static void do_single_test(data_t *data, int x, int y)
