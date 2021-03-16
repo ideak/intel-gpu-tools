@@ -1478,6 +1478,8 @@ igt_main
 	igt_fixture {
 		fd = drm_open_driver_master(DRIVER_INTEL);
 		igt_require_gem(fd);
+		/* Check if relocations supported by platform */
+		igt_require(gem_has_relocations(fd));
 	}
 
 	for (f = flags; f->name; f++) {
