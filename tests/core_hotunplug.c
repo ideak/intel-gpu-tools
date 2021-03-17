@@ -351,11 +351,13 @@ static void node_healthcheck(struct hotunplug *priv, unsigned flags)
 	if (!priv->failure) {
 		char path[200];
 
-		priv->failure = "Device sysfs healthckeck failure!";
 		local_debug("%s\n", "running device sysfs healthcheck");
-		if (igt_sysfs_path(fd_drm, path, sizeof(path)) &&
-		    igt_debugfs_path(fd_drm, path, sizeof(path)))
-			priv->failure = NULL;
+		priv->failure = "Device sysfs healthckeck failure!";
+		if (igt_sysfs_path(fd_drm, path, sizeof(path))) {
+			priv->failure = "Device debugfs healthckeck failure!";
+			if (igt_debugfs_path(fd_drm, path, sizeof(path)))
+				priv->failure = NULL;
+		}
 	}
 
 	fd_drm = close_device(fd_drm, "", "health checked ");
