@@ -817,9 +817,10 @@ enum crc_set { PACKED_CRC_SET,
 	       MAX_CRC_SET };
 
 static bool test_format_plane(data_t *data, enum pipe pipe,
-			      igt_output_t *output, igt_plane_t *plane)
+			      igt_output_t *output, igt_plane_t *plane, igt_fb_t *primary_fb)
 {
 	struct igt_fb fb = {};
+	struct igt_fb *clear_fb = plane->type == DRM_PLANE_TYPE_PRIMARY ? primary_fb : NULL;
 	drmModeModeInfo *mode;
 	uint32_t format, ref_format;
 	uint64_t modifier, ref_modifier;
@@ -879,7 +880,7 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 			height = test_fb.height;
 		}
 
-		igt_plane_set_fb(plane, NULL);
+		igt_plane_set_fb(plane, clear_fb);
 
 		igt_remove_fb(data->drm_fd, &test_fb);
 	}
@@ -937,7 +938,7 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 
 	igt_pipe_crc_stop(data->pipe_crc);
 
-	igt_plane_set_fb(plane, NULL);
+	igt_plane_set_fb(plane, clear_fb);
 	igt_remove_fb(data->drm_fd, &fb);
 
 	return result;
@@ -1010,7 +1011,7 @@ test_pixel_formats(data_t *data, enum pipe pipe)
 	for_each_plane_on_pipe(&data->display, pipe, plane) {
 		if (skip_plane(data, plane))
 			continue;
-		result &= test_format_plane(data, pipe, output, plane);
+		result &= test_format_plane(data, pipe, output, plane, &primary_fb);
 	}
 
 	test_fini(data);
