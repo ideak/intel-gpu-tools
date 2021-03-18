@@ -2148,7 +2148,8 @@ intel_bb_object_clear_flag(struct intel_bb *ibb, uint32_t handle, uint64_t flag)
  * @delta: delta value to add to @buffer's gpu address
  * @offset: offset within bb to be patched
  *
- * Function allocates additional relocation slot in reloc array for a handle.
+ * When relocations are requested function allocates additional relocation slot
+ * in reloc array for a handle.
  * Object must be previously added to bb.
  */
 static uint64_t intel_bb_add_reloc(struct intel_bb *ibb,
@@ -2166,6 +2167,10 @@ static uint64_t intel_bb_add_reloc(struct intel_bb *ibb,
 
 	object = intel_bb_find_object(ibb, handle);
 	igt_assert(object);
+
+	/* In no-reloc mode we just return the previously assigned address */
+	if (!ibb->enforce_relocs)
+		goto out;
 
 	/* For ibb we have relocs allocated in chunks */
 	if (to_handle == ibb->handle) {
@@ -2207,6 +2212,7 @@ static uint64_t intel_bb_add_reloc(struct intel_bb *ibb,
 		  delta, offset,
 		  from_user_pointer(relocs[i].presumed_offset));
 
+out:
 	return object->offset;
 }
 
