@@ -125,7 +125,6 @@ i915_progs = [
 	'gem_concurrent_blit',
 	'gem_cs_tlb',
 	'gem_ctx_bad_destroy',
-	'gem_ctx_clone',
 	'gem_ctx_create',
 	'gem_ctx_engines',
 	'gem_ctx_exec',
