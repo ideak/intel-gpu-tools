@@ -336,39 +336,6 @@ igt_main
 		gem_context_set_param(fd, &arg);
 	}
 
-	arg.param = I915_CONTEXT_PARAM_NO_ZEROMAP;
-
-	igt_describe("Validates context set param ioctl in non root mode with param "
-	       "set to no zeromap");
-	igt_subtest("non-root-set-no-zeromap") {
-		igt_fork(child, 1) {
-			igt_drop_root();
-
-			arg.ctx_id = ctx;
-			gem_context_get_param(fd, &arg);
-			arg.value--;
-			gem_context_set_param(fd, &arg);
-		}
-
-		igt_waitchildren();
-	}
-
-	igt_describe("Tests the context set param ioctl with no zeromap enabled in root mode");
-	igt_subtest("root-set-no-zeromap-enabled") {
-		arg.ctx_id = ctx;
-		gem_context_get_param(fd, &arg);
-		arg.value = 1;
-		gem_context_set_param(fd, &arg);
-	}
-
-	igt_describe("Tests the context set param ioctl with no zeromap disabled in root mode");
-	igt_subtest("root-set-no-zeromap-disabled") {
-		arg.ctx_id = ctx;
-		gem_context_get_param(fd, &arg);
-		arg.value = 0;
-		gem_context_set_param(fd, &arg);
-	}
-
 	igt_describe("Tests that multiple contexts can share the same VMA");
 	igt_subtest("vm")
 		test_vm(fd);
