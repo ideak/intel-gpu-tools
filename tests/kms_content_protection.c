@@ -707,7 +707,7 @@ static void test_content_protection_cleanup(void)
 static void create_fbs(void)
 {
 	igt_output_t *output;
-	int width, height;
+	int width = 0, height = 0;
 	drmModeModeInfo *mode;
 
 	for_each_connected_output(&data.display, output) {
@@ -730,9 +730,8 @@ igt_main
 {
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
-
 		igt_display_require(&data.display, data.drm_fd);
-
+		igt_display_require_output(&data.display);
 		create_fbs();
 	}
 
