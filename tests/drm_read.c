@@ -48,7 +48,7 @@
 
 IGT_TEST_DESCRIPTION("Call read(drm) and see if it behaves.");
 
-static void sighandler(int sig)
+static void sighandler(int sig, siginfo_t * info, void *context)
 {
 }
 
@@ -257,11 +257,14 @@ igt_main
 	struct igt_fb fb;
 	enum pipe pipe;
 
-	signal(SIGALRM, sighandler);
-	siginterrupt(SIGALRM, 1);
-
 	igt_fixture {
+		struct sigaction alarm_action = {};
 		igt_output_t *output;
+
+		igt_assert_neq(sigaction(SIGALRM, NULL, &alarm_action), -1);
+		alarm_action.sa_flags &= ~SA_RESTART;
+		alarm_action.sa_sigaction = sighandler;
+		igt_assert_neq(sigaction(SIGALRM, &alarm_action, NULL), -1);
 
 		fd = drm_open_driver_master(DRIVER_ANY);
 		kmstest_set_vt_graphics_mode();
