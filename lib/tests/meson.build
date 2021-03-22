@@ -38,11 +38,11 @@ endif
 foreach lib_test : lib_tests
 	exec = executable(lib_test, lib_test + '.c', install : false,
 			dependencies : igt_deps)
-	test('lib: ' + lib_test, exec)
+	test('lib ' + lib_test, exec)
 endforeach
 
 foreach lib_test : lib_fail_tests
 	exec = executable(lib_test, lib_test + '.c', install : false,
 			dependencies : igt_deps)
-	test('lib: ' + lib_test, exec, should_fail : true)
+	test('lib ' + lib_test, exec, should_fail : true)
 endforeach

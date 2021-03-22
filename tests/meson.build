@@ -404,7 +404,7 @@ test_list_target = custom_target('testlist',
 
 test_script = find_program('igt_command_line.sh')
 foreach prog : test_list
-	test('testcase check: ' + prog, test_script, args : prog)
+	test('testcase check ' + prog, test_script, args : prog)
 endforeach
 
 executable('gem_stress', 'i915/gem_stress.c',
