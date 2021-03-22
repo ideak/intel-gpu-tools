@@ -384,6 +384,52 @@ static void test_dc_state_dpms(data_t *data, int dc_flag)
 	cleanup_dc_dpms(data);
 }
 
+static bool support_dc6(int debugfs_fd)
+{
+       char buf[4096];
+
+       igt_debugfs_simple_read(debugfs_fd, "i915_dmc_info",
+			       buf, sizeof(buf));
+       return strstr(buf, "DC5 -> DC6 count");
+}
+
+static bool check_dc9(uint32_t debugfs_fd, int prev_dc, bool dc6_supported, int seconds)
+{
+/*
+ * Since we do not have DC9 Counter,
+ * So we rely on dc5/dc6 counter reset to check if Display Engine was in DC9.
+ */
+       return igt_wait(dc6_supported ? read_dc_counter(debugfs_fd, CHECK_DC6) <
+		       prev_dc : read_dc_counter(debugfs_fd, CHECK_DC5) <
+		       prev_dc, seconds, 100);
+}
+
+static void setup_dc9_dpms(data_t *data, int prev_dc, bool dc6_supported)
+{
+       setup_dc_dpms(data);
+       dpms_off(data);
+       igt_skip_on_f(!(igt_wait(dc6_supported ? read_dc_counter(data->debugfs_fd, CHECK_DC6) >
+				 prev_dc : read_dc_counter(data->debugfs_fd, CHECK_DC5) >
+				 prev_dc, 3000, 100)), "Unable to enters shallow DC states\n");
+       dpms_on(data);
+       cleanup_dc_dpms(data);
+}
+
+static void test_dc9_dpms(data_t *data)
+{
+       require_dc_counter(data->debugfs_fd, CHECK_DC5);
+       bool dc6_supported = support_dc6(data->debugfs_fd);
+
+       setup_dc9_dpms(data, dc6_supported ? read_dc_counter(data->debugfs_fd, CHECK_DC6) :
+		       read_dc_counter(data->debugfs_fd, CHECK_DC5), dc6_supported);
+       dpms_off(data);
+       igt_assert_f(check_dc9(data->debugfs_fd, dc6_supported ?
+			       read_dc_counter(data->debugfs_fd, CHECK_DC6) :
+			       read_dc_counter(data->debugfs_fd, CHECK_DC5),
+			       dc6_supported, 3000), "Not in DC9\n");
+       dpms_on(data);
+}
+
 IGT_TEST_DESCRIPTION("These tests validate Display Power DC states");
 int main(int argc, char *argv[])
 {
@@ -448,6 +494,13 @@ int main(int argc, char *argv[])
 			      "PC8+ residencies not supported\n");
 		test_dc_state_dpms(&data, CHECK_DC6);
 	}
+
+	igt_describe("This test validates display engine entry to DC9 state");
+	igt_subtest("dc9-dpms") {
+	       igt_require_f(igt_pm_pc8_plus_residencies_enabled(data.msr_fd),
+			       "PC8+ residencies not supported\n");
+	       test_dc9_dpms(&data);
+       }
 
 	igt_fixture {
 		free(data.pwr_dmn_info);
