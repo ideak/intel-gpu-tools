@@ -581,26 +581,20 @@ static void addfb25_tests(int fd)
 		gem_close(fd, gem_bo);
 }
 
-static int addfb_expected_ret(int fd, uint64_t modifier)
+static int addfb_expected_ret(igt_display_t *display, struct local_drm_mode_fb_cmd2 *f)
 {
-	int gen;
-
-	if (!is_i915_device(fd))
-		return 0;
-
-	gen = intel_gen(intel_get_drm_devid(fd));
-
-	if (modifier == LOCAL_I915_FORMAT_MOD_Yf_TILED)
-		return gen >= 9 && gen < 12 ? 0 : -1;
-	return gen >= 9 ? 0 : -1;
+	return igt_display_has_format_mod(display, f->pixel_format,
+					  f->modifier[0]) ? 0 : -1;
 }
 
 static void addfb25_ytile(int fd)
 {
 	struct local_drm_mode_fb_cmd2 f = {};
-	int gen;
+	igt_display_t display;
 
 	igt_fixture {
+		igt_display_require(&display, fd);
+
 		gem_bo = igt_create_bo_with_dimensions(fd, 1024, 1024,
 			DRM_FORMAT_XRGB8888, 0, 0, NULL, NULL, NULL);
 		igt_assert(gem_bo);
@@ -627,8 +621,8 @@ static void addfb25_ytile(int fd)
 
 		f.modifier[0] = LOCAL_I915_FORMAT_MOD_Y_TILED;
 		igt_assert(drmIoctl(fd, LOCAL_DRM_IOCTL_MODE_ADDFB2, &f) ==
-			   addfb_expected_ret(fd, f.modifier[0]));
-		if (!addfb_expected_ret(fd, f.modifier[0]))
+			   addfb_expected_ret(&display, &f));
+		if (!addfb_expected_ret(&display, &f))
 			igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_RMFB, &f.fb_id) == 0);
 		f.fb_id = 0;
 	}
@@ -640,8 +634,8 @@ static void addfb25_ytile(int fd)
 
 		f.modifier[0] = LOCAL_I915_FORMAT_MOD_Yf_TILED;
 		igt_assert(drmIoctl(fd, LOCAL_DRM_IOCTL_MODE_ADDFB2, &f) ==
-			   addfb_expected_ret(fd, f.modifier[0]));
-		if (!addfb_expected_ret(fd, f.modifier[0]))
+			   addfb_expected_ret(&display, &f));
+		if (!addfb_expected_ret(&display, &f))
 			igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_RMFB, &f.fb_id) == 0);
 		f.fb_id = 0;
 	}
@@ -651,12 +645,10 @@ static void addfb25_ytile(int fd)
 		igt_require_fb_modifiers(fd);
 		igt_require_intel(fd);
 
-		gen = intel_gen(intel_get_drm_devid(fd));
-		igt_require(gen >= 9);
-
 		f.modifier[0] = LOCAL_I915_FORMAT_MOD_Y_TILED;
 		f.height = 1023;
 		f.handles[0] = gem_bo_small;
+		igt_require(addfb_expected_ret(&display, &f) == 0);
 		igt_assert(drmIoctl(fd, LOCAL_DRM_IOCTL_MODE_ADDFB2, &f) < 0 && errno == EINVAL);
 		f.fb_id = 0;
 	}
@@ -664,6 +656,7 @@ static void addfb25_ytile(int fd)
 	igt_fixture {
 		gem_close(fd, gem_bo);
 		gem_close(fd, gem_bo_small);
+		igt_display_fini(&display);
 	}
 }
 
