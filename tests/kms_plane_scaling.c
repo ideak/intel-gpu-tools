@@ -230,6 +230,18 @@ static bool test_format(data_t *data,
 	return true;
 }
 
+static bool test_pipe_iteration(data_t *data, enum pipe pipe, int iteration)
+{
+	if (!is_i915_device(data->drm_fd) ||
+	    data->extended)
+		return true;
+
+	if ((pipe > PIPE_B) && (iteration >= 2))
+		return false;
+
+	return true;
+}
+
 static void test_scaler_with_rotation_pipe(data_t *d, enum pipe pipe,
 					   igt_output_t *output)
 {
@@ -531,6 +543,9 @@ test_scaler_with_clipping_clamping_scenario(data_t *d, enum pipe pipe, igt_outpu
 	for (int i = 0; i < d->plane1->drm_plane->count_formats; i++) {
 		unsigned f1 = d->plane1->drm_plane->formats[i];
 		struct igt_vec tested_formats2;
+
+		if (!test_pipe_iteration(d, pipe, i))
+			continue;
 
 		if (!test_format(d, &tested_formats1, f1) ||
 		    !can_scale(d, f1))
