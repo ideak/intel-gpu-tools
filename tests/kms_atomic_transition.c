@@ -174,7 +174,7 @@ wm_setup_plane(data_t *data, enum pipe pipe,
 			continue;
 
 		if (!mask || !(parms[i].mask & mask)) {
-			if (plane->values[IGT_PLANE_FB_ID]) {
+			if (plane->values[IGT_PLANE_FB_ID] && plane->type != DRM_PLANE_TYPE_PRIMARY) {
 				igt_plane_set_fb(plane, NULL);
 				planes_set_up++;
 			}
@@ -521,9 +521,9 @@ run_transition_test(data_t *data, enum pipe pipe, igt_output_t *output,
 		igt_output_set_pipe(output, pipe);
 	}
 
-	igt_display_commit2(&data->display, COMMIT_ATOMIC);
-
 	setup_parms(data, pipe, mode, &data->fb, &data->argb_fb, &data->sprite_fb, parms, &iter_max);
+
+	igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
 	/*
 	 * In some configurations the tests may not run to completion with all
