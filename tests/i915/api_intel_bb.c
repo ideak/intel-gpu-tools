@@ -1068,7 +1068,7 @@ static uint32_t count_compressed(int gen, struct intel_buf *buf)
 		if (ptr[buf->ccs[0].offset + i])
 			compressed++;
 
-	munmap(buf, intel_buf_bo_size(buf));
+	munmap(ptr, intel_buf_bo_size(buf));
 
 	return compressed;
 }
