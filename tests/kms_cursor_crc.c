@@ -523,26 +523,45 @@ static void create_cursor_fb(data_t *data, int cur_w, int cur_h)
 	igt_put_cairo_ctx(cr);
 }
 
-static bool has_nonsquare_cursors(data_t *data)
+static void require_cursor_size(data_t *data, int w, int h)
 {
-	uint32_t devid;
+	igt_fb_t primary_fb;
+	drmModeModeInfo *mode;
+	igt_display_t *display = &data->display;
+	igt_output_t *output = data->output;
+	igt_plane_t *primary, *cursor;
+	int ret;
 
-	if (!is_i915_device(data->drm_fd))
-		return false;
+	igt_output_set_pipe(output, data->pipe);
 
-	devid = intel_get_drm_devid(data->drm_fd);
+	mode = igt_output_get_mode(output);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+	cursor = igt_output_get_plane_type(output, DRM_PLANE_TYPE_CURSOR);
 
-	/*
-	 * Test non-square cursors a bit on the platforms
-	 * that support such things.
-	 */
-	if (devid == PCI_CHIP_845_G || devid == PCI_CHIP_I865_G)
-		return true;
+	/* Create temporary primary fb for testing */
+	igt_assert(igt_create_fb(data->drm_fd, mode->hdisplay, mode->vdisplay, DRM_FORMAT_XRGB8888,
+				 LOCAL_DRM_FORMAT_MOD_NONE, &primary_fb));
 
-	if (IS_VALLEYVIEW(devid) || IS_CHERRYVIEW(devid))
-		return false;
+	igt_plane_set_fb(primary, &primary_fb);
+	igt_plane_set_fb(cursor, &data->fb);
+	igt_plane_set_size(cursor, w, h);
+	igt_fb_set_size(&data->fb, cursor, w, h);
 
-	return intel_gen(devid) >= 7;
+	/* Test if the kernel supports the given cursor size or not */
+	if (display->is_atomic)
+		ret = igt_display_try_commit_atomic(display,
+						    DRM_MODE_ATOMIC_TEST_ONLY |
+						    DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
+	else
+		ret = igt_display_try_commit2(display, COMMIT_LEGACY);
+
+	igt_plane_set_fb(primary, NULL);
+	igt_plane_set_fb(cursor, NULL);
+
+	igt_remove_fb(data->drm_fd, &primary_fb);
+	igt_output_set_pipe(output, PIPE_NONE);
+
+	igt_skip_on_f(ret, "Cursor size %dx%d not supported by driver\n", w, h);
 }
 
 static void test_cursor_size(data_t *data)
@@ -697,27 +716,33 @@ static void run_tests_on_pipe(data_t *data, enum pipe pipe)
 			create_cursor_fb(data, w, h);
 		}
 
-		/* Using created cursor FBs to test cursor support */
-		igt_describe("Check if a given-size cursor is well-positioned inside the screen.");
-		igt_subtest_f("pipe-%s-cursor-%dx%d-onscreen", kmstest_pipe_name(pipe), w, h)
-			run_test(data, test_crc_onscreen, w, h);
+		igt_subtest_group {
+			igt_fixture
+				require_cursor_size(data, w, h);
 
-		igt_describe("Check if a given-size cursor is well-positioned outside the screen.");
-		igt_subtest_f("pipe-%s-cursor-%dx%d-offscreen", kmstest_pipe_name(pipe), w, h)
-			run_test(data, test_crc_offscreen, w, h);
+			/* Using created cursor FBs to test cursor support */
+			igt_describe("Check if a given-size cursor is well-positioned inside the "
+				     "screen.");
+			igt_subtest_f("pipe-%s-cursor-%dx%d-onscreen", kmstest_pipe_name(pipe), w, h)
+				run_test(data, test_crc_onscreen, w, h);
 
-		igt_describe("Check the smooth and pixel-by-pixel given-size cursor movements on"
-		             "horizontal, vertical and diagonal.");
-		igt_subtest_f("pipe-%s-cursor-%dx%d-sliding", kmstest_pipe_name(pipe), w, h)
-			run_test(data, test_crc_sliding, w, h);
+			igt_describe("Check if a given-size cursor is well-positioned outside the "
+				     "screen.");
+			igt_subtest_f("pipe-%s-cursor-%dx%d-offscreen", kmstest_pipe_name(pipe), w, h)
+				run_test(data, test_crc_offscreen, w, h);
 
-		igt_describe("Check random placement of a cursor with given size.");
-		igt_subtest_f("pipe-%s-cursor-%dx%d-random", kmstest_pipe_name(pipe), w, h)
-			run_test(data, test_crc_random, w, h);
+			igt_describe("Check the smooth and pixel-by-pixel given-size cursor "
+				     "movements on horizontal, vertical and diagonal.");
+			igt_subtest_f("pipe-%s-cursor-%dx%d-sliding", kmstest_pipe_name(pipe), w, h)
+				run_test(data, test_crc_sliding, w, h);
 
-		igt_describe("Check the rapid update of given-size cursor movements.");
-		igt_subtest_f("pipe-%s-cursor-%dx%d-rapid-movement", kmstest_pipe_name(pipe), w, h) {
-			run_test(data, test_rapid_movement, w, h);
+			igt_describe("Check random placement of a cursor with given size.");
+			igt_subtest_f("pipe-%s-cursor-%dx%d-random", kmstest_pipe_name(pipe), w, h)
+				run_test(data, test_crc_random, w, h);
+
+			igt_describe("Check the rapid update of given-size cursor movements.");
+			igt_subtest_f("pipe-%s-cursor-%dx%d-rapid-movement", kmstest_pipe_name(pipe), w, h)
+				run_test(data, test_rapid_movement, w, h);
 		}
 
 		igt_fixture
@@ -730,27 +755,25 @@ static void run_tests_on_pipe(data_t *data, enum pipe pipe)
 		 */
 		h /= 3;
 
-		igt_fixture {
-			if (has_nonsquare_cursors(data))
-				create_cursor_fb(data, w, h);
-		}
+		igt_fixture
+			create_cursor_fb(data, w, h);
 
-		/* Using created cursor FBs to test cursor support */
-		igt_subtest_f("pipe-%s-cursor-%dx%d-onscreen", kmstest_pipe_name(pipe), w, h) {
-			igt_require(has_nonsquare_cursors(data));
-			run_test(data, test_crc_onscreen, w, h);
-		}
-		igt_subtest_f("pipe-%s-cursor-%dx%d-offscreen", kmstest_pipe_name(pipe), w, h) {
-			igt_require(has_nonsquare_cursors(data));
-			run_test(data, test_crc_offscreen, w, h);
-		}
-		igt_subtest_f("pipe-%s-cursor-%dx%d-sliding", kmstest_pipe_name(pipe), w, h) {
-			igt_require(has_nonsquare_cursors(data));
-			run_test(data, test_crc_sliding, w, h);
-		}
-		igt_subtest_f("pipe-%s-cursor-%dx%d-random", kmstest_pipe_name(pipe), w, h) {
-			igt_require(has_nonsquare_cursors(data));
-			run_test(data, test_crc_random, w, h);
+		igt_subtest_group {
+			igt_fixture
+				require_cursor_size(data, w, h);
+
+			/* Using created cursor FBs to test cursor support */
+			igt_subtest_f("pipe-%s-cursor-%dx%d-onscreen", kmstest_pipe_name(pipe), w, h)
+				run_test(data, test_crc_onscreen, w, h);
+
+			igt_subtest_f("pipe-%s-cursor-%dx%d-offscreen", kmstest_pipe_name(pipe), w, h)
+				run_test(data, test_crc_offscreen, w, h);
+
+			igt_subtest_f("pipe-%s-cursor-%dx%d-sliding", kmstest_pipe_name(pipe), w, h)
+				run_test(data, test_crc_sliding, w, h);
+
+			igt_subtest_f("pipe-%s-cursor-%dx%d-random", kmstest_pipe_name(pipe), w, h)
+				run_test(data, test_crc_random, w, h);
 		}
 
 		igt_fixture
