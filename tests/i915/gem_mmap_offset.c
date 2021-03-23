@@ -591,7 +591,7 @@ static struct intel_buf *create_bo(struct buf_ops *bops, uint32_t value,
 	for (int i = 0; i < 64 / sizeof(*v); i++)
 		v[i] = value;
 
-	munmap(buf, size);
+	munmap(v, size);
 
 	return buf;
 }
