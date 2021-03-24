@@ -798,9 +798,6 @@ igt_main
 		ret = drmGetCap(data.drm_fd, DRM_CAP_CURSOR_HEIGHT, &cursor_height);
 		igt_assert(ret == 0 || errno == EINVAL);
 
-		/* We assume width and height are same so max is assigned width */
-		igt_assert_eq(cursor_width, cursor_height);
-
 		kmstest_set_vt_graphics_mode();
 
 		igt_require_pipe_crc(data.drm_fd);
