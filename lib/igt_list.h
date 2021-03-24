@@ -108,6 +108,12 @@ bool igt_list_empty(const struct igt_list_head *head);
 	     &pos->member != (head);					\
 	     pos = igt_container_of((pos)->member.prev, pos, member))
 
+#define igt_list_for_each_entry_safe_reverse(pos, tmp, head, member)	\
+	for (pos = igt_container_of((head)->prev, pos, member),		\
+	     tmp = igt_container_of((pos)->member.prev, tmp, member);	\
+	     &pos->member != (head);					\
+	     pos = tmp,							\
+	     tmp = igt_container_of((pos)->member.prev, tmp, member))
 
 /* IGT custom helpers */
 
