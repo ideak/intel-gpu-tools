@@ -89,6 +89,13 @@ build:tests-fedora-oldest-meson:
     - ninja -C build || ninja -C build -j 1
     - ninja -C build igt-gpu-tools-doc
 
+# ensure igt_nouveau stubs build when nouveau support for libdrm is disabled
+build:tests-fedora-no-libdrm-nouveau:
+  stage: build
+  script:
+    - meson -Dlibdrm_drivers= build
+    - ninja -C build || ninja -C build -j 1
+
 build:tests-fedora-clang:
   stage: build
   variables:

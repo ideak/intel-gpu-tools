@@ -108,6 +108,9 @@ endif
 if with_libdrm.contains('auto') or with_libdrm.contains('nouveau')
 	libdrm_nouveau = dependency('libdrm_nouveau', version : libdrm_version, required : with_libdrm.contains('nouveau'))
 	libdrm_info += 'nouveau'
+	if libdrm_nouveau.found()
+		config.set('HAVE_LIBDRM_NOUVEAU', 1)
+	endif
 endif
 if with_libdrm.contains('auto') or with_libdrm.contains('amdgpu')
 	libdrm_amdgpu = dependency('libdrm_amdgpu', version : libdrm_version, required : with_libdrm.contains('amdgpu'))

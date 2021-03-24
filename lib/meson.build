@@ -99,6 +99,14 @@ else
 	inc = [ inc, include_directories('stubs/drm') ]
 endif
 
+if libdrm_nouveau.found()
+	lib_deps += libdrm_nouveau
+	lib_sources += [
+		'igt_nouveau.c',
+		'nouveau/cea0b5.c'
+	]
+endif
+
 if libunwind.found()
 	lib_deps += libunwind
 else

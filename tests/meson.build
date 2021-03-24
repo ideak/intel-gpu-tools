@@ -78,7 +78,6 @@ test_progs = [
 	'kms_vrr',
 	'kms_writeback',
 	'meta_test',
-	'nouveau_crc',
 	'panfrost_get_param',
 	'panfrost_gem_new',
 	'panfrost_prime',
@@ -250,6 +249,7 @@ if libdrm_nouveau.found()
 		'prime_nv_api',
 		'prime_nv_pcopy',
 		'prime_nv_test',
+		'nouveau_crc',
 	]
 	test_deps += libdrm_nouveau
 endif

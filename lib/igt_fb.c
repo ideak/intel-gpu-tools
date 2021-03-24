@@ -44,6 +44,7 @@
 #include "igt_vc4.h"
 #include "igt_amd.h"
 #include "igt_x86.h"
+#include "igt_nouveau.h"
 #include "ioctl_wrappers.h"
 #include "intel_batchbuffer.h"
 #include "intel_chipset.h"
@@ -479,6 +480,48 @@ void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 		*width_ret = 256;
 		*height_ret = vc4_modifier_param;
 		break;
+	case DRM_FORMAT_MOD_NVIDIA_16BX2_BLOCK(0):
+	case DRM_FORMAT_MOD_NVIDIA_16BX2_BLOCK(1):
+	case DRM_FORMAT_MOD_NVIDIA_16BX2_BLOCK(2):
+	case DRM_FORMAT_MOD_NVIDIA_16BX2_BLOCK(3):
+	case DRM_FORMAT_MOD_NVIDIA_16BX2_BLOCK(4):
+	case DRM_FORMAT_MOD_NVIDIA_16BX2_BLOCK(5):
+		modifier = drm_fourcc_canonicalize_nvidia_format_mod(modifier);
+		/* fallthrough */
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 1, 0x7a, 0):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 1, 0x7a, 1):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 1, 0x7a, 2):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 1, 0x7a, 3):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 1, 0x7a, 4):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 1, 0x7a, 5):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 1, 0x78, 0):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 1, 0x78, 1):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 1, 0x78, 2):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 1, 0x78, 3):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 1, 0x78, 4):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 1, 0x78, 5):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 1, 0x70, 0):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 1, 0x70, 1):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 1, 0x70, 2):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 1, 0x70, 3):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 1, 0x70, 4):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 1, 0x70, 5):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 0, 0xfe, 0):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 0, 0xfe, 1):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 0, 0xfe, 2):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 0, 0xfe, 3):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 0, 0xfe, 4):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 0, 0xfe, 5):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 2, 0x06, 0):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 2, 0x06, 1):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 2, 0x06, 2):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 2, 0x06, 3):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 2, 0x06, 4):
+	case DRM_FORMAT_MOD_NVIDIA_BLOCK_LINEAR_2D(0, 1, 2, 0x06, 5):
+		igt_require_nouveau(fd);
+		*width_ret = 64;
+		*height_ret = igt_nouveau_get_block_height(modifier);
+		break;
 	default:
 		igt_assert(false);
 	}
@@ -688,6 +731,16 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 	} else if (is_gen12_ccs_plane(fb, plane)) {
 		/* A main surface using a CCS AUX surface must be 4x4 tiles aligned. */
 		return ALIGN(min_stride, 64);
+	} else if (!fb->modifier && is_nouveau_device(fb->fd)) {
+		int align;
+
+		/* Volta supports 47-bit memory addresses, everything before only supports 40-bit */
+		if (igt_nouveau_get_chipset(fb->fd) >= IGT_NOUVEAU_CHIPSET_GV100)
+			align = 64;
+		else
+			align = 256;
+
+		return ALIGN(min_stride, align);
 	} else {
 		unsigned int tile_width, tile_height;
 
@@ -954,7 +1007,7 @@ static void clear_yuv_buffer(struct igt_fb *fb)
 }
 
 /* helpers to create nice-looking framebuffers */
-static int create_bo_for_fb(struct igt_fb *fb)
+static int create_bo_for_fb(struct igt_fb *fb, bool prefer_sysmem)
 {
 	const struct format_desc_struct *fmt = lookup_drm_format(fb->drm_format);
 	unsigned int bpp = 0;
@@ -972,7 +1025,8 @@ static int create_bo_for_fb(struct igt_fb *fb)
 	if (fb->modifier || fb->size || fb->strides[0] ||
 	    (is_i915_device(fd) && igt_format_is_yuv(fb->drm_format)) ||
 	    (is_i915_device(fd) && igt_format_is_fp16(fb->drm_format)) ||
-	    (is_amdgpu_device(fd) && igt_format_is_yuv(fb->drm_format)))
+	    (is_amdgpu_device(fd) && igt_format_is_yuv(fb->drm_format)) ||
+	    is_nouveau_device(fd))
 		device_bo = true;
 
 	/* Sets offets and stride if necessary. */
@@ -1002,6 +1056,8 @@ static int create_bo_for_fb(struct igt_fb *fb)
 						   fb->modifier);
 		} else if (is_amdgpu_device(fd)) {
 			fb->gem_handle = igt_amd_create_bo(fd, fb->size);
+		} else if (is_nouveau_device(fd)) {
+			fb->gem_handle = igt_nouveau_create_bo(fd, prefer_sysmem, fb);
 		} else {
 			igt_assert(false);
 		}
@@ -1044,7 +1100,7 @@ void igt_create_bo_for_fb(int fd, int width, int height,
 {
 	igt_init_fb(fb, fd, width, height, format, modifier,
 		    IGT_COLOR_YCBCR_BT709, IGT_COLOR_YCBCR_LIMITED_RANGE);
-	create_bo_for_fb(fb);
+	create_bo_for_fb(fb, false);
 }
 
 /**
@@ -1078,7 +1134,7 @@ int igt_create_bo_with_dimensions(int fd, int width, int height,
 	for (int i = 0; i < fb.num_planes; i++)
 		fb.strides[i] = stride;
 
-	create_bo_for_fb(&fb);
+	create_bo_for_fb(&fb, false);
 
 	if (size_ret)
 		*size_ret = fb.size;
@@ -1705,7 +1761,7 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 		  __func__, width, height, IGT_FORMAT_ARGS(format), modifier,
 		  bo_size);
 
-	create_bo_for_fb(fb);
+	create_bo_for_fb(fb, false);
 	igt_assert(fb->gem_handle > 0);
 
 	igt_debug("%s(handle=%d, pitch=%d)\n",
@@ -2382,6 +2438,9 @@ static void free_linear_mapping(struct fb_blit_upload *blit)
 		igt_amd_fb_convert_plane_to_tiled(fb, map, &linear->fb, linear->map);
 
 		munmap(map, fb->size);
+	} else if (is_nouveau_device(fd)) {
+		igt_nouveau_fb_blit(fb, &linear->fb);
+		igt_nouveau_delete_bo(&linear->fb);
 	} else {
 		gem_munmap(linear->map, linear->fb.size);
 		gem_set_domain(fd, linear->fb.gem_handle,
@@ -2434,7 +2493,7 @@ static void setup_linear_mapping(struct fb_blit_upload *blit)
 		    fb->drm_format, LOCAL_DRM_FORMAT_MOD_NONE,
 		    fb->color_encoding, fb->color_range);
 
-	create_bo_for_fb(&linear->fb);
+	create_bo_for_fb(&linear->fb, true);
 
 	igt_assert(linear->fb.gem_handle > 0);
 
@@ -2452,6 +2511,13 @@ static void setup_linear_mapping(struct fb_blit_upload *blit)
 		linear->map = igt_amd_mmap_bo(fd, linear->fb.gem_handle,
 					      linear->fb.size,
 					      PROT_READ | PROT_WRITE);
+	} else if (is_nouveau_device(fd)) {
+		/* Currently we also blit linear bos instead of mapping them as-is, as mmap() on
+		 * nouveau is quite slow right now
+		 */
+		igt_nouveau_fb_blit(&linear->fb, fb);
+
+		linear->map = igt_nouveau_mmap_bo(&linear->fb, PROT_READ | PROT_WRITE);
 	} else {
 		/* Copy fb content to linear BO */
 		gem_set_domain(fd, linear->fb.gem_handle,
@@ -2514,7 +2580,10 @@ int igt_dirty_fb(int fd, struct igt_fb *fb)
 
 static void unmap_bo(struct igt_fb *fb, void *ptr)
 {
-	gem_munmap(ptr, fb->size);
+	if (is_nouveau_device(fb->fd))
+		igt_nouveau_munmap_bo(fb);
+	else
+		gem_munmap(ptr, fb->size);
 
 	if (fb->is_dumb)
 		igt_dirty_fb(fb->fd, fb);
@@ -2553,6 +2622,8 @@ static void *map_bo(int fd, struct igt_fb *fb)
 	else if (is_amdgpu_device(fd))
 		ptr = igt_amd_mmap_bo(fd, fb->gem_handle, fb->size,
 				      PROT_READ | PROT_WRITE);
+	else if (is_nouveau_device(fd))
+		ptr = igt_nouveau_mmap_bo(fb, PROT_READ | PROT_WRITE);
 	else
 		igt_assert(false);
 
@@ -3569,13 +3640,13 @@ static void create_cairo_surface__convert(int fd, struct igt_fb *fb)
 							     &blit->shadow_fb);
 	igt_assert(blit->shadow_ptr);
 
-	if (use_enginecopy(fb) || use_blitter(fb) ||
-	    igt_vc4_is_tiled(fb->modifier)) {
+	/* Note for nouveau, it's currently faster to copy fbs to/from vram (even linear ones) */
+	if (use_enginecopy(fb) || use_blitter(fb) || igt_vc4_is_tiled(fb->modifier) ||
+	    is_nouveau_device(fd)) {
 		setup_linear_mapping(&blit->base);
 
 		/* speed things up by working from a copy in system memory */
-		cvt.src.slow_reads =
-			is_i915_device(fd) && !gem_has_mappable_ggtt(fd);
+		cvt.src.slow_reads = is_i915_device(fd) && !gem_has_mappable_ggtt(fd);
 	} else {
 		blit->base.linear.fb = *fb;
 		blit->base.linear.fb.gem_handle = 0;
@@ -3659,7 +3730,8 @@ cairo_surface_t *igt_get_cairo_surface(int fd, struct igt_fb *fb)
 			create_cairo_surface__convert(fd, fb);
 		else if (use_blitter(fb) || use_enginecopy(fb) ||
 			 igt_vc4_is_tiled(fb->modifier) ||
-			 igt_amd_is_tiled(fb->modifier))
+			 igt_amd_is_tiled(fb->modifier) ||
+			 is_nouveau_device(fb->fd))
 			create_cairo_surface__gpu(fd, fb);
 		else
 			create_cairo_surface__gtt(fd, fb);
@@ -3733,6 +3805,8 @@ void igt_remove_fb(int fd, struct igt_fb *fb)
 	do_or_die(drmModeRmFB(fd, fb->fb_id));
 	if (fb->is_dumb)
 		kmstest_dumb_destroy(fd, fb->gem_handle);
+	else if (is_nouveau_device(fd))
+		igt_nouveau_delete_bo(fb);
 	else
 		gem_close(fd, fb->gem_handle);
 	fb->fb_id = 0;

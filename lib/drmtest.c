@@ -116,7 +116,12 @@ bool is_i915_device(int fd)
 
 bool is_nouveau_device(int fd)
 {
+	/* Currently all nouveau-specific codepaths require libdrm */
+#ifdef HAVE_LIBDRM_NOUVEAU
 	return __is_device(fd, "nouveau");
+#else
+	return false;
+#endif
 }
 
 bool is_vc4_device(int fd)

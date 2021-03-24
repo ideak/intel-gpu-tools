@@ -71,6 +71,7 @@ struct buf_ops;
  * @plane_bpp: The bpp for each plane.
  * @plane_width: The width for each plane.
  * @plane_height: The height for each plane.
+ * @driver_priv: Private driver-specific data, if any
  *
  * Tracking structure for KMS framebuffer objects.
  */
@@ -94,6 +95,7 @@ typedef struct igt_fb {
 	unsigned int plane_bpp[4];
 	unsigned int plane_width[4];
 	unsigned int plane_height[4];
+	void *driver_priv;
 } igt_fb_t;
 
 /**
