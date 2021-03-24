@@ -666,32 +666,51 @@ static void test_rapid_movement(data_t *data)
 static void run_size_tests(data_t *data, enum pipe pipe,
 			   int w, int h)
 {
+	char name[16];
+
+	if (w == 0 && h == 0)
+		strcpy(name, "max-size");
+	else
+		snprintf(name, sizeof(name), "%dx%d", w, h);
+
 	igt_fixture {
+		if (w == 0 && h == 0) {
+			w = data->cursor_max_w;
+			h = data->cursor_max_h;
+			/*
+			 * No point in doing the "max-size" test if
+			 * it was already covered by the other tests.
+			 */
+			igt_require_f(w != h || w > 512 || h > 512 ||
+				      !is_power_of_two(w) || !is_power_of_two(h),
+				      "Cursor max size %dx%d already covered by other tests\n",
+				      w, h);
+		}
 		create_cursor_fb(data, w, h);
 		require_cursor_size(data, w, h);
 	}
 
 	/* Using created cursor FBs to test cursor support */
 	igt_describe("Check if a given-size cursor is well-positioned inside the screen.");
-	igt_subtest_f("pipe-%s-cursor%dx%donscreen", kmstest_pipe_name(pipe), w, h)
+	igt_subtest_f("pipe-%s-cursor-%s-onscreen", kmstest_pipe_name(pipe), name)
 		run_test(data, test_crc_onscreen, w, h);
 
 	igt_describe("Check if a given-size cursor is well-positioned outside the "
 		     "screen.");
-	igt_subtest_f("pipe-%s-cursor%dx%doffscreen", kmstest_pipe_name(pipe), w, h)
+	igt_subtest_f("pipe-%s-cursor-%s-offscreen", kmstest_pipe_name(pipe), name)
 		run_test(data, test_crc_offscreen, w, h);
 
 	igt_describe("Check the smooth and pixel-by-pixel given-size cursor "
 		     "movements on horizontal, vertical and diagonal.");
-	igt_subtest_f("pipe-%s-cursor%dx%dsliding", kmstest_pipe_name(pipe), w, h)
+	igt_subtest_f("pipe-%s-cursor-%s-sliding", kmstest_pipe_name(pipe), name)
 		run_test(data, test_crc_sliding, w, h);
 
 	igt_describe("Check random placement of a cursor with given size.");
-	igt_subtest_f("pipe-%s-cursor%dx%drandom", kmstest_pipe_name(pipe), w, h)
+	igt_subtest_f("pipe-%s-cursor-%s-random", kmstest_pipe_name(pipe), name)
 		run_test(data, test_crc_random, w, h);
 
 	igt_describe("Check the rapid update of given-size cursor movements.");
-	igt_subtest_f("pipe-%s-cursor%dx%drapid-movement", kmstest_pipe_name(pipe), w, h)
+	igt_subtest_f("pipe-%s-cursor-%s-rapid-movement", kmstest_pipe_name(pipe), name)
 		run_test(data, test_rapid_movement, w, h);
 
 	igt_fixture
@@ -760,6 +779,8 @@ static void run_tests_on_pipe(data_t *data, enum pipe pipe)
 		igt_subtest_group
 			run_size_tests(data, pipe, w, h);
 	}
+
+	run_size_tests(data, pipe, 0, 0);
 }
 
 static data_t data;
