@@ -403,6 +403,19 @@ test_list_target = custom_target('testlist',
 	      install : true,
 	      install_dir : libexecdir)
 
+test_executables += executable('gem_concurrent_all', 'i915/gem_concurrent_all.c',
+	   dependencies : test_deps + [ libatomic ],
+	   install_dir : libexecdir,
+	   install_rpath : libexecdir_rpathdir,
+	   install : true)
+test_list += 'gem_concurrent_all'
+
+test_list_full_target = custom_target('testlist-full',
+	      output : 'test-list-full.txt',
+	      command : [ gen_testlist, '@OUTPUT@', test_list ],
+	      install : true,
+	      install_dir : libexecdir)
+
 test_script = find_program('igt_command_line.sh')
 foreach prog : test_list
 	test('testcase check ' + prog, test_script, args : prog)
