@@ -161,17 +161,6 @@ build:tests-debian-meson-mips:
     paths:
       - build
 
-build:tests-debian-autotools:
-  image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian:commit-$CI_COMMIT_SHA
-  stage: build
-  script:
-    - ./autogen.sh --enable-{chamelium,audio,intel,amdgpu,nouveau,tests,runner}
-    - make -j $(nproc) || make -j 1
-    - cp tests/test-list.txt autotools-test-list.txt
-  artifacts:
-    paths:
-      - autotools-test-list.txt
-
 #################### TEST ##########################
 
 test:ninja-test:
@@ -242,13 +231,6 @@ test:ninja-test-mips:
     paths:
       - build
     when: on_failure
-
-test:test-list-diff:
-  dependencies:
-    - build:tests-debian-autotools
-    - build:tests-debian-meson
-  stage: test
-  script: diff <(sed "s/ /\n/g" meson-test-list.txt| grep -v 'vc4\|v3d\|panfrost\|nouveau' | sort) <(sed "s/ /\n/g" autotools-test-list.txt | sort)
 
 test:list-undocumented-tests:
   dependencies:
