@@ -110,7 +110,7 @@ podman/docker to to run it on your system.
 
 Oneliner to get you started with the latest master:
 
-    # podman run --rm --priviledged registry.freedesktop.org/drm/igt-gpu-tools/igt:master
+    # podman run --rm --privileged registry.freedesktop.org/drm/igt-gpu-tools/igt:master
 
 
 Other Things
