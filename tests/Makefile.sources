@@ -553,10 +553,6 @@ kernel_tests_full = \
 	$(extra_kernel_tests) \
 	$(NULL)
 
-scripts = \
-	ddx_intel_after_fbdev \
-	$(NULL)
-
 IMAGES = pass.png 1080p-left.png 1080p-right.png
 
 testdisplay_SOURCES = \
