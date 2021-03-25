@@ -86,10 +86,7 @@ executable('intel_reg', sources : intel_reg_src,
 
 install_data('intel_gpu_abrt', install_dir : bindir)
 
-install_subdir('registers', install_dir : datadir,
-	       exclude_files : [
-		 'Makefile', 'Makefile.in', 'Makefile.am',
-	       ])
+install_subdir('registers', install_dir : datadir)
 
 executable('intel_gpu_top', 'intel_gpu_top.c',
 	   install : true,
