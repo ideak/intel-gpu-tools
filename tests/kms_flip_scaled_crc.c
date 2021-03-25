@@ -204,6 +204,9 @@ static void test_flip_to_scaled(data_t *data, uint32_t index, enum pipe pipe,
 
 	igt_require_f(ret != -ERANGE,
 		      "Platform scaling limits exceeded, skipping.\n");
+	igt_require_f(!(ret == -EINVAL && !modetoset),
+		      "No %dp and default mode too big, cdclk limits exceeded. Skipping.\n",
+		      data->attemptmodeheight);
 	igt_assert_eq(ret, 0);
 
 	igt_assert(read(data->drm_fd, &ev, sizeof(ev)) == sizeof(ev));
