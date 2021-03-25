@@ -35,3 +35,11 @@ foreach prog : benchmark_progs
 		   install_dir : benchmarksdir,
 		   dependencies : igt_deps)
 endforeach
+
+lib_gem_exec_tracer = shared_module(
+  'gem_exec_tracer',
+  'gem_exec_tracer.c',
+  dependencies : dlsym,
+  include_directories : inc,
+  install_dir : benchmarksdir,
+  install: true)
