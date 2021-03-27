@@ -205,7 +205,7 @@ static void check_error_state(const char *expected_ring_name,
 	igt_assert(found);
 }
 
-static void test_error_state_capture(unsigned ring_id,
+static void test_error_state_capture(const intel_ctx_t *ctx, unsigned ring_id,
 				     const char *ring_name)
 {
 	uint32_t *batch;
@@ -214,7 +214,7 @@ static void test_error_state_capture(unsigned ring_id,
 
 	clear_error_state();
 
-	hang = igt_hang_ctx(device, 0, ring_id, HANG_ALLOW_CAPTURE);
+	hang = igt_hang_ctx(device, ctx->id, ring_id, HANG_ALLOW_CAPTURE);
 	offset = hang.spin->obj[IGT_SPIN_BATCH].offset;
 
 	batch = gem_mmap__cpu(device, hang.spin->handle, 0, 4096, PROT_READ);
@@ -227,32 +227,34 @@ static void test_error_state_capture(unsigned ring_id,
 }
 
 static void
-test_engine_hang(const struct intel_execution_engine2 *e, unsigned int flags)
+test_engine_hang(const intel_ctx_t *ctx,
+		 const struct intel_execution_engine2 *e, unsigned int flags)
 {
 	const struct intel_execution_engine2 *other;
+	const intel_ctx_t *tmp_ctx;
 	igt_spin_t *spin, *next;
 	IGT_LIST_HEAD(list);
-	uint32_t ctx;
 
 	igt_skip_on(flags & IGT_SPIN_INVALID_CS &&
 		    gem_has_cmdparser(device, e->flags));
 
 	/* Fill all the other engines with background load */
-	__for_each_physical_engine(device, other) {
+	for_each_ctx_engine(device, ctx, other) {
 		if (other->flags == e->flags)
 			continue;
 
-		ctx = gem_context_clone_with_engines(device, 0);
-		spin = __igt_spin_new(device, ctx,
+		tmp_ctx = intel_ctx_create(device, &ctx->cfg);
+		spin = __igt_spin_new(device, .ctx = tmp_ctx,
 				      .engine = other->flags,
 				      .flags = IGT_SPIN_FENCE_OUT);
-		gem_context_destroy(device, ctx);
+		intel_ctx_destroy(device, tmp_ctx);
 
 		igt_list_move(&spin->link, &list);
 	}
 
 	/* And on the target engine, we hang */
 	spin = igt_spin_new(device,
+			    .ctx = ctx,
 			    .engine = e->flags,
 			    .flags = (IGT_SPIN_FENCE_OUT |
 				      IGT_SPIN_NO_PREEMPTION |
@@ -311,13 +313,16 @@ static void hangcheck_unterminated(void)
 igt_main
 {
 	const struct intel_execution_engine2 *e;
+	const intel_ctx_t *ctx;
 	igt_hang_t hang = {};
 
 	igt_fixture {
 		device = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(device);
 
-		hang = igt_allow_hang(device, 0, HANG_ALLOW_CAPTURE);
+		ctx = intel_ctx_create_all_physical(device);
+
+		hang = igt_allow_hang(device, ctx->id, HANG_ALLOW_CAPTURE);
 
 		sysfs = igt_sysfs_open(device);
 		igt_assert(sysfs != -1);
@@ -329,9 +334,9 @@ igt_main
 		test_error_state_basic();
 
 	igt_subtest_with_dynamic("error-state-capture") {
-		__for_each_physical_engine(device, e) {
+		for_each_ctx_engine(device, ctx, e) {
 			igt_dynamic_f("%s", e->name)
-				test_error_state_capture(e->flags, e->name);
+				test_error_state_capture(ctx, e->flags, e->name);
 		}
 	}
 
@@ -347,9 +352,9 @@ igt_main
                 ioctl(device, DRM_IOCTL_I915_GETPARAM, &gp);
 		igt_require(has_gpu_reset > 1);
 
-		__for_each_physical_engine(device, e) {
+		for_each_ctx_engine(device, ctx, e) {
 			igt_dynamic_f("%s", e->name)
-				test_engine_hang(e, 0);
+				test_engine_hang(ctx, e, 0);
 		}
 	}
 
@@ -364,9 +369,9 @@ igt_main
 		ioctl(device, DRM_IOCTL_I915_GETPARAM, &gp);
 		igt_require(has_gpu_reset > 1);
 
-		__for_each_physical_engine(device, e) {
+		for_each_ctx_engine(device, ctx, e) {
 			igt_dynamic_f("%s", e->name)
-				test_engine_hang(e, IGT_SPIN_INVALID_CS);
+				test_engine_hang(ctx, e, IGT_SPIN_INVALID_CS);
 		}
 	}
 
@@ -375,5 +380,7 @@ igt_main
 
 	igt_fixture {
 		igt_disallow_hang(device, hang);
+		intel_ctx_destroy(device, ctx);
+		close(device);
 	}
 }
