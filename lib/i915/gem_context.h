@@ -59,6 +59,7 @@ bool gem_has_queues(int i915);
 
 bool gem_has_contexts(int fd);
 void gem_require_contexts(int fd);
+bool gem_context_has_single_timeline(int i915);
 void gem_context_require_bannable(int fd);
 void gem_context_require_param(int fd, uint64_t param);
 

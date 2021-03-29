@@ -209,6 +209,23 @@ void gem_context_destroy(int fd, uint32_t ctx_id)
 	igt_assert_eq(__gem_context_destroy(fd, ctx_id), 0);
 }
 
+static bool __gem_context_has_flag(int i915, unsigned int flags)
+{
+	uint32_t ctx = 0;
+
+	__gem_context_create_ext(i915, flags, 0, &ctx);
+	if (ctx)
+		gem_context_destroy(i915, ctx);
+
+	errno = 0;
+	return ctx;
+}
+
+bool gem_context_has_single_timeline(int i915)
+{
+	return __gem_context_has_flag(i915, I915_CONTEXT_CREATE_FLAGS_SINGLE_TIMELINE);
+}
+
 int __gem_context_get_param(int fd, struct drm_i915_gem_context_param *p)
 {
 	int err = 0;
