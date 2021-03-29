@@ -26,10 +26,6 @@
 #include <stddef.h>
 #include <inttypes.h>
 
-#include <nouveau/nouveau.h>
-#include <nouveau/nvif/class.h>
-#include <nouveau/nvif/cl0080.h>
-
 #include "igt_core.h"
 
 #define IGT_NOUVEAU_CHIPSET_GV100 0x140
@@ -37,6 +33,10 @@
 typedef struct igt_fb igt_fb_t;
 
 #ifdef HAVE_LIBDRM_NOUVEAU
+#include <nouveau/nouveau.h>
+#include <nouveau/nvif/class.h>
+#include <nouveau/nvif/cl0080.h>
+
 #define DECL(d) d
 #else
 /* There shouldn't be any code that calls igt_nouveau_* functions without libdrm support enabled, as
