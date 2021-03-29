@@ -170,7 +170,7 @@ igt@gem_tiled_wc
 #
 # Data acquired on 2020-02-20 by Martin Peres
 ###############################################################################
-igt@kms_plane@pixel-format-pipe-[a-d]-planes(-source-clamping)?
+igt@kms_plane@pixel-format-pipe-[b-d]-planes(-source-clamping)?
 
 
 ###############################################################################
