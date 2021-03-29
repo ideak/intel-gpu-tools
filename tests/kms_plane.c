@@ -25,6 +25,7 @@
  */
 
 #include "igt.h"
+#include "igt_vec.h"
 #include <errno.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -816,16 +817,21 @@ enum crc_set { PACKED_CRC_SET,
 	       PLANAR_CRC_SET,
 	       MAX_CRC_SET };
 
+struct format_mod {
+	uint64_t modifier;
+	uint32_t format;
+};
+
 static bool test_format_plane(data_t *data, enum pipe pipe,
 			      igt_output_t *output, igt_plane_t *plane, igt_fb_t *primary_fb)
 {
 	struct igt_fb fb = {};
 	struct igt_fb *clear_fb = plane->type == DRM_PLANE_TYPE_PRIMARY ? primary_fb : NULL;
 	drmModeModeInfo *mode;
-	uint32_t format, ref_format;
-	uint64_t modifier, ref_modifier;
 	uint64_t width, height;
 	igt_crc_t ref_crc[MAX_CRC_SET][ARRAY_SIZE(colors_extended)];
+	struct igt_vec tested_formats;
+	struct format_mod ref = {};
 	igt_crc_t* crcset;
 	bool result = true;
 
@@ -835,12 +841,14 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 	if (data->crop != 0 && plane->type == DRM_PLANE_TYPE_CURSOR)
 		return true;
 
+	igt_vec_init(&tested_formats, sizeof(struct format_mod));
+
 	mode = igt_output_get_mode(output);
 	if (plane->type != DRM_PLANE_TYPE_CURSOR) {
 		width = mode->hdisplay;
 		height = mode->vdisplay;
-		ref_format = format = DRM_FORMAT_XRGB8888;
-		ref_modifier = modifier = DRM_FORMAT_MOD_NONE;
+		ref.format = DRM_FORMAT_XRGB8888;
+		ref.modifier = DRM_FORMAT_MOD_NONE;
 	} else {
 		if (!plane->drm_plane) {
 			igt_debug("Only legacy cursor ioctl supported, skipping cursor plane\n");
@@ -848,8 +856,8 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 		}
 		do_or_die(drmGetCap(data->drm_fd, DRM_CAP_CURSOR_WIDTH, &width));
 		do_or_die(drmGetCap(data->drm_fd, DRM_CAP_CURSOR_HEIGHT, &height));
-		ref_format = format = DRM_FORMAT_ARGB8888;
-		ref_modifier = modifier = DRM_FORMAT_MOD_NONE;
+		ref.format = DRM_FORMAT_ARGB8888;
+		ref.modifier = DRM_FORMAT_MOD_NONE;
 	}
 
 	igt_debug("Testing connector %s on %s plane %s.%u\n",
@@ -859,15 +867,15 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 	igt_pipe_crc_start(data->pipe_crc);
 
 	igt_info("Testing format " IGT_FORMAT_FMT " / modifier 0x%" PRIx64 " on %s.%u\n",
-		 IGT_FORMAT_ARGS(format), modifier,
+		 IGT_FORMAT_ARGS(ref.format), ref.modifier,
 		 kmstest_pipe_name(pipe), plane->index);
 
 	if (data->display.is_atomic) {
 		struct igt_fb test_fb;
 		int ret;
 
-		igt_create_fb(data->drm_fd, 64, 64, format,
-			      LOCAL_DRM_FORMAT_MOD_NONE, &test_fb);
+		igt_create_fb(data->drm_fd, 64, 64, ref.format,
+			      DRM_FORMAT_MOD_LINEAR, &test_fb);
 
 		igt_plane_set_fb(plane, &test_fb);
 
@@ -885,12 +893,12 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 		igt_remove_fb(data->drm_fd, &test_fb);
 	}
 
-	capture_format_crcs_packed(data, pipe, plane, format, modifier,
+	capture_format_crcs_packed(data, pipe, plane, ref.format, ref.modifier,
 				   width, height, IGT_COLOR_YCBCR_BT709,
 				   IGT_COLOR_YCBCR_LIMITED_RANGE,
 				   ref_crc[PACKED_CRC_SET], &fb);
 
-	capture_format_crcs_planar(data, pipe, plane, format, modifier,
+	capture_format_crcs_planar(data, pipe, plane, ref.format, ref.modifier,
 				   width, height, IGT_COLOR_YCBCR_BT709,
 				   IGT_COLOR_YCBCR_LIMITED_RANGE,
 				   ref_crc[PLANAR_CRC_SET], &fb);
@@ -903,36 +911,55 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 	igt_require(num_unique_crcs(ref_crc[PLANAR_CRC_SET], data->num_colors) > 1);
 
 	for (int i = 0; i < plane->format_mod_count; i++) {
-		format = plane->formats[i];
-		modifier = plane->modifiers[i];
+		struct format_mod f = {
+			.format = plane->formats[i],
+			.modifier = plane->modifiers[i],
+		};
 
-		if (format == ref_format &&
-		    modifier == ref_modifier)
+		if (f.format == ref.format &&
+		    f.modifier == ref.modifier)
 			continue;
 
-		if (format == DRM_FORMAT_C8) {
+		/* test each format "class" only once in non-extended tests */
+		if (!data->extended && f.modifier != DRM_FORMAT_MOD_LINEAR) {
+			struct format_mod rf = {
+				.format = igt_reduce_format(f.format),
+				.modifier = f.modifier,
+			};
+
+			if (igt_vec_index(&tested_formats, &rf) >= 0) {
+				igt_info("Skipping format " IGT_FORMAT_FMT " / modifier 0x%" PRIx64 " on %s.%u\n",
+					 IGT_FORMAT_ARGS(f.format), f.modifier,
+					 kmstest_pipe_name(pipe), plane->index);
+				continue;
+			}
+
+			igt_vec_push(&tested_formats, &rf);
+		}
+
+		if (f.format == DRM_FORMAT_C8) {
 			if (!set_c8_legacy_lut(data, pipe, LUT_MASK))
 				continue;
 		} else {
-			if (!igt_fb_supported_format(format))
+			if (!igt_fb_supported_format(f.format))
 				continue;
 		}
 
-		crcset = ref_crc[(igt_format_is_yuv_semiplanar(format)
+		crcset = ref_crc[(igt_format_is_yuv_semiplanar(f.format)
 				 ? PLANAR_CRC_SET : PACKED_CRC_SET)];
 
-		if (igt_format_is_yuv(format))
+		if (igt_format_is_yuv(f.format))
 			result &= test_format_plane_yuv(data, pipe, plane,
-							format, modifier,
+							f.format, f.modifier,
 							width, height,
 							crcset, &fb);
 		else
 			result &= test_format_plane_rgb(data, pipe, plane,
-							format, modifier,
+							f.format, f.modifier,
 							width, height,
 							crcset, &fb);
 
-		if (format == DRM_FORMAT_C8)
+		if (f.format == DRM_FORMAT_C8)
 			set_legacy_lut(data, pipe, LUT_MASK);
 	}
 
@@ -940,6 +967,8 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 
 	igt_plane_set_fb(plane, clear_fb);
 	igt_remove_fb(data->drm_fd, &fb);
+
+	igt_vec_fini(&tested_formats);
 
 	return result;
 }
