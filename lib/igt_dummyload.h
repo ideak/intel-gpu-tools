@@ -31,6 +31,7 @@
 #include "igt_core.h"
 #include "igt_list.h"
 #include "i915_drm.h"
+#include "intel_ctx.h"
 
 typedef struct igt_spin {
 	struct igt_list_head link;
@@ -62,6 +63,7 @@ typedef struct igt_spin {
 /**
  * igt_spin_factory_t:
  * @ctx_id: GEM context handle
+ * @ctx: intel_ctx_t context wrapper
  * @dependency: GEM object to depend on
  * @engine: Flags describing the engine to execute on
  * @flags: Set of IGT_SPIN_* flags
@@ -71,6 +73,7 @@ typedef struct igt_spin {
  */
 typedef struct igt_spin_factory {
 	uint32_t ctx_id;
+	const intel_ctx_t *ctx;
 	uint32_t dependency;
 	unsigned int engine;
 	unsigned int flags;

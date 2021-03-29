@@ -123,16 +123,28 @@ emit_recursive_batch(igt_spin_t *spin,
 	addr += random() % addr / 2;
 	addr &= -4096;
 
+	igt_assert(!(opts->ctx && opts->ctx_id));
+
 	nengine = 0;
 	if (opts->engine == ALL_ENGINES) {
 		struct intel_execution_engine2 *engine;
 
-		for_each_context_engine(fd, opts->ctx_id, engine) {
-			if (opts->flags & IGT_SPIN_POLL_RUN &&
-			    !gem_class_can_store_dword(fd, engine->class))
-				continue;
+		if (opts->ctx) {
+			for_each_ctx_engine(fd, opts->ctx, engine) {
+				if (opts->flags & IGT_SPIN_POLL_RUN &&
+				    !gem_class_can_store_dword(fd, engine->class))
+					continue;
 
-			flags[nengine++] = engine->flags;
+				flags[nengine++] = engine->flags;
+			}
+		} else {
+			for_each_context_engine(fd, opts->ctx_id, engine) {
+				if (opts->flags & IGT_SPIN_POLL_RUN &&
+				    !gem_class_can_store_dword(fd, engine->class))
+					continue;
+
+				flags[nengine++] = engine->flags;
+			}
 		}
 	} else {
 		flags[nengine++] = opts->engine;
@@ -325,7 +337,7 @@ emit_recursive_batch(igt_spin_t *spin,
 
 	execbuf->buffers_ptr =
 	       	to_user_pointer(obj + (2 - execbuf->buffer_count));
-	execbuf->rsvd1 = opts->ctx_id;
+	execbuf->rsvd1 = opts->ctx ? opts->ctx->id : opts->ctx_id;
 
 	if (opts->flags & IGT_SPIN_FENCE_OUT)
 		execbuf->flags |= I915_EXEC_FENCE_OUT;
@@ -422,8 +434,10 @@ igt_spin_factory(int fd, const struct igt_spin_factory *opts)
 		struct intel_execution_engine2 e;
 		int class;
 
-		if (!gem_context_lookup_engine(fd, opts->engine,
-					       opts->ctx_id, &e)) {
+		if (opts->ctx) {
+			class = opts->ctx->cfg.engines[opts->engine].engine_class;
+		} else if (!gem_context_lookup_engine(fd, opts->engine,
+						      opts->ctx_id, &e)) {
 			class = e.class;
 		} else {
 			gem_require_ring(fd, opts->engine);
