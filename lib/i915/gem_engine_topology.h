@@ -29,6 +29,10 @@
 
 #define GEM_MAX_ENGINES		I915_EXEC_RING_MASK + 1
 
+int __gem_query_engines(int fd,
+			struct drm_i915_query_engine_info *query_engines,
+			int length);
+
 /**
  * intel_engine_data:
  * @nengines: Number of engines

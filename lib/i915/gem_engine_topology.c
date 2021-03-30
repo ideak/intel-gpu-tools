@@ -70,14 +70,17 @@ static int __gem_query(int fd, struct drm_i915_query *q)
 	return err;
 }
 
-static void gem_query(int fd, struct drm_i915_query *q)
-{
-	igt_assert_eq(__gem_query(fd, q), 0);
-}
-
-static void query_engines(int fd,
-			  struct drm_i915_query_engine_info *query_engines,
-			  int length)
+/**
+ * __gem_query_engines:
+ * @fd: open i915 drm file descriptor
+ * @query_engines: Returned engine query info
+ * @length: Size of query_engines, including room for the engines array
+ *
+ * Queries the set of engines available on this device.
+ */
+int __gem_query_engines(int fd,
+			struct drm_i915_query_engine_info *query_engines,
+			int length)
 {
 	struct drm_i915_query_item item = { };
 	struct drm_i915_query query = { };
@@ -89,7 +92,14 @@ static void query_engines(int fd,
 
 	item.data_ptr = to_user_pointer(query_engines);
 
-	gem_query(fd, &query);
+	return __gem_query(fd, &query);
+}
+
+static void query_engines(int fd,
+			  struct drm_i915_query_engine_info *query_engines,
+			  int length)
+{
+	igt_assert_eq(__gem_query_engines(fd, query_engines, length), 0);
 }
 
 static void ctx_map_engines(int fd, struct intel_engine_data *ed,
