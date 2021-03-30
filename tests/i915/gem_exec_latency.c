@@ -319,7 +319,7 @@ static void latency_from_ring(int fd,
 
 		if (flags & PREEMPT)
 			spin = __igt_spin_new(fd,
-					      .ctx = ctx[0],
+					      .ctx_id = ctx[0],
 					      .engine = e->flags);
 
 		if (flags & CORK) {

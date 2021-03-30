@@ -306,7 +306,7 @@ static void virtual(int i915)
 			set_load_balancer(i915, ctx[i], ci, count, NULL);
 
 			spin[i] = igt_spin_new(i915,
-					       .ctx = ctx[i],
+					       .ctx_id = ctx[i],
 					       .flags = spin_flags());
 			i++;
 		}

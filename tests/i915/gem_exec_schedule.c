@@ -206,11 +206,11 @@ static void unplug_show_queue(int fd, struct igt_cork *c, unsigned int engine)
 
 	for (int n = 0; n < max; n++) {
 		const struct igt_spin_factory opts = {
-			.ctx = create_highest_priority(fd),
+			.ctx_id = create_highest_priority(fd),
 			.engine = engine,
 		};
 		spin[n] = __igt_spin_factory(fd, &opts);
-		gem_context_destroy(fd, opts.ctx);
+		gem_context_destroy(fd, opts.ctx_id);
 	}
 
 	igt_cork_unplug(c); /* batches will now be queued on the engine */
@@ -637,7 +637,7 @@ static void lateslice(int i915, unsigned int engine, unsigned long flags)
 	igt_require(intel_gen(intel_get_drm_devid(i915)) >= 8);
 
 	ctx = gem_context_create(i915);
-	spin[0] = igt_spin_new(i915, .ctx = ctx, .engine = engine,
+	spin[0] = igt_spin_new(i915, .ctx_id = ctx, .engine = engine,
 			       .flags = (IGT_SPIN_POLL_RUN |
 					 IGT_SPIN_FENCE_OUT |
 					 flags));
@@ -646,7 +646,7 @@ static void lateslice(int i915, unsigned int engine, unsigned long flags)
 	igt_spin_busywait_until_started(spin[0]);
 
 	ctx = gem_context_create(i915);
-	spin[1] = igt_spin_new(i915, .ctx = ctx, .engine = engine,
+	spin[1] = igt_spin_new(i915, .ctx_id = ctx, .engine = engine,
 			       .fence = spin[0]->out_fence,
 			       .flags = (IGT_SPIN_POLL_RUN |
 					 IGT_SPIN_FENCE_IN |
@@ -663,7 +663,7 @@ static void lateslice(int i915, unsigned int engine, unsigned long flags)
 	 */
 
 	ctx = gem_context_create(i915);
-	spin[2] = igt_spin_new(i915, .ctx = ctx, .engine = engine,
+	spin[2] = igt_spin_new(i915, .ctx_id = ctx, .engine = engine,
 			       .flags = IGT_SPIN_POLL_RUN | flags);
 	gem_context_destroy(i915, ctx);
 
@@ -762,7 +762,7 @@ static void submit_slice(int i915,
 		engines.engines[0].engine_class = e->class;
 		engines.engines[0].engine_instance = e->instance;
 		gem_context_set_param(i915, &param);
-		spin = igt_spin_new(i915, .ctx = param.ctx_id,
+		spin = igt_spin_new(i915, .ctx_id = param.ctx_id,
 				    .fence = fence,
 				    .flags =
 				    IGT_SPIN_POLL_RUN |
@@ -906,7 +906,7 @@ static void semaphore_codependency(int i915, unsigned long flags)
 
 		task[i].xcs =
 			__igt_spin_new(i915,
-				       .ctx = ctx,
+				       .ctx_id = ctx,
 				       .engine = e->flags,
 				       .flags = IGT_SPIN_POLL_RUN | flags);
 		igt_spin_busywait_until_started(task[i].xcs);
@@ -914,7 +914,7 @@ static void semaphore_codependency(int i915, unsigned long flags)
 		/* Common rcs tasks will be queued in FIFO */
 		task[i].rcs =
 			__igt_spin_new(i915,
-				       .ctx = ctx,
+				       .ctx_id = ctx,
 				       .engine = 0,
 				       .dependency = task[i].xcs->handle);
 
@@ -1400,7 +1400,7 @@ static void preempt(int fd, const struct intel_execution_engine2 *e, unsigned fl
 			gem_context_set_priority(fd, ctx[LO], MIN_PRIO);
 		}
 		spin[n] = __igt_spin_new(fd,
-					 .ctx = ctx[LO],
+					 .ctx_id = ctx[LO],
 					 .engine = e->flags,
 					 .flags = flags & USERPTR ? IGT_SPIN_USERPTR : 0);
 		igt_debug("spin[%d].handle=%d\n", n, spin[n]->handle);
@@ -1436,7 +1436,7 @@ static igt_spin_t *__noise(int fd, uint32_t ctx, int prio, igt_spin_t *spin)
 	__for_each_physical_engine(fd, e) {
 		if (spin == NULL) {
 			spin = __igt_spin_new(fd,
-					      .ctx = ctx,
+					      .ctx_id = ctx,
 					      .engine = e->flags);
 		} else {
 			struct drm_i915_gem_execbuffer2 eb = {
@@ -1715,7 +1715,7 @@ static void preempt_self(int fd, unsigned ring)
 	gem_context_set_priority(fd, ctx[HI], MIN_PRIO);
 	__for_each_physical_engine(fd, e) {
 		spin[n] = __igt_spin_new(fd,
-					 .ctx = ctx[NOISE],
+					 .ctx_id = ctx[NOISE],
 					 .engine = e->flags);
 		store_dword(fd, ctx[HI], e->flags,
 			    result, (n + 1)*sizeof(uint32_t), n + 1,
@@ -1763,7 +1763,7 @@ static void preemptive_hang(int fd, const struct intel_execution_engine2 *e)
 		gem_context_set_priority(fd, ctx[LO], MIN_PRIO);
 
 		spin[n] = __igt_spin_new(fd,
-					 .ctx = ctx[LO],
+					 .ctx_id = ctx[LO],
 					 .engine = e->flags);
 
 		gem_context_destroy(fd, ctx[LO]);
@@ -2748,7 +2748,7 @@ static void fairslice(int i915,
 		ctx[i] = gem_context_clone_with_engines(i915, 0);
 		if (spin == NULL) {
 			spin = __igt_spin_new(i915,
-					      .ctx = ctx[i],
+					      .ctx_id = ctx[i],
 					      .engine = e->flags,
 					      .flags = flags);
 		} else {

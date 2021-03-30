@@ -630,7 +630,7 @@ static void nonpriv(int fd,
 
 		tmpl_regs(fd, ctx, e, tmpl, values[v]);
 
-		spin = igt_spin_new(fd, .ctx = ctx, .engine = e->flags);
+		spin = igt_spin_new(fd, .ctx_id = ctx, .engine = e->flags);
 
 		igt_debug("%s[%d]: Setting all registers to 0x%08x\n",
 			  __func__, v, values[v]);
@@ -642,12 +642,12 @@ static void nonpriv(int fd,
 
 			/* Explicit sync to keep the switch between write/read */
 			syncpt = igt_spin_new(fd,
-					      .ctx = ctx,
+					      .ctx_id = ctx,
 					      .engine = e->flags,
 					      .flags = IGT_SPIN_FENCE_OUT);
 
 			dirt = igt_spin_new(fd,
-					    .ctx = sw,
+					    .ctx_id = sw,
 					    .engine = e->flags,
 					    .fence = syncpt->out_fence,
 					    .flags = (IGT_SPIN_FENCE_IN |
@@ -655,7 +655,7 @@ static void nonpriv(int fd,
 			igt_spin_free(fd, syncpt);
 
 			syncpt = igt_spin_new(fd,
-					      .ctx = ctx,
+					      .ctx_id = ctx,
 					      .engine = e->flags,
 					      .fence = dirt->out_fence,
 					      .flags = IGT_SPIN_FENCE_IN);
@@ -709,7 +709,7 @@ static void isolation(int fd,
 		ctx[0] = gem_context_clone_with_engines(fd, 0);
 		regs[0] = read_regs(fd, ctx[0], e, flags);
 
-		spin = igt_spin_new(fd, .ctx = ctx[0], .engine = e->flags);
+		spin = igt_spin_new(fd, .ctx_id = ctx[0], .engine = e->flags);
 
 		if (flags & DIRTY1) {
 			igt_debug("%s[%d]: Setting all registers of ctx 0 to 0x%08x\n",
@@ -777,7 +777,7 @@ static uint32_t create_reset_context(int i915)
 static void inject_reset_context(int fd, const struct intel_execution_engine2 *e)
 {
 	struct igt_spin_factory opts = {
-		.ctx = create_reset_context(fd),
+		.ctx_id = create_reset_context(fd),
 		.engine = e->flags,
 		.flags = IGT_SPIN_FAST,
 	};
@@ -802,7 +802,7 @@ static void inject_reset_context(int fd, const struct intel_execution_engine2 *e
 	igt_force_gpu_reset(fd);
 
 	igt_spin_free(fd, spin);
-	gem_context_destroy(fd, opts.ctx);
+	gem_context_destroy(fd, opts.ctx_id);
 }
 
 static void preservation(int fd,
@@ -826,7 +826,7 @@ static void preservation(int fd,
 	gem_quiescent_gpu(fd);
 
 	ctx[num_values] = gem_context_clone_with_engines(fd, 0);
-	spin = igt_spin_new(fd, .ctx = ctx[num_values], .engine = e->flags);
+	spin = igt_spin_new(fd, .ctx_id = ctx[num_values], .engine = e->flags);
 	regs[num_values][0] = read_regs(fd, ctx[num_values], e, flags);
 	for (int v = 0; v < num_values; v++) {
 		ctx[v] = gem_context_clone_with_engines(fd, 0);
@@ -866,7 +866,7 @@ static void preservation(int fd,
 		break;
 	}
 
-	spin = igt_spin_new(fd, .ctx = ctx[num_values], .engine = e->flags);
+	spin = igt_spin_new(fd, .ctx_id = ctx[num_values], .engine = e->flags);
 	for (int v = 0; v < num_values; v++)
 		regs[v][1] = read_regs(fd, ctx[v], e, flags);
 	regs[num_values][1] = read_regs(fd, ctx[num_values], e, flags);

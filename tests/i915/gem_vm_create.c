@@ -364,7 +364,7 @@ static void async_destroy(int i915)
 	int err;
 
 	spin[0] = igt_spin_new(i915,
-			       .ctx = arg.ctx_id,
+			       .ctx_id = arg.ctx_id,
 			       .flags = IGT_SPIN_POLL_RUN);
 	igt_spin_busywait_until_started(spin[0]);
 
@@ -373,7 +373,7 @@ static void async_destroy(int i915)
 		err = 0;
 	igt_assert_eq(err, 0);
 
-	spin[1] = __igt_spin_new(i915, .ctx = arg.ctx_id);
+	spin[1] = __igt_spin_new(i915, .ctx_id = arg.ctx_id);
 
 	igt_spin_end(spin[0]);
 	gem_sync(i915, spin[0]->handle);

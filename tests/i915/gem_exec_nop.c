@@ -918,7 +918,7 @@ static void preempt(int fd, uint32_t handle,
 	intel_detect_and_clear_missed_interrupts(fd);
 
 	count = 0;
-	spin = __igt_spin_new(fd, .ctx = ctx[0], .engine = e->flags);
+	spin = __igt_spin_new(fd, .ctx_id = ctx[0], .engine = e->flags);
 	clock_gettime(CLOCK_MONOTONIC, &start);
 	do {
 		gem_execbuf(fd, &execbuf);

@@ -298,7 +298,7 @@ igt_hang_t igt_hang_ctx(int fd, uint32_t ctx, int ring, unsigned flags)
 		context_set_ban(fd, ctx, 0);
 
 	spin = __igt_spin_new(fd,
-			      .ctx = ctx,
+			      .ctx_id = ctx,
 			      .engine = ring,
 			      .flags = IGT_SPIN_NO_PREEMPTION);
 

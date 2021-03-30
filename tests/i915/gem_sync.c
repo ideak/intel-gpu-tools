@@ -1110,7 +1110,7 @@ preempt(int fd, unsigned ring, int num_children, int timeout)
 		do {
 			igt_spin_t *spin =
 				__igt_spin_new(fd,
-					       .ctx = ctx[0],
+					       .ctx_id = ctx[0],
 					       .engine = execbuf.flags);
 
 			do {

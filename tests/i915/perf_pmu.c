@@ -176,7 +176,7 @@ static igt_spin_t * __spin_poll(int fd, uint32_t ctx,
 				const struct intel_execution_engine2 *e)
 {
 	struct igt_spin_factory opts = {
-		.ctx = ctx,
+		.ctx_id = ctx,
 		.engine = e->flags,
 	};
 
@@ -382,7 +382,7 @@ busy_double_start(int gem_fd, const struct intel_execution_engine2 *e)
 	spin[0] = __spin_sync(gem_fd, 0, e);
 	usleep(500e3);
 	spin[1] = __igt_spin_new(gem_fd,
-				 .ctx = ctx,
+				 .ctx_id = ctx,
 				 .engine = e->flags);
 
 	/*

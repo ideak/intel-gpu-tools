@@ -125,8 +125,8 @@ static void disjoint_timelines(int i915)
 	child = gem_context_clone(i915, 0, I915_CONTEXT_CLONE_VM, 0);
 	plug = igt_cork_plug(&cork, i915);
 
-	spin[0] = __igt_spin_new(i915, .ctx = 0, .dependency = plug);
-	spin[1] = __igt_spin_new(i915, .ctx = child);
+	spin[0] = __igt_spin_new(i915, .ctx_id = 0, .dependency = plug);
+	spin[1] = __igt_spin_new(i915, .ctx_id = child);
 
 	/* Wait for the second spinner, will hang if stuck behind the first */
 	igt_spin_end(spin[1]);
@@ -389,7 +389,7 @@ static void exec_single_timeline(int i915, unsigned int engine)
 			continue;
 
 		if (spin == NULL) {
-			spin = __igt_spin_new(i915, .ctx = ctx, .engine = e->flags);
+			spin = __igt_spin_new(i915, .ctx_id = ctx, .engine = e->flags);
 		} else {
 			struct drm_i915_gem_execbuffer2 execbuf = {
 				.buffers_ptr = spin->execbuf.buffers_ptr,
@@ -417,7 +417,7 @@ static void exec_single_timeline(int i915, unsigned int engine)
 			continue;
 
 		if (spin == NULL) {
-			spin = __igt_spin_new(i915, .ctx = ctx, .engine = e->flags);
+			spin = __igt_spin_new(i915, .ctx_id = ctx, .engine = e->flags);
 		} else {
 			struct drm_i915_gem_execbuffer2 execbuf = {
 				.buffers_ptr = spin->execbuf.buffers_ptr,
@@ -511,11 +511,11 @@ static void unplug_show_queue(int i915, struct igt_cork *c, unsigned int engine)
 
 	for (int n = 0; n < ARRAY_SIZE(spin); n++) {
 		const struct igt_spin_factory opts = {
-			.ctx = create_highest_priority(i915),
+			.ctx_id = create_highest_priority(i915),
 			.engine = engine,
 		};
 		spin[n] = __igt_spin_factory(i915, &opts);
-		gem_context_destroy(i915, opts.ctx);
+		gem_context_destroy(i915, opts.ctx_id);
 	}
 
 	igt_cork_unplug(c); /* batches will now be queued on the engine */
@@ -593,11 +593,11 @@ static void independent(int i915,
 
 	for (int n = 0; n < ARRAY_SIZE(spin); n++) {
 		const struct igt_spin_factory opts = {
-			.ctx = create_highest_priority(i915),
+			.ctx_id = create_highest_priority(i915),
 			.engine = e->flags,
 		};
 		spin[n] = __igt_spin_factory(i915, &opts);
-		gem_context_destroy(i915, opts.ctx);
+		gem_context_destroy(i915, opts.ctx_id);
 	}
 
 	fence = igt_cork_plug(&cork, i915);

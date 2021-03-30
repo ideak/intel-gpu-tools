@@ -185,7 +185,7 @@ static void norecovery(int i915)
 		igt_assert_eq(param.value, pass);
 
 		spin = __igt_spin_new(i915,
-				      .ctx = param.ctx_id,
+				      .ctx_id = param.ctx_id,
 				      .flags = IGT_SPIN_POLL_RUN);
 		igt_spin_busywait_until_started(spin);
 

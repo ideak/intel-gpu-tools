@@ -531,7 +531,7 @@ static void check_individual_engine(int i915,
 			     I915_PMU_ENGINE_BUSY(ci[idx].engine_class,
 						  ci[idx].engine_instance));
 
-	spin = igt_spin_new(i915, .ctx = ctx, .engine = idx + 1);
+	spin = igt_spin_new(i915, .ctx_id = ctx, .engine = idx + 1);
 	load = measure_load(pmu, 10000);
 	igt_spin_free(i915, spin);
 
@@ -660,13 +660,13 @@ static void bonded(int i915, unsigned int flags)
 			plug = NULL;
 			if (flags & CORK) {
 				plug = __igt_spin_new(i915,
-						      .ctx = master,
+						      .ctx_id = master,
 						      .engine = bond,
 						      .dependency = igt_cork_plug(&cork, i915));
 			}
 
 			spin = __igt_spin_new(i915,
-					      .ctx = master,
+					      .ctx_id = master,
 					      .engine = bond,
 					      .flags = IGT_SPIN_FENCE_OUT);
 
@@ -807,7 +807,7 @@ static void bonded_slice(int i915)
 		set_load_balancer(i915, ctx, siblings, count, NULL);
 
 		spin = __igt_spin_new(i915,
-				      .ctx = ctx,
+				      .ctx_id = ctx,
 				      .flags = (IGT_SPIN_NO_PREEMPTION |
 						IGT_SPIN_POLL_RUN));
 		igt_spin_end(spin); /* we just want its address for later */
@@ -832,7 +832,7 @@ static void bonded_slice(int i915)
 
 			while (!READ_ONCE(*stop)) {
 				spin = igt_spin_new(i915,
-						    .ctx = ctx,
+						    .ctx_id = ctx,
 						    .engine = (1 + rand() % count),
 						    .flags = IGT_SPIN_POLL_RUN);
 				igt_spin_busywait_until_started(spin);
@@ -893,7 +893,7 @@ static void __bonded_chain(int i915, uint32_t ctx,
 		if (priorities[i] < 0)
 			gem_context_set_priority(i915, ctx, priorities[i]);
 		spin = igt_spin_new(i915,
-				    .ctx = ctx,
+				    .ctx_id = ctx,
 				    .engine = 1,
 				    .flags = (IGT_SPIN_POLL_RUN |
 					      IGT_SPIN_FENCE_OUT));
@@ -972,7 +972,7 @@ static void __bonded_chain_inv(int i915, uint32_t ctx,
 		if (priorities[i] < 0)
 			gem_context_set_priority(i915, ctx, priorities[i]);
 		spin = igt_spin_new(i915,
-				    .ctx = ctx,
+				    .ctx_id = ctx,
 				    .engine = 1,
 				    .flags = (IGT_SPIN_POLL_RUN |
 					      IGT_SPIN_FENCE_OUT));
@@ -1839,7 +1839,7 @@ static void __bonded_early(int i915, uint32_t ctx,
 
 	/* A: spin forever on engine 1 */
 	spin = igt_spin_new(i915,
-			    .ctx = ctx,
+			    .ctx_id = ctx,
 			    .engine = (flags & VIRTUAL_ENGINE) ? 0 : 1,
 			    .flags = IGT_SPIN_NO_PREEMPTION);
 
@@ -1954,10 +1954,10 @@ static void busy(int i915)
 		free(ci);
 
 		spin[0] = __igt_spin_new(i915,
-					 .ctx = ctx,
+					 .ctx_id = ctx,
 					 .flags = IGT_SPIN_POLL_RUN);
 		spin[1] = __igt_spin_new(i915,
-					 .ctx = ctx,
+					 .ctx_id = ctx,
 					 .dependency = scratch);
 
 		igt_spin_busywait_until_started(spin[0]);
@@ -2056,7 +2056,7 @@ static void full(int i915, unsigned int flags)
 			ctx = load_balancer_create(i915, ci, count);
 
 			if (spin == NULL) {
-				spin = __igt_spin_new(i915, .ctx = ctx);
+				spin = __igt_spin_new(i915, .ctx_id = ctx);
 			} else {
 				struct drm_i915_gem_execbuffer2 eb = {
 					.buffers_ptr = spin->execbuf.buffers_ptr,
@@ -2603,7 +2603,7 @@ static void semaphore(int i915)
 		for (int i = 0; i < count; i++) {
 			set_load_balancer(i915, block[i], ci, count, NULL);
 			spin[i] = __igt_spin_new(i915,
-						 .ctx = block[i],
+						 .ctx_id = block[i],
 						 .dependency = scratch);
 		}
 
@@ -2920,7 +2920,7 @@ static void __fairslice(int i915,
 	for (int i = 0; i < ARRAY_SIZE(ctx); i++) {
 		ctx[i] = load_balancer_create(i915, ci, count);
 		if (spin == NULL) {
-			spin = __igt_spin_new(i915, .ctx = ctx[i]);
+			spin = __igt_spin_new(i915, .ctx_id = ctx[i]);
 		} else {
 			struct drm_i915_gem_execbuffer2 eb = {
 				.buffer_count = 1,

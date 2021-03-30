@@ -61,7 +61,7 @@ typedef struct igt_spin {
 
 /**
  * igt_spin_factory_t:
- * @ctx: GEM context handle
+ * @ctx_id: GEM context handle
  * @dependency: GEM object to depend on
  * @engine: Flags describing the engine to execute on
  * @flags: Set of IGT_SPIN_* flags
@@ -70,7 +70,7 @@ typedef struct igt_spin {
  * A factory struct which contains creation parameters for an igt_spin_t.
  */
 typedef struct igt_spin_factory {
-	uint32_t ctx;
+	uint32_t ctx_id;
 	uint32_t dependency;
 	unsigned int engine;
 	unsigned int flags;

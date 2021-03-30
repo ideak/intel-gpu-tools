@@ -145,7 +145,7 @@ static void spin_all(int i915, unsigned int flags)
 
 		/* Prevent preemption so only one is allowed on each engine */
 		spin = igt_spin_new(i915,
-				    .ctx = ctx,
+				    .ctx_id = ctx,
 				    .engine = e->flags,
 				    .flags = (IGT_SPIN_POLL_RUN |
 					      IGT_SPIN_NO_PREEMPTION));

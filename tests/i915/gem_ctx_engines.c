@@ -337,7 +337,7 @@ static void execute_one(int i915)
 	igt_spin_t *spin;
 
 	/* Prewarm the spinner */
-	spin = igt_spin_new(i915, .ctx = param.ctx_id,
+	spin = igt_spin_new(i915, .ctx_id = param.ctx_id,
 			    .flags = (IGT_SPIN_NO_PREEMPTION |
 				      IGT_SPIN_POLL_RUN));
 
@@ -440,7 +440,7 @@ static void execute_oneforall(int i915)
 			igt_spin_t *spin;
 
 			spin = __igt_spin_new(i915,
-					      .ctx = param.ctx_id,
+					      .ctx_id = param.ctx_id,
 					      .engine = i);
 
 			busy.handle = spin->handle;
@@ -481,7 +481,7 @@ static void execute_allforone(int i915)
 		igt_spin_t *spin;
 
 		spin = __igt_spin_new(i915,
-				      .ctx = param.ctx_id,
+				      .ctx_id = param.ctx_id,
 				      .engine = i++);
 
 		busy.handle = spin->handle;

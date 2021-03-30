@@ -177,7 +177,7 @@ static int __gem_wait(int fd, uint32_t handle, int64_t timeout)
 static igt_spin_t * __spin_poll(int fd, uint32_t ctx, unsigned long flags)
 {
 	struct igt_spin_factory opts = {
-		.ctx = ctx,
+		.ctx_id = ctx,
 		.engine = flags,
 		.flags = IGT_SPIN_NO_PREEMPTION | IGT_SPIN_FENCE_OUT,
 	};

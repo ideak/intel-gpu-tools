@@ -127,7 +127,7 @@ emit_recursive_batch(igt_spin_t *spin,
 	if (opts->engine == ALL_ENGINES) {
 		struct intel_execution_engine2 *engine;
 
-		for_each_context_engine(fd, opts->ctx, engine) {
+		for_each_context_engine(fd, opts->ctx_id, engine) {
 			if (opts->flags & IGT_SPIN_POLL_RUN &&
 			    !gem_class_can_store_dword(fd, engine->class))
 				continue;
@@ -325,7 +325,7 @@ emit_recursive_batch(igt_spin_t *spin,
 
 	execbuf->buffers_ptr =
 	       	to_user_pointer(obj + (2 - execbuf->buffer_count));
-	execbuf->rsvd1 = opts->ctx;
+	execbuf->rsvd1 = opts->ctx_id;
 
 	if (opts->flags & IGT_SPIN_FENCE_OUT)
 		execbuf->flags |= I915_EXEC_FENCE_OUT;
@@ -423,7 +423,7 @@ igt_spin_factory(int fd, const struct igt_spin_factory *opts)
 		int class;
 
 		if (!gem_context_lookup_engine(fd, opts->engine,
-					       opts->ctx, &e)) {
+					       opts->ctx_id, &e)) {
 			class = e.class;
 		} else {
 			gem_require_ring(fd, opts->engine);
