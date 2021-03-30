@@ -993,7 +993,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 		kmstest_set_vt_graphics_mode();
 
 		igt_display_require(&data.display, data.drm_fd);
-		igt_require(&data.display.is_atomic);
+		igt_require(data.display.is_atomic);
 
 		igt_display_require_output(&data.display);
 
