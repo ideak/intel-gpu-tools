@@ -43,6 +43,7 @@ lib_sources = [
 	'intel_batchbuffer.c',
 	'intel_bufops.c',
 	'intel_chipset.c',
+	'intel_ctx.c',
 	'intel_device_info.c',
 	'intel_os.c',
 	'intel_mmio.c',
