@@ -220,6 +220,7 @@ i915_progs = [
 	'gem_userptr_blits',
 	'gem_vm_create',
 	'gem_wait',
+	'gem_watchdog',
 	'gem_workarounds',
 	'i915_fb_tiling',
 	'i915_getparams_basic',

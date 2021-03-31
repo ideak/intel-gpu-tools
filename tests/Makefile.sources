@@ -463,6 +463,9 @@ gem_userptr_blits_SOURCES = i915/gem_userptr_blits.c
 TESTS_progs += gem_wait
 gem_wait_SOURCES = i915/gem_wait.c
 
+TESTS_progs += gem_watchdog
+gem_exec_watchdog_SOURCES = i915/gem_watchdog.c
+
 TESTS_progs += gem_workarounds
 gem_workarounds_SOURCES = i915/gem_workarounds.c
 
