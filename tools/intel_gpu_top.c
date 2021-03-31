@@ -671,9 +671,14 @@ struct clients {
 
 static struct clients *init_clients(const char *drm_card)
 {
-	struct clients *clients = malloc(sizeof(*clients));
+	struct clients *clients;
 	const char *slash;
 	ssize_t ret;
+	int dir;
+
+	clients = malloc(sizeof(*clients));
+	if (!clients)
+		return NULL;
 
 	memset(clients, 0, sizeof(*clients));
 
@@ -687,6 +692,14 @@ static struct clients *init_clients(const char *drm_card)
 	ret = snprintf(clients->sysfs_root, sizeof(clients->sysfs_root),
 		       "/sys/class/drm/%s/clients/", slash);
 	assert(ret > 0 && ret < sizeof(clients->sysfs_root));
+
+	dir = open(clients->sysfs_root, O_DIRECTORY | O_RDONLY);
+	if (dir < 0) {
+		free(clients);
+		clients = NULL;
+	} else {
+		close(dir);
+	}
 
 	return clients;
 }
@@ -2519,8 +2532,10 @@ int main(int argc, char **argv)
 
 	clients = init_clients(card.pci_slot_name[0] ? card.card : NULL);
 	init_engine_classes(engines);
-	clients->num_classes = engines->num_classes;
-	clients->class = engines->class;
+	if (clients) {
+		clients->num_classes = engines->num_classes;
+		clients->class = engines->class;
+	}
 
 	pmu_sample(engines);
 	scan_clients(clients);
