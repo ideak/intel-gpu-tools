@@ -81,6 +81,11 @@ Filter types: ::
     pci      pci:[vendor=%04x/name][,device=%04x][,card=%d]
              vendor is hex number or vendor name
 
+JSON OUTPUT
+===========
+
+To parse the JSON as output by the tool the consumer should wrap its entirety into square brackets ([ ]). This will make each sample point a JSON array element and will avoid "Multiple root elements" JSON validation error.
+
 LIMITATIONS
 ===========
 
