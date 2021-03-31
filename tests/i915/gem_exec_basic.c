@@ -45,10 +45,13 @@ igt_main
 	struct drm_i915_query_memory_regions *query_info;
 	struct igt_collection *regions, *set;
 	uint32_t batch_size;
+	const intel_ctx_t *ctx;
 	int fd = -1;
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
+		ctx = intel_ctx_create_all_physical(fd);
+
 		/* igt_require_gem(fd); // test is mandatory */
 		igt_fork_hang_detector(fd);
 
@@ -70,12 +73,13 @@ igt_main
 			memset(&exec, 0, sizeof(exec));
 			exec.handle = batch_create(fd, batch_size, region);
 
-			__for_each_physical_engine(fd, e) {
+			for_each_ctx_engine(fd, ctx, e) {
 				igt_dynamic_f("%s-%s", e->name, sub_name) {
 					struct drm_i915_gem_execbuffer2 execbuf = {
 						.buffers_ptr = to_user_pointer(&exec),
 						.buffer_count = 1,
 						.flags = e->flags,
+						.rsvd1 = ctx->id,
 					};
 
 					gem_execbuf(fd, &execbuf);
@@ -91,6 +95,7 @@ igt_main
 		free(query_info);
 		igt_collection_destroy(set);
 		igt_stop_hang_detector();
+		intel_ctx_destroy(fd, ctx);
 		close(fd);
 	}
 }
