@@ -246,20 +246,24 @@ static void always_clear(int i915, int timeout)
 static void busy_create(int i915, int timeout)
 {
 	struct intel_execution_engine2 *e;
+	const intel_ctx_t *ctx;
 	igt_spin_t *spin[I915_EXEC_RING_MASK + 1];
 	unsigned long count = 0;
 
+	ctx = intel_ctx_create_all_physical(i915);
+
 	igt_fork_hang_detector(i915);
-	__for_each_physical_engine(i915, e)
-		spin[e->flags] = igt_spin_new(i915, .engine = e->flags);
+	for_each_ctx_engine(i915, ctx, e)
+		spin[e->flags] = igt_spin_new(i915, .ctx = ctx,
+					      .engine = e->flags);
 
 	igt_until_timeout(timeout) {
-		__for_each_physical_engine(i915, e) {
+		for_each_ctx_engine(i915, ctx, e) {
 			uint32_t handle;
 			igt_spin_t *next;
 
 			handle = gem_create(i915, 4096);
-			next = igt_spin_new(i915,
+			next = igt_spin_new(i915, .ctx = ctx,
 					    .engine = e->flags,
 					    .dependency = handle,
 					    .flags = IGT_SPIN_SOFTDEP);
@@ -271,6 +275,8 @@ static void busy_create(int i915, int timeout)
 			count++;
 		}
 	}
+
+	intel_ctx_destroy(i915, ctx);
 
 	igt_info("Created %ld objects while busy\n", count);
 
