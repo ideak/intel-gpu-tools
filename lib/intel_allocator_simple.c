@@ -25,12 +25,7 @@ intel_allocator_simple_create_full(int fd, uint64_t start, uint64_t end,
 
 struct simple_vma_heap {
 	struct igt_list_head holes;
-
-	/* If true, simple_vma_heap_alloc will prefer high addresses
-	 *
-	 * Default is true.
-	 */
-	bool alloc_high;
+	enum allocator_strategy strategy;
 };
 
 struct simple_vma_hole {
@@ -220,14 +215,11 @@ static void simple_vma_heap_init(struct simple_vma_heap *heap,
 	IGT_INIT_LIST_HEAD(&heap->holes);
 	simple_vma_heap_free(heap, start, size);
 
-	switch (strategy) {
-	case ALLOC_STRATEGY_LOW_TO_HIGH:
-		heap->alloc_high = false;
-		break;
-	case ALLOC_STRATEGY_HIGH_TO_LOW:
-	default:
-		heap->alloc_high = true;
-	}
+	/* Use LOW_TO_HIGH or HIGH_TO_LOW strategy only */
+	if (strategy == ALLOC_STRATEGY_LOW_TO_HIGH)
+		heap->strategy = strategy;
+	else
+		heap->strategy = ALLOC_STRATEGY_HIGH_TO_LOW;
 }
 
 static void simple_vma_heap_finish(struct simple_vma_heap *heap)
@@ -294,7 +286,8 @@ static void simple_vma_hole_alloc(struct simple_vma_hole *hole,
 
 static bool simple_vma_heap_alloc(struct simple_vma_heap *heap,
 				  uint64_t *offset, uint64_t size,
-				  uint64_t alignment)
+				  uint64_t alignment,
+				  enum allocator_strategy strategy)
 {
 	struct simple_vma_hole *hole, *tmp;
 	uint64_t misalign;
@@ -305,7 +298,16 @@ static bool simple_vma_heap_alloc(struct simple_vma_heap *heap,
 
 	simple_vma_heap_validate(heap);
 
-	if (heap->alloc_high) {
+	/* Ensure we support only NONE/LOW_TO_HIGH/HIGH_TO_LOW strategies */
+	igt_assert(strategy == ALLOC_STRATEGY_NONE ||
+		   strategy == ALLOC_STRATEGY_LOW_TO_HIGH ||
+		   strategy == ALLOC_STRATEGY_HIGH_TO_LOW);
+
+	/* Use default strategy chosen on open */
+	if (strategy == ALLOC_STRATEGY_NONE)
+		strategy = heap->strategy;
+
+	if (strategy == ALLOC_STRATEGY_HIGH_TO_LOW) {
 		simple_vma_foreach_hole_safe(hole, heap, tmp) {
 			if (size > hole->size)
 				continue;
@@ -412,7 +414,8 @@ static bool simple_vma_heap_alloc_addr(struct intel_allocator_simple *ials,
 
 static uint64_t intel_allocator_simple_alloc(struct intel_allocator *ial,
 					     uint32_t handle, uint64_t size,
-					     uint64_t alignment)
+					     uint64_t alignment,
+					     enum allocator_strategy strategy)
 {
 	struct intel_allocator_record *rec;
 	struct intel_allocator_simple *ials;
@@ -430,7 +433,7 @@ static uint64_t intel_allocator_simple_alloc(struct intel_allocator *ial,
 		igt_assert(rec->size == size);
 	} else {
 		if (!simple_vma_heap_alloc(&ials->heap, &offset,
-					   size, alignment))
+					   size, alignment, strategy))
 			return ALLOC_INVALID_ADDRESS;
 
 		rec = malloc(sizeof(*rec));

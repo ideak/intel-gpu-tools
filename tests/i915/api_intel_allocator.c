@@ -50,9 +50,18 @@ static void alloc_simple(int fd)
 
 	intel_allocator_get_address_range(ahnd, &start, &end);
 	offset0 = intel_allocator_alloc(ahnd, 1, end - start, 0);
-	offset1 = __intel_allocator_alloc(ahnd, 2, 4096, 0);
+	offset1 = __intel_allocator_alloc(ahnd, 2, 4096, 0, ALLOC_STRATEGY_NONE);
 	igt_assert(offset1 == ALLOC_INVALID_ADDRESS);
 	intel_allocator_free(ahnd, 1);
+
+	offset0 = intel_allocator_alloc_with_strategy(ahnd, 1, 4096, 0,
+						      ALLOC_STRATEGY_HIGH_TO_LOW);
+	offset1 = intel_allocator_alloc_with_strategy(ahnd, 2, 4096, 0,
+						      ALLOC_STRATEGY_LOW_TO_HIGH);
+	igt_assert(offset0 > offset1);
+
+	intel_allocator_free(ahnd, 1);
+	intel_allocator_free(ahnd, 2);
 
 	igt_assert_eq(intel_allocator_close(ahnd), true);
 }

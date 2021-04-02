@@ -579,15 +579,17 @@ static int handle_request(struct alloc_req *req, struct alloc_resp *resp)
 			resp->alloc.offset = ial->alloc(ial,
 							req->alloc.handle,
 							req->alloc.size,
-							req->alloc.alignment);
+							req->alloc.alignment,
+							req->alloc.strategy);
 			alloc_info("<alloc> [tid: %ld] ahnd: %" PRIx64
 				   ", ctx: %u, vm: %u, handle: %u"
 				   ", size: 0x%" PRIx64 ", offset: 0x%" PRIx64
-				   ", alignment: 0x%" PRIx64 "\n",
+				   ", alignment: 0x%" PRIx64 ", strategy: %u\n",
 				   (long) req->tid, req->allocator_handle,
 				   al->ctx, al->vm,
 				   req->alloc.handle, req->alloc.size,
-				   resp->alloc.offset, req->alloc.alignment);
+				   resp->alloc.offset, req->alloc.alignment,
+				   req->alloc.strategy);
 			break;
 
 		case REQ_FREE:
@@ -1040,13 +1042,15 @@ void intel_allocator_get_address_range(uint64_t allocator_handle,
  * range returns ALLOC_INVALID_ADDRESS.
  */
 uint64_t __intel_allocator_alloc(uint64_t allocator_handle, uint32_t handle,
-				 uint64_t size, uint64_t alignment)
+				 uint64_t size, uint64_t alignment,
+				 enum allocator_strategy strategy)
 {
 	struct alloc_req req = { .request_type = REQ_ALLOC,
 				 .allocator_handle = allocator_handle,
 				 .alloc.handle = handle,
 				 .alloc.size = size,
-				 .alloc.alignment = alignment };
+				 .alloc.alignment = alignment,
+				 .alloc.strategy = strategy };
 	struct alloc_resp resp;
 
 	igt_assert(handle_request(&req, &resp) == 0);
@@ -1063,7 +1067,8 @@ uint64_t __intel_allocator_alloc(uint64_t allocator_handle, uint32_t handle,
  * @alignment: determines object alignment
  *
  * Same as __intel_allocator_alloc() but asserts if allocator can't return
- * valid address.
+ * valid address. Uses default allocation strategy chosen during opening
+ * the allocator.
  */
 uint64_t intel_allocator_alloc(uint64_t allocator_handle, uint32_t handle,
 			       uint64_t size, uint64_t alignment)
@@ -1071,11 +1076,39 @@ uint64_t intel_allocator_alloc(uint64_t allocator_handle, uint32_t handle,
 	uint64_t offset;
 
 	offset = __intel_allocator_alloc(allocator_handle, handle,
-					 size, alignment);
+					 size, alignment,
+					 ALLOC_STRATEGY_NONE);
 	igt_assert(offset != ALLOC_INVALID_ADDRESS);
 
 	return offset;
 }
+
+/**
+ * intel_allocator_alloc_with_strategy:
+ * @allocator_handle: handle to an allocator
+ * @handle: handle to an object
+ * @size: size of an object
+ * @alignment: determines object alignment
+ * @strategy: strategy of allocation
+ *
+ * Same as __intel_allocator_alloc() but asserts if allocator can't return
+ * valid address. Use @strategy instead of default chosen during opening
+ * the allocator.
+ */
+uint64_t intel_allocator_alloc_with_strategy(uint64_t allocator_handle,
+					     uint32_t handle,
+					     uint64_t size, uint64_t alignment,
+					     enum allocator_strategy strategy)
+{
+	uint64_t offset;
+
+	offset = __intel_allocator_alloc(allocator_handle, handle,
+					 size, alignment, strategy);
+	igt_assert(offset != ALLOC_INVALID_ADDRESS);
+
+	return offset;
+}
+
 
 /**
  * intel_allocator_free:

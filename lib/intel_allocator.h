@@ -141,7 +141,8 @@ struct intel_allocator {
 	void (*get_address_range)(struct intel_allocator *ial,
 				  uint64_t *startp, uint64_t *endp);
 	uint64_t (*alloc)(struct intel_allocator *ial, uint32_t handle,
-			  uint64_t size, uint64_t alignment);
+			  uint64_t size, uint64_t alignment,
+			  enum allocator_strategy strategy);
 	bool (*is_allocated)(struct intel_allocator *ial, uint32_t handle,
 			     uint64_t size, uint64_t alignment);
 	bool (*reserve)(struct intel_allocator *ial,
@@ -181,9 +182,14 @@ bool intel_allocator_close(uint64_t allocator_handle);
 void intel_allocator_get_address_range(uint64_t allocator_handle,
 				       uint64_t *startp, uint64_t *endp);
 uint64_t __intel_allocator_alloc(uint64_t allocator_handle, uint32_t handle,
-				 uint64_t size, uint64_t alignment);
+				 uint64_t size, uint64_t alignment,
+				 enum allocator_strategy strategy);
 uint64_t intel_allocator_alloc(uint64_t allocator_handle, uint32_t handle,
 			       uint64_t size, uint64_t alignment);
+uint64_t intel_allocator_alloc_with_strategy(uint64_t allocator_handle,
+					     uint32_t handle,
+					     uint64_t size, uint64_t alignment,
+					     enum allocator_strategy strategy);
 bool intel_allocator_free(uint64_t allocator_handle, uint32_t handle);
 bool intel_allocator_is_allocated(uint64_t allocator_handle, uint32_t handle,
 				  uint64_t size, uint64_t offset);

@@ -45,12 +45,14 @@ static void intel_allocator_random_get_address_range(struct intel_allocator *ial
 
 static uint64_t intel_allocator_random_alloc(struct intel_allocator *ial,
 					     uint32_t handle, uint64_t size,
-					     uint64_t alignment)
+					     uint64_t alignment,
+					     enum allocator_strategy strategy)
 {
 	struct intel_allocator_random *ialr = ial->priv;
 	uint64_t offset;
 
 	(void) handle;
+	(void) strategy;
 
 	/* randomize the address, we try to avoid relocations */
 	do {

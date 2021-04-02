@@ -46,12 +46,14 @@ static void intel_allocator_reloc_get_address_range(struct intel_allocator *ial,
 
 static uint64_t intel_allocator_reloc_alloc(struct intel_allocator *ial,
 					    uint32_t handle, uint64_t size,
-					    uint64_t alignment)
+					    uint64_t alignment,
+					    enum allocator_strategy strategy)
 {
 	struct intel_allocator_reloc *ialr = ial->priv;
 	uint64_t offset, aligned_offset;
 
 	(void) handle;
+	(void) strategy;
 
 	alignment = max(alignment, 4096);
 	aligned_offset = ALIGN(ialr->offset, alignment);
