@@ -53,7 +53,8 @@ static void xchg_obj(void *array, unsigned i, unsigned j)
 }
 
 #define CONTEXTS 0x1
-static void wide(int fd, int ring_size, int timeout, unsigned int flags)
+static void wide(int fd, const intel_ctx_t *ctx, int ring_size,
+		 int timeout, unsigned int flags)
 {
 	const struct intel_execution_engine2 *engine;
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
@@ -63,6 +64,7 @@ static void wide(int fd, int ring_size, int timeout, unsigned int flags)
 		struct drm_i915_gem_exec_object2 exec[2];
 		struct drm_i915_gem_relocation_entry reloc;
 		struct drm_i915_gem_execbuffer2 execbuf;
+		const intel_ctx_t *ctx;
 		uint32_t *cmd;
 	} *exec;
 	struct drm_i915_gem_exec_object2 *obj;
@@ -72,7 +74,7 @@ static void wide(int fd, int ring_size, int timeout, unsigned int flags)
 	double time;
 
 	nengine = 0;
-	__for_each_physical_engine(fd, engine) {
+	for_each_ctx_engine(fd, ctx, engine) {
 		if (!gem_class_has_mutable_submission(fd, engine->class))
 			continue;
 
@@ -106,7 +108,10 @@ static void wide(int fd, int ring_size, int timeout, unsigned int flags)
 					 I915_EXEC_HANDLE_LUT);
 
 		if (flags & CONTEXTS) {
-			exec[e].execbuf.rsvd1 = gem_context_create(fd);
+			exec[e].ctx = intel_ctx_create(fd, &ctx->cfg);
+			exec[e].execbuf.rsvd1 = exec[e].ctx->id;
+		} else {
+			exec[e].execbuf.rsvd1 = ctx->id;
 		}
 
 		exec[e].exec[0].handle = gem_create(fd, 4096);
@@ -151,9 +156,9 @@ static void wide(int fd, int ring_size, int timeout, unsigned int flags)
 			int i;
 
 			if (flags & CONTEXTS) {
-				gem_context_destroy(fd, exec[e].execbuf.rsvd1);
-				exec[e].execbuf.rsvd1 =
-					gem_context_clone_with_engines(fd, 0);
+				intel_ctx_destroy(fd, exec[e].ctx);
+				exec[e].ctx = intel_ctx_create(fd, &ctx->cfg);
+				exec[e].execbuf.rsvd1 = exec[e].ctx->id;
 			}
 
 			exec[e].reloc.presumed_offset = exec[e].exec[1].offset;
@@ -193,6 +198,7 @@ static void wide(int fd, int ring_size, int timeout, unsigned int flags)
 			execbuf.flags = (engines[e] |
 					 I915_EXEC_NO_RELOC |
 					 I915_EXEC_HANDLE_LUT);
+			execbuf.rsvd1 = ctx->id;
 			gem_execbuf(fd, &execbuf);
 		}
 		clock_gettime(CLOCK_MONOTONIC, &now);
@@ -214,7 +220,7 @@ static void wide(int fd, int ring_size, int timeout, unsigned int flags)
 
 	for (unsigned e = 0; e < nengine; e++) {
 		if (flags & CONTEXTS)
-			gem_context_destroy(fd, exec[e].execbuf.rsvd1);
+			intel_ctx_destroy(fd, exec[e].ctx);
 
 		for (unsigned n = 0; n < ring_size; n++)
 			gem_close(fd, exec[e].obj[n].handle);
@@ -230,14 +236,16 @@ igt_main
 {
 	int ring_size = 0;
 	int device = -1;
+	const intel_ctx_t *ctx;
 
 	igt_fixture {
 
 		device = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(device);
 		gem_submission_print_method(device);
+		ctx = intel_ctx_create_all_physical(device);
 
-		ring_size = gem_submission_measure(device, NULL, ALL_ENGINES);
+		ring_size = gem_submission_measure(device, &ctx->cfg, ALL_ENGINES);
 
 		igt_info("Ring size: %d batches\n", ring_size);
 		igt_require(ring_size > 0);
@@ -246,15 +254,16 @@ igt_main
 	}
 
 	igt_subtest("wide-all")
-		wide(device, ring_size, 20, 0);
+		wide(device, ctx, ring_size, 20, 0);
 
 	igt_subtest("wide-contexts") {
 		gem_require_contexts(device);
-		wide(device, ring_size, 20, CONTEXTS);
+		wide(device, ctx, ring_size, 20, CONTEXTS);
 	}
 
 	igt_fixture {
 		igt_stop_hang_detector();
+		intel_ctx_destroy(device, ctx);
 		close(device);
 	}
 }
