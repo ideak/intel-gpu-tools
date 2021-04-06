@@ -20,7 +20,6 @@ test_progs = [
 	'kms_atomic',
 	'kms_atomic_interruptible',
 	'kms_atomic_transition',
-	'kms_available_modes_crc',
 	'kms_big_fb',
 	'kms_big_joiner' ,
 	'kms_busy',
