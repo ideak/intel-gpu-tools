@@ -84,6 +84,7 @@ __context_create_cfg(int fd, const intel_ctx_cfg_t *cfg, uint32_t *ctx_id)
 	uint64_t ext_root = 0;
 	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines, GEM_MAX_ENGINES);
 	struct drm_i915_gem_context_create_ext_setparam engines_param, vm_param;
+	struct drm_i915_gem_context_create_ext_setparam persist_param;
 	uint32_t i;
 
 	if (cfg->vm) {
@@ -97,6 +98,18 @@ __context_create_cfg(int fd, const intel_ctx_cfg_t *cfg, uint32_t *ctx_id)
 			},
 		};
 		add_user_ext(&ext_root, &vm_param.base);
+	}
+
+	if (cfg->nopersist) {
+		persist_param = (struct drm_i915_gem_context_create_ext_setparam) {
+			.base = {
+				.name = I915_CONTEXT_CREATE_EXT_SETPARAM,
+			},
+			.param = {
+				.param = I915_CONTEXT_PARAM_PERSISTENCE,
+			},
+		};
+		add_user_ext(&ext_root, &persist_param.base);
 	}
 
 	if (cfg->num_engines) {
