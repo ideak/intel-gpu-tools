@@ -292,6 +292,7 @@ static int local_i915_healthcheck(int i915, const char *prefix)
 		.buffer_count = 1,
 	};
 	const struct intel_execution_engine2 *engine;
+	const intel_ctx_t *ctx;
 	int fence = -1, err = 0, status = 1;
 
 	local_debug("%s%s\n", prefix, "running i915 GPU healthcheck");
@@ -303,7 +304,9 @@ static int local_i915_healthcheck(int i915, const char *prefix)
 	gem_write(i915, obj.handle, 0, &bbe, sizeof(bbe));
 
 	/* As soon as a fence is open, don't fail before closing it */
-	__for_each_physical_engine(i915, engine) {
+	ctx = intel_ctx_create_all_physical(i915);
+	for_each_ctx_engine(i915, ctx, engine) {
+		execbuf.rsvd1 = ctx->id;
 		execbuf.flags = engine->flags | I915_EXEC_FENCE_OUT;
 		err = __gem_execbuf_wr(i915, &execbuf);
 		if (igt_warn_on_f(err < 0, "__gem_execbuf_wr() returned %d\n",
@@ -317,6 +320,7 @@ static int local_i915_healthcheck(int i915, const char *prefix)
 			break;
 		}
 	}
+	intel_ctx_destroy(i915, ctx);
 	if (fence >= 0) {
 		status = sync_fence_wait(fence, -1);
 		if (igt_warn_on_f(status < 0, "sync_fence_wait() returned %d\n",
