@@ -38,8 +38,6 @@
 #define MADV_FREE 8
 #endif
 
-static unsigned int engines[I915_EXEC_RING_MASK + 1], nengine;
-
 static void get_pages(int fd, uint64_t alloc)
 {
 	uint32_t handle = gem_create(fd, alloc);
@@ -164,8 +162,10 @@ static void execbufN(int fd, uint64_t alloc)
 static void execbufX(int fd, uint64_t alloc)
 {
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	struct intel_engine_data engines;
 	struct drm_i915_gem_exec_object2 *obj;
 	struct drm_i915_gem_execbuffer2 execbuf;
+	const intel_ctx_t *ctx;
 	int count = alloc >> 20;
 	uint64_t obj_size;
 
@@ -174,6 +174,9 @@ static void execbufX(int fd, uint64_t alloc)
 
 	obj[count].handle = gem_create(fd, 4096);
 	gem_write(fd, obj[count].handle, 0, &bbe, sizeof(bbe));
+
+	ctx = intel_ctx_create_all_physical(fd);
+	engines = intel_engine_list_for_ctx_cfg(fd, &ctx->cfg);
 
 	for (int i = 1; i <= count; i++) {
 		int j = count - i;
@@ -185,13 +188,16 @@ static void execbufX(int fd, uint64_t alloc)
 
 		execbuf.buffers_ptr = to_user_pointer(&obj[j]);
 		execbuf.buffer_count = i + 1;
-		execbuf.flags = engines[j % nengine];
+		execbuf.flags = engines.engines[j % engines.nengines].flags;
+		execbuf.rsvd1 = ctx->id;
 		gem_execbuf(fd, &execbuf);
 	}
 
 	for (int i = 0; i <= count; i++)
 		gem_madvise(fd, obj[i].handle, I915_MADV_DONTNEED);
 	munmap(obj, obj_size);
+
+	intel_ctx_destroy(fd, ctx);
 }
 
 static void hang(int fd, uint64_t alloc)
@@ -429,7 +435,6 @@ igt_main
 	igt_fixture {
 		const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
 		uint64_t mem_size = intel_get_total_ram_mb();
-		const struct intel_execution_engine2 *e;
 		int fd;
 
 		fd = drm_open_driver(DRIVER_INTEL);
@@ -450,11 +455,6 @@ igt_main
 
 		intel_require_memory(num_processes, alloc_size,
 				     CHECK_SWAP | CHECK_RAM);
-
-		nengine = 0;
-		__for_each_physical_engine(fd, e)
-			engines[nengine++] = e->flags;
-		igt_require(nengine);
 
 		close(fd);
 	}
