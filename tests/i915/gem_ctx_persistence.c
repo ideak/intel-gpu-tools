@@ -147,33 +147,6 @@ static void test_idempotent(int i915)
 	igt_assert_eq(p.value, expected);
 }
 
-static void test_clone(int i915)
-{
-	struct drm_i915_gem_context_param p = {
-		.param = I915_CONTEXT_PARAM_PERSISTENCE,
-	};
-	uint32_t ctx, clone;
-
-	/*
-	 * Check that persistence is inherited across a clone.
-	 */
-	igt_require( __gem_context_create(i915, &ctx) == 0);
-
-	p.ctx_id = ctx;
-	p.value = 0;
-	gem_context_set_param(i915, &p);
-
-	clone = gem_context_clone(i915, ctx, I915_CONTEXT_CLONE_FLAGS, 0);
-	gem_context_destroy(i915, ctx);
-
-	p.ctx_id = clone;
-	p.value = -1;
-	gem_context_get_param(i915, &p);
-	igt_assert_eq(p.value, 0);
-
-	gem_context_destroy(i915, clone);
-}
-
 static void test_persistence(int i915, unsigned int engine)
 {
 	igt_spin_t *spin;
@@ -1365,9 +1338,6 @@ igt_main
 
 	igt_subtest("idempotent")
 		test_idempotent(i915);
-
-	igt_subtest("clone")
-		test_clone(i915);
 
 	igt_subtest("file")
 		test_nonpersistent_file(i915);
