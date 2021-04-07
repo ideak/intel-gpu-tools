@@ -3,7 +3,6 @@ test_progs = [
 	'core_getclient',
 	'core_getstats',
 	'core_getversion',
-	'core_hotunplug',
 	'core_setmaster',
 	'core_setmaster_vs_auth',
 	'debugfs_test',
@@ -361,6 +360,13 @@ test_executables += executable('perf',
 	   install_rpath : libexecdir_rpathdir,
 	   install : true)
 test_list += 'perf'
+
+test_executables += executable('core_hotunplug', 'core_hotunplug.c',
+	   dependencies : test_deps + [ lib_igt_i915_perf ],
+	   install_dir : libexecdir,
+	   install_rpath : libexecdir_rpathdir,
+	   install : true)
+test_list += 'core_hotunplug'
 
 executable('testdisplay', ['testdisplay.c', 'testdisplay_hotplug.c'],
 	   dependencies : test_deps,

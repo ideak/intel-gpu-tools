@@ -31,6 +31,7 @@
 #include <unistd.h>
 
 #include "i915/gem.h"
+#include "i915/perf.h"
 #include "igt.h"
 #include "igt_device_scan.h"
 #include "igt_kmod.h"
@@ -50,6 +51,7 @@ struct hotunplug {
 	const char *dev_bus_addr;
 	const char *failure;
 	bool need_healthcheck;
+	bool has_intel_perf;
 };
 
 /* Helpers */
@@ -319,6 +321,16 @@ static int local_i915_recover(int i915)
 	return local_i915_healthcheck(i915, "post-");
 }
 
+static bool local_i915_perf_healthcheck(int i915)
+{
+	struct intel_perf *intel_perf;
+
+	intel_perf = intel_perf_for_fd(i915);
+	if (intel_perf)
+		intel_perf_free(intel_perf);
+	return intel_perf;
+}
+
 #define FLAG_RENDER	(1 << 0)
 #define FLAG_RECOVER	(1 << 1)
 static void node_healthcheck(struct hotunplug *priv, unsigned flags)
@@ -352,12 +364,19 @@ static void node_healthcheck(struct hotunplug *priv, unsigned flags)
 		char path[200];
 
 		local_debug("%s\n", "running device sysfs healthcheck");
-		priv->failure = "Device sysfs healthckeck failure!";
+		priv->failure = "Device sysfs healthcheck failure!";
 		if (igt_sysfs_path(fd_drm, path, sizeof(path))) {
 			priv->failure = "Device debugfs healthckeck failure!";
 			if (igt_debugfs_path(fd_drm, path, sizeof(path)))
 				priv->failure = NULL;
 		}
+	}
+
+	if (!priv->failure && priv->has_intel_perf) {
+		local_debug("%s\n", "running i915 device perf healthcheck");
+		priv->failure = "Device perf healthckeck failure!";
+		if (local_i915_perf_healthcheck(fd_drm))
+			priv->failure = NULL;
 	}
 
 	fd_drm = close_device(fd_drm, "", "health checked ");
@@ -553,6 +572,7 @@ igt_main
 		.fd		= { .drm = -1, .drm_hc = -1, .sysfs_dev = -1, },
 		.failure	= NULL,
 		.need_healthcheck = true,
+		.has_intel_perf = false,
 	};
 
 	igt_fixture {
@@ -566,6 +586,8 @@ igt_main
 
 			gem_quiescent_gpu(fd_drm);
 			igt_require_gem(fd_drm);
+
+			priv.has_intel_perf = local_i915_perf_healthcheck(fd_drm);
 
 			/**
 			 * FIXME: Unbinding the i915 driver on some Haswell
