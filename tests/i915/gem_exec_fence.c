@@ -2347,7 +2347,7 @@ struct inter_engine_context {
 		uint32_t context;
 	} iterations[9];
 
-	struct intel_engine_data *engines;
+	struct intel_engine_data engines;
 
 	struct inter_engine_batches {
 		void *increment_bb;
@@ -2415,7 +2415,7 @@ static void submit_timeline_execbuf(struct inter_engine_context *context,
 		execbuf->cliprects_ptr = to_user_pointer(&fence_list);
 	}
 
-	execbuf->flags |= context->engines->engines[run_engine_idx].flags;
+	execbuf->flags |= context->engines.engines[run_engine_idx].flags;
 
 	gem_execbuf(context->fd, execbuf);
 }
@@ -2660,12 +2660,13 @@ get_cs_timestamp_frequency(int fd)
 	igt_skip("Kernel with PARAM_CS_TIMESTAMP_FREQUENCY support required\n");
 }
 
-static void setup_timeline_chain_engines(struct inter_engine_context *context, int fd, struct intel_engine_data *engines)
+static void setup_timeline_chain_engines(struct inter_engine_context *context, int fd)
 {
 	memset(context, 0, sizeof(*context));
 
 	context->fd = fd;
-	context->engines = engines;
+	context->engines = intel_init_engine_list(fd, 0);
+	igt_require(context->engines.nengines > 1);
 
 	context->wait_context = gem_context_clone_with_engines(fd, 0);
 	context->wait_timeline = syncobj_create(fd, 0);
@@ -2685,15 +2686,16 @@ static void setup_timeline_chain_engines(struct inter_engine_context *context, i
 	gem_write(fd, context->wait_bb_handle, 0,
 		  context->wait_bb, context->wait_bb_len);
 
-	context->batches = calloc(engines->nengines, sizeof(*context->batches));
-	for (uint32_t e = 0; e < engines->nengines; e++) {
+	context->batches = calloc(context->engines.nengines,
+				  sizeof(*context->batches));
+	for (uint32_t e = 0; e < context->engines.nengines; e++) {
 		struct inter_engine_batches *batches = &context->batches[e];
 
 		batches->timeline = syncobj_create(fd, 0);
 
 		build_increment_engine_bb(
 			batches,
-			gem_engine_mmio_base(fd, engines->engines[e].name));
+			gem_engine_mmio_base(fd, context->engines.engines[e].name));
 		batches->increment_bb_handle = gem_create(fd, 4096);
 		gem_write(fd, batches->increment_bb_handle, 0,
 			  batches->increment_bb, batches->increment_bb_len);
@@ -2706,7 +2708,7 @@ static void setup_timeline_chain_engines(struct inter_engine_context *context, i
 	{
 		uint64_t dword = 1;
 		gem_write(fd, context->engine_counter_object.handle,
-			  sizeof(dword) * (context->engines->nengines - 1),
+			  sizeof(dword) * (context->engines.nengines - 1),
 			  &dword, sizeof(dword));
 	}
 }
@@ -2724,7 +2726,7 @@ static void teardown_timeline_chain_engines(struct inter_engine_context *context
 	gem_close(context->fd, context->wait_bb_handle);
 	free(context->wait_bb);
 
-	for (uint32_t e = 0; e < context->engines->nengines; e++) {
+	for (uint32_t e = 0; e < context->engines.nengines; e++) {
 		struct inter_engine_batches *batches = &context->batches[e];
 
 		syncobj_destroy(context->fd, batches->timeline);
@@ -2734,12 +2736,12 @@ static void teardown_timeline_chain_engines(struct inter_engine_context *context
 	free(context->batches);
 }
 
-static void test_syncobj_timeline_chain_engines(int fd, struct intel_engine_data *engines)
+static void test_syncobj_timeline_chain_engines(int fd)
 {
 	struct inter_engine_context ctx;
 	uint64_t *counter_output;
 
-	setup_timeline_chain_engines(&ctx, fd, engines);
+	setup_timeline_chain_engines(&ctx, fd);
 
 	/*
 	 * Delay all the other operations by making them depend on an
@@ -2748,11 +2750,11 @@ static void test_syncobj_timeline_chain_engines(int fd, struct intel_engine_data
 	wait_engine(&ctx, 0, ctx.wait_timeline, 1);
 
 	for (uint32_t iter = 0; iter < ARRAY_SIZE(ctx.iterations); iter++) {
-		for (uint32_t engine = 0; engine < engines->nengines; engine++) {
+		for (uint32_t engine = 0; engine < ctx.engines.nengines; engine++) {
 			uint32_t prev_prev_engine =
-				(engines->nengines + engine - 2) % engines->nengines;
+				(ctx.engines.nengines + engine - 2) % ctx.engines.nengines;
 			uint32_t prev_engine =
-				(engines->nengines + engine - 1) % engines->nengines;
+				(ctx.engines.nengines + engine - 1) % ctx.engines.nengines;
 			/*
 			 * Pick up the wait engine semaphore for the
 			 * first increment, then pick up the previous
@@ -2778,28 +2780,28 @@ static void test_syncobj_timeline_chain_engines(int fd, struct intel_engine_data
 
 	counter_output = gem_mmap__wc(fd, ctx.engine_counter_object.handle, 0, 4096, PROT_READ);
 
-	for (uint32_t i = 0; i < ctx.engines->nengines; i++)
+	for (uint32_t i = 0; i < ctx.engines.nengines; i++)
 		igt_debug("engine %i (%s)\t= %016"PRIx64"\n", i,
-			  ctx.engines->engines[i].name, counter_output[i]);
+			  ctx.engines.engines[i].name, counter_output[i]);
 
 	/*
 	 * Verify that we get the fibonacci number expected (we start
 	 * at the sequence on the second number : 1).
 	 */
-	igt_assert_eq(counter_output[engines->nengines - 1],
-		      fib(ARRAY_SIZE(ctx.iterations) * engines->nengines + 1));
+	igt_assert_eq(counter_output[ctx.engines.nengines - 1],
+		      fib(ARRAY_SIZE(ctx.iterations) * ctx.engines.nengines + 1));
 
 	munmap(counter_output, 4096);
 
 	teardown_timeline_chain_engines(&ctx);
 }
 
-static void test_syncobj_stationary_timeline_chain_engines(int fd, struct intel_engine_data *engines)
+static void test_syncobj_stationary_timeline_chain_engines(int fd)
 {
 	struct inter_engine_context ctx;
 	uint64_t *counter_output;
 
-	setup_timeline_chain_engines(&ctx, fd, engines);
+	setup_timeline_chain_engines(&ctx, fd);
 
 	/*
 	 * Delay all the other operations by making them depend on an
@@ -2808,11 +2810,11 @@ static void test_syncobj_stationary_timeline_chain_engines(int fd, struct intel_
 	wait_engine(&ctx, 0, ctx.wait_timeline, 1);
 
 	for (uint32_t iter = 0; iter < ARRAY_SIZE(ctx.iterations); iter++) {
-		for (uint32_t engine = 0; engine < engines->nengines; engine++) {
+		for (uint32_t engine = 0; engine < ctx.engines.nengines; engine++) {
 			uint32_t prev_prev_engine =
-				(engines->nengines + engine - 2) % engines->nengines;
+				(ctx.engines.nengines + engine - 2) % ctx.engines.nengines;
 			uint32_t prev_engine =
-				(engines->nengines + engine - 1) % engines->nengines;
+				(ctx.engines.nengines + engine - 1) % ctx.engines.nengines;
 			/*
 			 * Pick up the wait engine semaphore for the
 			 * first increment, then pick up the previous
@@ -2844,23 +2846,23 @@ static void test_syncobj_stationary_timeline_chain_engines(int fd, struct intel_
 
 	counter_output = gem_mmap__wc(fd, ctx.engine_counter_object.handle, 0, 4096, PROT_READ);
 
-	for (uint32_t i = 0; i < ctx.engines->nengines; i++)
+	for (uint32_t i = 0; i < ctx.engines.nengines; i++)
 		igt_debug("engine %i (%s)\t= %016"PRIx64"\n", i,
-			  ctx.engines->engines[i].name, counter_output[i]);
-	igt_assert_eq(counter_output[engines->nengines - 1],
-		      fib(ARRAY_SIZE(ctx.iterations) * engines->nengines + 1));
+			  ctx.engines.engines[i].name, counter_output[i]);
+	igt_assert_eq(counter_output[ctx.engines.nengines - 1],
+		      fib(ARRAY_SIZE(ctx.iterations) * ctx.engines.nengines + 1));
 
 	munmap(counter_output, 4096);
 
 	teardown_timeline_chain_engines(&ctx);
 }
 
-static void test_syncobj_backward_timeline_chain_engines(int fd, struct intel_engine_data *engines)
+static void test_syncobj_backward_timeline_chain_engines(int fd)
 {
 	struct inter_engine_context ctx;
 	uint64_t *counter_output;
 
-	setup_timeline_chain_engines(&ctx, fd, engines);
+	setup_timeline_chain_engines(&ctx, fd);
 
 	/*
 	 * Delay all the other operations by making them depend on an
@@ -2869,11 +2871,11 @@ static void test_syncobj_backward_timeline_chain_engines(int fd, struct intel_en
 	wait_engine(&ctx, 0, ctx.wait_timeline, 1);
 
 	for (uint32_t iter = 0; iter < ARRAY_SIZE(ctx.iterations); iter++) {
-		for (uint32_t engine = 0; engine < engines->nengines; engine++) {
+		for (uint32_t engine = 0; engine < ctx.engines.nengines; engine++) {
 			uint32_t prev_prev_engine =
-				(engines->nengines + engine - 2) % engines->nengines;
+				(ctx.engines.nengines + engine - 2) % ctx.engines.nengines;
 			uint32_t prev_engine =
-				(engines->nengines + engine - 1) % engines->nengines;
+				(ctx.engines.nengines + engine - 1) % ctx.engines.nengines;
 			/*
 			 * Pick up the wait engine semaphore for the
 			 * first increment, then pick up the previous
@@ -2905,11 +2907,11 @@ static void test_syncobj_backward_timeline_chain_engines(int fd, struct intel_en
 
 	counter_output = gem_mmap__wc(fd, ctx.engine_counter_object.handle, 0, 4096, PROT_READ);
 
-	for (uint32_t i = 0; i < ctx.engines->nengines; i++)
+	for (uint32_t i = 0; i < ctx.engines.nengines; i++)
 		igt_debug("engine %i (%s)\t= %016"PRIx64"\n", i,
-			  ctx.engines->engines[i].name, counter_output[i]);
-	igt_assert_eq(counter_output[engines->nengines - 1],
-		      fib(ARRAY_SIZE(ctx.iterations) * engines->nengines + 1));
+			  ctx.engines.engines[i].name, counter_output[i]);
+	igt_assert_eq(counter_output[ctx.engines.nengines - 1],
+		      fib(ARRAY_SIZE(ctx.iterations) * ctx.engines.nengines + 1));
 
 	munmap(counter_output, 4096);
 
@@ -3203,8 +3205,6 @@ igt_main
 			test_syncobj_timeline_multiple_ext_nodes(i915);
 
 		igt_subtest_group { /* syncobj timeline engine chaining */
-			struct intel_engine_data engines;
-
 			igt_fixture {
 				/*
 				 * We need support for MI_ALU on all
@@ -3212,18 +3212,16 @@ igt_main
 				 * only on Gen8+
 				 */
 				igt_require(intel_gen(intel_get_drm_devid(i915)) >= 8);
-				engines = intel_init_engine_list(i915, 0);
-				igt_require(engines.nengines > 1);
 			}
 
 			igt_subtest("syncobj-timeline-chain-engines")
-				test_syncobj_timeline_chain_engines(i915, &engines);
+				test_syncobj_timeline_chain_engines(i915);
 
 			igt_subtest("syncobj-stationary-timeline-chain-engines")
-				test_syncobj_stationary_timeline_chain_engines(i915, &engines);
+				test_syncobj_stationary_timeline_chain_engines(i915);
 
 			igt_subtest("syncobj-backward-timeline-chain-engines")
-				test_syncobj_backward_timeline_chain_engines(i915, &engines);
+				test_syncobj_backward_timeline_chain_engines(i915);
 		}
 
 		igt_fixture {
