@@ -29,7 +29,7 @@
 #include <stdlib.h>
 #include <signal.h>
 #include <termios.h>
-
+#include <libgen.h>
 #include <sys/stat.h>
 
 #include "igt_dp_compliance.h"
@@ -39,22 +39,14 @@ struct termios saved_tio;
 
 void enter_exec_path(char **argv)
 {
-	char *exec_path = NULL;
-	char *pos = NULL;
-	short len_path = 0;
+	char exec_path[PATH_MAX];
 	int ret;
 
-	len_path = strlen(argv[0]);
-	exec_path = (char *) malloc(len_path);
-
-	memcpy(exec_path, argv[0], len_path);
-	pos = strrchr(exec_path, '/');
-	if (pos != NULL)
-		*(pos+1) = '\0';
-
-	ret = chdir(exec_path);
+	memset(exec_path, 0, sizeof(exec_path));
+	ret = readlink("/proc/self/exe", exec_path, sizeof(exec_path)-1);
+	igt_assert(ret != -1);
+	ret = chdir(dirname(exec_path));
 	igt_assert_eq(ret, 0);
-	free(exec_path);
 }
 
 static void restore_termio_mode(int sig)
