@@ -672,6 +672,7 @@ igt_main
 	 * and thus the kenrnel rounding up to the next tile
 	 * height won't do anything.
 	 */
+	igt_describe("Sanity check if addfb ioctl fails correctly for given modifier with small bo");
 	for (int i = 1; i < ARRAY_SIZE(modifiers); i++) {
 		igt_subtest_f("%s-addfb-size-overflow",
 			      modifiers[i].name) {
@@ -682,6 +683,7 @@ igt_main
 		}
 	}
 
+	igt_describe("Sanity check if addfb ioctl fails correctly for given modifier and offsets with small bo");
 	for (int i = 1; i < ARRAY_SIZE(modifiers); i++) {
 		igt_subtest_f("%s-addfb-size-offset-overflow",
 			      modifiers[i].name) {
@@ -692,6 +694,7 @@ igt_main
 		}
 	}
 
+	igt_describe("Sanity check if addfb ioctl works correctly for given size and strides of fb");
 	for (int i = 0; i < ARRAY_SIZE(modifiers); i++) {
 		igt_subtest_f("%s-addfb", modifiers[i].name) {
 			data.modifier = modifiers[i].modifier;
@@ -710,6 +713,8 @@ igt_main
 			for (int k = 0; k < ARRAY_SIZE(rotations); k++) {
 				data.rotation = rotations[k].rotation;
 
+				igt_describe("Sanity check if addfb ioctl works correctly for given "
+						"combination of modifier formats and rotation");
 				igt_subtest_f("%s-%dbpp-rotate-%d", modifiers[i].name,
 					      formats[j].bpp, rotations[k].angle) {
 					igt_require(data.format == DRM_FORMAT_C8 ||
