@@ -131,6 +131,11 @@ static char endis_ast(bool enabled)
 	return enabled ? '*' : ' ';
 }
 
+static int skl_num_pipes(uint32_t d)
+{
+	return intel_gen(d) >= 12 ? 4 : 3;
+}
+
 static int skl_num_planes(uint32_t d, int pipe)
 {
 	int gen = intel_gen(d);
@@ -269,7 +274,7 @@ static void skl_wm_dump(void)
 {
 	struct intel_mmio_data mmio_data;
 	int pipe, plane, level;
-	int num_pipes = 3;
+	int num_pipes = skl_num_pipes(devid);
 	int max_planes = skl_max_planes(devid);
 	int num_levels = 8;
 	uint32_t base_addr = 0x70000, addr, wm_offset;
