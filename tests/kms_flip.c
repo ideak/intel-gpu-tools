@@ -1667,10 +1667,12 @@ igt_main
 		}
 	}
 
+	igt_describe("Tests that nonblocking reading fails correctly");
 	igt_subtest("nonblocking-read")
 		test_nonblocking_read(drm_fd);
 
 	for (i = 0; i < sizeof(tests) / sizeof (tests[0]); i++) {
+		igt_describe("Basic test for validating modeset, dpms and pageflips");
 		igt_subtest_with_dynamic_f("%s%s",
 			      tests[i].flags & TEST_BASIC ? "basic-" : "",
 			      tests[i].name)
@@ -1679,6 +1681,7 @@ igt_main
 		if (tests[i].flags & TEST_NO_2X_OUTPUT)
 			continue;
 
+		igt_describe("Test for validating modeset, dpms and pageflips with a pair of connected displays");
 		igt_subtest_with_dynamic_f("2x-%s", tests[i].name)
 			run_pair(tests[i].duration, tests[i].flags);
 	}
@@ -1705,12 +1708,14 @@ igt_main
 		if (tests[i].flags & (TEST_EINVAL | TEST_EBUSY | TEST_HANG))
 			continue;
 
+		igt_describe("Interrupt test for validating modeset, dpms and pageflips");
 		igt_subtest_with_dynamic_f("%s-interruptible", tests[i].name)
 			run_test(tests[i].duration, tests[i].flags);
 
 		if (tests[i].flags & TEST_NO_2X_OUTPUT)
 			continue;
 
+		 igt_describe("Interrupt test for validating modeset, dpms and pageflips with pair of connected displays");
 		igt_subtest_with_dynamic_f("2x-%s-interruptible", tests[i].name)
 			run_pair(tests[i].duration, tests[i].flags);
 	}

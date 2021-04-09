@@ -271,7 +271,8 @@ igt_main
 	}
 
 	for (test_cnt = 0; test_cnt < ARRAY_SIZE(tests); test_cnt++) {
-
+		igt_describe("Validate display stream compression functionality if supported on "
+			       "DP/eDP connector");
 		igt_subtest_f("basic-dsc-enable-%s",
 			      kmstest_connector_type_str(tests[test_cnt])) {
 			test_conn_cnt = 0;

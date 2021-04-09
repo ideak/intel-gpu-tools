@@ -173,6 +173,7 @@ igt_main
 	 * generated and compared to the reference one.
 	 */
 
+	igt_describe("Check pageflip from tiled buffer to linear one works correctly with x tiling");
 	igt_subtest_with_dynamic("flip-changes-tiling") {
 		uint64_t tiling[2] = { LOCAL_I915_FORMAT_MOD_X_TILED,
 				       LOCAL_DRM_FORMAT_MOD_NONE };
@@ -187,6 +188,7 @@ igt_main
 		}
 	}
 
+	igt_describe("Check pageflip from tiled buffer to linear one works correctly with y tiling");
 	igt_subtest_with_dynamic("flip-changes-tiling-Y") {
 		uint64_t tiling[2] = { LOCAL_I915_FORMAT_MOD_Y_TILED,
 				       LOCAL_DRM_FORMAT_MOD_NONE };
@@ -205,7 +207,7 @@ igt_main
 		}
 	}
 
-
+	igt_describe("Check pageflip from tiled buffer to linear one works correctly with yf tiling");
 	igt_subtest_with_dynamic("flip-changes-tiling-Yf") {
 		uint64_t tiling[2] = { LOCAL_I915_FORMAT_MOD_Yf_TILED,
 				       LOCAL_DRM_FORMAT_MOD_NONE };
@@ -232,6 +234,7 @@ igt_main
 	 * reference one.
 	 */
 
+	igt_describe("Check pageflip from tiled buffer to another tiled one works correctly with x tiling");
 	igt_subtest_with_dynamic("flip-X-tiled") {
 		uint64_t tiling[2] = { LOCAL_I915_FORMAT_MOD_X_TILED,
 				       LOCAL_I915_FORMAT_MOD_X_TILED };
@@ -246,6 +249,7 @@ igt_main
 		}
 	}
 
+	igt_describe("Check pageflip from tiled buffer to another tiled one works correctly with y tiling");
 	igt_subtest_with_dynamic("flip-Y-tiled") {
 		uint64_t tiling[2] = { LOCAL_I915_FORMAT_MOD_Y_TILED,
 				       LOCAL_I915_FORMAT_MOD_Y_TILED };
@@ -264,6 +268,7 @@ igt_main
 		}
 	}
 
+	igt_describe("Check pageflip from tiled buffer to another tiled one works correctly with yf tiling");
 	igt_subtest_with_dynamic("flip-Yf-tiled") {
 		uint64_t tiling[2] = { LOCAL_I915_FORMAT_MOD_Yf_TILED,
 				       LOCAL_I915_FORMAT_MOD_Yf_TILED };
@@ -290,6 +295,7 @@ igt_main
 	 * reference one.
 	 */
 
+	igt_describe("Check pageflip from linear buffer to tiled one works correctly with x tiling");
 	igt_subtest_with_dynamic("flip-to-X-tiled") {
 		uint64_t tiling[2] = { LOCAL_DRM_FORMAT_MOD_NONE,
 				       LOCAL_I915_FORMAT_MOD_X_TILED };
@@ -304,6 +310,7 @@ igt_main
 		}
 	}
 
+	igt_describe("Check pageflip from linear buffer to tiled one works correctly with y tiling");
 	igt_subtest_with_dynamic("flip-to-Y-tiled") {
 		uint64_t tiling[2] = { LOCAL_DRM_FORMAT_MOD_NONE,
 				       LOCAL_I915_FORMAT_MOD_Y_TILED };
@@ -322,6 +329,7 @@ igt_main
 		}
 	}
 
+	igt_describe("Check pageflip from linear buffer to tiled one works correctly with yf tiling");
 	igt_subtest_with_dynamic("flip-to-Yf-tiled") {
 		uint64_t tiling[2] = { LOCAL_DRM_FORMAT_MOD_NONE,
 				       LOCAL_I915_FORMAT_MOD_Yf_TILED };

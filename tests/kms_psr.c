@@ -480,12 +480,14 @@ igt_main_args("", long_options, help_str, opt_handler, &data)
 	for (data.op_psr_mode = PSR_MODE_1; data.op_psr_mode <= PSR_MODE_2;
 	     data.op_psr_mode++) {
 
+		igt_describe("Basic check for psr if it is detecting changes made in planes");
 		igt_subtest_f("%sbasic", append_subtest_name[data.op_psr_mode]) {
 			data.test_plane_id = DRM_PLANE_TYPE_PRIMARY;
 			test_setup(&data);
 			test_cleanup(&data);
 		}
 
+		igt_describe("Check if psr is detecting changes when drrs is disabled");
 		igt_subtest_f("%sno_drrs", append_subtest_name[data.op_psr_mode]) {
 			data.test_plane_id = DRM_PLANE_TYPE_PRIMARY;
 			test_setup(&data);
@@ -494,6 +496,8 @@ igt_main_args("", long_options, help_str, opt_handler, &data)
 		}
 
 		for (op = PAGE_FLIP; op <= RENDER; op++) {
+			igt_describe("Check if psr is detecting page-flipping,memory mapping and "
+					"rendering operations performed on primary planes");
 			igt_subtest_f("%sprimary_%s",
 				      append_subtest_name[data.op_psr_mode],
 				      op_str(op)) {
@@ -506,6 +510,8 @@ igt_main_args("", long_options, help_str, opt_handler, &data)
 		}
 
 		for (op = MMAP_GTT; op <= PLANE_ONOFF; op++) {
+			igt_describe("Check if psr is detecting memory mapping,rendering "
+					"and plane operations performed on sprite planes");
 			igt_subtest_f("%ssprite_%s",
 				      append_subtest_name[data.op_psr_mode],
 				      op_str(op)) {
@@ -516,6 +522,8 @@ igt_main_args("", long_options, help_str, opt_handler, &data)
 				test_cleanup(&data);
 			}
 
+			igt_describe("Check if psr is detecting memory mapping, rendering "
+					"and plane operations performed on cursor planes");
 			igt_subtest_f("%scursor_%s",
 				      append_subtest_name[data.op_psr_mode],
 				      op_str(op)) {
@@ -527,6 +535,8 @@ igt_main_args("", long_options, help_str, opt_handler, &data)
 			}
 		}
 
+		igt_describe("Check if psr is detecting changes when rendering operation is performed"
+				"  with dpms enabled or disabled");
 		igt_subtest_f("%sdpms", append_subtest_name[data.op_psr_mode]) {
 			data.op = RENDER;
 			data.test_plane_id = DRM_PLANE_TYPE_PRIMARY;
@@ -536,6 +546,8 @@ igt_main_args("", long_options, help_str, opt_handler, &data)
 			test_cleanup(&data);
 		}
 
+		igt_describe("Check if psr is detecting changes when plane operation is performed "
+				"with suspend resume cycles");
 		igt_subtest_f("%ssuspend", append_subtest_name[data.op_psr_mode]) {
 			data.op = PLANE_ONOFF;
 			data.test_plane_id = DRM_PLANE_TYPE_CURSOR;
