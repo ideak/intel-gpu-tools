@@ -471,8 +471,8 @@ static void skl_wm_dump(void)
 		for (level = 0; level < num_levels; level++) {
 			printf("%10d", level);
 			for (plane = 0; plane < num_planes; plane++) {
-				blocks = REG_DECODE1(wm[level][pipe][plane], 0, 11);
-				lines = REG_DECODE1(wm[level][pipe][plane], 14, 5);
+				blocks = REG_DECODE1(wm[level][pipe][plane], 0, 12);
+				lines = REG_DECODE1(wm[level][pipe][plane], 14, 13);
 				enable = REG_DECODE1(wm[level][pipe][plane], 31, 1);
 
 				printf("%5d%c", blocks, endis_ast(enable));
@@ -486,8 +486,8 @@ static void skl_wm_dump(void)
 
 		printf("     TRANS");
 		for (plane = 0; plane < num_planes; plane++) {
-			blocks = REG_DECODE1(wm_trans[pipe][plane], 0, 11);
-			lines = REG_DECODE1(wm_trans[pipe][plane], 14, 5);
+			blocks = REG_DECODE1(wm_trans[pipe][plane], 0, 12);
+			lines = REG_DECODE1(wm_trans[pipe][plane], 14, 13);
 			enable = REG_DECODE1(wm_trans[pipe][plane], 31, 1);
 
 			printf("%5d%c", blocks, endis_ast(enable));
@@ -500,8 +500,8 @@ static void skl_wm_dump(void)
 		if (skl_has_sagv_wm(devid)) {
 			printf("\n      SAGV");
 			for (plane = 0; plane < num_planes; plane++) {
-				blocks = REG_DECODE1(wm_sagv[pipe][plane], 0, 11);
-				lines = REG_DECODE1(wm_sagv[pipe][plane], 14, 5);
+				blocks = REG_DECODE1(wm_sagv[pipe][plane], 0, 12);
+				lines = REG_DECODE1(wm_sagv[pipe][plane], 14, 13);
 				enable = REG_DECODE1(wm_sagv[pipe][plane], 31, 1);
 
 				printf("%5d%c", blocks, endis_ast(enable));
@@ -513,8 +513,8 @@ static void skl_wm_dump(void)
 
 			printf("\nSAGV TRANS");
 			for (plane = 0; plane < num_planes; plane++) {
-				blocks = REG_DECODE1(wm_sagv_trans[pipe][plane], 0, 11);
-				lines = REG_DECODE1(wm_sagv_trans[pipe][plane], 14, 5);
+				blocks = REG_DECODE1(wm_sagv_trans[pipe][plane], 0, 12);
+				lines = REG_DECODE1(wm_sagv_trans[pipe][plane], 14, 13);
 				enable = REG_DECODE1(wm_sagv_trans[pipe][plane], 31, 1);
 
 				printf("%5d%c", blocks, endis_ast(enable));
@@ -529,20 +529,20 @@ static void skl_wm_dump(void)
 
 		printf("\nstart");
 		for (plane = 0; plane < num_planes; plane++) {
-			start = REG_DECODE1(buf_cfg[pipe][plane], 0, 11);
+			start = REG_DECODE1(buf_cfg[pipe][plane], 0, 12);
 			printf("%10d", start);
 		}
 
 		printf("\n  end");
 		for (plane = 0; plane < num_planes; plane++) {
-			end = REG_DECODE1(buf_cfg[pipe][plane], 16, 11);
+			end = REG_DECODE1(buf_cfg[pipe][plane], 16, 12);
 			printf("%10d", end);
 		}
 
 		printf("\n size");
 		for (plane = 0; plane < num_planes; plane++) {
-			start = REG_DECODE1(buf_cfg[pipe][plane], 0, 11);
-			end =  REG_DECODE1(buf_cfg[pipe][plane], 16, 11);
+			start = REG_DECODE1(buf_cfg[pipe][plane], 0, 12);
+			end =  REG_DECODE1(buf_cfg[pipe][plane], 16, 12);
 			size = end - start + 1;
 			printf("%10d", (end == 0 && size == 1) ? 0 : size);
 		}
@@ -553,20 +553,20 @@ static void skl_wm_dump(void)
 
 			printf("\nstart");
 			for (plane = 0; plane < num_planes; plane++) {
-				start = REG_DECODE1(nv12_buf_cfg[pipe][plane], 0, 11);
+				start = REG_DECODE1(nv12_buf_cfg[pipe][plane], 0, 12);
 				printf("%10d", start);
 			}
 
 			printf("\n  end");
 			for (plane = 0; plane < num_planes; plane++) {
-				end = REG_DECODE1(nv12_buf_cfg[pipe][plane], 16, 11);
+				end = REG_DECODE1(nv12_buf_cfg[pipe][plane], 16, 12);
 				printf("%10d", end);
 			}
 
 			printf("\n size");
 			for (plane = 0; plane < num_planes; plane++) {
-				start = REG_DECODE1(nv12_buf_cfg[pipe][plane], 0, 11);
-				end =  REG_DECODE1(nv12_buf_cfg[pipe][plane], 16, 11);
+				start = REG_DECODE1(nv12_buf_cfg[pipe][plane], 0, 12);
+				end =  REG_DECODE1(nv12_buf_cfg[pipe][plane], 16, 12);
 				size = end - start + 1;
 				printf("%10d", (end == 0 && size == 1) ? 0 : size);
 			}
