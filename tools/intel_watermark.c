@@ -133,9 +133,11 @@ static char endis_ast(bool enabled)
 
 static int skl_num_planes(uint32_t d, int pipe)
 {
-	if (IS_GEN11(d))
+	int gen = intel_gen(d);
+
+	if (gen >= 11)
 		return 8;
-	else if (IS_GEN10(d) || IS_GEMINILAKE(d))
+	else if (gen == 10 || IS_GEMINILAKE(d))
 		return 5;
 	else if (IS_BROXTON(d))
 		return pipe == 2 ? 4 : 5;
@@ -145,9 +147,11 @@ static int skl_num_planes(uint32_t d, int pipe)
 
 static int skl_max_planes(uint32_t d)
 {
-	if (IS_GEN11(d))
+	int gen = intel_gen(d);
+
+	if (gen >= 11)
 		return 8;
-	else if (IS_GEN10(d) || IS_GEMINILAKE(d) || IS_BROXTON(d))
+	else if (gen == 10 || IS_GEMINILAKE(d) || IS_BROXTON(d))
 		return 5;
 	else
 		return 4;
