@@ -135,7 +135,9 @@ static int skl_num_planes(uint32_t d, int pipe)
 {
 	int gen = intel_gen(d);
 
-	if (gen >= 11)
+	if (gen >= 13 || IS_ALDERLAKE_S(d) || IS_ROCKETLAKE(d))
+		return 6;
+	else if (gen >= 11)
 		return 8;
 	else if (gen == 10 || IS_GEMINILAKE(d))
 		return 5;
@@ -149,7 +151,9 @@ static int skl_max_planes(uint32_t d)
 {
 	int gen = intel_gen(d);
 
-	if (gen >= 11)
+	if (gen >= 13 || IS_ALDERLAKE_S(d) || IS_ROCKETLAKE(d))
+		return 6;
+	else if (gen >= 11)
 		return 8;
 	else if (gen == 10 || IS_GEMINILAKE(d) || IS_BROXTON(d))
 		return 5;
