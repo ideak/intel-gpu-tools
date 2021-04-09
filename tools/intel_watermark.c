@@ -35,6 +35,7 @@
 
 static uint32_t display_base;
 static uint32_t devid;
+static unsigned int sr_sleep;
 
 static uint32_t read_reg(uint32_t addr)
 {
@@ -238,6 +239,22 @@ static const char *skl_nv12_buf_cfg_reg_name(int pipe, int plane)
 		 plane, pipe_name(pipe));
 
 	return reg_name;
+}
+
+static void hsw_wm_sr_cnt(void)
+{
+	if (sr_sleep) {
+		uint32_t pre, post;
+
+		pre = read_reg(0x45264);
+		sleep(sr_sleep);
+		post = read_reg(0x45264);
+
+		printf("WM_SR_CNT: 0x%08x->0x%08x\n", pre, post);
+		printf("SR residency: %u%%\n", ((post - pre) * 8 / (sr_sleep * 10000)));
+	} else {
+		printf("WM_SR_CNT: 0x%08x\n", read_reg(0x45264));
+	}
 }
 
 static void skl_wm_dump(void)
@@ -462,6 +479,8 @@ static void skl_wm_dump(void)
 	printf("* plane watermark enabled\n");
 	printf("(x) line watermark if enabled\n");
 
+	hsw_wm_sr_cnt();
+
 	wm_dbg = read_reg(0x45280);
 	printf("WM_DBG: 0x%08x\n", wm_dbg);
 	printf(" LP used:");
@@ -627,7 +646,11 @@ static void ilk_wm_dump(void)
 	       endis(!REG_DECODE1(arb_ctl, 15, 1)));
 
 	if (IS_BROADWELL(devid) || IS_HASWELL(devid)) {
-		uint32_t wm_dbg = read_reg(0x45280);
+		uint32_t wm_dbg;
+
+		hsw_wm_sr_cnt();
+
+		wm_dbg = read_reg(0x45280);
 		printf("WM_DBG: 0x%08x\n", wm_dbg);
 		if (wm_dbg & (1 << 31))
 			printf(" Full maxfifo used\n");
@@ -1265,9 +1288,37 @@ static void gen2_wm_dump(void)
 	}
 }
 
+static void __attribute__((noreturn)) usage(const char *name)
+{
+	fprintf(stderr, "Usage: %s [options]\n"
+		" -s,--sr-sleep <seconds>\n",
+		name);
+	exit(1);
+}
+
 int main(int argc, char *argv[])
 {
 	devid = intel_get_pci_device()->device_id;
+
+	for (;;) {
+		static const struct option long_options[] = {
+			{ .name = "sr-sleep", .has_arg = required_argument, },
+			{}
+		};
+
+		int opt = getopt_long(argc, argv, "s:", long_options, NULL);
+		if (opt == -1)
+			break;
+
+		switch (opt) {
+		case 's':
+			sr_sleep = atoi(optarg);
+			break;
+		default:
+			usage(argv[0]);
+			break;
+		}
+	}
 
 	if (intel_gen(devid) >= 9) {
 		skl_wm_dump();
