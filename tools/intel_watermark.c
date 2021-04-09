@@ -166,6 +166,19 @@ static int skl_max_planes(uint32_t d)
 		return 4;
 }
 
+static bool skl_has_sagv_wm(uint32_t d)
+{
+	return intel_gen(d) >= 13;
+}
+
+static int skl_num_wm_levels(uint32_t d)
+{
+	if (skl_has_sagv_wm(d))
+		return 6;
+	else
+		return 8;
+}
+
 static const char *skl_plane_name(int plane)
 {
 	static char name[32];
@@ -223,6 +236,30 @@ static const char *skl_wm_trans_reg_name(int plane)
 	return reg_name;
 }
 
+static const char *skl_wm_sagv_reg_name(int plane)
+{
+	static char reg_name[32];
+
+	if (plane == 0)
+		snprintf(reg_name, sizeof(reg_name), "CUR_WM_SAGV");
+	else
+		snprintf(reg_name, sizeof(reg_name), "PLANE_WM_SAGV_%1d", plane);
+
+	return reg_name;
+}
+
+static const char *skl_wm_sagv_trans_reg_name(int plane)
+{
+	static char reg_name[32];
+
+	if (plane == 0)
+		snprintf(reg_name, sizeof(reg_name), "CUR_WM_SAGV_TRANS");
+	else
+		snprintf(reg_name, sizeof(reg_name), "PLANE_WM_SAGV_TRANS_%1d", plane);
+
+	return reg_name;
+}
+
 static const char *skl_buf_cfg_reg_name(int plane)
 {
 	static char reg_name[32];
@@ -266,10 +303,12 @@ static void skl_wm_dump(void)
 	int pipe, plane, level;
 	int num_pipes = skl_num_pipes(devid);
 	int max_planes = skl_max_planes(devid);
-	int num_levels = 8;
+	int num_levels = skl_num_wm_levels(devid);
 	uint32_t base_addr = 0x70000, addr, wm_offset;
 	uint32_t wm[num_levels][num_pipes][max_planes];
 	uint32_t wm_trans[num_pipes][max_planes];
+	uint32_t wm_sagv[num_pipes][max_planes];
+	uint32_t wm_sagv_trans[num_pipes][max_planes];
 	uint32_t buf_cfg[num_pipes][max_planes];
 	uint32_t nv12_buf_cfg[num_pipes][max_planes];
 	uint32_t plane_ctl[num_pipes][max_planes];
@@ -296,6 +335,11 @@ static void skl_wm_dump(void)
 			for (level = 0; level < num_levels; level++) {
 				wm_offset = addr + 0x00140 + level * 0x4;
 				wm[level][pipe][plane] = read_reg(wm_offset);
+			}
+
+			if (skl_has_sagv_wm(devid)) {
+				wm_sagv[pipe][plane] = read_reg(addr + 0x00158);
+				wm_sagv_trans[pipe][plane] = read_reg(addr + 0x0015c);
 			}
 		}
 	}
@@ -348,6 +392,32 @@ static void skl_wm_dump(void)
 	}
 	printf("\n");
 
+	if (skl_has_sagv_wm(devid)) {
+		for (plane = 0; plane < max_planes; plane++) {
+			printf("%21s\t", skl_wm_sagv_reg_name(plane));
+
+			for (pipe = 0; pipe < num_pipes; pipe++) {
+				if (plane >= skl_num_planes(devid, pipe))
+					break;
+				printf("0x%08x\t", wm_sagv[pipe][plane]);
+			}
+			printf("\n");
+		}
+		printf("\n");
+
+		for (plane = 0; plane < max_planes; plane++) {
+			printf("%21s\t", skl_wm_sagv_trans_reg_name(plane));
+
+			for (pipe = 0; pipe < num_pipes; pipe++) {
+				if (plane >= skl_num_planes(devid, pipe))
+					break;
+				printf("0x%08x\t", wm_sagv_trans[pipe][plane]);
+			}
+			printf("\n");
+		}
+		printf("\n");
+	}
+
 	for (plane = 0; plane < max_planes; plane++) {
 		printf("%21s\t", skl_buf_cfg_reg_name(plane));
 
@@ -386,7 +456,7 @@ static void skl_wm_dump(void)
 		linetime = REG_DECODE1(wm_linetime[pipe], 0, 9);
 		printf("LINETIME: %d (%.3f usec)\n", linetime, linetime* 0.125f);
 
-		printf("LEVEL");
+		printf("     LEVEL");
 		for (plane = 0; plane < num_planes; plane++) {
 			if (plane == 0)
 				enable = REG_DECODE1(plane_ctl[pipe][plane], 0, 3) ||
@@ -399,7 +469,7 @@ static void skl_wm_dump(void)
 		printf("\n");
 
 		for (level = 0; level < num_levels; level++) {
-			printf("%5d", level);
+			printf("%10d", level);
 			for (plane = 0; plane < num_planes; plane++) {
 				blocks = REG_DECODE1(wm[level][pipe][plane], 0, 11);
 				lines = REG_DECODE1(wm[level][pipe][plane], 14, 5);
@@ -414,7 +484,7 @@ static void skl_wm_dump(void)
 			printf("\n");
 		}
 
-		printf("TRANS");
+		printf("     TRANS");
 		for (plane = 0; plane < num_planes; plane++) {
 			blocks = REG_DECODE1(wm_trans[pipe][plane], 0, 11);
 			lines = REG_DECODE1(wm_trans[pipe][plane], 14, 5);
@@ -425,6 +495,34 @@ static void skl_wm_dump(void)
 				printf("(%2d)", lines);
 			else
 				printf("(--)");
+		}
+
+		if (skl_has_sagv_wm(devid)) {
+			printf("\n      SAGV");
+			for (plane = 0; plane < num_planes; plane++) {
+				blocks = REG_DECODE1(wm_sagv[pipe][plane], 0, 11);
+				lines = REG_DECODE1(wm_sagv[pipe][plane], 14, 5);
+				enable = REG_DECODE1(wm_sagv[pipe][plane], 31, 1);
+
+				printf("%5d%c", blocks, endis_ast(enable));
+				if (!REG_DECODE1(wm_sagv[pipe][plane], 30, 1))
+					printf("(%2d)", lines);
+				else
+					printf("(--)");
+			}
+
+			printf("\nSAGV TRANS");
+			for (plane = 0; plane < num_planes; plane++) {
+				blocks = REG_DECODE1(wm_sagv_trans[pipe][plane], 0, 11);
+				lines = REG_DECODE1(wm_sagv_trans[pipe][plane], 14, 5);
+				enable = REG_DECODE1(wm_sagv_trans[pipe][plane], 31, 1);
+
+				printf("%5d%c", blocks, endis_ast(enable));
+				if (!REG_DECODE1(wm_sagv_trans[pipe][plane], 30, 1))
+					printf("(%2d)", lines);
+				else
+					printf("(--)");
+			}
 		}
 
 		printf("\nDDB allocation:");
