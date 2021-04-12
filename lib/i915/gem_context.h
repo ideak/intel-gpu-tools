@@ -30,7 +30,10 @@
 struct drm_i915_gem_context_param;
 
 uint32_t gem_context_create(int fd);
+uint32_t gem_context_create_ext(int fd, uint32_t flags, uint64_t extensions);
 int __gem_context_create(int fd, uint32_t *ctx_id);
+int __gem_context_create_ext(int fd, uint32_t flags, uint64_t extensions,
+			     uint32_t *ctx_id);
 void gem_context_destroy(int fd, uint32_t ctx_id);
 int __gem_context_destroy(int fd, uint32_t ctx_id);
 

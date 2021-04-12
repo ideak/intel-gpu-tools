@@ -108,6 +108,40 @@ int __gem_context_create(int fd, uint32_t *ctx_id)
 }
 
 /**
+ * __gem_context_create_ext:
+ * @fd: open i915 drm file descriptor
+ * @flags: context create flags
+ * @extensions: first extension struct, or 0 for no extensions
+ * @ctx_id: on success, the context ID is written here
+ *
+ * Creates a new GEM context with flags and extensions.  If no flags or
+ * extensions are required, it's the same as __gem_context_create and works
+ * on older kernels.
+ */
+int __gem_context_create_ext(int fd, uint32_t flags, uint64_t extensions,
+			     uint32_t *ctx_id)
+{
+	struct drm_i915_gem_context_create_ext ctx_create;
+	int err = 0;
+
+	if (!flags && !extensions)
+		return __gem_context_create(fd, ctx_id);
+
+	memset(&ctx_create, 0, sizeof(ctx_create));
+	ctx_create.flags = flags;
+	if (extensions) {
+		ctx_create.flags |= I915_CONTEXT_CREATE_FLAGS_USE_EXTENSIONS;
+		ctx_create.extensions = extensions;
+	}
+
+	err = create_ext_ioctl(fd, &ctx_create);
+	if (!err)
+		*ctx_id = ctx_create.ctx_id;
+
+	return err;
+}
+
+/**
  * gem_context_create:
  * @fd: open i915 drm file descriptor
  *
@@ -122,6 +156,28 @@ uint32_t gem_context_create(int fd)
 	uint32_t ctx_id;
 
 	igt_assert_eq(__gem_context_create(fd, &ctx_id), 0);
+	igt_assert(ctx_id != 0);
+
+	return ctx_id;
+}
+
+/**
+ * gem_context_create_ext:
+ * @fd: open i915 drm file descriptor
+ * @flags: context create flags
+ * @extensions: first extension struct, or 0 for no extensions
+ *
+ * Creates a new GEM context with flags and extensions.  If no flags or
+ * extensions are required, it's the same as gem_context_create and works
+ * on older kernels.
+ *
+ * Returns: The id of the allocated context.
+ */
+uint32_t gem_context_create_ext(int fd, uint32_t flags, uint64_t extensions)
+{
+	uint32_t ctx_id;
+
+	igt_assert_eq(__gem_context_create_ext(fd, flags, extensions, &ctx_id), 0);
 	igt_assert(ctx_id != 0);
 
 	return ctx_id;
