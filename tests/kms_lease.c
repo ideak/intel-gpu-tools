@@ -1312,21 +1312,31 @@ igt_main
 		}
 	}
 
+	igt_describe("Tests error handling while creating invalid corner-cases for "
+		     "create-lease ioctl");
 	igt_subtest("invalid-create-leases")
 		invalid_create_leases(&data);
 
+	igt_describe("Tests that  possible_crtcs logically match between master and "
+		     "lease, and that the values are correctly renumbered on the lease side.");
 	igt_subtest("possible-crtcs-filtering")
 		possible_crtcs_filtering(&data);
 
+	igt_describe("Tests the drop/set_master interactions.");
 	igt_subtest("master-vs-lease")
 		master_vs_lease(&data);
 
+	igt_describe("Tests that the 2nd master can only create leases while being active "
+		     "master, and that leases on the first master don't prevent lease creation "
+		     "for the 2nd master.");
 	igt_subtest("multimaster-lease")
 		multimaster_lease(&data);
 
+	igt_describe("Tests the implicitly added planes.");
 	igt_subtest("implicit-plane-lease")
 		implicit_plane_lease(&data);
 
+	igt_describe("Tests all the uevent cases");
 	igt_subtest("lease-uevent")
 		lease_uevent(&data);
 }

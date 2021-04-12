@@ -419,12 +419,20 @@ igt_main
 	igt_fixture
 		setup_environment(&drm);
 
+	igt_describe("Test the relationship between fbcon and the frontbuffer "
+		     "tracking infrastructure with fbc enabled.");
 	igt_subtest("fbc")
 		subtest(&drm, &fbc, false);
+	igt_describe("Test the relationship between fbcon and the frontbuffer "
+		     "tracking infrastructure with psr enabled.");
 	igt_subtest("psr")
 		subtest(&drm, &psr, false);
+	igt_describe("Suspend test to validate  the relationship between fbcon and the frontbuffer "
+		     "tracking infrastructure with fbc enabled.");
 	igt_subtest("fbc-suspend")
 		subtest(&drm, &fbc, true);
+	igt_describe("Suspend test to validate the relationship between fbcon and the frontbuffer "
+		     "tracking infrastructure with psr enabled.");
 	igt_subtest("psr-suspend")
 		subtest(&drm, &psr, true);
 

@@ -888,6 +888,7 @@ igt_main_args("det:", NULL, help_str, opt_handler, NULL)
 	}
 
 	for (i = 0; i < ARRAY_SIZE(tests); i++) {
+		igt_describe("Tests the mode by iterating through all valid/invalid crtc/connector combinations");
 		igt_subtest(tests[i].name) {
 			struct test_config tconf = {
 				.flags		= tests[i].flags,

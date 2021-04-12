@@ -305,6 +305,7 @@ igt_main
 
 	/* XXX Extend to cover atomic rendering tests to all planes + legacy */
 
+	igt_describe("Test for basic check of KMS ABI with busy framebuffers.");
 	igt_subtest_with_dynamic("basic") { /* just run on the first pipe */
 		enum pipe pipe;
 		igt_output_t *output;
@@ -327,9 +328,11 @@ igt_main
 			igt_display_require_output_on_pipe(&display, n);
 		}
 
+		igt_describe("Tests basic flip on pipe.");
 		igt_subtest_f("basic-flip-pipe-%s", kmstest_pipe_name(n)) {
 			test_flip(&display, n, false);
 		}
+		igt_describe("Tests basic modeset on pipe.");
 		igt_subtest_f("basic-modeset-pipe-%s", kmstest_pipe_name(n)) {
 
 			test_flip(&display, n, true);
@@ -339,6 +342,7 @@ igt_main
 			hang = igt_allow_hang(display.drm_fd, 0, 0);
 		}
 
+		igt_describe("Hang test on pipe with oldfb and extended pageflip modeset.");
 		igt_subtest_f("extended-pageflip-modeset-hang-oldfb-pipe-%s",
 			      kmstest_pipe_name(n)) {
 			test_pageflip_modeset_hang(&display, n);
@@ -347,22 +351,27 @@ igt_main
 		igt_fixture
 			igt_require(display.is_atomic);
 
+		igt_describe("Test the results with a single hanging pageflip on pipe with oldfb.");
 		igt_subtest_f("extended-pageflip-hang-oldfb-pipe-%s",
 			      kmstest_pipe_name(n))
 			test_hang(&display, n, false, false);
 
+		igt_describe("Test the results with a single hanging pageflip on pipe with newfb.");
 		igt_subtest_f("extended-pageflip-hang-newfb-pipe-%s",
 			      kmstest_pipe_name(n))
 			test_hang(&display, n, false, true);
 
+		igt_describe("Tests modeset disable/enable with hang on pipe with oldfb.");
 		igt_subtest_f("extended-modeset-hang-oldfb-pipe-%s",
 			      kmstest_pipe_name(n))
 			test_hang(&display, n, true, false);
 
+		igt_describe("Tests modeset disable/enable with hang on pipe with newfb.");
 		igt_subtest_f("extended-modeset-hang-newfb-pipe-%s",
 			      kmstest_pipe_name(n))
 			test_hang(&display, n, true, true);
 
+		igt_describe("Tests modeset disable/enable with hang on reset pipe with oldfb.");
 		igt_subtest_f("extended-modeset-hang-oldfb-with-reset-pipe-%s",
 			      kmstest_pipe_name(n)) {
 			igt_set_module_param_int(display.drm_fd, "force_reset_modeset_test", 1);
@@ -372,6 +381,7 @@ igt_main
 			igt_set_module_param_int(display.drm_fd, "force_reset_modeset_test", 0);
 		}
 
+		igt_describe("Tests modeset disable/enable with hang on reset pipe with newfb.");
 		igt_subtest_f("extended-modeset-hang-newfb-with-reset-pipe-%s",
 			      kmstest_pipe_name(n)) {
 			igt_set_module_param_int(display.drm_fd, "force_reset_modeset_test", 1);

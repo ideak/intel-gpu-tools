@@ -1104,6 +1104,8 @@ igt_main
 				      LOCAL_DRM_FORMAT_MOD_NONE, &fb);
 	}
 
+	igt_describe("Test for KMS atomic modesetting on overlay plane and ensure coherency between "
+		     "the legacy and atomic interfaces.");
 	igt_subtest("plane-overlay-legacy") {
 		igt_plane_t *overlay =
 			igt_pipe_get_plane_type(pipe_obj, DRM_PLANE_TYPE_OVERLAY);
@@ -1114,6 +1116,8 @@ igt_main
 		plane_overlay(pipe_obj, output, overlay);
 	}
 
+	igt_describe("Test for KMS atomic modesetting on primary plane and ensure coherency between "
+		     "the legacy and atomic interfaces.");
 	igt_subtest("plane-primary-legacy") {
 		atomic_setup(&display, pipe, output, primary, &fb);
 
@@ -1148,12 +1152,16 @@ igt_main
 		plane_immutable_zpos(&display, pipe_obj, output);
 	}
 
+	igt_describe("Test to ensure that DRM_MODE_ATOMIC_TEST_ONLY really only touches "
+		     "the free-standing state objects and nothing else.");
 	igt_subtest("test-only") {
 		atomic_clear(&display, pipe, primary, output);
 
 		test_only(pipe_obj, primary, output);
 	}
 
+	igt_describe("Test for KMS atomic modesetting on cursor plane and ensure coherency between "
+		     "legacy and atomic interfaces.");
 	igt_subtest("plane-cursor-legacy") {
 		igt_plane_t *cursor =
 			igt_pipe_get_plane_type(pipe_obj, DRM_PLANE_TYPE_CURSOR);
@@ -1164,30 +1172,37 @@ igt_main
 		plane_cursor(pipe_obj, output, cursor);
 	}
 
+	igt_describe("Test error handling when invalid plane parameters are passed");
 	igt_subtest("plane-invalid-params") {
 		atomic_setup(&display, pipe, output, primary, &fb);
 
 		plane_invalid_params(pipe_obj, output, primary, &fb);
 	}
 
+	igt_describe("Test error handling when invalid plane fence parameters are passed");
 	igt_subtest("plane-invalid-params-fence") {
 		atomic_setup(&display, pipe, output, primary, &fb);
 
 		plane_invalid_params_fence(pipe_obj, output, primary);
 	}
 
+	igt_describe("Test error handling when invalid crtc parameters are passed");
 	igt_subtest("crtc-invalid-params") {
 		atomic_setup(&display, pipe, output, primary, &fb);
 
 		crtc_invalid_params(pipe_obj, output, primary, &fb);
 	}
 
+	igt_describe("Test error handling when invalid crtc fence parameters are passed");
 	igt_subtest("crtc-invalid-params-fence") {
 		atomic_setup(&display, pipe, output, primary, &fb);
 
 		crtc_invalid_params_fence(pipe_obj, output, primary, &fb);
 	}
 
+	igt_describe("Test abuse the atomic ioctl directly in order to test "
+		     "various invalid conditions which the libdrm wrapper won't "
+		     "allow us to create.");
 	igt_subtest("atomic-invalid-params") {
 		atomic_setup(&display, pipe, output, primary, &fb);
 

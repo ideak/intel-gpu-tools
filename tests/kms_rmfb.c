@@ -168,9 +168,13 @@ igt_main
 		igt_display_require_output(&data.display);
 	}
 
+	igt_describe("RMFB is supposed to free the framebuffers from any and all "
+		     "planes so test this and make sure it works.");
 	igt_subtest_f("rmfb-ioctl")
 		run_rmfb_test(&data, false);
 
+	igt_describe("RMFB is supposed to free the framebuffers from any and all planes "
+		     "so test this and make sure it works with fd close and reopen.");
 	igt_subtest_f("close-fd")
 		run_rmfb_test(&data, true);
 

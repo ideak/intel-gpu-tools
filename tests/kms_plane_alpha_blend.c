@@ -531,30 +531,39 @@ static void run_subtests(data_t *data, enum pipe pipe)
 			      kmstest_pipe_name(pipe));
 	}
 
+	igt_describe("Tests basic plane alpha properties.");
 	igt_subtest_f("pipe-%s-alpha-basic", kmstest_pipe_name(pipe))
 		run_test_on_pipe_planes(data, pipe, false, true, basic_alpha);
 
+	igt_describe("Tests plane alpha-7efc properties.");
 	igt_subtest_f("pipe-%s-alpha-7efc", kmstest_pipe_name(pipe))
 		run_test_on_pipe_planes(data, pipe, false, true, alpha_7efc);
 
+	igt_describe("Tests pipe coverage blending properties.");
 	igt_subtest_f("pipe-%s-coverage-7efc", kmstest_pipe_name(pipe))
 		run_test_on_pipe_planes(data, pipe, true, true, coverage_7efc);
 
+	igt_describe("Tests pipe coverage blending properties.");
 	igt_subtest_f("pipe-%s-coverage-vs-premult-vs-constant", kmstest_pipe_name(pipe))
 		run_test_on_pipe_planes(data, pipe, true, false, coverage_premult_constant);
 
+	igt_describe("Tests the alpha property with transparent fb.");
 	igt_subtest_f("pipe-%s-alpha-transparent-fb", kmstest_pipe_name(pipe))
 		run_test_on_pipe_planes(data, pipe, false, false, argb_transparent);
 
+	igt_describe("Tests alpha properties with opaque fb.");
 	igt_subtest_f("pipe-%s-alpha-opaque-fb", kmstest_pipe_name(pipe))
 		run_test_on_pipe_planes(data, pipe, false, false, argb_opaque);
 
+	igt_describe("Tests plane alpha and blending properties with minimum alpha value.");
 	igt_subtest_f("pipe-%s-constant-alpha-min", kmstest_pipe_name(pipe))
 		run_test_on_pipe_planes(data, pipe, true, false, constant_alpha_min);
 
+	igt_describe("Tests plane alpha and blending properties with medium alpha value");
 	igt_subtest_f("pipe-%s-constant-alpha-mid", kmstest_pipe_name(pipe))
 		run_test_on_pipe_planes(data, pipe, true, false, constant_alpha_mid);
 
+	igt_describe("Tests plane alpha and blending properties with maximum alpha value");
 	igt_subtest_f("pipe-%s-constant-alpha-max", kmstest_pipe_name(pipe))
 		run_test_on_pipe_planes(data, pipe, true, false, constant_alpha_max);
 }

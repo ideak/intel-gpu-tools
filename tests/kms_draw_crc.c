@@ -331,6 +331,8 @@ igt_main
 	for (format_idx = 0; format_idx < N_FORMATS; format_idx++) {
 	for (method = 0; method < IGT_DRAW_METHOD_COUNT; method++) {
 	for (tiling_idx = 0; tiling_idx < N_TILING_METHODS; tiling_idx++) {
+		igt_describe("This subtest verfies igt_draw library works "
+			     "with different tilings, DRM_FORMATS, DRAW_METHODS.");
 		igt_subtest_f("draw-method-%s-%s-%s",
 			      format_str(format_idx),
 			      igt_draw_get_method_name(method),
@@ -339,6 +341,8 @@ igt_main
 					    tilings[tiling_idx]);
 	} } }
 
+	igt_describe("This subtest verifies CRC after filling fb with x-tiling "
+		     "or none.");
 	igt_subtest("fill-fb")
 		fill_fb_subtest();
 

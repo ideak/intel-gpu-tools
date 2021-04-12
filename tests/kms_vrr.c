@@ -469,12 +469,18 @@ igt_main
 		igt_display_require_output(&data.display);
 	}
 
+	igt_describe("Tests that VRR is enabled and that the difference between flip "
+		     "timestamps converges to the requested rate");
 	igt_subtest("flip-basic")
 		run_vrr_test(&data, test_basic, 0);
 
+	igt_describe("Tests with DPMS that VRR is enabled and that the difference between flip "
+		     "timestamps converges to the requested rate.");
 	igt_subtest("flip-dpms")
 		run_vrr_test(&data, test_basic, TEST_DPMS);
 
+	igt_describe("Tests that VRR is enabled and that the difference between flip "
+		     "timestamps converges to the requested rate in a suspend test");
 	igt_subtest("flip-suspend")
 		run_vrr_test(&data, test_basic, TEST_SUSPEND);
 

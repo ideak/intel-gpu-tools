@@ -139,6 +139,7 @@ igt_main_args("", long_opts, help_str, opt_handler, NULL)
 		start_connection = connector->connection;
 	}
 
+	igt_describe("Test to detect forced load.");
 	igt_subtest("force-load-detect") {
 		int i, j, w = 64, h = 64;
 		drmModePlaneRes *plane_resources;
@@ -225,6 +226,7 @@ igt_main_args("", long_opts, help_str, opt_handler, NULL)
 		}
 	}
 
+	igt_describe("Test to check the forced connector state.");
 	igt_subtest("force-connector-state") {
 		igt_display_t display;
 
@@ -261,6 +263,7 @@ igt_main_args("", long_opts, help_str, opt_handler, NULL)
 		drmModeFreeConnector(temp);
 	}
 
+	igt_describe("Test to check the values after forcing edid.");
 	igt_subtest("force-edid") {
 		kmstest_force_connector(drm_fd, connector,
 					FORCE_CONNECTOR_ON);
@@ -295,6 +298,7 @@ igt_main_args("", long_opts, help_str, opt_handler, NULL)
 
 	}
 
+	igt_describe("Tests pruning of stale modes.");
 	igt_subtest("prune-stale-modes") {
 		int i;
 

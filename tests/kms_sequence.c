@@ -305,6 +305,8 @@ igt_main
 			if (m->flags & ~f->valid)
 				continue;
 
+			igt_describe("This is a test of drmCrtcGetSequence and "
+				     "drmCrtcQueueSequence");
 			igt_subtest_f("%s-%s", f->name, m->name) {
 				data.flags = m->flags;
 				run_test(&data, fd, f->func);

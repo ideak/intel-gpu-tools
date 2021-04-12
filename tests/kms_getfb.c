@@ -170,11 +170,14 @@ static void test_handle_input(int fd)
 		do_ioctl(fd, DRM_IOCTL_MODE_ADDFB2, &add);
 	}
 
+	igt_describe("Tests error handling for a zero'd input.");
 	igt_subtest("getfb-handle-zero") {
 		struct drm_mode_fb_cmd get = { .fb_id = 0 };
 		do_ioctl_err(fd, DRM_IOCTL_MODE_GETFB, &get, ENOENT);
 	}
 
+	igt_describe("Tests error handling when passing an valid "
+		     "handle.");
 	igt_subtest("getfb-handle-valid") {
 		struct drm_mode_fb_cmd get = { .fb_id = add.fb_id };
 		do_ioctl(fd, DRM_IOCTL_MODE_GETFB, &get);
@@ -187,12 +190,16 @@ static void test_handle_input(int fd)
 		gem_close(fd, get.handle);
 	}
 
+	igt_describe("Tests error handling when passing a handle that "
+		     "has been closed.");
 	igt_subtest("getfb-handle-closed") {
 		struct drm_mode_fb_cmd get = { .fb_id = add.fb_id };
 		do_ioctl(fd, DRM_IOCTL_MODE_RMFB, &add.fb_id);
 		do_ioctl_err(fd, DRM_IOCTL_MODE_GETFB, &get, ENOENT);
 	}
 
+	igt_describe("Tests error handling when passing an invalid "
+		     "handle.");
 	igt_subtest("getfb-handle-not-fb") {
 		struct drm_mode_fb_cmd get = { .fb_id = get_any_prop_id(fd) };
 		igt_require(get.fb_id > 0);
@@ -218,6 +225,8 @@ static void test_duplicate_handles(int fd)
 		do_ioctl(fd, DRM_IOCTL_MODE_ADDFB2, &add);
 	}
 
+	igt_describe("Tests error handling while requesting for two different "
+		     "handles from same fd.");
 	igt_subtest("getfb-addfb-different-handles") {
 		struct drm_mode_fb_cmd get = { .fb_id = add.fb_id };
 
@@ -226,6 +235,8 @@ static void test_duplicate_handles(int fd)
 		gem_close(fd, get.handle);
 	}
 
+	igt_describe("Tests error handling while requesting for two different "
+		     "handles from different fd.");
 	igt_subtest("getfb-repeated-different-handles") {
 		struct drm_mode_fb_cmd get1 = { .fb_id = add.fb_id };
 		struct drm_mode_fb_cmd get2 = { .fb_id = add.fb_id };
@@ -238,6 +249,9 @@ static void test_duplicate_handles(int fd)
 		gem_close(fd, get2.handle);
 	}
 
+	igt_describe("Tests error handling while requesting CCS buffers "
+		     "it should refuse because getfb supports returning "
+		     "a single buffer handle.");
 	igt_subtest("getfb-reject-ccs") {
 		struct drm_mode_fb_cmd2 add_ccs = { };
 		struct drm_mode_fb_cmd get = { };

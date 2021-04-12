@@ -264,18 +264,28 @@ igt_main
 		igt_display_require(&data.display, data.drm_fd);
 	}
 
+	igt_describe("Tests pipe-B and pipe-C interactions in IVB by enabling pipe-B with mode "
+		     "that requires 3 lanes and then enabling pipe-c with dpms off/on pipe-B.");
 	igt_subtest("pipe-B-dpms-off-modeset-pipe-C")
 		test_dpms(&data);
 
+	igt_describe("Tests pipe-B and pipe-C interactions in IVB by enabling 2 different modes "
+		     "on pipe-B and then a single mode on pipe-C.");
 	igt_subtest("pipe-B-double-modeset-then-modeset-pipe-C")
 		test_lane_reduction(&data);
 
+	igt_describe("Tests pipe-B and pipe-C interactions in IVB by disabling pipe-B and then "
+		     "setting mode on pipe-C.");
 	igt_subtest("disable-pipe-B-enable-pipe-C")
 		test_disable_pipe_B(&data);
 
+	igt_describe("Tests pipe-B and pipe-C interactions in IVB by enabling pipe-B with 3 lanes "
+		     "from pipe-C.");
 	igt_subtest("from-pipe-C-to-B-with-3-lanes")
 		test_from_C_to_B_with_3_lanes(&data);
 
+	igt_describe("Tests pipe-B and pipe-C interactions in IVB by enabling pipe-C while pipe-B "
+		     "has 3-lanes");
 	igt_subtest("enable-pipe-C-while-B-has-3-lanes")
 		test_fail_enable_pipe_C_while_B_has_3_lanes(&data);
 

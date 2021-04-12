@@ -262,6 +262,8 @@ static void prop_tests(int fd)
 	get_props.count_props = 1;
 	get_props.obj_id = blob_id;
 
+	igt_describe("Tests error handling when invalid properties are fetched with "
+		     "object of any type.");
 	igt_subtest("invalid-get-prop-any") {
 		get_props.obj_type = 0; /* DRM_MODE_OBJECT_ANY */
 
@@ -269,6 +271,8 @@ static void prop_tests(int fd)
 				    &get_props) == -1 && errno == EINVAL);
 	}
 
+	igt_describe("Tests error handling when invalid properties are fetched with blob "
+		     "object type.");
 	igt_subtest("invalid-get-prop") {
 		get_props.obj_type = DRM_MODE_OBJECT_BLOB;
 
@@ -280,6 +284,8 @@ static void prop_tests(int fd)
 	set_prop.prop_id = 1;
 	set_prop.obj_id = blob_id;
 
+	igt_describe("Tests error handling when invalid properties are set with object "
+		     "of any type.");
 	igt_subtest("invalid-set-prop-any") {
 		set_prop.obj_type = 0; /* DRM_MODE_OBJECT_ANY */
 
@@ -287,6 +293,7 @@ static void prop_tests(int fd)
 				    &set_prop) == -1 && errno == EINVAL);
 	}
 
+	igt_describe("Tests error handling when invalid properties are set with blob object type.");
 	igt_subtest("invalid-set-prop") {
 		set_prop.obj_type = DRM_MODE_OBJECT_BLOB;
 
@@ -308,18 +315,23 @@ igt_main
 		igt_require_propblob(fd);
 	}
 
+	igt_describe("Test to ensure property support exists.");
 	igt_subtest("basic")
 		test_basic(fd);
 
+	igt_describe("Tests error handling when invalid property IDs are passed.");
 	igt_subtest("blob-prop-core")
 		test_core(fd);
 
+	igt_describe("Tests error handling when incorrect blob size is passed.");
 	igt_subtest("blob-prop-validate")
 		test_validate(fd);
 
+	igt_describe("Tests validates the lifetime of the properties created.");
 	igt_subtest("blob-prop-lifetime")
 		test_lifetime(fd);
 
+	igt_describe("Test validates destroying multiple properties explicitly works as needed.");
 	igt_subtest("blob-multiple")
 		test_multiple(fd);
 

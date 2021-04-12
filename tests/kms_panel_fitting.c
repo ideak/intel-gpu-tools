@@ -257,9 +257,11 @@ igt_main
 		igt_display_require_output(&data.display);
 	}
 
+	igt_describe("Tests panel fitting usages with legacy style commit.");
 	igt_subtest("legacy")
 		test_panel_fitting(&data);
 
+	igt_describe("Tests panel fitting usages with atomic fastset.");
 	igt_subtest("atomic-fastset")
 		test_atomic_fastset(&data);
 

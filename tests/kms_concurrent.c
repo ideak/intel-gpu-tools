@@ -329,6 +329,8 @@ run_tests_for_pipe(data_t *data, enum pipe pipe)
 		igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
 	}
 
+	igt_describe("Test atomic mode setting concurrently with multiple planes and screen "
+		     "resolution.");
 	igt_subtest_f("pipe-%s", kmstest_pipe_name(pipe))
 		for_each_valid_output_on_pipe(&data->display, pipe, output)
 			run_test(data, pipe, output);

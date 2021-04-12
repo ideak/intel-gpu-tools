@@ -63,6 +63,7 @@ igt_main
 		igt_require(tv_connector);
 	}
 
+	igt_describe("Check tv load detection works correctly.");
 	igt_subtest("load-detect") {
 		/*
 		 * disable all outputs to make sure we have a

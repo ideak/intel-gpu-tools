@@ -282,22 +282,28 @@ igt_main
 		data.debugfs = igt_debugfs_dir(data.drm_fd);
 	}
 
+	igt_describe("Tests error handling when the bad source is set.");
 	igt_subtest("bad-source")
 		test_bad_source(&data);
 
 	for_each_pipe_static(pipe) {
+		igt_describe("Test for pipe CRC reads.");
 		igt_subtest_f("read-crc-pipe-%s", kmstest_pipe_name(pipe))
 			test_read_crc(&data, pipe, 0);
 
+		igt_describe("Tests the pipe CRC read and ensure frame sequence.");
 		igt_subtest_f("read-crc-pipe-%s-frame-sequence", kmstest_pipe_name(pipe))
 			test_read_crc(&data, pipe, TEST_SEQUENCE);
 
+		igt_describe("Test for O_NONBLOCK CRC reads.");
 		igt_subtest_f("nonblocking-crc-pipe-%s", kmstest_pipe_name(pipe))
 			test_read_crc(&data, pipe, TEST_NONBLOCK);
 
+		igt_describe("Test for O_NONBLOCK CRC reads and ensure frame sequence.");
 		igt_subtest_f("nonblocking-crc-pipe-%s-frame-sequence", kmstest_pipe_name(pipe))
 			test_read_crc(&data, pipe, TEST_SEQUENCE | TEST_NONBLOCK);
 
+		igt_describe("Suspend test for pipe CRC reads");
 		igt_subtest_f("suspend-read-crc-pipe-%s", kmstest_pipe_name(pipe)) {
 			test_read_crc(&data, pipe, 0);
 
@@ -312,6 +318,7 @@ igt_main
 		igt_subtest_f("disable-crc-after-crtc-pipe-%s", kmstest_pipe_name(pipe))
 			test_disable_crc_after_crtc(&data, pipe);
 
+		igt_describe("Hang test for pipe CRC read");
 		igt_subtest_f("hang-read-crc-pipe-%s", kmstest_pipe_name(pipe)) {
 			igt_hang_t hang = igt_allow_hang(data.drm_fd, 0, 0);
 
