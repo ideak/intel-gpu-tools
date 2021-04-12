@@ -794,10 +794,17 @@ void __intel_allocator_multiprocess_prepare(void)
 	channel->init(channel);
 }
 
+#define START_TIMEOUT_MS 100
 void __intel_allocator_multiprocess_start(void)
 {
+	int time_left = START_TIMEOUT_MS;
+
 	pthread_create(&allocator_thread, NULL,
 		       allocator_thread_loop, NULL);
+
+	/* Wait unless allocator thread get started */
+	while (time_left-- > 0 && !READ_ONCE(allocator_thread_running))
+		usleep(1000);
 }
 
 /**
