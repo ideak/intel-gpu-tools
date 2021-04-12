@@ -136,25 +136,6 @@ int __gem_query_engines(int fd,
 	return __gem_query(fd, &query);
 }
 
-static void ctx_map_engines(int fd, struct intel_engine_data *ed,
-			    struct drm_i915_gem_context_param *param)
-{
-	struct i915_context_param_engines *engines =
-			from_user_pointer(param->value);
-	int i = 0;
-
-	for (typeof(engines->engines[0]) *p = &engines->engines[0];
-	     i < ed->nengines; i++, p++) {
-		p->engine_class = ed->engines[i].class;
-		p->engine_instance = ed->engines[i].instance;
-	}
-
-	param->size = offsetof(typeof(*engines), engines[i]);
-	engines->extensions = 0;
-
-	gem_context_set_param(fd, param);
-}
-
 static const char *class_names[] = {
 	[I915_ENGINE_CLASS_RENDER]	  = "rcs",
 	[I915_ENGINE_CLASS_COPY]	  = "bcs",
@@ -213,11 +194,6 @@ static int __query_engine_list(int fd, struct intel_engine_data *ed)
 	ed->nengines = query_engine->num_engines;
 
 	return 0;
-}
-
-static void query_engine_list(int fd, struct intel_engine_data *ed)
-{
-	igt_assert_eq(__query_engine_list(fd, ed), 0);
 }
 
 struct intel_execution_engine2 *
@@ -351,40 +327,6 @@ static int gem_topology_get_param(int fd,
 		return -1; /* using default engine map */
 
 	return 0;
-}
-
-struct intel_engine_data intel_init_engine_list(int fd, uint32_t ctx_id)
-{
-	DEFINE_CONTEXT_ENGINES_PARAM(engines, param, ctx_id, GEM_MAX_ENGINES);
-	struct intel_engine_data engine_data = { };
-	int i;
-
-	if (gem_topology_get_param(fd, &param)) {
-		/* if kernel does not support engine/context mapping */
-		return intel_engine_list_for_static(fd);
-	}
-
-	if (!param.size) {
-		query_engine_list(fd, &engine_data);
-		ctx_map_engines(fd, &engine_data, &param);
-	} else {
-		/* engine count can be inferred from size */
-		param.size -= sizeof(struct i915_context_param_engines);
-		param.size /= sizeof(struct i915_engine_class_instance);
-
-		igt_assert_f(param.size <= GEM_MAX_ENGINES,
-			     "unsupported engine count\n");
-
-		for (i = 0; i < param.size; i++)
-			init_engine(&engine_data.engines[i],
-				    engines.engines[i].engine_class,
-				    engines.engines[i].engine_instance,
-				    i);
-
-		engine_data.nengines = i;
-	}
-
-	return engine_data;
 }
 
 int gem_context_lookup_engine(int fd, uint64_t engine, uint32_t ctx_id,

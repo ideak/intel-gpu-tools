@@ -51,7 +51,6 @@ struct intel_engine_data {
 bool gem_has_engine_topology(int fd);
 struct intel_engine_data intel_engine_list_of_physical(int fd);
 struct intel_engine_data intel_engine_list_for_ctx_cfg(int fd, const intel_ctx_cfg_t *cfg);
-struct intel_engine_data intel_init_engine_list(int fd, uint32_t ctx_id);
 
 /* iteration functions */
 struct intel_execution_engine2 *
@@ -106,11 +105,6 @@ struct intel_execution_engine2 gem_eb_flags_to_engine(unsigned int flags);
 #define for_each_ctx_engine(fd__, ctx__, e__) \
 	for_each_ctx_cfg_engine(fd__, &(ctx__)->cfg, e__)
 
-#define for_each_context_engine(fd__, ctx__, e__) \
-	for (struct intel_engine_data i__ = intel_init_engine_list(fd__, ctx__); \
-	     ((e__) = intel_get_current_engine(&i__)); \
-	     intel_next_engine(&i__))
-
 /**
  * for_each_physical_engine
  * @fd__: open i915 drm file descriptor
@@ -125,15 +119,6 @@ struct intel_execution_engine2 gem_eb_flags_to_engine(unsigned int flags);
 	for (struct intel_engine_data i__##e__ = intel_engine_list_of_physical(fd__); \
 	     ((e__) = intel_get_current_physical_engine(&i__##e__)); \
 	     intel_next_engine(&i__##e__))
-
-/* needs to replace "for_each_physical_engine" when conflicts are fixed */
-#define ____for_each_physical_engine(fd__, ctx__, e__) \
-	for (struct intel_engine_data i__##e__ = intel_init_engine_list(fd__, ctx__); \
-	     ((e__) = intel_get_current_physical_engine(&i__##e__)); \
-	     intel_next_engine(&i__##e__))
-
-#define __for_each_physical_engine(fd__, e__) \
-	____for_each_physical_engine(fd__, 0, e__)
 
 __attribute__((format(scanf, 4, 5)))
 int gem_engine_property_scanf(int i915, const char *engine, const char *attr,
