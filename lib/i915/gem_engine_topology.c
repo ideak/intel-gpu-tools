@@ -212,6 +212,34 @@ intel_get_current_physical_engine(struct intel_engine_data *ed)
 	return e;
 }
 
+static struct intel_engine_data intel_engine_list_for_static(int fd)
+{
+	const struct intel_execution_engine2 *e2;
+	struct intel_engine_data engine_data = { };
+
+	igt_debug("using pre-allocated engine list\n");
+
+	__for_each_static_engine(e2) {
+		if (igt_only_list_subtests() ||
+		    (fd < 0) ||
+		    gem_has_ring(fd, e2->flags)) {
+			struct intel_execution_engine2 *__e2 =
+				&engine_data.engines[
+				engine_data.nengines];
+
+			strcpy(__e2->name, e2->name);
+			__e2->instance   = e2->instance;
+			__e2->class      = e2->class;
+			__e2->flags      = e2->flags;
+			__e2->is_virtual = false;
+
+			engine_data.nengines++;
+                }
+	}
+
+	return engine_data;
+}
+
 static int gem_topology_get_param(int fd,
 				  struct drm_i915_gem_context_param *p)
 {
@@ -232,28 +260,7 @@ struct intel_engine_data intel_init_engine_list(int fd, uint32_t ctx_id)
 
 	if (gem_topology_get_param(fd, &param)) {
 		/* if kernel does not support engine/context mapping */
-		const struct intel_execution_engine2 *e2;
-
-		igt_debug("using pre-allocated engine list\n");
-
-		__for_each_static_engine(e2) {
-			if (igt_only_list_subtests() ||
-			    (fd < 0) ||
-			    gem_has_ring(fd, e2->flags)) {
-				struct intel_execution_engine2 *__e2 =
-					&engine_data.engines[
-					engine_data.nengines];
-
-				strcpy(__e2->name, e2->name);
-				__e2->instance   = e2->instance;
-				__e2->class      = e2->class;
-				__e2->flags      = e2->flags;
-				__e2->is_virtual = false;
-
-				engine_data.nengines++;
-                        }
-		}
-		return engine_data;
+		return intel_engine_list_for_static(fd);
 	}
 
 	if (!param.size) {
