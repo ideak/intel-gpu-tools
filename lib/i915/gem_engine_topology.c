@@ -39,6 +39,47 @@
  *
  * This helper library contains functions used for querying and dealing
  * with engines in GEM contexts.
+ *
+ * Combined with intel_ctx_t, these helpers give a pretty standard pattern
+ * for testing every engine in a device:
+ * |[<!-- language="C" -->
+ *	const struct intel_execution_engine2 *e;
+ *	const intel_ctx_t *ctx = intel_ctx_create_all_physical(fd);
+ *
+ *	igt_subtest_with_dynamic("basic") {
+ *		for_each_ctx_engine(fd, ctx, e) {
+ *			igt_dynamic_f("%s", e->name)
+ *			run_ctx_test(fd, ctx, e);
+ *		}
+ *	}
+ * ]|
+ * This pattern works regardless of whether or not the engines topology API
+ * is available and regardless of whether or not your platform supports
+ * contexts.  If engines are unavailable, it falls back to a legacy context
+ * and if contexts are unavailable, intel_ctx_create_all_physical() will
+ * return a wrapper around ctx0.
+ *
+ * If, for some reason, you want to create a second identical context to
+ * use with your engine iterator, duplicating the context is easy:
+ * |[<!-- language="C" -->
+ *	const intel_ctx_t *ctx2 = intel_ctx_create(fd, &ctx->cfg);
+ * ]|
+ *
+ * If you want each subtest to always create its own contexts, there are
+ * also iterators which work only on a context config.  As long as all
+ * contexts are created from that config, or from one with an identical set
+ * of engines, the iterator will be valid for those contexts.
+ * |[<!-- language="C" -->
+ *	const struct intel_execution_engine2 *e;
+ *	intel_ctx_cfg_t cfg = intel_ctx_cfg_all_physical(fd);
+ *
+ *	igt_subtest_with_dynamic("basic") {
+ *		for_each_ctx_cfg_engine(fd, &cfg, e) {
+ *			igt_dynamic_f("%s", e->name)
+ *			run_ctx_cfg_test(fd, &cfg, e);
+ *		}
+ *	}
+ * ]|
  */
 
 /*
@@ -254,6 +295,35 @@ struct intel_engine_data intel_engine_list_of_physical(int fd)
 		return engine_data;
 
 	return intel_engine_list_for_static(fd);
+}
+
+/**
+ * intel_engine_list_for_ctx_cfg:
+ * @fd: open i915 drm file descriptor
+ * @cfg: Context config
+ *
+ * Returns the list of all engines in the context config
+ */
+struct intel_engine_data
+intel_engine_list_for_ctx_cfg(int fd, const intel_ctx_cfg_t *cfg)
+{
+	igt_assert(cfg);
+	if (fd >= 0 && cfg->num_engines) {
+		struct intel_engine_data engine_data = { };
+		int i;
+
+		engine_data.nengines = cfg->num_engines;
+		for (i = 0; i < cfg->num_engines; i++)
+			init_engine(&engine_data.engines[i],
+				    cfg->engines[i].engine_class,
+				    cfg->engines[i].engine_instance,
+				    i);
+
+		return engine_data;
+	} else {
+		/* This is a legacy context */
+		return intel_engine_list_for_static(fd);
+	}
 }
 
 static int gem_topology_get_param(int fd,

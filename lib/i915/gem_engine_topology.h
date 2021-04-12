@@ -26,8 +26,7 @@
 
 #include "igt_gt.h"
 #include "i915_drm.h"
-
-#define GEM_MAX_ENGINES		I915_EXEC_RING_MASK + 1
+#include "intel_ctx.h"
 
 int __gem_query_engines(int fd,
 			struct drm_i915_query_engine_info *query_engines,
@@ -51,6 +50,7 @@ struct intel_engine_data {
 
 bool gem_has_engine_topology(int fd);
 struct intel_engine_data intel_engine_list_of_physical(int fd);
+struct intel_engine_data intel_engine_list_for_ctx_cfg(int fd, const intel_ctx_cfg_t *cfg);
 struct intel_engine_data intel_init_engine_list(int fd, uint32_t ctx_id);
 
 /* iteration functions */
@@ -80,6 +80,31 @@ struct intel_execution_engine2 gem_eb_flags_to_engine(unsigned int flags);
  */
 #define __for_each_static_engine(e__) \
 	for ((e__) = intel_execution_engines2; (e__)->name[0]; (e__)++)
+
+/**
+ * for_each_ctx_cfg_engine
+ * @fd__: open i915 drm file descriptor
+ * @ctx_cfg__: Intel context config
+ * @e__: struct intel_execution_engine2 iterator
+ *
+ * Iterates over each physical engine in the context config
+ */
+#define for_each_ctx_cfg_engine(fd__, ctx_cfg__, e__) \
+	for (struct intel_engine_data i__##e__ = \
+			intel_engine_list_for_ctx_cfg(fd__, ctx_cfg__); \
+	     ((e__) = intel_get_current_engine(&i__##e__)); \
+	     intel_next_engine(&i__##e__))
+
+/**
+ * for_each_ctx_engine
+ * @fd__: open i915 drm file descriptor
+ * @ctx__: Intel context wrapper
+ * @e__: struct intel_execution_engine2 iterator
+ *
+ * Iterates over each physical engine in the context
+ */
+#define for_each_ctx_engine(fd__, ctx__, e__) \
+	for_each_ctx_cfg_engine(fd__, &(ctx__)->cfg, e__)
 
 #define for_each_context_engine(fd__, ctx__, e__) \
 	for (struct intel_engine_data i__ = intel_init_engine_list(fd__, ctx__); \
