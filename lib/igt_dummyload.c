@@ -131,22 +131,13 @@ emit_recursive_batch(igt_spin_t *spin,
 	if (opts->engine == ALL_ENGINES) {
 		struct intel_execution_engine2 *engine;
 
-		if (opts->ctx) {
-			for_each_ctx_engine(fd, opts->ctx, engine) {
-				if (opts->flags & IGT_SPIN_POLL_RUN &&
-				    !gem_class_can_store_dword(fd, engine->class))
-					continue;
+		igt_assert(opts->ctx);
+		for_each_ctx_engine(fd, opts->ctx, engine) {
+			if (opts->flags & IGT_SPIN_POLL_RUN &&
+			    !gem_class_can_store_dword(fd, engine->class))
+				continue;
 
-				flags[nengine++] = engine->flags;
-			}
-		} else {
-			for_each_context_engine(fd, opts->ctx_id, engine) {
-				if (opts->flags & IGT_SPIN_POLL_RUN &&
-				    !gem_class_can_store_dword(fd, engine->class))
-					continue;
-
-				flags[nengine++] = engine->flags;
-			}
+			flags[nengine++] = engine->flags;
 		}
 	} else {
 		flags[nengine++] = opts->engine;
