@@ -50,6 +50,7 @@ struct intel_engine_data {
 };
 
 bool gem_has_engine_topology(int fd);
+struct intel_engine_data intel_engine_list_of_physical(int fd);
 struct intel_engine_data intel_init_engine_list(int fd, uint32_t ctx_id);
 
 /* iteration functions */
@@ -84,6 +85,21 @@ struct intel_execution_engine2 gem_eb_flags_to_engine(unsigned int flags);
 	for (struct intel_engine_data i__ = intel_init_engine_list(fd__, ctx__); \
 	     ((e__) = intel_get_current_engine(&i__)); \
 	     intel_next_engine(&i__))
+
+/**
+ * for_each_physical_engine
+ * @fd__: open i915 drm file descriptor
+ * @e__: struct intel_execution_engine2 iterator
+ *
+ * Iterates over each physical engine in device.  Be careful when using
+ * this iterator as your context may not have all of these engines and the
+ * intel_execution_engine2::flags field in the iterator may not match your
+ * context configuration.
+ */
+#define for_each_physical_engine(fd__, e__) \
+	for (struct intel_engine_data i__##e__ = intel_engine_list_of_physical(fd__); \
+	     ((e__) = intel_get_current_physical_engine(&i__##e__)); \
+	     intel_next_engine(&i__##e__))
 
 /* needs to replace "for_each_physical_engine" when conflicts are fixed */
 #define ____for_each_physical_engine(fd__, ctx__, e__) \

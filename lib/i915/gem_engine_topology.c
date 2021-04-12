@@ -240,6 +240,22 @@ static struct intel_engine_data intel_engine_list_for_static(int fd)
 	return engine_data;
 }
 
+/**
+ * intel_engine_list_of_physical:
+ * @fd: open i915 drm file descriptor
+ *
+ * Returns the list of all physical engines in the device
+ */
+struct intel_engine_data intel_engine_list_of_physical(int fd)
+{
+	struct intel_engine_data engine_data = { };
+
+	if (__query_engine_list(fd, &engine_data) == 0)
+		return engine_data;
+
+	return intel_engine_list_for_static(fd);
+}
+
 static int gem_topology_get_param(int fd,
 				  struct drm_i915_gem_context_param *p)
 {
