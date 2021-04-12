@@ -95,13 +95,6 @@ int __gem_query_engines(int fd,
 	return __gem_query(fd, &query);
 }
 
-static void query_engines(int fd,
-			  struct drm_i915_query_engine_info *query_engines,
-			  int length)
-{
-	igt_assert_eq(__gem_query_engines(fd, query_engines, length), 0);
-}
-
 static void ctx_map_engines(int fd, struct intel_engine_data *ed,
 			    struct drm_i915_gem_context_param *param)
 {
@@ -160,14 +153,16 @@ static void init_engine(struct intel_execution_engine2 *e2,
 	igt_assert(ret < sizeof(e2->name));
 }
 
-static void query_engine_list(int fd, struct intel_engine_data *ed)
+static int __query_engine_list(int fd, struct intel_engine_data *ed)
 {
 	uint8_t buff[SIZEOF_QUERY] = { };
 	struct drm_i915_query_engine_info *query_engine =
 			(struct drm_i915_query_engine_info *) buff;
-	int i;
+	int i, err;
 
-	query_engines(fd, query_engine, SIZEOF_QUERY);
+	err = __gem_query_engines(fd, query_engine, SIZEOF_QUERY);
+	if (err)
+		return err;
 
 	for (i = 0; i < query_engine->num_engines; i++)
 		init_engine(&ed->engines[i],
@@ -175,6 +170,13 @@ static void query_engine_list(int fd, struct intel_engine_data *ed)
 			    query_engine->engines[i].engine.engine_instance, i);
 
 	ed->nengines = query_engine->num_engines;
+
+	return 0;
+}
+
+static void query_engine_list(int fd, struct intel_engine_data *ed)
+{
+	igt_assert_eq(__query_engine_list(fd, ed), 0);
 }
 
 struct intel_execution_engine2 *
