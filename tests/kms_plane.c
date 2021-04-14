@@ -549,7 +549,8 @@ static void capture_crc(data_t *data, unsigned int vblank, igt_crc_t *crc)
 {
 	igt_pipe_crc_get_for_frame(data->drm_fd, data->pipe_crc, vblank, crc);
 
-	igt_fail_on_f(crc->has_valid_frame && crc->frame != vblank,
+	igt_fail_on_f(!igt_skip_crc_compare &&
+		      crc->has_valid_frame && crc->frame != vblank,
 		      "Got CRC for the wrong frame (got %u, expected %u). CRC buffer overflow?\n",
 		      crc->frame, vblank);
 }
