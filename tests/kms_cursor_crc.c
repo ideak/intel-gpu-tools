@@ -492,13 +492,6 @@ static void test_cursor_opaque(data_t *data)
 	test_cursor_alpha(data, 1.0);
 }
 
-static void run_test(data_t *data, void (*testfunc)(data_t *), int cursor_w, int cursor_h)
-{
-	prepare_crtc(data, data->output, cursor_w, cursor_h);
-	testfunc(data);
-	cleanup_crtc(data);
-}
-
 static void create_cursor_fb(data_t *data, int cur_w, int cur_h)
 {
 	cairo_t *cr;
@@ -565,6 +558,16 @@ static void require_cursor_size(data_t *data, int w, int h)
 	igt_output_set_pipe(output, PIPE_NONE);
 
 	igt_skip_on_f(ret, "Cursor size %dx%d not supported by driver\n", w, h);
+}
+
+static void run_test(data_t *data, void (*testfunc)(data_t *), int cursor_w, int cursor_h)
+{
+	if (data->fb.fb_id != 0)
+		require_cursor_size(data, cursor_w, cursor_h);
+
+	prepare_crtc(data, data->output, cursor_w, cursor_h);
+	testfunc(data);
+	cleanup_crtc(data);
 }
 
 static void test_cursor_size(data_t *data)
@@ -687,7 +690,6 @@ static void run_size_tests(data_t *data, enum pipe pipe,
 				      w, h);
 		}
 		create_cursor_fb(data, w, h);
-		require_cursor_size(data, w, h);
 	}
 
 	/* Using created cursor FBs to test cursor support */
