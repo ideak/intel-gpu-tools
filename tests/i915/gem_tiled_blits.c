@@ -196,17 +196,21 @@ igt_main
 		run_test(fd, 2);
 
 	igt_subtest("normal") {
+		intel_allocator_multiprocess_start();
 		igt_fork(child, ncpus)
 			run_test(fd, count);
 		igt_waitchildren();
+		intel_allocator_multiprocess_stop();
 	}
 
 	igt_subtest("interruptible") {
+		intel_allocator_multiprocess_start();
 		igt_fork_signal_helper();
 		igt_fork(child, ncpus)
 			run_test(fd, count);
 		igt_waitchildren();
 		igt_stop_signal_helper();
+		intel_allocator_multiprocess_stop();
 	}
 
 	igt_fixture {
