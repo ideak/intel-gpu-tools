@@ -59,13 +59,23 @@ typedef struct igt_spin {
 #define SPIN_CLFLUSH (1 << 0)
 } igt_spin_t;
 
-struct igt_spin_factory {
+/**
+ * igt_spin_factory_t:
+ * @ctx: GEM context handle
+ * @dependency: GEM object to depend on
+ * @engine: Flags describing the engine to execute on
+ * @flags: Set of IGT_SPIN_* flags
+ * @fence: In-fence to wait on
+ *
+ * A factory struct which contains creation parameters for an igt_spin_t.
+ */
+typedef struct igt_spin_factory {
 	uint32_t ctx;
 	uint32_t dependency;
 	unsigned int engine;
 	unsigned int flags;
 	int fence;
-};
+} igt_spin_factory_t;
 
 #define IGT_SPIN_FENCE_IN      (1 << 0)
 #define IGT_SPIN_FENCE_SUBMIT  (1 << 1)
@@ -78,14 +88,14 @@ struct igt_spin_factory {
 #define IGT_SPIN_SOFTDEP       (1 << 8)
 
 igt_spin_t *
-__igt_spin_factory(int fd, const struct igt_spin_factory *opts);
+__igt_spin_factory(int fd, const igt_spin_factory_t *opts);
 igt_spin_t *
-igt_spin_factory(int fd, const struct igt_spin_factory *opts);
+igt_spin_factory(int fd, const igt_spin_factory_t *opts);
 
 #define __igt_spin_new(fd, ...) \
-	__igt_spin_factory(fd, &((struct igt_spin_factory){__VA_ARGS__}))
+	__igt_spin_factory(fd, &((igt_spin_factory_t){__VA_ARGS__}))
 #define igt_spin_new(fd, ...) \
-	igt_spin_factory(fd, &((struct igt_spin_factory){__VA_ARGS__}))
+	igt_spin_factory(fd, &((igt_spin_factory_t){__VA_ARGS__}))
 
 void igt_spin_set_timeout(igt_spin_t *spin, int64_t ns);
 void igt_spin_reset(igt_spin_t *spin);
