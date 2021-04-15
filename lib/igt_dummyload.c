@@ -424,22 +424,12 @@ igt_spin_factory(int fd, const struct igt_spin_factory *opts)
 {
 	igt_spin_t *spin;
 
-	if (opts->engine != ALL_ENGINES) {
-		struct intel_execution_engine2 e;
-		int class;
+	if ((opts->flags & IGT_SPIN_POLL_RUN) && opts->engine != ALL_ENGINES) {
+		unsigned int class;
 
-		if (opts->ctx) {
-			class = opts->ctx->cfg.engines[opts->engine].engine_class;
-		} else if (!gem_context_lookup_engine(fd, opts->engine,
-						      opts->ctx_id, &e)) {
-			class = e.class;
-		} else {
-			gem_require_ring(fd, opts->engine);
-			class = gem_execbuf_flags_to_engine_class(opts->engine);
-		}
-
-		if (opts->flags & IGT_SPIN_POLL_RUN)
-			igt_require(gem_class_can_store_dword(fd, class));
+		igt_assert(opts->ctx);
+		class = intel_ctx_engine_class(opts->ctx, opts->engine);
+		igt_require(gem_class_can_store_dword(fd, class));
 	}
 
 	if (opts->flags & IGT_SPIN_INVALID_CS)

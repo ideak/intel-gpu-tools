@@ -317,35 +317,6 @@ intel_engine_list_for_ctx_cfg(int fd, const intel_ctx_cfg_t *cfg)
 	}
 }
 
-static int gem_topology_get_param(int fd,
-				  struct drm_i915_gem_context_param *p)
-{
-	if (igt_only_list_subtests())
-		return -ENODEV;
-
-	if (__gem_context_get_param(fd, p))
-		return -1; /* using default engine map */
-
-	return 0;
-}
-
-int gem_context_lookup_engine(int fd, uint64_t engine, uint32_t ctx_id,
-			      struct intel_execution_engine2 *e)
-{
-	DEFINE_CONTEXT_ENGINES_PARAM(engines, param, ctx_id, GEM_MAX_ENGINES);
-
-	/* a bit paranoic */
-	igt_assert(e);
-
-	if (gem_topology_get_param(fd, &param) || !param.size)
-		return -EINVAL;
-
-	e->class = engines.engines[engine].engine_class;
-	e->instance = engines.engines[engine].engine_instance;
-
-	return 0;
-}
-
 /**
  * gem_has_engine_topology:
  * @fd: open i915 drm file descriptor

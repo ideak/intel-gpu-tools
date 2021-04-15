@@ -61,9 +61,6 @@ intel_get_current_physical_engine(struct intel_engine_data *ed);
 
 void intel_next_engine(struct intel_engine_data *ed);
 
-int gem_context_lookup_engine(int fd, uint64_t engine, uint32_t ctx_id,
-			      struct intel_execution_engine2 *e);
-
 bool gem_context_has_engine_map(int fd, uint32_t ctx);
 
 bool gem_engine_is_equal(const struct intel_execution_engine2 *e1,
