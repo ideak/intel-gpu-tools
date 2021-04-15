@@ -1665,15 +1665,6 @@ static void preempt_queue(int fd, const intel_ctx_cfg_t *cfg,
 	}
 }
 
-static bool has_context_engines(int i915)
-{
-	struct drm_i915_gem_context_param param = {
-		.ctx_id = 0,
-		.param = I915_CONTEXT_PARAM_ENGINES,
-	};
-	return __gem_context_set_param(i915, &param) == 0;
-}
-
 static void preempt_engines(int i915,
 			    const struct intel_execution_engine2 *e,
 			    unsigned int flags)
@@ -1694,7 +1685,7 @@ static void preempt_engines(int i915,
 	 * timeline that we can reprioritise and shuffle amongst themselves.
 	 */
 
-	igt_require(has_context_engines(i915));
+	igt_require(gem_has_engine_topology(i915));
 
 	for (int n = 0; n < GEM_MAX_ENGINES; n++) {
 		cfg.engines[n].engine_class = e->class;

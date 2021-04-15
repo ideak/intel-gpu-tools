@@ -46,15 +46,6 @@
 #define engine_class(e, n) ((e)->engines[(n)].engine_class)
 #define engine_instance(e, n) ((e)->engines[(n)].engine_instance)
 
-static bool has_context_engines(int i915)
-{
-	struct drm_i915_gem_context_param param = {
-		.ctx_id = 0,
-		.param = I915_CONTEXT_PARAM_ENGINES,
-	};
-	return __gem_context_set_param(i915, &param) == 0;
-}
-
 static void invalid_engines(int i915)
 {
 	struct i915_context_param_engines stack = {}, *engines;
@@ -561,7 +552,7 @@ igt_main
 		igt_require_gem(i915);
 
 		gem_require_contexts(i915);
-		igt_require(has_context_engines(i915));
+		igt_require(gem_has_engine_topology(i915));
 
 		igt_fork_hang_detector(i915);
 	}

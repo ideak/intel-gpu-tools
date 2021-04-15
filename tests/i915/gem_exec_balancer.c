@@ -2786,15 +2786,6 @@ static bool has_persistence(int i915)
 	return __gem_context_set_param(i915, &p) == 0;
 }
 
-static bool has_context_engines(int i915)
-{
-	struct drm_i915_gem_context_param p = {
-		.param = I915_CONTEXT_PARAM_ENGINES,
-	};
-
-	return __gem_context_set_param(i915, &p) == 0;
-}
-
 static bool has_load_balancer(int i915)
 {
 	const intel_ctx_cfg_t cfg = {
@@ -2819,7 +2810,7 @@ igt_main
 		igt_require_gem(i915);
 
 		gem_require_contexts(i915);
-		igt_require(has_context_engines(i915));
+		igt_require(gem_has_engine_topology(i915));
 		igt_require(has_load_balancer(i915));
 		igt_require(has_perf_engines(i915));
 

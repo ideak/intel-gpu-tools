@@ -70,12 +70,13 @@ static int create_ext_ioctl(int i915,
 bool gem_has_contexts(int fd)
 {
 	uint32_t ctx_id = 0;
+	int err;
 
-	__gem_context_create(fd, &ctx_id);
-	if (ctx_id)
+	err = __gem_context_create(fd, &ctx_id);
+	if (!err)
 		gem_context_destroy(fd, ctx_id);
 
-	return ctx_id;
+	return !err;
 }
 
 /**

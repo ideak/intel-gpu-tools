@@ -86,19 +86,8 @@
  * Limit what we support for simplicity due limitation in how much we
  * can address via execbuf2.
  */
-#define SIZEOF_CTX_PARAM	offsetof(struct i915_context_param_engines, \
-					 engines[GEM_MAX_ENGINES])
 #define SIZEOF_QUERY		offsetof(struct drm_i915_query_engine_info, \
 					 engines[GEM_MAX_ENGINES])
-
-#define DEFINE_CONTEXT_ENGINES_PARAM(e__, p__, c__, N__) \
-		I915_DEFINE_CONTEXT_PARAM_ENGINES(e__, N__); \
-		struct drm_i915_gem_context_param p__ = { \
-			.param = I915_CONTEXT_PARAM_ENGINES, \
-			.ctx_id = c__, \
-			.size = SIZEOF_CTX_PARAM, \
-			.value = to_user_pointer(memset(&e__, 0, sizeof(e__))), \
-		}
 
 static int __gem_query(int fd, struct drm_i915_query *q)
 {
@@ -321,17 +310,17 @@ intel_engine_list_for_ctx_cfg(int fd, const intel_ctx_cfg_t *cfg)
  * gem_has_engine_topology:
  * @fd: open i915 drm file descriptor
  *
- * Queries whether the engine topology API is supported or not.
+ * Queries whether the engine topology API is supported or not.  Every
+ * kernel that has the global engines query should have the
+ * CONTEXT_PARAM_ENGINES and vice versa so this one check can be used for
+ * either.
  *
  * Returns: Engine topology API availability.
  */
 bool gem_has_engine_topology(int fd)
 {
-	struct drm_i915_gem_context_param param = {
-		.param = I915_CONTEXT_PARAM_ENGINES,
-	};
-
-	return !__gem_context_get_param(fd, &param);
+	struct intel_engine_data ed;
+	return !__query_engine_list(fd, &ed);
 }
 
 struct intel_execution_engine2 gem_eb_flags_to_engine(unsigned int flags)
@@ -358,23 +347,6 @@ struct intel_execution_engine2 gem_eb_flags_to_engine(unsigned int flags)
 	}
 
 	return e2__;
-}
-
-bool gem_context_has_engine_map(int fd, uint32_t ctx)
-{
-	struct drm_i915_gem_context_param param = {
-		.param = I915_CONTEXT_PARAM_ENGINES,
-		.ctx_id = ctx
-	};
-
-	/*
-	 * If the kernel is too old to support PARAM_ENGINES,
-	 * then naturally the context has no engine map.
-	 */
-	if (__gem_context_get_param(fd, &param))
-		return false;
-
-	return param.size;
 }
 
 bool gem_engine_is_equal(const struct intel_execution_engine2 *e1,
