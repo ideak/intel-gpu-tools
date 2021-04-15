@@ -32,6 +32,14 @@
 #include "ioctl_wrappers.h"
 
 #include "i915/gem_engine_topology.h"
+/**
+ * SECTION:gem_engine_topology
+ * @short_description: Helpers for dealing engine topology
+ * @title: GEM Engine Topology
+ *
+ * This helper library contains functions used for querying and dealing
+ * with engines in GEM contexts.
+ */
 
 /*
  * Limit what we support for simplicity due limitation in how much we
@@ -276,6 +284,14 @@ int gem_context_lookup_engine(int fd, uint64_t engine, uint32_t ctx_id,
 	return 0;
 }
 
+/**
+ * gem_has_engine_topology:
+ * @fd: open i915 drm file descriptor
+ *
+ * Queries whether the engine topology API is supported or not.
+ *
+ * Returns: Engine topology API availability.
+ */
 bool gem_has_engine_topology(int fd)
 {
 	struct drm_i915_gem_context_param param = {

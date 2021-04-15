@@ -29,6 +29,15 @@
 
 #define GEM_MAX_ENGINES		I915_EXEC_RING_MASK + 1
 
+/**
+ * intel_engine_data:
+ * @nengines: Number of engines
+ * @n: Current engine index
+ * @current_engine: Current engine
+ * @engines: List of all engines
+ *
+ * This struct acts as an interator for walking over a set of engines.
+ */
 struct intel_engine_data {
 	uint32_t nengines;
 	uint32_t n;
@@ -58,6 +67,12 @@ bool gem_engine_is_equal(const struct intel_execution_engine2 *e1,
 
 struct intel_execution_engine2 gem_eb_flags_to_engine(unsigned int flags);
 
+/**
+ * __for_each_static_engine:
+ * @e__: struct intel_execution_engine2 iterator
+ *
+ * Iterates over each of the statically defined (legacy) engines.
+ */
 #define __for_each_static_engine(e__) \
 	for ((e__) = intel_execution_engines2; (e__)->name[0]; (e__)++)
 
