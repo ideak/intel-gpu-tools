@@ -94,34 +94,11 @@ const struct {
 static void setup_fb(data_t *data, struct igt_fb *newfb, uint32_t width,
 		     uint32_t height, uint64_t format, uint64_t modifier)
 {
-	struct drm_mode_fb_cmd2 f = {0};
-	cairo_t *cr;
-
 	igt_require(igt_display_has_format_mod(&data->display, format,
 					       modifier));
 
-	igt_create_bo_for_fb(data->drm_fd, width, height, format, modifier,
-			     newfb);
-	igt_assert(newfb->gem_handle > 0);
-
-	f.width = newfb->width;
-	f.height = newfb->height;
-	f.pixel_format = newfb->drm_format;
-	f.flags = LOCAL_DRM_MODE_FB_MODIFIERS;
-
-	for (int n = 0; n < newfb->num_planes; n++) {
-		f.handles[n] = newfb->gem_handle;
-		f.modifier[n] = newfb->modifier;
-		f.pitches[n] = newfb->strides[n];
-		f.offsets[n] = newfb->offsets[n];
-	}
-
-	cr = igt_get_cairo_ctx(data->drm_fd, newfb);
-	igt_paint_color(cr, 0, 0, newfb->width, newfb->height, 0, 1, 0);
-	igt_put_cairo_ctx(cr);
-
-	igt_assert(drmIoctl(data->drm_fd, LOCAL_DRM_IOCTL_MODE_ADDFB2, &f) == 0);
-	newfb->fb_id = f.fb_id;
+	igt_create_color_fb(data->drm_fd, width, height,
+			    format, modifier, 0, 1, 0, newfb);
 }
 
 static void free_fbs(data_t *data)
