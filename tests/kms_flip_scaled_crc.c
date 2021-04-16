@@ -145,6 +145,10 @@ static void test_flip_to_scaled(data_t *data, uint32_t index, enum pipe pipe,
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_display_commit_atomic(&data->display, DRM_MODE_ATOMIC_ALLOW_MODESET,
 				  NULL);
+	if (data->pipe_crc) {
+		igt_pipe_crc_stop(data->pipe_crc);
+		igt_pipe_crc_free(data->pipe_crc);
+	}
 	data->pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe,
 					  INTEL_PIPE_CRC_SOURCE_AUTO);
 
