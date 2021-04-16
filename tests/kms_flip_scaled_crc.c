@@ -107,6 +107,45 @@ static void free_fbs(data_t *data)
 	igt_remove_fb(data->drm_fd, &data->big_fb);
 }
 
+static void set_lut(data_t *data, enum pipe pipe)
+{
+	igt_pipe_t *pipe_obj = &data->display.pipes[pipe];
+	struct drm_color_lut *lut;
+	drmModeCrtc *crtc;
+	int i, lut_size;
+
+	crtc = drmModeGetCrtc(data->drm_fd, pipe_obj->crtc_id);
+	lut_size = crtc->gamma_size;
+	drmModeFreeCrtc(crtc);
+
+	lut = malloc(sizeof(lut[0]) * lut_size);
+
+	/*
+	 * The scaler may have lower internal precision than
+	 * the rest of the pipe. Limit the output to 8bpc using
+	 * the legacy LUT.
+	 */
+	for (i = 0; i < lut_size; i++) {
+		uint16_t v  = (i * 0xffff / (lut_size - 1)) & 0xff00;
+
+		lut[i].red = v;
+		lut[i].green = v;
+		lut[i].blue = v;
+	}
+
+	igt_pipe_obj_replace_prop_blob(pipe_obj, IGT_CRTC_GAMMA_LUT,
+				       lut, sizeof(lut[0]) * lut_size);
+
+	free(lut);
+}
+
+static void clear_lut(data_t *data, enum pipe pipe)
+{
+	igt_pipe_t *pipe_obj = &data->display.pipes[pipe];
+
+	igt_pipe_obj_set_prop_value(pipe_obj, IGT_CRTC_GAMMA_LUT, 0);
+}
+
 static void test_flip_to_scaled(data_t *data, uint32_t index, enum pipe pipe,
 				igt_output_t *output)
 {
@@ -149,6 +188,7 @@ static void test_flip_to_scaled(data_t *data, uint32_t index, enum pipe pipe,
 				      data->big_fb.modifier))
 		return;
 
+	set_lut(data, pipe);
 	igt_display_commit_atomic(&data->display, DRM_MODE_ATOMIC_ALLOW_MODESET,
 				  NULL);
 	if (data->pipe_crc) {
@@ -204,6 +244,8 @@ static void test_flip_to_scaled(data_t *data, uint32_t index, enum pipe pipe,
 	igt_pipe_crc_stop(data->pipe_crc);
 	igt_pipe_crc_free(data->pipe_crc);
 	data->pipe_crc = NULL;
+
+	clear_lut(data, pipe);
 }
 
 igt_main
