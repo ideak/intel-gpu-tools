@@ -708,6 +708,7 @@ static void print_usage(const char *help_str, bool output_on_stderr)
 		   "  --debug[=log-domain]\n"
 		   "  --interactive-debug[=domain]\n"
 		   "  --skip-crc-compare\n"
+		   "  --trace-on-oops\n"
 		   "  --help-description\n"
 		   "  --describe\n"
 		   "  --device filters\n"
