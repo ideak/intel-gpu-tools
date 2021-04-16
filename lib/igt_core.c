@@ -1014,10 +1014,10 @@ static int common_init(int *argc, char **argv,
 			goto out;
 		case OPT_SKIP_CRC:
 			igt_skip_crc_compare = true;
-			goto out;
+			break;
 		case OPT_TRACE_OOPS:
 			show_ftrace = true;
-			goto out;
+			break;
 		case OPT_DEVICE:
 			assert(optarg);
 			/* if set by env IGT_DEVICE we need to free it */
