@@ -143,6 +143,12 @@ static void test_flip_to_scaled(data_t *data, uint32_t index, enum pipe pipe,
 	igt_output_set_pipe(output, pipe);
 
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+	if (!igt_plane_has_format_mod(primary, data->small_fb.drm_format,
+				      data->small_fb.modifier) ||
+	    !igt_plane_has_format_mod(primary, data->big_fb.drm_format,
+				      data->big_fb.modifier))
+		return;
+
 	igt_display_commit_atomic(&data->display, DRM_MODE_ATOMIC_ALLOW_MODESET,
 				  NULL);
 	if (data->pipe_crc) {
