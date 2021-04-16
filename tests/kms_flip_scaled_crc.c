@@ -189,7 +189,7 @@ static void test_flip_to_scaled(data_t *data, uint32_t index, enum pipe pipe,
 	igt_assert(read(data->drm_fd, &ev, sizeof(ev)) == sizeof(ev));
 
 	igt_pipe_crc_get_current(data->drm_fd, data->pipe_crc, &big_crc);
-	igt_assert(igt_check_crc_equal(&small_crc, &big_crc));
+	igt_assert_crc_equal(&small_crc, &big_crc);
 
 	igt_pipe_crc_stop(data->pipe_crc);
 	igt_pipe_crc_free(data->pipe_crc);
