@@ -223,11 +223,11 @@ igt_main
 	for (int index = 0; index < ARRAY_SIZE(flip_scenario_test); index++) {
 		igt_describe(flip_scenario_test[index].describe);
 		igt_subtest(flip_scenario_test[index].name) {
+			free_fbs(&data);
 			for_each_pipe_with_single_output(&data.display, pipe,
 							 output)
 				test_flip_to_scaled(&data, index, pipe, output);
 
-			free_fbs(&data);
 		}
 	}
 	igt_fixture {
