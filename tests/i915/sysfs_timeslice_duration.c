@@ -138,13 +138,12 @@ static void set_unbannable(int i915, uint32_t ctx)
 	gem_context_set_param(i915, &p);
 }
 
-static uint32_t create_context(int i915, unsigned int class, unsigned int inst, int prio)
+static const intel_ctx_t *
+create_ctx(int i915, unsigned int class, unsigned int inst, int prio)
 {
-	uint32_t ctx;
-
-	ctx = gem_context_create_for_engine(i915, class, inst);
-	set_unbannable(i915, ctx);
-	gem_context_set_priority(i915, ctx, prio);
+	const intel_ctx_t *ctx = intel_ctx_create_for_engine(i915, class, inst);
+	set_unbannable(i915, ctx->id);
+	gem_context_set_priority(i915, ctx->id, prio);
 
 	return ctx;
 }
@@ -191,7 +190,7 @@ static uint64_t __test_duration(int i915, int engine, unsigned int timeout)
 	double duration = clockrate(i915);
 	unsigned int class, inst, mmio;
 	uint32_t *cs, *map;
-	uint32_t ctx[2];
+	const intel_ctx_t *ctx[2];
 	int start;
 	int i;
 
@@ -204,8 +203,8 @@ static uint64_t __test_duration(int i915, int engine, unsigned int timeout)
 
 	set_timeslice(engine, timeout);
 
-	ctx[0] = create_context(i915, class, inst, 0);
-	ctx[1] = create_context(i915, class, inst, 0);
+	ctx[0] = create_ctx(i915, class, inst, 0);
+	ctx[1] = create_ctx(i915, class, inst, 0);
 
 	map = gem_mmap__device_coherent(i915, obj[2].handle,
 					0, 4096, PROT_WRITE);
@@ -260,10 +259,10 @@ static uint64_t __test_duration(int i915, int engine, unsigned int timeout)
 	igt_assert(cs - map < 4096 / sizeof(*cs));
 	munmap(map, 4096);
 
-	eb.rsvd1 = ctx[0];
+	eb.rsvd1 = ctx[0]->id;
 	gem_execbuf(i915, &eb);
 
-	eb.rsvd1 = ctx[1];
+	eb.rsvd1 = ctx[1]->id;
 	eb.batch_start_offset = start;
 	gem_execbuf(i915, &eb);
 
@@ -280,7 +279,7 @@ static uint64_t __test_duration(int i915, int engine, unsigned int timeout)
 	munmap(map, 4096);
 
 	for (i = 0; i < ARRAY_SIZE(ctx); i++)
-		gem_context_destroy(i915, ctx[i]);
+		intel_ctx_destroy(i915, ctx[i]);
 
 	for (i = 0; i < ARRAY_SIZE(obj); i++)
 		gem_close(i915, obj[i].handle);
@@ -371,23 +370,23 @@ static uint64_t __test_timeout(int i915, int engine, unsigned int timeout)
 	struct timespec ts = {};
 	igt_spin_t *spin[2];
 	uint64_t elapsed;
-	uint32_t ctx[2];
+	const intel_ctx_t *ctx[2];
 
 	igt_assert(igt_sysfs_scanf(engine, "class", "%u", &class) == 1);
 	igt_assert(igt_sysfs_scanf(engine, "instance", "%u", &inst) == 1);
 
 	set_timeslice(engine, timeout);
 
-	ctx[0] = create_context(i915, class, inst, 0);
-	spin[0] = igt_spin_new(i915, ctx[0],
+	ctx[0] = create_ctx(i915, class, inst, 0);
+	spin[0] = igt_spin_new(i915, .ctx = ctx[0],
 			       .flags = (IGT_SPIN_NO_PREEMPTION |
 					 IGT_SPIN_POLL_RUN |
 					 IGT_SPIN_FENCE_OUT));
 	igt_spin_busywait_until_started(spin[0]);
 
-	ctx[1] = create_context(i915, class, inst, 0);
+	ctx[1] = create_ctx(i915, class, inst, 0);
 	igt_nsec_elapsed(&ts);
-	spin[1] = igt_spin_new(i915, ctx[1], .flags = IGT_SPIN_POLL_RUN);
+	spin[1] = igt_spin_new(i915, .ctx = ctx[1], .flags = IGT_SPIN_POLL_RUN);
 	igt_spin_busywait_until_started(spin[1]);
 	elapsed = igt_nsec_elapsed(&ts);
 
@@ -398,8 +397,8 @@ static uint64_t __test_timeout(int i915, int engine, unsigned int timeout)
 
 	igt_spin_free(i915, spin[0]);
 
-	gem_context_destroy(i915, ctx[1]);
-	gem_context_destroy(i915, ctx[0]);
+	intel_ctx_destroy(i915, ctx[1]);
+	intel_ctx_destroy(i915, ctx[0]);
 	gem_quiescent_gpu(i915);
 
 	return elapsed;
@@ -460,7 +459,7 @@ static void test_off(int i915, int engine)
 	unsigned int class, inst;
 	unsigned int saved;
 	igt_spin_t *spin[2];
-	uint32_t ctx[2];
+	const intel_ctx_t *ctx[2];
 
 	/*
 	 * As always, there are some who must run uninterrupted and simply do
@@ -482,15 +481,15 @@ static void test_off(int i915, int engine)
 
 	set_timeslice(engine, 0);
 
-	ctx[0] = create_context(i915, class, inst, 0);
-	spin[0] = igt_spin_new(i915, ctx[0],
+	ctx[0] = create_ctx(i915, class, inst, 0);
+	spin[0] = igt_spin_new(i915, .ctx = ctx[0],
 			       .flags = (IGT_SPIN_NO_PREEMPTION |
 					 IGT_SPIN_POLL_RUN |
 					 IGT_SPIN_FENCE_OUT));
 	igt_spin_busywait_until_started(spin[0]);
 
-	ctx[1] = create_context(i915, class, inst, 0);
-	spin[1] = igt_spin_new(i915, ctx[1], .flags = IGT_SPIN_POLL_RUN);
+	ctx[1] = create_ctx(i915, class, inst, 0);
+	spin[1] = igt_spin_new(i915, .ctx = ctx[1], .flags = IGT_SPIN_POLL_RUN);
 
 	for (int i = 0; i < 150; i++) {
 		igt_assert_eq(sync_fence_status(spin[0]->out_fence), 0);
@@ -507,8 +506,8 @@ static void test_off(int i915, int engine)
 
 	igt_spin_free(i915, spin[0]);
 
-	gem_context_destroy(i915, ctx[1]);
-	gem_context_destroy(i915, ctx[0]);
+	intel_ctx_destroy(i915, ctx[1]);
+	intel_ctx_destroy(i915, ctx[0]);
 
 	igt_assert(enable_hangcheck(i915, true));
 	gem_quiescent_gpu(i915);
