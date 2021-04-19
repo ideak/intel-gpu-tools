@@ -82,6 +82,7 @@ static int
 __context_create_cfg(int fd, const intel_ctx_cfg_t *cfg, uint32_t *ctx_id)
 {
 	uint64_t ext_root = 0;
+	I915_DEFINE_CONTEXT_ENGINES_LOAD_BALANCE(balance, GEM_MAX_ENGINES);
 	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines, GEM_MAX_ENGINES);
 	struct drm_i915_gem_context_create_ext_setparam engines_param, vm_param;
 	struct drm_i915_gem_context_create_ext_setparam persist_param;
@@ -113,9 +114,39 @@ __context_create_cfg(int fd, const intel_ctx_cfg_t *cfg, uint32_t *ctx_id)
 	}
 
 	if (cfg->num_engines) {
+		unsigned num_logical_engines;
 		memset(&engines, 0, sizeof(engines));
-		for (i = 0; i < cfg->num_engines; i++)
-			engines.engines[i] = cfg->engines[i];
+
+		if (cfg->load_balance) {
+			memset(&balance, 0, sizeof(balance));
+
+			/* In this case, the first engine is the virtual
+			 * balanced engine and the subsequent engines are
+			 * the actual requested engines.
+			 */
+			igt_assert(cfg->num_engines + 1 <= GEM_MAX_ENGINES);
+			num_logical_engines = cfg->num_engines + 1;
+
+			engines.engines[0].engine_class =
+				I915_ENGINE_CLASS_INVALID;
+			engines.engines[0].engine_instance =
+				I915_ENGINE_CLASS_INVALID_NONE;
+
+			balance.num_siblings = cfg->num_engines;
+			for (i = 0; i < cfg->num_engines; i++) {
+				igt_assert_eq(cfg->engines[0].engine_class,
+					      cfg->engines[i].engine_class);
+				balance.engines[i] = cfg->engines[i];
+				engines.engines[i + 1] = cfg->engines[i];
+			}
+
+			engines.extensions = to_user_pointer(&balance);
+		} else {
+			igt_assert(cfg->num_engines <= GEM_MAX_ENGINES);
+			num_logical_engines = cfg->num_engines;
+			for (i = 0; i < cfg->num_engines; i++)
+				engines.engines[i] = cfg->engines[i];
+		}
 
 		engines_param = (struct drm_i915_gem_context_create_ext_setparam) {
 			.base = {
@@ -123,11 +154,13 @@ __context_create_cfg(int fd, const intel_ctx_cfg_t *cfg, uint32_t *ctx_id)
 			},
 			.param = {
 				.param = I915_CONTEXT_PARAM_ENGINES,
-				.size = sizeof_param_engines(cfg->num_engines),
+				.size = sizeof_param_engines(num_logical_engines),
 				.value = to_user_pointer(&engines),
 			},
 		};
 		add_user_ext(&ext_root, &engines_param.base);
+	} else {
+		igt_assert(!cfg->load_balance);
 	}
 
 	return __gem_context_create_ext(fd, cfg->flags, ext_root, ctx_id);
@@ -259,7 +292,16 @@ void intel_ctx_destroy(int fd, const intel_ctx_t *ctx)
  */
 unsigned int intel_ctx_engine_class(const intel_ctx_t *ctx, unsigned int engine)
 {
-	if (ctx->cfg.num_engines) {
+	if (ctx->cfg.load_balance) {
+		if (engine == 0) {
+			/* This is our virtual engine */
+			return ctx->cfg.engines[0].engine_class;
+		} else {
+			/* This is a physical engine */
+			igt_assert(engine - 1 < ctx->cfg.num_engines);
+			return ctx->cfg.engines[engine - 1].engine_class;
+		}
+	} else if (ctx->cfg.num_engines) {
 		igt_assert(engine < ctx->cfg.num_engines);
 		return ctx->cfg.engines[engine].engine_class;
 	} else {

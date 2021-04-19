@@ -17,6 +17,7 @@
  * @flags: Context create flags
  * @vm: VM to inherit or 0 for using a per-context VM
  * @nopersist: set I915_CONTEXT_PARAM_PERSISTENCE to 0
+ * @load_balance: True if the first engine should be a load balancing engine
  * @num_engines: Number of client-specified engines or 0 for legacy mode
  * @engines: Client-specified engines
  *
@@ -44,6 +45,7 @@ typedef struct intel_ctx_cfg {
 	uint32_t flags;
 	uint32_t vm;
 	bool nopersist;
+	bool load_balance;
 	unsigned int num_engines;
 	struct i915_engine_class_instance engines[GEM_MAX_ENGINES];
 } intel_ctx_cfg_t;

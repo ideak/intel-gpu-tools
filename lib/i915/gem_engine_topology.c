@@ -312,12 +312,27 @@ intel_engine_list_for_ctx_cfg(int fd, const intel_ctx_cfg_t *cfg)
 		struct intel_engine_data engine_data = { };
 		int i;
 
-		engine_data.nengines = cfg->num_engines;
-		for (i = 0; i < cfg->num_engines; i++)
-			init_engine(&engine_data.engines[i],
-				    cfg->engines[i].engine_class,
-				    cfg->engines[i].engine_instance,
-				    i);
+		if (cfg->load_balance) {
+			engine_data.nengines = cfg->num_engines + 1;
+
+			init_engine(&engine_data.engines[0],
+				    I915_ENGINE_CLASS_INVALID,
+				    I915_ENGINE_CLASS_INVALID_NONE,
+				    0);
+
+			for (i = 0; i < cfg->num_engines; i++)
+				init_engine(&engine_data.engines[i + 1],
+					    cfg->engines[i].engine_class,
+					    cfg->engines[i].engine_instance,
+					    i + 1);
+		} else {
+			engine_data.nengines = cfg->num_engines;
+			for (i = 0; i < cfg->num_engines; i++)
+				init_engine(&engine_data.engines[i],
+					    cfg->engines[i].engine_class,
+					    cfg->engines[i].engine_instance,
+					    i);
+		}
 
 		return engine_data;
 	} else {
