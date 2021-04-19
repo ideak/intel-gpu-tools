@@ -737,14 +737,18 @@ static void
 test_hang_busy(int i915)
 {
 	uint32_t *ptr, *tile, *x;
+	const intel_ctx_t *ctx = intel_ctx_create(i915, NULL);
 	igt_spin_t *spin;
 	igt_hang_t hang;
 	uint32_t handle;
 
-	hang = igt_allow_hang(i915, 0, 0);
+	hang = igt_allow_hang(i915, ctx->id, 0);
 	igt_require(igt_params_set(i915, "reset", "1")); /* global */
 
-	spin = igt_spin_new(i915, .flags = IGT_SPIN_POLL_RUN | IGT_SPIN_FENCE_OUT | IGT_SPIN_NO_PREEMPTION);
+	spin = igt_spin_new(i915, .ctx = ctx,
+			    .flags = IGT_SPIN_POLL_RUN |
+				     IGT_SPIN_FENCE_OUT |
+				     IGT_SPIN_NO_PREEMPTION);
 	igt_spin_busywait_until_started(spin);
 	igt_assert(spin->execbuf.buffer_count == 2);
 
@@ -785,20 +789,25 @@ test_hang_busy(int i915)
 
 	igt_spin_free(i915, spin);
 	igt_disallow_hang(i915, hang);
+	intel_ctx_destroy(i915, ctx);
 }
 
 static void
 test_hang_user(int i915)
 {
+	const intel_ctx_t *ctx = intel_ctx_create(i915, NULL);
 	uint32_t *ptr, *mem, *x;
 	igt_spin_t *spin;
 	igt_hang_t hang;
 	uint32_t handle;
 
-	hang = igt_allow_hang(i915, 0, 0);
+	hang = igt_allow_hang(i915, ctx->id, 0);
 	igt_require(igt_params_set(i915, "reset", "1")); /* global */
 
-	spin = igt_spin_new(i915, .flags = IGT_SPIN_POLL_RUN | IGT_SPIN_FENCE_OUT | IGT_SPIN_NO_PREEMPTION);
+	spin = igt_spin_new(i915, .ctx = ctx,
+			    .flags = IGT_SPIN_POLL_RUN |
+				     IGT_SPIN_FENCE_OUT |
+				     IGT_SPIN_NO_PREEMPTION);
 	igt_spin_busywait_until_started(spin);
 	igt_assert(spin->execbuf.buffer_count == 2);
 
@@ -835,6 +844,7 @@ test_hang_user(int i915)
 
 	igt_spin_free(i915, spin);
 	igt_disallow_hang(i915, hang);
+	intel_ctx_destroy(i915, ctx);
 }
 
 static int min_tile_width(uint32_t devid, int tiling)
