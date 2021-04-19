@@ -35,6 +35,7 @@
 #include "i915/gem_engine_topology.h"
 #include "i915/gem_mman.h"
 #include "i915/gem_submission.h"
+#include "igt_aux.h"
 #include "igt_core.h"
 #include "igt_device.h"
 #include "igt_dummyload.h"
@@ -101,7 +102,7 @@ emit_recursive_batch(igt_spin_t *spin,
 	unsigned int flags[GEM_MAX_ENGINES];
 	unsigned int nengine;
 	int fence_fd = -1;
-	uint64_t addr;
+	uint64_t addr, addr_scratch, ahnd = opts->ahnd, objflags = 0;
 	uint32_t *cs;
 	int i;
 
@@ -119,11 +120,17 @@ emit_recursive_batch(igt_spin_t *spin,
 	 * are not allowed in the first 256KiB, for fear of negative relocations
 	 * that wrap.
 	 */
-	addr = gem_aperture_size(fd) / 2;
-	if (addr >> 31)
-		addr = 1u << 31;
-	addr += random() % addr / 2;
-	addr &= -4096;
+
+	if (!ahnd) {
+		addr = gem_aperture_size(fd) / 2;
+		if (addr >> 31)
+			addr = 1u << 31;
+		addr += random() % addr / 2;
+		addr &= -4096;
+	} else {
+		spin->ahnd = ahnd;
+		objflags |= EXEC_OBJECT_PINNED;
+	}
 
 	igt_assert(!(opts->ctx && opts->ctx_id));
 
@@ -164,16 +171,34 @@ emit_recursive_batch(igt_spin_t *spin,
 	execbuf->buffer_count++;
 	cs = spin->batch;
 
-	obj[BATCH].offset = addr;
+	if (ahnd)
+		addr = intel_allocator_alloc_with_strategy(ahnd, obj[BATCH].handle,
+							   BATCH_SIZE, 0,
+							   ALLOC_STRATEGY_LOW_TO_HIGH);
+	obj[BATCH].offset = CANONICAL(addr);
+	obj[BATCH].flags |= objflags;
+	if (obj[BATCH].offset >= (1ull << 32))
+		obj[BATCH].flags |= EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+
 	addr += BATCH_SIZE;
 
 	if (opts->dependency) {
 		igt_assert(!(opts->flags & IGT_SPIN_POLL_RUN));
+		if (ahnd)
+			addr_scratch = intel_allocator_alloc_with_strategy(ahnd, opts->dependency,
+									   BATCH_SIZE, 0,
+									   ALLOC_STRATEGY_LOW_TO_HIGH);
+		else
+			addr_scratch = addr;
 
 		obj[SCRATCH].handle = opts->dependency;
-		obj[SCRATCH].offset = addr;
+		obj[SCRATCH].offset = CANONICAL(addr_scratch);
+		obj[SCRATCH].flags |= objflags;
+		if (obj[SCRATCH].offset >= (1ull << 32))
+			obj[SCRATCH].flags |= EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+
 		if (!(opts->flags & IGT_SPIN_SOFTDEP)) {
-			obj[SCRATCH].flags = EXEC_OBJECT_WRITE;
+			obj[SCRATCH].flags |= EXEC_OBJECT_WRITE;
 
 			/* dummy write to dependency */
 			r = &relocs[obj[BATCH].relocation_count++];
@@ -212,8 +237,14 @@ emit_recursive_batch(igt_spin_t *spin,
 								       0, 4096,
 								       PROT_READ | PROT_WRITE);
 		}
+
+		if (ahnd)
+			addr = intel_allocator_alloc_with_strategy(ahnd,
+								   spin->poll_handle,
+								   BATCH_SIZE * 3, 0,
+								   ALLOC_STRATEGY_LOW_TO_HIGH);
 		addr += 4096; /* guard page */
-		obj[SCRATCH].offset = addr;
+		obj[SCRATCH].offset = CANONICAL(addr);
 		addr += 4096;
 
 		igt_assert_eq(spin->poll[SPIN_POLL_START_IDX], 0);
@@ -223,11 +254,15 @@ emit_recursive_batch(igt_spin_t *spin,
 		r->offset = sizeof(uint32_t) * 1;
 		r->delta = sizeof(uint32_t) * SPIN_POLL_START_IDX;
 
+		obj[SCRATCH].flags |= objflags;
+		if (obj[SCRATCH].offset >= (1ull << 32))
+			obj[SCRATCH].flags |= EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+
 		*cs++ = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
 
 		if (gen >= 8) {
 			*cs++ = r->presumed_offset + r->delta;
-			*cs++ = 0;
+			*cs++ = (r->presumed_offset + r->delta) >> 32;
 		} else if (gen >= 4) {
 			*cs++ = 0;
 			*cs++ = r->presumed_offset + r->delta;
@@ -314,10 +349,11 @@ emit_recursive_batch(igt_spin_t *spin,
 	r->offset = (cs + 1 - spin->batch) * sizeof(*cs);
 	r->read_domains = I915_GEM_DOMAIN_COMMAND;
 	r->delta = LOOP_START_OFFSET;
+
 	if (gen >= 8) {
 		*cs++ = MI_BATCH_BUFFER_START | 1 << 8 | 1;
 		*cs++ = r->presumed_offset + r->delta;
-		*cs++ = 0;
+		*cs++ = (r->presumed_offset + r->delta) >> 32;
 	} else if (gen >= 6) {
 		*cs++ = MI_BATCH_BUFFER_START | 1 << 8;
 		*cs++ = r->presumed_offset + r->delta;
@@ -350,6 +386,10 @@ emit_recursive_batch(igt_spin_t *spin,
 	for (i = 0; i < nengine; i++) {
 		execbuf->flags &= ~ENGINE_MASK;
 		execbuf->flags |= flags[i];
+
+		/* For allocator we have to rid of relocation_count */
+		for (int j = 0; j < ARRAY_SIZE(spin->obj) && ahnd; j++)
+			spin->obj[j].relocation_count = 0;
 
 		gem_execbuf_wr(fd, execbuf);
 
@@ -569,11 +609,17 @@ static void __igt_spin_free(int fd, igt_spin_t *spin)
 	if (spin->batch)
 		gem_munmap(spin->batch, BATCH_SIZE);
 
-	if (spin->poll_handle)
+	if (spin->poll_handle) {
 		gem_close(fd, spin->poll_handle);
+		if (spin->ahnd)
+			intel_allocator_free(spin->ahnd, spin->poll_handle);
+	}
 
-	if (spin->handle)
+	if (spin->handle) {
 		gem_close(fd, spin->handle);
+		if (spin->ahnd)
+			intel_allocator_free(spin->ahnd, spin->handle);
+	}
 
 	if (spin->out_fence >= 0)
 		close(spin->out_fence);
