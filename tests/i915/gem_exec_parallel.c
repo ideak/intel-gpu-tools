@@ -49,6 +49,7 @@ static inline uint32_t hash32(uint32_t val)
 #define USERPTR 0x4
 
 #define NUMOBJ 16
+#define NUMTHREADS 1024
 
 struct thread {
 	pthread_t thread;
@@ -56,11 +57,13 @@ struct thread {
 	pthread_cond_t *cond;
 	unsigned flags;
 	uint32_t *scratch;
+	uint64_t *offsets;
 	unsigned id;
 	const intel_ctx_t *ctx;
 	unsigned engine;
 	uint32_t used;
 	int fd, gen, *go;
+	uint64_t ahnd;
 };
 
 static void *thread(void *data)
@@ -70,6 +73,7 @@ static void *thread(void *data)
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	const intel_ctx_t *tmp_ctx = NULL;
+	uint64_t offset;
 	uint32_t batch[16];
 	uint16_t used;
 	int fd, i;
@@ -112,7 +116,7 @@ static void *thread(void *data)
 	reloc.delta = 4*t->id;
 	obj[1].handle = gem_create(fd, 4096);
 	obj[1].relocs_ptr = to_user_pointer(&reloc);
-	obj[1].relocation_count = 1;
+	obj[1].relocation_count = !t->ahnd ? 1 : 0;
 	gem_write(fd, obj[1].handle, 0, batch, sizeof(batch));
 
 	memset(&execbuf, 0, sizeof(execbuf));
@@ -140,6 +144,18 @@ static void *thread(void *data)
 		if (t->flags & FDS)
 			obj[0].handle = gem_open(fd, obj[0].handle);
 
+		if (t->ahnd) {
+			offset = t->offsets[x];
+			i = 0;
+			batch[++i] = offset + 4*t->id;
+			batch[++i] = offset >> 32;
+			obj[0].offset = offset;
+			obj[0].flags |= EXEC_OBJECT_PINNED | EXEC_OBJECT_WRITE;
+			obj[1].offset = get_offset(t->ahnd, obj[1].handle, 4096, 0);
+			obj[1].flags |= EXEC_OBJECT_PINNED;
+			gem_write(fd, obj[1].handle, 0, batch, sizeof(batch));
+		}
+
 		gem_execbuf(fd, &execbuf);
 
 		if (t->flags & FDS)
@@ -158,7 +174,7 @@ static void *thread(void *data)
 
 static void check_bo(int fd, uint32_t *data, uint32_t handle, int pass, struct thread *threads)
 {
-	uint32_t x = hash32(handle * pass) % 1024;
+	uint32_t x = hash32(handle * pass) % NUMTHREADS;
 	uint32_t result;
 
 	if (!(threads[x].used & (1 << pass)))
@@ -213,6 +229,7 @@ static void all(int fd, const intel_ctx_t *ctx,
 	void *arg[NUMOBJ];
 	int go;
 	int i;
+	uint64_t ahnd = get_reloc_ahnd(fd, 0), offsets[NUMOBJ];
 
 	if (flags & CONTEXTS)
 		gem_require_contexts(fd);
@@ -238,9 +255,11 @@ static void all(int fd, const intel_ctx_t *ctx,
 		scratch[i] = handle[i] = handle_create(fd, flags, &arg[i]);
 		if (flags & FDS)
 			scratch[i] = gem_flink(fd, handle[i]);
+		offsets[i] = get_offset(ahnd, scratch[i], 4096, 0);
+
 	}
 
-	threads = calloc(1024, sizeof(struct thread));
+	threads = calloc(NUMTHREADS, sizeof(struct thread));
 	igt_assert(threads);
 
 	intel_detect_and_clear_missed_interrupts(fd);
@@ -248,7 +267,7 @@ static void all(int fd, const intel_ctx_t *ctx,
 	pthread_cond_init(&cond, 0);
 	go = 0;
 
-	for (i = 0; i < 1024; i++) {
+	for (i = 0; i < NUMTHREADS; i++) {
 		threads[i].id = i;
 		threads[i].fd = fd;
 		threads[i].gen = gen;
@@ -256,19 +275,21 @@ static void all(int fd, const intel_ctx_t *ctx,
 		threads[i].engine = engines[i % nengine];
 		threads[i].flags = flags;
 		threads[i].scratch = scratch;
+		threads[i].offsets = ahnd ? offsets : NULL;
 		threads[i].mutex = &mutex;
 		threads[i].cond = &cond;
 		threads[i].go = &go;
+		threads[i].ahnd = ahnd;
 
 		pthread_create(&threads[i].thread, 0, thread, &threads[i]);
 	}
 
 	pthread_mutex_lock(&mutex);
-	go = 1024;
+	go = NUMTHREADS;
 	pthread_cond_broadcast(&cond);
 	pthread_mutex_unlock(&mutex);
 
-	for (i = 0; i < 1024; i++)
+	for (i = 0; i < NUMTHREADS; i++)
 		pthread_join(threads[i].thread, NULL);
 
 	for (i = 0; i < NUMOBJ; i++) {
