@@ -83,6 +83,7 @@ static void run_test(int fd, const intel_ctx_t *ctx,
 	unsigned engines[I915_EXEC_RING_MASK + 1];
 	unsigned nengine;
 	igt_spin_t *spin = NULL;
+	uint64_t ahnd = get_reloc_ahnd(fd, 0);
 
 	nengine = 0;
 	if (engine == ALL_ENGINES) {
@@ -120,27 +121,39 @@ static void run_test(int fd, const intel_ctx_t *ctx,
 	igt_require(__gem_execbuf(fd, &execbuf) == 0);
 	gem_close(fd, obj[1].handle);
 
-	memset(&reloc, 0, sizeof(reloc));
-	reloc.target_handle = obj[0].handle;
-	reloc.presumed_offset = obj[0].offset;
-	reloc.offset = sizeof(uint32_t);
-	if (gen >= 4 && gen < 8)
-		reloc.offset += sizeof(uint32_t);
-	reloc.read_domains = I915_GEM_DOMAIN_INSTRUCTION;
-	reloc.write_domain = I915_GEM_DOMAIN_INSTRUCTION;
+	if (!ahnd) {
+		memset(&reloc, 0, sizeof(reloc));
+		reloc.target_handle = obj[0].handle;
+		reloc.presumed_offset = obj[0].offset;
+		reloc.offset = sizeof(uint32_t);
+		if (gen >= 4 && gen < 8)
+			reloc.offset += sizeof(uint32_t);
+		reloc.read_domains = I915_GEM_DOMAIN_INSTRUCTION;
+		reloc.write_domain = I915_GEM_DOMAIN_INSTRUCTION;
 
-	obj[1].relocs_ptr = to_user_pointer(&reloc);
-	obj[1].relocation_count = 1;
+		obj[1].relocs_ptr = to_user_pointer(&reloc);
+		obj[1].relocation_count = 1;
+	} else {
+		/* ignore first execbuf offset */
+		obj[0].offset = get_offset(ahnd, obj[0].handle, 4096, 0);
+		obj[0].flags |= EXEC_OBJECT_PINNED;
+	}
 
 	for (int i = 0; i < 1024; i++) {
 		uint64_t offset;
 		uint32_t buf[16];
 		int b;
 
-		obj[1].handle = gem_create(fd, 4096);
-
 		reloc.delta = i * sizeof(uint32_t);
-		offset = reloc.presumed_offset + reloc.delta;
+
+		obj[1].handle = gem_create(fd, 4096);
+		if (ahnd) {
+			obj[1].offset = get_offset(ahnd, obj[1].handle, 4096, 0);
+			obj[1].flags |= EXEC_OBJECT_PINNED;
+			offset = obj[0].offset + reloc.delta;
+		} else {
+			offset = reloc.presumed_offset + reloc.delta;
+		}
 
 		b = 0;
 		buf[b] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
@@ -165,7 +178,7 @@ static void run_test(int fd, const intel_ctx_t *ctx,
 	}
 
 	if (flags & HANG)
-		spin = igt_spin_new(fd, .engine = engine);
+		spin = igt_spin_new(fd, .ahnd = ahnd, .engine = engine);
 
 	switch (mode(flags)) {
 	case NOSLEEP:
@@ -201,6 +214,7 @@ static void run_test(int fd, const intel_ctx_t *ctx,
 
 	check_bo(fd, obj[0].handle);
 	gem_close(fd, obj[0].handle);
+	put_ahnd(ahnd);
 
 	gem_quiescent_gpu(fd);
 
