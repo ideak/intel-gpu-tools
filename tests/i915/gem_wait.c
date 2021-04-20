@@ -78,11 +78,13 @@ static void invalid_buf(int fd)
 static void basic(int fd, const intel_ctx_t *ctx, unsigned engine,
 		  unsigned flags)
 {
+	uint64_t ahnd = get_reloc_ahnd(fd, ctx->id);
 	IGT_CORK_HANDLE(cork);
 	uint32_t plug =
 		flags & (WRITE | AWAIT) ? igt_cork_plug(&cork, fd) : 0;
 	igt_spin_t *spin =
 		igt_spin_new(fd,
+			     .ahnd = ahnd,
 			     .ctx = ctx,
 			     .engine = engine,
 			     .dependency = plug,
@@ -147,6 +149,7 @@ static void basic(int fd, const intel_ctx_t *ctx, unsigned engine,
 	if (plug)
 		gem_close(fd, plug);
 	igt_spin_free(fd, spin);
+	put_ahnd(ahnd);
 }
 
 static void test_all_engines(const char *name, int i915, const intel_ctx_t *ctx,
