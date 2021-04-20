@@ -220,9 +220,8 @@ static void execbuf(int i915)
 		.buffers_ptr = to_user_pointer(&batch),
 		.buffer_count = 1,
 	};
-	struct drm_i915_gem_context_param arg = {
-		.param = I915_CONTEXT_PARAM_VM,
-	};
+	intel_ctx_cfg_t cfg = {};
+	const intel_ctx_t *ctx;
 
 	/* First verify that we try to use "softpinning" by default */
 	batch.offset = 48 << 20;
@@ -230,20 +229,24 @@ static void execbuf(int i915)
 	igt_assert_eq_u64(batch.offset, 48 << 20);
 	gem_sync(i915, batch.handle);
 
-	arg.value = gem_vm_create(i915);
-	gem_context_set_param(i915, &arg);
+	cfg.vm = gem_vm_create(i915);
+	ctx = intel_ctx_create(i915, &cfg);
+	eb.rsvd1 = ctx->id;
 	gem_execbuf(i915, &eb);
 	igt_assert_eq_u64(batch.offset, 48 << 20);
-	gem_vm_destroy(i915, arg.value);
+	gem_vm_destroy(i915, cfg.vm);
+	intel_ctx_destroy(i915, ctx);
 
 	gem_sync(i915, batch.handle); /* be idle! */
 
-	arg.value = gem_vm_create(i915);
-	gem_context_set_param(i915, &arg);
+	cfg.vm = gem_vm_create(i915);
+	ctx = intel_ctx_create(i915, &cfg);
 	batch.offset = 0;
+	eb.rsvd1 = ctx->id;
 	gem_execbuf(i915, &eb);
 	igt_assert_eq_u64(batch.offset, 0);
-	gem_vm_destroy(i915, arg.value);
+	gem_vm_destroy(i915, cfg.vm);
+	intel_ctx_destroy(i915, ctx);
 
 	gem_sync(i915, batch.handle);
 	gem_close(i915, batch.handle);
