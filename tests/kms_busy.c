@@ -78,11 +78,13 @@ static void flip_to_fb(igt_display_t *dpy, int pipe,
 	struct pollfd pfd = { .fd = dpy->drm_fd, .events = POLLIN };
 	struct drm_event_vblank ev;
 	IGT_CORK_FENCE(cork);
+	uint64_t ahnd = get_reloc_ahnd(dpy->drm_fd, 0);
 	igt_spin_t *t;
 	int fence;
 
 	fence = igt_cork_plug(&cork, dpy->drm_fd);
 	t = igt_spin_new(dpy->drm_fd,
+			 .ahnd = ahnd,
 			 .fence = fence,
 			 .dependency = fb->gem_handle,
 			 .flags = IGT_SPIN_FENCE_IN);
@@ -130,6 +132,7 @@ static void flip_to_fb(igt_display_t *dpy, int pipe,
 	}
 
 	igt_spin_free(dpy->drm_fd, t);
+	put_ahnd(ahnd);
 }
 
 static void test_flip(igt_display_t *dpy, int pipe, bool modeset)
@@ -183,7 +186,9 @@ static void test_flip(igt_display_t *dpy, int pipe, bool modeset)
 static void test_atomic_commit_hang(igt_display_t *dpy, igt_plane_t *primary,
 				    struct igt_fb *busy_fb)
 {
+	uint64_t ahnd = get_reloc_ahnd(dpy->drm_fd, 0);
 	igt_spin_t *t = igt_spin_new(dpy->drm_fd,
+				     .ahnd = ahnd,
 				     .dependency = busy_fb->gem_handle,
 				     .flags = IGT_SPIN_NO_PREEMPTION);
 	struct pollfd pfd = { .fd = dpy->drm_fd, .events = POLLIN };
@@ -214,6 +219,7 @@ static void test_atomic_commit_hang(igt_display_t *dpy, igt_plane_t *primary,
 	igt_assert(read(dpy->drm_fd, &ev, sizeof(ev)) == sizeof(ev));
 
 	igt_spin_end(t);
+	put_ahnd(ahnd);
 }
 
 static void test_hang(igt_display_t *dpy,
@@ -265,6 +271,7 @@ static void test_pageflip_modeset_hang(igt_display_t *dpy, enum pipe pipe)
 	igt_output_t *output;
 	igt_plane_t *primary;
 	igt_spin_t *t;
+	uint64_t ahnd = get_reloc_ahnd(dpy->drm_fd, 0);
 
 	output = set_fb_on_crtc(dpy, pipe, &fb);
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
@@ -272,6 +279,7 @@ static void test_pageflip_modeset_hang(igt_display_t *dpy, enum pipe pipe)
 	igt_display_commit2(dpy, dpy->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 
 	t = igt_spin_new(dpy->drm_fd,
+			 .ahnd = ahnd,
 			 .dependency = fb.gem_handle,
 			 .flags = IGT_SPIN_NO_PREEMPTION);
 
@@ -285,6 +293,7 @@ static void test_pageflip_modeset_hang(igt_display_t *dpy, enum pipe pipe)
 	igt_assert(read(dpy->drm_fd, &ev, sizeof(ev)) == sizeof(ev));
 
 	igt_spin_end(t);
+	put_ahnd(ahnd);
 
 	igt_remove_fb(dpy->drm_fd, &fb);
 }
