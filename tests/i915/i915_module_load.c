@@ -42,6 +42,7 @@ static void store_all(int i915)
 	const unsigned int gen = intel_gen(intel_get_drm_devid(i915));
 	uint32_t engines[I915_EXEC_RING_MASK + 1];
 	uint32_t batch[16];
+	uint64_t ahnd, offset, bb_offset;
 	unsigned int sz = ALIGN(sizeof(batch) * ARRAY_SIZE(engines), 4096);
 	struct drm_i915_gem_relocation_entry reloc = {
 		.offset = sizeof(uint32_t),
@@ -91,6 +92,12 @@ static void store_all(int i915)
 	cs = gem_mmap__device_coherent(i915, obj[1].handle, 0, sz, PROT_WRITE);
 
 	ctx = intel_ctx_create_all_physical(i915);
+	ahnd = get_reloc_ahnd(i915, ctx->id);
+	if (ahnd)
+		obj[1].relocation_count = 0;
+	bb_offset = get_offset(ahnd, obj[1].handle, sz, 4096);
+	offset = get_offset(ahnd, obj[0].handle, sizeof(engines), 0);
+
 	for_each_ctx_engine(i915, ctx, e) {
 		uint64_t addr;
 
@@ -99,6 +106,16 @@ static void store_all(int i915)
 
 		if (!gem_class_can_store_dword(i915, e->class))
 			continue;
+
+		if (ahnd) {
+			i = 1;
+			batch[i++] = offset + reloc.delta;
+			batch[i++] = offset >> 32;
+			obj[0].offset = offset;
+			obj[0].flags |= EXEC_OBJECT_PINNED;
+			obj[1].offset = bb_offset;
+			obj[1].flags |= EXEC_OBJECT_PINNED;
+		}
 
 		batch[value] = nengine;
 
@@ -109,7 +126,8 @@ static void store_all(int i915)
 		execbuf.rsvd1 = ctx->id;
 
 		memcpy(cs + execbuf.batch_start_offset, batch, sizeof(batch));
-		memcpy(cs + reloc.offset, &addr, reloc_sz);
+		if (!ahnd)
+			memcpy(cs + reloc.offset, &addr, reloc_sz);
 		gem_execbuf(i915, &execbuf);
 
 		if (++nengine == ARRAY_SIZE(engines))
@@ -126,6 +144,9 @@ static void store_all(int i915)
 	gem_read(i915, obj[0].handle, 0, engines, nengine * sizeof(engines[0]));
 	gem_close(i915, obj[0].handle);
 	intel_ctx_destroy(i915, ctx);
+	put_offset(ahnd, obj[0].handle);
+	put_offset(ahnd, obj[1].handle);
+	put_ahnd(ahnd);
 
 	for (i = 0; i < nengine; i++)
 		igt_assert_eq_u32(engines[i], i);
