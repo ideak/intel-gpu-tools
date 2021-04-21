@@ -269,7 +269,8 @@ static bool has_ctx_exec(int fd, unsigned ring, uint32_t ctx)
  * Returns:
  * Structure with helper internal state for igt_post_hang_ring().
  */
-igt_hang_t igt_hang_ctx(int fd, uint32_t ctx, int ring, unsigned flags)
+static igt_hang_t __igt_hang_ctx(int fd, uint64_t ahnd, uint32_t ctx, int ring,
+				 unsigned flags)
 {
 	struct drm_i915_gem_context_param param;
 	igt_spin_t *spin;
@@ -298,11 +299,23 @@ igt_hang_t igt_hang_ctx(int fd, uint32_t ctx, int ring, unsigned flags)
 		context_set_ban(fd, ctx, 0);
 
 	spin = __igt_spin_new(fd,
+			      .ahnd = ahnd,
 			      .ctx_id = ctx,
 			      .engine = ring,
 			      .flags = IGT_SPIN_NO_PREEMPTION);
 
 	return (igt_hang_t){ spin, ctx, ban, flags };
+}
+
+igt_hang_t igt_hang_ctx(int fd, uint32_t ctx, int ring, unsigned flags)
+{
+	return __igt_hang_ctx(fd, 0, ctx, ring, flags);
+}
+
+igt_hang_t igt_hang_ctx_with_ahnd(int fd, uint64_t ahnd, uint32_t ctx, int ring,
+				  unsigned flags)
+{
+	return __igt_hang_ctx(fd, ahnd, ctx, ring, flags);
 }
 
 /**
@@ -321,6 +334,12 @@ igt_hang_t igt_hang_ring(int fd, int ring)
 {
 	return igt_hang_ctx(fd, 0, ring, 0);
 }
+
+igt_hang_t igt_hang_ring_with_ahnd(int fd, int ring, uint64_t ahnd)
+{
+	return igt_hang_ctx_with_ahnd(fd, ahnd, 0, ring, 0);
+}
+
 
 /**
  * igt_post_hang_ring:

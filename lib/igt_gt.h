@@ -46,10 +46,14 @@ void igt_disallow_hang(int fd, igt_hang_t arg);
 #define HANG_POISON 0xc5c5c5c5
 
 igt_hang_t igt_hang_ctx(int fd, uint32_t ctx, int ring, unsigned flags);
+igt_hang_t igt_hang_ctx_with_ahnd(int fd, uint64_t ahnd, uint32_t ctx, int ring,
+				  unsigned flags);
+
 #define HANG_ALLOW_BAN 1
 #define HANG_ALLOW_CAPTURE 2
 
 igt_hang_t igt_hang_ring(int fd, int ring);
+igt_hang_t igt_hang_ring_with_ahnd(int fd, int ring, uint64_t ahnd);
 void igt_post_hang_ring(int fd, igt_hang_t arg);
 
 void igt_force_gpu_reset(int fd);
