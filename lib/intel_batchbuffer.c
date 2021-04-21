@@ -1513,14 +1513,6 @@ static void __intel_bb_destroy_cache(struct intel_bb *ibb)
 	ibb->root = NULL;
 }
 
-static void __intel_bb_detach_intel_bufs(struct intel_bb *ibb)
-{
-	struct intel_buf *entry, *tmp;
-
-	igt_list_for_each_entry_safe(entry, tmp, &ibb->intel_bufs, link)
-		intel_bb_detach_intel_buf(ibb, entry);
-}
-
 static void __intel_bb_remove_intel_bufs(struct intel_bb *ibb)
 {
 	struct intel_buf *entry, *tmp;
@@ -1647,50 +1639,6 @@ int intel_bb_sync(struct intel_bb *ibb)
 	}
 
 	return ret;
-}
-
-uint64_t intel_bb_assign_vm(struct intel_bb *ibb, uint64_t allocator,
-			    uint32_t vm_id)
-{
-	struct drm_i915_gem_context_param arg = {
-		.param = I915_CONTEXT_PARAM_VM,
-	};
-	uint64_t prev_allocator = ibb->allocator_handle;
-	bool closed = false;
-
-	if (ibb->vm_id == vm_id) {
-		igt_debug("Skipping to assign same vm_id: %u\n", vm_id);
-		return 0;
-	}
-
-	/* Cannot switch if someone keeps bb refcount */
-	igt_assert(ibb->refcount == 1);
-
-	/* Detach intel_bufs and remove bb handle */
-	__intel_bb_detach_intel_bufs(ibb);
-	intel_bb_remove_object(ibb, ibb->handle, ibb->batch_offset, ibb->size);
-
-	/* Cache + objects are not valid after change anymore */
-	__intel_bb_destroy_objects(ibb);
-	__intel_bb_destroy_cache(ibb);
-
-	/* Attach new allocator */
-	ibb->allocator_handle = allocator;
-
-	/* Setparam */
-	ibb->vm_id = vm_id;
-
-	/* Skip set param, we likely return to default vm */
-	if (vm_id) {
-		arg.ctx_id = ibb->ctx;
-		arg.value = vm_id;
-		gem_context_set_param(ibb->i915, &arg);
-	}
-
-	/* Recreate bb */
-	intel_bb_reset(ibb, false);
-
-	return closed ? 0 : prev_allocator;
 }
 
 /*
@@ -2038,19 +1986,6 @@ intel_bb_add_intel_buf_with_alignment(struct intel_bb *ibb, struct intel_buf *bu
 				      uint64_t alignment, bool write)
 {
 	return __intel_bb_add_intel_buf(ibb, buf, alignment, write);
-}
-
-void intel_bb_detach_intel_buf(struct intel_bb *ibb, struct intel_buf *buf)
-{
-	igt_assert(ibb);
-	igt_assert(buf);
-	igt_assert(!buf->ibb || buf->ibb == ibb);
-
-	if (!igt_list_empty(&buf->link)) {
-		buf->addr.offset = INTEL_BUF_INVALID_ADDRESS;
-		buf->ibb = NULL;
-		igt_list_del_init(&buf->link);
-	}
 }
 
 bool intel_bb_remove_intel_buf(struct intel_bb *ibb, struct intel_buf *buf)

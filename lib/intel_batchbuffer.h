@@ -523,9 +523,6 @@ static inline void intel_bb_unref(struct intel_bb *ibb)
 void intel_bb_reset(struct intel_bb *ibb, bool purge_objects_cache);
 int intel_bb_sync(struct intel_bb *ibb);
 
-uint64_t intel_bb_assign_vm(struct intel_bb *ibb, uint64_t allocator,
-			    uint32_t vm_id);
-
 void intel_bb_print(struct intel_bb *ibb);
 void intel_bb_dump(struct intel_bb *ibb, const char *filename);
 void intel_bb_set_debug(struct intel_bb *ibb, bool debug);
@@ -588,7 +585,6 @@ intel_bb_add_intel_buf(struct intel_bb *ibb, struct intel_buf *buf, bool write);
 struct drm_i915_gem_exec_object2 *
 intel_bb_add_intel_buf_with_alignment(struct intel_bb *ibb, struct intel_buf *buf,
 				      uint64_t alignment, bool write);
-void intel_bb_detach_intel_buf(struct intel_bb *ibb, struct intel_buf *buf);
 bool intel_bb_remove_intel_buf(struct intel_bb *ibb, struct intel_buf *buf);
 void intel_bb_print_intel_bufs(struct intel_bb *ibb);
 struct drm_i915_gem_exec_object2 *
