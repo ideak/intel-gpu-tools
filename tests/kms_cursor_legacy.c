@@ -517,6 +517,7 @@ static void basic_flip_cursor(igt_display_t *display,
 	struct igt_fb fb_info, cursor_fb, cursor_fb2, argb_fb;
 	unsigned vblank_start;
 	enum pipe pipe = find_connected_pipe(display, false);
+	uint64_t ahnd = (flags & BASIC_BUSY) ? get_reloc_ahnd(display->drm_fd, 0) : 0;
 	igt_spin_t *spin;
 	int i, miss1 = 0, miss2 = 0, delta;
 
@@ -548,6 +549,7 @@ static void basic_flip_cursor(igt_display_t *display,
 		spin = NULL;
 		if (flags & BASIC_BUSY)
 			spin = igt_spin_new(display->drm_fd,
+					    .ahnd = ahnd,
 					    .dependency = fb_info.gem_handle);
 
 		/* Start with a synchronous query to align with the vblank */
@@ -631,6 +633,7 @@ static void basic_flip_cursor(igt_display_t *display,
 		igt_remove_fb(display->drm_fd, &argb_fb);
 	if (cursor_fb2.gem_handle)
 		igt_remove_fb(display->drm_fd, &cursor_fb2);
+	put_ahnd(ahnd);
 }
 
 static int
@@ -1319,6 +1322,7 @@ static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
 	igt_pipe_t *pipe_connected = &display->pipes[pipe];
 	igt_plane_t *plane_primary = igt_pipe_get_plane_type(pipe_connected, DRM_PLANE_TYPE_PRIMARY);
 	igt_crc_t crcs[2], test_crc;
+	uint64_t ahnd = get_reloc_ahnd(display->drm_fd, 0);
 
 	if (atomic)
 		igt_require(display->is_atomic);
@@ -1366,6 +1370,7 @@ static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
 		igt_spin_t *spin;
 
 		spin = igt_spin_new(display->drm_fd,
+				    .ahnd = ahnd,
 				    .dependency = fb_info[1].gem_handle);
 
 		vblank_start = kmstest_get_vblank(display->drm_fd, pipe, DRM_VBLANK_NEXTONMISS);
@@ -1394,6 +1399,7 @@ static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
 	igt_remove_fb(display->drm_fd, &fb_info[1]);
 	igt_remove_fb(display->drm_fd, &fb_info[0]);
 	igt_remove_fb(display->drm_fd, &cursor_fb);
+	put_ahnd(ahnd);
 }
 
 igt_main
