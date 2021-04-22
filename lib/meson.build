@@ -341,7 +341,7 @@ pkgconf.set('prefix', get_option('prefix'))
 pkgconf.set('exec_prefix', '${prefix}')
 pkgconf.set('libdir', '${prefix}/@0@'.format(get_option('libdir')))
 pkgconf.set('includedir', '${prefix}/@0@'.format(get_option('includedir')))
-pkgconf.set('i915_perf_version', '1.2.0')
+pkgconf.set('i915_perf_version', '1.3.0')
 
 configure_file(
   input : 'i915-perf.pc.in',

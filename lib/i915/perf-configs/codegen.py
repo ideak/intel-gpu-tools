@@ -169,6 +169,7 @@ class Gen:
             "$EuSlicesTotalCount": { 'c': "perf->devinfo.n_eu_slices" },
             "$EuSubslicesTotalCount": { 'c': "perf->devinfo.n_eu_sub_slices" },
             "$EuDualSubslicesTotalCount": { 'c': "perf->devinfo.n_eu_sub_slices" },
+            "$EuDualSubslicesSlice0123Count": { 'c': "perf->devinfo.n_eu_sub_slices_half_slices" },
             "$EuThreadsCount": { 'c': "perf->devinfo.eu_threads_count" },
             "$SliceMask": { 'c': "perf->devinfo.slice_mask" },
             "$DualSubsliceMask": { 'c': "perf->devinfo.subslice_mask" },

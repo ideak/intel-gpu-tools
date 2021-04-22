@@ -155,6 +155,10 @@ intel_perf_for_devinfo(uint32_t device_id,
 {
 	const struct intel_device_info *devinfo = intel_get_device_info(device_id);
 	struct intel_perf *perf;
+	uint32_t subslice_mask_len;
+	uint32_t eu_mask_len;
+	uint32_t half_max_subslices;
+	uint64_t half_subslices_mask;
 	int bits_per_subslice;
 
 	if (!devinfo)
@@ -182,6 +186,25 @@ intel_perf_for_devinfo(uint32_t device_id,
 			 "%s", devinfo->codename);
 	}
 
+	/* Store i915 topology. */
+	perf->devinfo.max_slices = topology->max_slices;
+	perf->devinfo.max_subslices_per_slice = topology->max_subslices;
+	perf->devinfo.max_eu_per_subslice = topology->max_eus_per_subslice;
+
+	subslice_mask_len =
+		topology->max_slices * topology->subslice_stride;
+	assert(sizeof(perf->devinfo.subslice_masks) >= subslice_mask_len);
+	memcpy(perf->devinfo.subslice_masks,
+	       &topology->data[topology->subslice_offset],
+	       subslice_mask_len);
+
+	eu_mask_len = topology->eu_stride *
+		topology->max_subslices * topology->max_slices;
+	assert(sizeof(perf->devinfo.eu_masks) >= eu_mask_len);
+	memcpy(perf->devinfo.eu_masks,
+	       &topology->data[topology->eu_offset],
+	       eu_mask_len);
+
 	/* On Gen11+ the equations from the xml files expect an 8bits
 	 * mask per subslice, versus only 3bits on prior Gens.
 	 */
@@ -206,6 +229,14 @@ intel_perf_for_devinfo(uint32_t device_id,
 
 	perf->devinfo.n_eu_slices = __builtin_popcount(perf->devinfo.slice_mask);
 	perf->devinfo.n_eu_sub_slices = __builtin_popcount(perf->devinfo.subslice_mask);
+
+	/* Compute number of subslices/dualsubslices in first half of
+	 * the GPU.
+	 */
+	half_max_subslices = topology->max_subslices / 2;
+	half_subslices_mask = perf->devinfo.subslice_mask &
+		((1 << half_max_subslices) - 1);
+	perf->devinfo.n_eu_sub_slices_half_slices = __builtin_popcount(half_subslices_mask);
 
 	/* Valid on most generations except Gen9LP. */
 	perf->devinfo.eu_threads_count = 7;

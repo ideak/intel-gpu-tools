@@ -32,7 +32,11 @@ extern "C" {
 
 #include "igt_list.h"
 
-struct intel_device_info;
+#define _DIV_ROUND_UP(a, b)  (((a) + (b) - 1) / (b))
+
+#define INTEL_DEVICE_MAX_SLICES           (6)  /* Maximum on gfx10 */
+#define INTEL_DEVICE_MAX_SUBSLICES        (8)  /* Maximum on gfx11 */
+#define INTEL_DEVICE_MAX_EUS_PER_SUBSLICE (16) /* Maximum on gfx12 */
 
 struct intel_perf_devinfo {
 	char devname[20];
@@ -62,12 +66,66 @@ struct intel_perf_devinfo {
 	uint64_t n_eu_slices;
 	/* Total number of subslices/dualsubslices */
 	uint64_t n_eu_sub_slices;
+	/* Number of subslices/dualsubslices in the first half of the
+	 * slices.
+	 */
+	uint64_t n_eu_sub_slices_half_slices;
 	/* Mask of available subslices/dualsubslices */
 	uint64_t subslice_mask;
 	/* Mask of available slices */
 	uint64_t slice_mask;
 	/* Number of threads in one EU */
 	uint64_t eu_threads_count;
+
+	/**
+	 * Maximu number of slices present on this device (can be more than
+	 * num_slices if some slices are fused).
+	 */
+	uint16_t max_slices;
+
+	/**
+	 * Maximu number of subslices per slice present on this device (can be more
+	 * than the maximum value in the num_subslices[] array if some subslices are
+	 * fused).
+	 */
+	uint16_t max_subslices_per_slice;
+
+	/**
+	 * Stride to access subslice_masks[].
+	 */
+	uint16_t subslice_slice_stride;
+
+	/**
+	 * Maximum number of EUs per subslice (can be more than
+	 * num_eu_per_subslice if some EUs are fused off).
+	 */
+	uint16_t max_eu_per_subslice;
+
+	/**
+	 * Strides to access eu_masks[].
+	 */
+	uint16_t eu_slice_stride;
+	uint16_t eu_subslice_stride;
+
+	/**
+	 * A bit mask of the slices available.
+	 */
+	uint8_t slice_masks[_DIV_ROUND_UP(INTEL_DEVICE_MAX_SLICES, 8)];
+
+	/**
+	 * An array of bit mask of the subslices available, use subslice_slice_stride
+	 * to access this array.
+	 */
+	uint8_t subslice_masks[INTEL_DEVICE_MAX_SLICES *
+			       _DIV_ROUND_UP(INTEL_DEVICE_MAX_SUBSLICES, 8)];
+
+	/**
+	 * An array of bit mask of EUs available, use eu_slice_stride &
+	 * eu_subslice_stride to access this array.
+	 */
+	uint8_t eu_masks[INTEL_DEVICE_MAX_SLICES *
+			 INTEL_DEVICE_MAX_SUBSLICES *
+			 _DIV_ROUND_UP(INTEL_DEVICE_MAX_EUS_PER_SUBSLICE, 8)];
 };
 
 typedef enum {
@@ -216,6 +274,31 @@ struct intel_perf {
 
 struct drm_i915_perf_record_header;
 struct drm_i915_query_topology_info;
+
+static inline bool
+intel_perf_devinfo_slice_available(const struct intel_perf_devinfo *devinfo,
+				   int slice)
+{
+	return (devinfo->slice_masks[slice / 8] & (1U << (slice % 8))) != 0;
+}
+
+static inline bool
+intel_perf_devinfo_subslice_available(const struct intel_perf_devinfo *devinfo,
+				      int slice, int subslice)
+{
+	return (devinfo->subslice_masks[slice * devinfo->subslice_slice_stride +
+					subslice / 8] & (1U << (subslice % 8))) != 0;
+}
+
+static inline bool
+intel_perf_devinfo_eu_available(const struct intel_perf_devinfo *devinfo,
+				int slice, int subslice, int eu)
+{
+	unsigned subslice_offset = slice * devinfo->eu_slice_stride +
+		subslice * devinfo->eu_subslice_stride;
+
+	return (devinfo->eu_masks[subslice_offset + eu / 8] & (1U << eu % 8)) != 0;
+}
 
 struct intel_perf *intel_perf_for_fd(int drm_fd);
 struct intel_perf *intel_perf_for_devinfo(uint32_t device_id,
