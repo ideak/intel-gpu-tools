@@ -94,8 +94,8 @@ class Set:
             counter = Counter(self, xml_counter)
             self.counters.append(counter)
             self.counter_vars["$" + counter.get('symbol_name')] = counter
-            self.max_funcs[counter.get('symbol_name')] = counter.max_sym
-            self.read_funcs[counter.get('symbol_name')] = counter.read_sym
+            self.max_funcs["$" + counter.get('symbol_name')] = counter.max_sym
+            self.read_funcs["$" + counter.get('symbol_name')] = counter.read_sym
 
         for counter in self.counters:
             counter.compute_hashes()
@@ -256,6 +256,13 @@ class Gen:
     def splice_ugte(self, args):
         return self.brkt(args[1]) + " >= " + self.brkt(args[0])
 
+    def resolve_variable(self, name, set):
+        if name in self.hw_vars:
+            return self.hw_vars[name]['c']
+        if name in set.counter_vars:
+            return set.read_funcs[name] + "(perf, metric_set, accumulator)"
+        return None
+
     def output_rpn_equation_code(self, set, counter, equation):
         self.c("/* RPN equation: " + equation + " */")
         tokens = equation.split()
@@ -272,13 +279,10 @@ class Gen:
                 for i in range(0, argc):
                     operand = stack.pop()
                     if operand[0] == "$":
-                        if operand in self.hw_vars:
-                            operand = self.hw_vars[operand]['c']
-                        elif operand in set.counter_vars:
-                            reference = set.counter_vars[operand]
-                            operand = set.read_funcs[operand[1:]] + "(perf, metric_set, accumulator)"
-                        else:
+                        resolved_variable = self.resolve_variable(operand, set)
+                        if resolved_variable == None:
                             raise Exception("Failed to resolve variable " + operand + " in equation " + equation + " for " + set.name + " :: " + counter.get('name'));
+                        operand = resolved_variable
                     args.append(operand)
 
                 tmp_id = callback(tmp_id, args)
@@ -293,10 +297,11 @@ class Gen:
 
         value = stack[-1]
 
-        if value in self.hw_vars:
-            value = self.hw_vars[value]['c']
-        if value in set.counter_vars:
-            value = set.read_funcs[value[1:]] + "(perf, metric_set, accumulator)"
+        if value[0] == "$":
+            resolved_variable = self.resolve_variable(value, set)
+            if resolved_variable == None:
+                raise Exception("Failed to resolve variable " + value + " in expression " + expression + " for " + set.name + " :: " + counter_name)
+            value = resolved_variable
 
         self.c("\nreturn " + value + ";")
 
@@ -313,10 +318,10 @@ class Gen:
                 for i in range(0, argc):
                     operand = stack.pop()
                     if operand[0] == "$":
-                        if operand in self.hw_vars:
-                            operand = self.hw_vars[operand]['c']
-                        else:
+                        resolved_variable = self.resolve_variable(operand, set)
+                        if resolved_variable == None:
                             raise Exception("Failed to resolve variable " + operand + " in expression " + expression + " for " + set.name + " :: " + counter_name)
+                        operand = resolved_variable
                     args.append(operand)
 
                 subexp = callback(args)
@@ -328,7 +333,15 @@ class Gen:
                     counter_name + ".\nThis is probably due to some unhandled RPN operation, in the expression \"" +
                     expression + "\"")
 
-        return stack[-1]
+        value = stack[-1]
+
+        if value[0] == "$":
+            resolved_variable = self.resolve_variable(value, set)
+            if resolved_variable == None:
+                raise Exception("Failed to resolve variable " + value + " in expression " + expression + " for " + set.name + " :: " + counter_name)
+            value = resolved_variable
+
+        return value
 
     def output_availability(self, set, availability, counter_name):
         expression = self.splice_rpn_expression(set, counter_name, availability)

@@ -69,8 +69,8 @@ def output_counter_report(set, counter):
     c("counter->type = INTEL_PERF_LOGICAL_COUNTER_TYPE_{0};\n".format(semantic_type_uc))
     c("counter->storage = INTEL_PERF_LOGICAL_COUNTER_STORAGE_{0};\n".format(data_type_uc))
     c("counter->unit = INTEL_PERF_LOGICAL_COUNTER_UNIT_{0};\n".format(output_units(counter.get('units'))))
-    c("counter->read_{0} = {1};\n".format(data_type, set.read_funcs[counter.get('symbol_name')]))
-    c("counter->max_{0} = {1};\n".format(data_type, set.max_funcs[counter.get('symbol_name')]))
+    c("counter->read_{0} = {1};\n".format(data_type, set.read_funcs["$" + counter.get('symbol_name')]))
+    c("counter->max_{0} = {1};\n".format(data_type, set.max_funcs["$" + counter.get('symbol_name')]))
     c("intel_perf_add_logical_counter(perf, counter, \"{0}\");\n".format(counter.get('mdapi_group')))
 
     if availability:
