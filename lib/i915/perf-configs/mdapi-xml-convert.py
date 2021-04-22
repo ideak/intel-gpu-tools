@@ -544,7 +544,7 @@ for arg in args.xml:
         chipset = oa_registry.Registry.chipset_name(mdapi_set.get('SupportedHW'))
         chipset_fullname = chipset
         if concurrent_group.get('SupportedGT') != None:
-            chipset_fullname = chipset_fullname + concurrent_group.get('SupportedGT')
+            chipset_fullname = chipset_fullname + oa_registry.Registry.gt_name(concurrent_group.get('SupportedGT'))
         if chipset not in chipsets:
             print_err("WARNING: unsupported chipset {0}, consider updating {1}".format(chipset, __file__))
             continue

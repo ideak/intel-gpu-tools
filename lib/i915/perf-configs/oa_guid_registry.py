@@ -1,6 +1,7 @@
 
 import copy
 import hashlib
+import re
 
 import xml.etree.ElementTree as et
 
@@ -104,3 +105,8 @@ class Registry:
 
         # Unknown HW
         assert 0
+
+
+    @staticmethod
+    def gt_name(name):
+        return re.sub(' ', '', name)

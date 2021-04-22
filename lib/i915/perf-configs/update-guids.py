@@ -128,7 +128,7 @@ for arg in args.xml:
 
         chipset = oa_registry.Registry.chipset_name(mdapi_set.get('SupportedHW')).lower()
         if concurrent_group.get('SupportedGT') != None:
-            chipset = chipset + concurrent_group.get('SupportedGT').lower()
+            chipset = chipset + oa_registry.Registry.gt_name(concurrent_group.get('SupportedGT')).lower()
 
         set_name = mdapi_set.get('SymbolName')
 
