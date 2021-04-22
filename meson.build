@@ -262,6 +262,7 @@ libexecdir = join_paths(get_option('libexecdir'), 'igt-gpu-tools')
 amdgpudir = join_paths(libexecdir, 'amdgpu')
 mandir = get_option('mandir')
 pkgconfigdir = join_paths(libdir, 'pkgconfig')
+python3 = find_program('python3', required : true)
 
 if get_option('use_rpath')
 	# Set up runpath for the test executables towards libigt.so.
@@ -316,8 +317,7 @@ subdir('overlay')
 subdir('man')
 
 gtk_doc = dependency('gtk-doc', required : build_docs)
-python3 = find_program('python3', required : build_docs)
-if build_tests and gtk_doc.found() and python3.found()
+if build_tests and gtk_doc.found()
 	subdir('docs')
 elif build_docs.enabled()
 	error('Documentation requires building tests')

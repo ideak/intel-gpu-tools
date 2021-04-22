@@ -231,47 +231,46 @@ i915_perf_hardware = [
 
 i915_xml_files = []
 foreach hw : i915_perf_hardware
-  i915_xml_files += 'i915/perf-configs/oa-@0@.xml'.format(hw)
+  i915_xml_files += files('i915/perf-configs/oa-@0@.xml'.format(hw))
 endforeach
 
 i915_perf_files += custom_target(
   'i915-perf-equations',
-  input : i915_xml_files,
+  input : [ 'i915/perf-configs/perf-equations-codegen.py' ] + i915_xml_files,
   output : [ 'i915_perf_equations.c', 'i915_perf_equations.h' ],
   command : [
-    find_program('i915/perf-configs/perf-equations-codegen.py'),
+    python3, '@INPUT0@',
     '--code', '@OUTPUT0@',
     '--header', '@OUTPUT1@',
-    '@INPUT@',
+    i915_xml_files,
   ])
-
-i915_perf_register_codegen = find_program('i915/perf-configs/perf-registers-codegen.py')
-i915_perf_metrics_codegen = find_program('i915/perf-configs/perf-metricset-codegen.py')
 
 foreach hw : i915_perf_hardware
   i915_perf_files += custom_target(
     'i915-perf-registers-@0@'.format(hw),
-    input : 'i915/perf-configs/oa-@0@.xml'.format(hw),
+    input : [ 'i915/perf-configs/perf-registers-codegen.py',
+              'i915/perf-configs/oa-@0@.xml'.format(hw) ],
     output : [ 'i915_perf_registers_@0@.c'.format(hw),
                'i915_perf_registers_@0@.h'.format(hw), ],
     command : [
-      i915_perf_register_codegen,
+      python3, '@INPUT0@',
       '--code', '@OUTPUT0@',
       '--header', '@OUTPUT1@',
-      '--xml-file', '@INPUT@'
+      '--xml-file', '@INPUT1@'
     ])
   i915_perf_files += custom_target(
     'i915-perf-metrics-@0@'.format(hw),
-    input : 'i915/perf-configs/oa-@0@.xml'.format(hw),
+    input : [ 'i915/perf-configs/perf-metricset-codegen.py',
+              'i915/perf-configs/oa-@0@.xml'.format(hw) ],
     output : [ 'i915_perf_metrics_@0@.c'.format(hw),
                'i915_perf_metrics_@0@.h'.format(hw), ],
     command : [
-      i915_perf_metrics_codegen,
+      python3, '@INPUT0@',
       '--code', '@OUTPUT0@',
       '--header', '@OUTPUT1@',
       '--equations-include', 'i915_perf_equations.h',
       '--registers-include', 'i915_perf_registers_@0@.h'.format(hw),
-      '--xml-file', '@INPUT@',
+      '--xml-file', '@INPUT1@',
     ])
 endforeach
 
