@@ -126,7 +126,7 @@ for arg in args.xml:
 
         mdapi_config_hash = oa_registry.Registry.mdapi_hw_config_hash(mdapi_set)
 
-        chipset = mdapi_set.get('SupportedHW').lower()
+        chipset = oa_registry.Registry.chipset_name(mdapi_set.get('SupportedHW')).lower()
         if concurrent_group.get('SupportedGT') != None:
             chipset = chipset + concurrent_group.get('SupportedGT').lower()
 

@@ -546,7 +546,7 @@ for arg in args.xml:
             print_err("WARNING: duplicate set named \"" + set_symbol_name + "\" (SKIPPING)")
             continue
 
-        chipset = mdapi_set.get('SupportedHW')
+        chipset = oa_registry.Registry.chipset_name(mdapi_set.get('SupportedHW'))
         if concurrent_group.get('SupportedGT') != None:
             chipset = chipset + concurrent_group.get('SupportedGT')
         if chipset not in chipsets:

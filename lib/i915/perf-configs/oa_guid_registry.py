@@ -81,3 +81,26 @@ class Registry:
         """
 
         return "%s-%s" % (chipset, hash)
+
+
+    @staticmethod
+    def chipset_name(name):
+        known_chipsets = ( 'HSW',
+                           'BDW',
+                           'CHV',
+                           'SKL',
+                           'BXT',
+                           'KBL',
+                           'GLK',
+                           'CFL',
+                           'CNL',
+                           'ICL',
+                           'EHL',
+                           'TGL',
+                           'RKL',
+                           'DG1' )
+        if name in known_chipsets:
+            return name
+
+        # Unknown HW
+        assert 0
