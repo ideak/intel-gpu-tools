@@ -56,11 +56,17 @@ struct intel_perf_devinfo {
 	uint64_t gt_min_freq;
 	uint64_t gt_max_freq;
 
+	/* Total number of EUs */
 	uint64_t n_eus;
+	/* Total number of EUs in a slice */
 	uint64_t n_eu_slices;
+	/* Total number of subslices/dualsubslices */
 	uint64_t n_eu_sub_slices;
+	/* Mask of available subslices/dualsubslices */
 	uint64_t subslice_mask;
+	/* Mask of available slices */
 	uint64_t slice_mask;
+	/* Number of threads in one EU */
 	uint64_t eu_threads_count;
 };
 
