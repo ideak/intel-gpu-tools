@@ -1,15 +1,3 @@
-.deps
-Makefile
-Makefile.in
-aclocal.m4
-autom4te.cache
-configure
-configure.lineno
-config.log
-config.status
-depcomp
-install-sh
-missing
 *.o
 
 intel-gen4asm
