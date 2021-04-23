@@ -1,3 +1,34 @@
+Release 1.26 (2021-04-23)
+-------------------------
+
+- Autotools support has been entirely dropped in favor of only meson. (Arkadiusz Hiler)
+
+- Tests can now signal that the whole test round should be aborted. (Arkadiusz Hiler)
+
+- Various robustness improvements for Chamelium use. (Arkadiusz Hiler,
+  Kunal Joshi, Imre Deak, et al)
+
+- Device filtering improvements for multi-device use. (Arkadiusz Hiler)
+
+- Device filtering for various Intel tools like intel_gpu_top. (Ayaz A Siddiqui)
+
+- Overhauled kernel parameter handling. (Jani Nikula)
+
+- Introduced an i915 batchbuffer facility. (Zbigniew Kempczyński)
+
+- Improvements for testing nouveau. (Lyude Paul)
+
+- More readable and useful output for lsgpu and other tools that list
+  devices. (Tvrtko Ursulin)
+
+- intel_gpu_top can now show per-client busyness stats. (Tvrtko Ursulin)
+
+- igt_runner can now limit the disk space used by a single test. (Petri Latvala)
+
+
+And many other bug fixes, improvements, cleanups and new tests.
+
+
 Release 1.25 (2020-03-20)
 -------------------------
 
