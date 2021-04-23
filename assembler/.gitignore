@@ -1,7 +1,0 @@
-*.o
-
-intel-gen4asm
-intel-gen4disasm
-gram.c
-gram.h
-lex.c
