@@ -162,6 +162,7 @@ static void test_vm(int i915)
 	struct drm_i915_gem_context_param arg = {
 		.param = I915_CONTEXT_PARAM_VM,
 	};
+	int err;
 	uint32_t parent, child;
 	igt_spin_t *spin;
 
@@ -174,8 +175,11 @@ static void test_vm(int i915)
 	 * in the next context that shared the VM.
 	 */
 
+	arg.ctx_id = gem_context_create(i915);
 	arg.value = -1ull;
-	igt_require(__gem_context_set_param(i915, &arg) == -ENOENT);
+	err = __gem_context_set_param(i915, &arg);
+	gem_context_destroy(i915, arg.ctx_id);
+	igt_require(err == -ENOENT);
 
 	parent = gem_context_create(i915);
 	child = gem_context_create(i915);
@@ -199,6 +203,7 @@ static void test_vm(int i915)
 	batch.offset = 0;
 	gem_execbuf(i915, &eb);
 	igt_assert_eq_u64(batch.offset, 0);
+	gem_context_destroy(i915, child);
 
 	eb.rsvd1 = parent;
 	gem_execbuf(i915, &eb);
@@ -206,14 +211,9 @@ static void test_vm(int i915)
 
 	arg.ctx_id = parent;
 	gem_context_get_param(i915, &arg);
-	gem_context_set_param(i915, &arg);
-
-	/* Still the same VM, so expect the old VMA again */
-	batch.offset = 0;
-	gem_execbuf(i915, &eb);
-	igt_assert_eq_u64(batch.offset, nonzero_offset);
 
 	/* Note: changing an active ctx->vm may be verboten */
+	child = gem_context_create(i915);
 	arg.ctx_id = child;
 	if (__gem_context_set_param(i915, &arg) != -EBUSY) {
 		eb.rsvd1 = child;
