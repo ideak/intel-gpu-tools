@@ -221,6 +221,137 @@ const char *chamelium_port_get_name(struct chamelium_port *port)
 }
 
 /**
+ * chamelium_require_connector_present
+ * @ports: All connected ports
+ * @type: Required port type
+ * @port_count: Total port count
+ * @count: The required number of port count
+ *
+ * Check there are required ports connected of given type
+ */
+void
+chamelium_require_connector_present(struct chamelium_port **ports,
+				    unsigned int type,
+				    int port_count,
+				    int count)
+{
+	int i;
+	int found = 0;
+
+	for (i = 0; i < port_count; i++) {
+		if (chamelium_port_get_type(ports[i]) == type)
+			found++;
+	}
+
+	igt_require_f(found >= count,
+		      "port of type %s found %d and required %d\n",
+		      kmstest_connector_type_str(type), found, count);
+}
+
+/**
+ * chamelium_reprobe_connector
+ * @display: A pointer to an #igt_display_t structure
+ * @chamelium: The Chamelium instance to use
+ * @port: Chamelium port to reprobe
+ *
+ *  Reprobe the given connector and fetch current status
+ *
+ *  Returns: drmModeConnection
+ */
+drmModeConnection
+chamelium_reprobe_connector(igt_display_t *display,
+			    struct chamelium *chamelium,
+			    struct chamelium_port *port)
+{
+	drmModeConnector *connector;
+	drmModeConnection status;
+	igt_output_t *output;
+
+	igt_debug("Reprobing %s...\n", chamelium_port_get_name(port));
+	connector = chamelium_port_get_connector(chamelium, port, true);
+	igt_assert(connector);
+	status = connector->connection;
+
+	/* let's make sure that igt_display is up to date too */
+	output = igt_output_from_connector(display, connector);
+	output->force_reprobe = true;
+	igt_output_refresh(output);
+
+	drmModeFreeConnector(connector);
+	return status;
+}
+
+/**
+ * chamelium_wait_for_conn_status_change
+ * @display: A pointer to an #igt_display_t structure
+ * @chamelium: The Chamelium instance to use
+ * @port: Chamelium port to check connector status update
+ * @status: Enum which describes connector states
+ *
+ * Wait for the connector to change the status
+ */
+void
+chamelium_wait_for_conn_status_change(igt_display_t *display,
+			     struct chamelium *chamelium,
+			     struct chamelium_port *port,
+			     drmModeConnection status)
+{
+	igt_debug("Waiting for %s to get %s...\n",
+			  chamelium_port_get_name(port),
+			  kmstest_connector_status_str(status));
+
+	/*
+	 * Rely on simple reprobing so we don't fail tests that don't require
+	 * that hpd events work in the event that hpd doesn't work on the system
+	 */
+	igt_until_timeout(CHAMELIUM_HOTPLUG_TIMEOUT) {
+		if (chamelium_reprobe_connector(display,
+						chamelium, port) == status)
+			return;
+
+		usleep(50000);
+	}
+
+	igt_assert_f(false, "Timed out waiting for %s to get %s\n",
+				 chamelium_port_get_name(port),
+				 kmstest_connector_status_str(status));
+}
+
+/**
+ * chamelium_reset_state
+ *
+ * @chamelium: The Chamelium instance to use
+ * @port: Chamelium port to reset
+ * @ports: All connected ports
+ * @port_count: Count of connected ports
+ *
+ * Reset chamelium ports
+ */
+void
+chamelium_reset_state(igt_display_t *display,
+		      struct chamelium *chamelium,
+		      struct chamelium_port *port,
+		      struct chamelium_port **ports,
+		      int port_count)
+{
+	int p;
+
+	chamelium_reset(chamelium);
+
+	if (port) {
+		chamelium_wait_for_conn_status_change(display, chamelium,
+						      port,
+						      DRM_MODE_DISCONNECTED);
+	} else {
+		for (p = 0; p < port_count; p++) {
+			port = ports[p];
+			chamelium_wait_for_conn_status_change(display, chamelium,
+							      port, DRM_MODE_DISCONNECTED);
+		}
+	}
+}
+
+/**
  * chamelium_destroy_frame_dump:
  * @dump: The frame dump to destroy
  *

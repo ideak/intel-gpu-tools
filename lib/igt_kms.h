@@ -78,6 +78,25 @@ enum port {
 };
 
 /**
+ * igt_custom_edid_type:
+ *
+ * Enum used for the helper function igt_custom_edid_type
+ * @IGT_CUSTOM_EDID_BASE: Returns base edid
+ * @IGT_CUSTOM_EDID_ALT: Returns alternate edid
+ * @IGT_CUSTOM_EDID_HDMI_AUDIO: Returns edid with HDMI audio block
+ * @IGT_CUSTOM_EDID_DP_AUDIO: Returns edid with DP audio block
+ * @IGT_CUSTOM_EDID_ASPECT_RATIO: Returns base edid with apect ratio data block
+ */
+enum igt_custom_edid_type {
+	IGT_CUSTOM_EDID_BASE,
+	IGT_CUSTOM_EDID_ALT,
+	IGT_CUSTOM_EDID_HDMI_AUDIO,
+	IGT_CUSTOM_EDID_DP_AUDIO,
+	IGT_CUSTOM_EDID_ASPECT_RATIO,
+};
+#define IGT_CUSTOM_EDID_COUNT 5
+
+/**
  * kmstest_port_name:
  * @port: display plane
  *
@@ -446,6 +465,7 @@ igt_output_t *igt_output_from_connector(igt_display_t *display,
 void igt_output_refresh(igt_output_t *output);
 const drmModeModeInfo *igt_std_1024_mode_get(void);
 void igt_output_set_writeback_fb(igt_output_t *output, struct igt_fb *fb);
+void igt_modeset_disable_all_outputs(igt_display_t *display);
 
 igt_plane_t *igt_pipe_get_plane_type(igt_pipe_t *pipe, int plane_type);
 int igt_pipe_count_plane_type(igt_pipe_t *pipe, int plane_type);
@@ -795,7 +815,8 @@ const struct edid *igt_kms_get_hdmi_audio_edid(void);
 const struct edid *igt_kms_get_dp_audio_edid(void);
 const struct edid *igt_kms_get_4k_edid(void);
 const struct edid *igt_kms_get_3d_edid(void);
-
+const struct edid *igt_kms_get_aspect_ratio_edid(void);
+const struct edid *igt_kms_get_custom_edid(enum igt_custom_edid_type edid);
 struct udev_monitor *igt_watch_uevents(void);
 bool igt_hotplug_detected(struct udev_monitor *mon,
 			  int timeout_secs);

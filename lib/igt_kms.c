@@ -376,6 +376,83 @@ const struct edid *igt_kms_get_3d_edid(void)
 	return edid;
 }
 
+/**
+ * igt_kms_get_aspect_ratio_edid:
+ *
+ * Gets the base edid block, which includes the following modes
+ * and different aspect ratio
+ *
+ *  - 1920x1080 60Hz
+ *  - 1280x720 60Hz
+ *  - 1024x768 60Hz
+ *  - 800x600 60Hz
+ *  - 640x480 60Hz
+ *
+ * Returns: a basic edid block with aspect ratio block
+ */
+const struct edid *igt_kms_get_aspect_ratio_edid(void)
+{
+	static unsigned char raw_edid[2 * EDID_BLOCK_SIZE] = {0};
+	struct edid *edid;
+	struct edid_ext *edid_ext;
+	struct edid_cea *edid_cea;
+	char *cea_data;
+	struct edid_cea_data_block *block;
+	size_t cea_data_size = 0, vsdb_size;
+	const struct cea_vsdb *vsdb;
+
+	edid = (struct edid *) raw_edid;
+	memcpy(edid, igt_kms_get_base_edid(), sizeof(struct edid));
+	edid->extensions_len = 1;
+	edid_ext = &edid->extensions[0];
+	edid_cea = &edid_ext->data.cea;
+	cea_data = edid_cea->data;
+
+	/* The HDMI VSDB advertises support for InfoFrames */
+	block = (struct edid_cea_data_block *) &cea_data[cea_data_size];
+	vsdb = cea_vsdb_get_hdmi_default(&vsdb_size);
+	cea_data_size += edid_cea_data_block_set_vsdb(block, vsdb,
+						      vsdb_size);
+
+	/* Short Video Descriptor */
+	block = (struct edid_cea_data_block *) &cea_data[cea_data_size];
+	cea_data_size += edid_cea_data_block_set_svd(block, edid_ar_svds,
+						     sizeof(edid_ar_svds));
+
+	assert(cea_data_size <= sizeof(edid_cea->data));
+
+	edid_ext_set_cea(edid_ext, cea_data_size, 0, 0);
+
+	edid_update_checksum(edid);
+
+	return edid;
+}
+
+/**
+ * igt_kms_get_custom_edid:
+ *
+ * @edid: enum to specify which edid block is required
+ * returns pointer to requested edid block
+ *
+ * Returns: required edid
+ */
+const struct edid *igt_kms_get_custom_edid(enum igt_custom_edid_type edid)
+{
+	switch (edid) {
+	case IGT_CUSTOM_EDID_BASE:
+		return igt_kms_get_base_edid();
+	case IGT_CUSTOM_EDID_ALT:
+		return igt_kms_get_alt_edid();
+	case IGT_CUSTOM_EDID_HDMI_AUDIO:
+		return igt_kms_get_hdmi_audio_edid();
+	case IGT_CUSTOM_EDID_DP_AUDIO:
+		return igt_kms_get_dp_audio_edid();
+	case IGT_CUSTOM_EDID_ASPECT_RATIO:
+		return igt_kms_get_aspect_ratio_edid();
+	}
+	assert(0); /* unreachable */
+}
+
 const char * const igt_plane_prop_names[IGT_NUM_PLANE_PROPS] = {
 	[IGT_PLANE_SRC_X] = "SRC_X",
 	[IGT_PLANE_SRC_Y] = "SRC_Y",
@@ -2274,6 +2351,29 @@ const drmModeModeInfo *igt_std_1024_mode_get(void)
 	};
 
 	return &std_1024_mode;
+}
+
+/*
+ * igt_modeset_disable_all_outputs
+ * @diplay: igt display structure
+ *
+ * Modeset to disable all output
+ *
+ * We need to do a modeset disabling all output to get the next
+ * HPD event on TypeC port
+ */
+void igt_modeset_disable_all_outputs(igt_display_t *display)
+{
+	int i;
+
+	for (i = 0; i < display->n_outputs; i++) {
+		igt_output_t *output = &display->outputs[i];
+
+		igt_output_set_pipe(output, PIPE_NONE);
+	}
+
+	igt_display_commit2(display, COMMIT_ATOMIC);
+
 }
 
 static void igt_pipe_fini(igt_pipe_t *pipe)
