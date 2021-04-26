@@ -69,6 +69,7 @@ static void invalid_engines(int i915)
 	uint32_t handle;
 	igt_spin_t *spin;
 	void *ptr;
+	uint64_t ahnd;
 
 	param.size = 0;
 	igt_assert_eq(__set_param_fresh_context(i915, param), -EINVAL);
@@ -180,8 +181,10 @@ static void invalid_engines(int i915)
 
 	/* Test that we can't set engines after we've done an execbuf */
 	param.ctx_id = gem_context_create(i915);
-	spin = igt_spin_new(i915, .ctx_id = param.ctx_id);
+	ahnd = get_reloc_ahnd(i915, param.ctx_id);
+	spin = igt_spin_new(i915, .ahnd = ahnd, .ctx_id = param.ctx_id);
 	igt_spin_free(i915, spin);
+	put_ahnd(ahnd);
 	igt_assert_eq(__gem_context_set_param(i915, &param), -EINVAL);
 	gem_context_destroy(i915, param.ctx_id);
 
@@ -283,14 +286,18 @@ static void execute_one(int i915)
 		for (int i = -1; i <= I915_EXEC_RING_MASK; i++) {
 			intel_ctx_cfg_t cfg = {};
 			const intel_ctx_t *ctx;
+			uint64_t ahnd;
 			igt_spin_t *spin;
 
 			cfg.num_engines = 1;
 			cfg.engines[0].engine_class = e->class;
 			cfg.engines[0].engine_instance = e->instance;
 			ctx = intel_ctx_create(i915, &cfg);
+			ahnd = get_reloc_ahnd(i915, ctx->id);
 
-			spin = igt_spin_new(i915, .ctx = ctx,
+			spin = igt_spin_new(i915,
+					    .ahnd = ahnd,
+					    .ctx = ctx,
 					    .flags = (IGT_SPIN_NO_PREEMPTION |
 						      IGT_SPIN_POLL_RUN));
 
@@ -324,6 +331,7 @@ static void execute_one(int i915)
 				      i != -1 ? 1 << e->class : 0);
 
 			igt_spin_free(i915, spin);
+			put_ahnd(ahnd);
 
 			gem_sync(i915, obj.handle);
 			intel_ctx_destroy(i915, ctx);
@@ -344,9 +352,11 @@ static void execute_oneforall(int i915)
 		.size = sizeof(engines),
 	};
 	const struct intel_execution_engine2 *e;
+	uint64_t ahnd;
 
 	for_each_physical_engine(i915, e) {
 		param.ctx_id = gem_context_create(i915);
+		ahnd = get_reloc_ahnd(i915, param.ctx_id);
 
 		memset(&engines, 0, sizeof(engines));
 		for (int i = 0; i <= I915_EXEC_RING_MASK; i++) {
@@ -360,6 +370,7 @@ static void execute_oneforall(int i915)
 			igt_spin_t *spin;
 
 			spin = __igt_spin_new(i915,
+					      .ahnd = ahnd,
 					      .ctx_id = param.ctx_id,
 					      .engine = i);
 
@@ -371,6 +382,7 @@ static void execute_oneforall(int i915)
 		}
 
 		gem_context_destroy(i915, param.ctx_id);
+		put_ahnd(ahnd);
 	}
 }
 
@@ -384,6 +396,7 @@ static void execute_allforone(int i915)
 	};
 	const struct intel_execution_engine2 *e;
 	int i;
+	uint64_t ahnd = get_reloc_ahnd(i915, param.ctx_id);
 
 	i = 0;
 	memset(&engines, 0, sizeof(engines));
@@ -401,6 +414,7 @@ static void execute_allforone(int i915)
 		igt_spin_t *spin;
 
 		spin = __igt_spin_new(i915,
+				      .ahnd = ahnd,
 				      .ctx_id = param.ctx_id,
 				      .engine = i++);
 
@@ -412,6 +426,7 @@ static void execute_allforone(int i915)
 	}
 
 	gem_context_destroy(i915, param.ctx_id);
+	put_ahnd(ahnd);
 }
 
 static uint32_t read_result(int timeline, uint32_t *map, int idx)
@@ -539,6 +554,7 @@ static void independent_all(int i915, const intel_ctx_t *ctx)
 	const unsigned int gen = intel_gen(intel_get_drm_devid(i915));
 	const struct intel_execution_engine2 *e;
 	igt_spin_t *spin = NULL;
+	uint64_t ahnd = get_reloc_ahnd(i915, ctx->id);
 
 	for_each_ctx_engine(i915, ctx, e) {
 		if (spin) {
@@ -546,7 +562,9 @@ static void independent_all(int i915, const intel_ctx_t *ctx)
 			spin->execbuf.flags |= e->flags;
 			gem_execbuf(i915, &spin->execbuf);
 		} else {
-			spin = igt_spin_new(i915, .ctx = ctx,
+			spin = igt_spin_new(i915,
+					    .ahnd = ahnd,
+					    .ctx = ctx,
 					    .engine = e->flags,
 					    .flags = (IGT_SPIN_NO_PREEMPTION |
 						      IGT_SPIN_POLL_RUN));
@@ -567,6 +585,7 @@ static void independent_all(int i915, const intel_ctx_t *ctx)
 	}
 	sched_yield();
 	igt_spin_free(i915, spin);
+	put_ahnd(ahnd);
 	igt_waitchildren();
 }
 
