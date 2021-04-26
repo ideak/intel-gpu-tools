@@ -810,12 +810,14 @@ void igt_reset_connectors(void);
 uint32_t kmstest_get_vbl_flag(int crtc_offset);
 
 const struct edid *igt_kms_get_base_edid(void);
+const struct edid *igt_kms_get_base_tile_edid(void);
 const struct edid *igt_kms_get_alt_edid(void);
 const struct edid *igt_kms_get_hdmi_audio_edid(void);
 const struct edid *igt_kms_get_dp_audio_edid(void);
 const struct edid *igt_kms_get_4k_edid(void);
 const struct edid *igt_kms_get_3d_edid(void);
 const struct edid *igt_kms_get_aspect_ratio_edid(void);
+struct edid **igt_kms_get_tiled_edid(uint8_t htile, uint8_t vtile);
 const struct edid *igt_kms_get_custom_edid(enum igt_custom_edid_type edid);
 struct udev_monitor *igt_watch_uevents(void);
 bool igt_hotplug_detected(struct udev_monitor *mon,

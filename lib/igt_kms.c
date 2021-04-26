@@ -88,6 +88,9 @@
 
 /* list of connectors that need resetting on exit */
 #define MAX_CONNECTORS 32
+#define MAX_EDID 2
+#define DISPLAY_TILE_BLOCK 0x12
+
 static struct {
 	uint32_t connector_type;
 	uint32_t connector_type_id;
@@ -127,6 +130,26 @@ const struct edid *igt_kms_get_base_edid(void)
 	edid_init_with_mode(&edid, &mode);
 	edid_update_checksum(&edid);
 
+	return &edid;
+}
+
+const struct edid *igt_kms_get_base_tile_edid(void)
+{
+	static struct edid edid;
+	drmModeModeInfo mode = {};
+
+	mode.clock = 277250;
+	mode.hdisplay = 1920;
+	mode.hsync_start = 1968;
+	mode.hsync_end = 2000;
+	mode.htotal = 2080;
+	mode.vdisplay = 2160;
+	mode.vsync_start = 2163;
+	mode.vsync_end = 2173;
+	mode.vtotal = 2222;
+	mode.vrefresh = 60;
+	edid_init_with_mode(&edid, &mode);
+	edid_update_checksum(&edid);
 	return &edid;
 }
 
@@ -263,6 +286,85 @@ const struct edid *igt_kms_get_dp_audio_edid(void)
 	speaker_alloc.speakers = CEA_SPEAKER_FRONT_LEFT_RIGHT_CENTER;
 
 	return generate_audio_edid(raw_edid, false, &sad, &speaker_alloc);
+}
+
+struct edid **igt_kms_get_tiled_edid(uint8_t htile, uint8_t vtile)
+{
+	uint8_t top[2];
+	int edids, i;
+	static  char raw_edid[MAX_EDID][256] = {0};
+	static struct edid *edid[MAX_EDID];
+
+	top[0] = 0x00;
+	top[1] = 0x00;
+	top[0] = top[0] | (htile<<4);
+	vtile = vtile & 15;
+	top[0] = top[0] | vtile;
+	top[1] = top[1] | ((htile << 2) & 192);
+	top[1] = top[1] | (vtile & 48);
+
+	edids = (htile+1) * (vtile+1);
+
+	for (i = 0; i < edids; i++)
+		edid[i] = (struct edid *) raw_edid[i];
+
+	for (i = 0; i < edids; i++) {
+
+		struct edid_ext *edid_ext;
+		struct edid_tile *edid_tile;
+
+	/* Create a new EDID from the base IGT EDID, and add an
+	 * extension that advertises tile support.
+	 */
+		memcpy(edid[i],
+		igt_kms_get_base_tile_edid(), sizeof(struct edid));
+		edid[i]->extensions_len = 1;
+		edid_ext = &edid[i]->extensions[0];
+		edid_tile = &edid_ext->data.tile;
+	/* Set 0x70 to 1st byte of extension,
+	 * so it is identified as display block
+	 */
+		edid_ext_set_displayid(edid_ext);
+	/* To identify it as a tiled display block extension */
+		edid_tile->header[0] = DISPLAY_TILE_BLOCK;
+		edid_tile->header[1] = 0x79;
+		edid_tile->header[2] = 0x00;
+		edid_tile->header[3] = 0x00;
+		edid_tile->header[4] = 0x12;
+		edid_tile->header[5] = 0x00;
+		edid_tile->header[6] = 0x16;
+	/* Tile Capabilities */
+		edid_tile->tile_cap = SCALE_TO_FIT;
+	/* Set number of htile and vtile */
+		edid_tile->topo[0] = top[0];
+		if (i == 0)
+			edid_tile->topo[1] = 0x10;
+		else if (i == 1)
+			edid_tile->topo[1] = 0x00;
+		edid_tile->topo[2] = top[1];
+	/* Set tile resolution */
+		edid_tile->tile_size[0] = 0x7f;
+		edid_tile->tile_size[1] = 0x07;
+		edid_tile->tile_size[2] = 0x6f;
+		edid_tile->tile_size[3] = 0x08;
+	/* Dimension of Bezels */
+		edid_tile->tile_pixel_bezel[0] = 0;
+		edid_tile->tile_pixel_bezel[1] = 0;
+		edid_tile->tile_pixel_bezel[2] = 0;
+		edid_tile->tile_pixel_bezel[3] = 0;
+		edid_tile->tile_pixel_bezel[4] = 0;
+	/* Manufacturer Information */
+		edid_tile->topology_id[0] = 0x44;
+		edid_tile->topology_id[1] = 0x45;
+		edid_tile->topology_id[2] = 0x4c;
+		edid_tile->topology_id[3] = 0x43;
+		edid_tile->topology_id[4] = 0x48;
+		edid_tile->topology_id[5] = 0x02;
+		edid_tile->topology_id[6] = 0x00;
+		edid_tile->topology_id[7] = 0x00;
+		edid_tile->topology_id[8] = 0x00;
+	}
+	return edid;
 }
 
 static const uint8_t edid_4k_svds[] = {

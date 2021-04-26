@@ -165,9 +165,14 @@ struct chamelium_edid *chamelium_new_edid(struct chamelium *chamelium,
 					  const struct edid *edid);
 const struct edid *chamelium_edid_get_raw(struct chamelium_edid *edid,
 					  struct chamelium_port *port);
+struct edid *chamelium_edid_get_editable_raw(struct chamelium_edid *edid,
+					     struct chamelium_port *port);
 void chamelium_port_set_edid(struct chamelium *chamelium,
 			     struct chamelium_port *port,
 			     struct chamelium_edid *edid);
+void chamelium_port_set_tiled_edid(struct chamelium *chamelium,
+				   struct chamelium_port *port,
+				   struct chamelium_edid *edid);
 bool chamelium_port_get_ddc_state(struct chamelium *chamelium,
 				  struct chamelium_port *port);
 void chamelium_port_set_ddc_state(struct chamelium *chamelium,

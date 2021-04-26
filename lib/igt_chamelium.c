@@ -857,6 +857,33 @@ const struct edid *chamelium_edid_get_raw(struct chamelium_edid *edid,
 }
 
 /**
+ * chamelium_edid_get_editable_raw: get the raw EDID which can be edited later.
+ * @edid: the Chamelium EDID
+ * @port: the Chamelium port
+ *
+ * The EDID provided to #chamelium_new_edid may be mutated for identification
+ * purposes. This function allows to retrieve the exact EDID that will be set
+ * for a given port.
+ *
+ * The returned raw EDID is only valid until the next call to this function.
+ */
+struct edid *chamelium_edid_get_editable_raw(struct chamelium_edid *edid,
+					  struct chamelium_port *port)
+{
+	size_t port_index = port - edid->chamelium->ports;
+	size_t edid_size;
+
+	if (!edid->raw[port_index]) {
+		edid_size = edid_get_size(edid->base);
+		edid->raw[port_index] = malloc(edid_size);
+		memcpy(edid->raw[port_index], edid->base, edid_size);
+		chamelium_port_tag_edid(port, edid->raw[port_index]);
+	}
+
+	return edid->raw[port_index];
+}
+
+/**
  * chamelium_port_set_edid:
  * @chamelium: The Chamelium instance to use
  * @port: The port on the Chamelium to set the EDID on
@@ -890,6 +917,46 @@ void chamelium_port_set_edid(struct chamelium *chamelium,
 		edid_id = 0;
 	}
 
+	xmlrpc_DECREF(chamelium_rpc(chamelium, NULL, "ApplyEdid", "(ii)",
+				    port->id, edid_id));
+}
+
+/**
+ * chamelium_port_set_tiled_edid:
+ * @chamelium: The Chamelium instance to use
+ * @port: The port on the Chamelium to set the EDID on
+ * @edid: The Chamelium EDID to set or NULL to use the default Chamelium EDID
+ *
+ * Sets unique serial for tiled edid.
+ * Sets a port on the chamelium to use the specified EDID. This does not fire a
+ * hotplug pulse on it's own, and merely changes what EDID the chamelium port
+ * will report to us the next time we probe it. Users will need to reprobe the
+ * connectors themselves if they want to see the EDID reported by the port
+ * change.
+ *
+ * To create an EDID, see #chamelium_new_edid.
+ */
+void chamelium_port_set_tiled_edid(struct chamelium *chamelium,
+			     struct chamelium_port *port,
+			     struct chamelium_edid *edid)
+{
+	int edid_id;
+	size_t port_index;
+	struct edid *raw_edid;
+
+	if (edid) {
+		port_index = port - chamelium->ports;
+		edid_id = edid->ids[port_index];
+		if (edid_id == 0) {
+			raw_edid = chamelium_edid_get_editable_raw(edid, port);
+			raw_edid->serial[0] = 0x02;
+			base_edid_update_checksum(raw_edid);
+			edid_id = chamelium_upload_edid(chamelium, raw_edid);
+			edid->ids[port_index] = edid_id;
+		}
+	} else {
+		edid_id = 0;
+	}
 	xmlrpc_DECREF(chamelium_rpc(chamelium, NULL, "ApplyEdid", "(ii)",
 				    port->id, edid_id));
 }

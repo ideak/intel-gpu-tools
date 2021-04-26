@@ -313,7 +313,25 @@ void edid_update_checksum(struct edid *edid)
 			ext->data.cea.checksum =
 				compute_checksum((uint8_t *) ext,
 						 sizeof(struct edid_ext));
+		else if (ext->tag == EDID_EXT_DISPLAYID) {
+			ext->data.tile.extension_checksum =
+				compute_checksum((uint8_t *) &ext->data.tile,
+						 sizeof(struct edid_ext));
+			ext->data.tile.checksum =
+				compute_checksum((uint8_t *) ext,
+						 sizeof(struct edid_ext));
+		}
 	}
+}
+
+/**
+ * base_edid_update_checksum: compute and update the checksum of the main EDID
+ * block
+ */
+void base_edid_update_checksum(struct edid *edid)
+{
+	edid->checksum = compute_checksum((uint8_t *) edid,
+					  sizeof(struct edid));
 }
 
 /**
@@ -456,6 +474,15 @@ size_t edid_cea_data_block_set_speaker_alloc(struct edid_cea_data_block *block,
 	memcpy(block->data.speakers, speakers, size);
 
 	return sizeof(struct edid_cea_data_block) + size;
+}
+
+/**
+ * edid_ext_set_tile initialize an EDID extension block to be identified
+ * as a tiled display topology block
+ */
+void edid_ext_set_displayid(struct edid_ext *ext)
+{
+	ext->tag = EDID_EXT_DISPLAYID;
 }
 
 /**
