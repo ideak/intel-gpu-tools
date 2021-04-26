@@ -124,6 +124,7 @@ static void sysfs_range(int i915)
 	igt_spin_t *spin;
 	double measured;
 	int pmu;
+	uint64_t ahnd = get_reloc_ahnd(i915, 0);
 
 	/*
 	 * The sysfs interface sets the global limits and overrides the
@@ -145,7 +146,7 @@ static void sysfs_range(int i915)
 		uint32_t cur, discard;
 
 		gem_quiescent_gpu(i915);
-		spin = igt_spin_new(i915);
+		spin = igt_spin_new(i915, .ahnd = ahnd);
 		usleep(10000);
 
 		set_sysfs_freq(sys_freq, sys_freq);
@@ -164,6 +165,7 @@ static void sysfs_range(int i915)
 	gem_quiescent_gpu(i915);
 
 	close(pmu);
+	put_ahnd(ahnd);
 
 #undef N_STEPS
 }
