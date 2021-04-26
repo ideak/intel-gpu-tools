@@ -165,6 +165,7 @@ static void test_vm(int i915)
 	int err;
 	uint32_t parent, child;
 	igt_spin_t *spin;
+	uint64_t ahnd;
 
 	/*
 	 * Proving 2 contexts share the same GTT is quite tricky as we have no
@@ -190,8 +191,10 @@ static void test_vm(int i915)
 
 	/* Test that we can't set the VM after we've done an execbuf */
 	arg.ctx_id = gem_context_create(i915);
-	spin = igt_spin_new(i915, .ctx_id = arg.ctx_id);
+	ahnd = get_reloc_ahnd(i915, arg.ctx_id);
+	spin = igt_spin_new(i915, .ahnd = ahnd, .ctx_id = arg.ctx_id);
 	igt_spin_free(i915, spin);
+	put_ahnd(ahnd);
 	arg.value = gem_vm_create(i915);
 	err = __gem_context_set_param(i915, &arg);
 	gem_context_destroy(i915, arg.ctx_id);
@@ -201,8 +204,9 @@ static void test_vm(int i915)
 	parent = gem_context_create(i915);
 	child = gem_context_create(i915);
 
+	ahnd = get_reloc_ahnd(i915, 0);
 	/* Create a background spinner to keep the engines busy */
-	spin = igt_spin_new(i915);
+	spin = igt_spin_new(i915, .ahnd = ahnd);
 	for (int i = 0; i < 16; i++) {
 		spin->execbuf.rsvd1 = gem_context_create(i915);
 		__gem_context_set_priority(i915, spin->execbuf.rsvd1, 1023);
@@ -259,6 +263,7 @@ static void test_vm(int i915)
 	igt_spin_free(i915, spin);
 	gem_sync(i915, batch.handle);
 	gem_close(i915, batch.handle);
+	put_ahnd(ahnd);
 }
 
 static void test_set_invalid_param(int fd, uint64_t param, uint64_t value)
