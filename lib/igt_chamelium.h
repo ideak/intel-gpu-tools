@@ -82,11 +82,6 @@ struct chamelium_infoframe {
 
 struct chamelium_edid;
 
-/* Set of Video Identification Codes advertised in the EDID */
-static const uint8_t edid_ar_svds[] = {
-	16, /* 1080p @ 60Hz, 16:9 */
-};
-
 /**
  * CHAMELIUM_MAX_PORTS: the maximum number of ports supported by igt_chamelium.
  *

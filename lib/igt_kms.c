@@ -478,6 +478,11 @@ const struct edid *igt_kms_get_3d_edid(void)
 	return edid;
 }
 
+/* Set of Video Identification Codes advertised in the EDID */
+static const uint8_t edid_ar_svds[] = {
+	16, /* 1080p @ 60Hz, 16:9 */
+};
+
 /**
  * igt_kms_get_aspect_ratio_edid:
  *
