@@ -89,7 +89,7 @@ static void flip_handler(int fd_, unsigned int sequence, unsigned int tv_sec,
 
 	last_ms = cur_ms;
 
-	data->flip_timestamp_us = ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+	data->flip_timestamp_us = tv_sec * 1000000l + tv_usec;
 }
 
 static void wait_flip_event(data_t *data)
@@ -282,7 +282,7 @@ static void test_timestamp(data_t *data)
 	igt_info("vbl1_timestamp = %ldus\nflip_timestamp = %ldus\nvbl2_timestamp = %ldus\n",
 		 vbl_time, data->flip_timestamp_us, vbl_time1);
 
-	igt_assert_f(vbl_time < data->flip_timestamp_us && vbl_time1 > data->flip_timestamp_us,
+	igt_assert_f(vbl_time <= data->flip_timestamp_us && vbl_time1 > data->flip_timestamp_us,
 		     "Async flip time stamp is expected to be in between 2 vblank time stamps\n");
 }
 
