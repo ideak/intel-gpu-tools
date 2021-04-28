@@ -244,6 +244,35 @@ static void test_vm(int i915)
 	gem_close(i915, batch.handle);
 }
 
+static void test_set_invalid_param(int fd, uint64_t param, uint64_t value)
+{
+	/* Create a fresh context */
+	struct drm_i915_gem_context_param arg = {
+		.ctx_id = gem_context_create(fd),
+		.param = param,
+		.value = value,
+	};
+	int err;
+
+	err = __gem_context_set_param(fd, &arg);
+	gem_context_destroy(fd, arg.ctx_id);
+	igt_assert_eq(err, -EINVAL);
+}
+
+static void test_get_invalid_param(int fd, uint64_t param)
+{
+	/* Create a fresh context */
+	struct drm_i915_gem_context_param arg = {
+		.ctx_id = gem_context_create(fd),
+		.param = param,
+	};
+	int err;
+
+	err = __gem_context_get_param(fd, &arg);
+	gem_context_destroy(fd, arg.ctx_id);
+	igt_assert_eq(err, -EINVAL);
+}
+
 igt_main
 {
 	struct drm_i915_gem_context_param arg;
@@ -405,6 +434,21 @@ igt_main
 		arg.ctx_id = ctx;
 		igt_assert_eq(__gem_context_set_param(fd, &arg), -EINVAL);
 	}
+
+	igt_subtest("invalid-set-ringsize")
+		test_set_invalid_param(fd, I915_CONTEXT_PARAM_RINGSIZE, 8192);
+
+	igt_subtest("invalid-get-ringsize")
+		test_get_invalid_param(fd, I915_CONTEXT_PARAM_RINGSIZE);
+
+	igt_subtest("invalid-set-no-zeromap")
+		test_set_invalid_param(fd, I915_CONTEXT_PARAM_NO_ZEROMAP, 1);
+
+	igt_subtest("invalid-get-no-zeromap")
+		test_get_invalid_param(fd, I915_CONTEXT_PARAM_NO_ZEROMAP);
+
+	igt_subtest("invalid-get-engines")
+		test_get_invalid_param(fd, I915_CONTEXT_PARAM_ENGINES);
 
 	igt_fixture
 		close(fd);
