@@ -181,6 +181,23 @@ static void test_vm(int i915)
 	gem_context_destroy(i915, arg.ctx_id);
 	igt_require(err == -ENOENT);
 
+	/* Test that we can't set the VM on ctx0 */
+	arg.ctx_id = 0;
+	arg.value = gem_vm_create(i915);
+	err = __gem_context_set_param(i915, &arg);
+	gem_vm_destroy(i915, arg.value);
+	igt_assert_eq(err, -EINVAL);
+
+	/* Test that we can't set the VM after we've done an execbuf */
+	arg.ctx_id = gem_context_create(i915);
+	spin = igt_spin_new(i915, .ctx_id = arg.ctx_id);
+	igt_spin_free(i915, spin);
+	arg.value = gem_vm_create(i915);
+	err = __gem_context_set_param(i915, &arg);
+	gem_context_destroy(i915, arg.ctx_id);
+	gem_vm_destroy(i915, arg.value);
+	igt_assert_eq(err, -EINVAL);
+
 	parent = gem_context_create(i915);
 	child = gem_context_create(i915);
 
