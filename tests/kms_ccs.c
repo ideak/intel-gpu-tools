@@ -195,7 +195,7 @@ static void check_ccs_cc_plane(int drm_fd, igt_fb_t *fb, int plane, const float 
 	munmap(map, fb->size);
 };
 
-static void check_all_ccs_planes(int drm_fd, igt_fb_t *fb, const float *cc_color)
+static void check_all_ccs_planes(int drm_fd, igt_fb_t *fb, const float *cc_color, bool check_cc_plane)
 {
 	int i;
 
@@ -203,7 +203,7 @@ static void check_all_ccs_planes(int drm_fd, igt_fb_t *fb, const float *cc_color
 		if (igt_fb_is_ccs_plane(fb, i) &&
 		    !igt_fb_is_gen12_ccs_cc_plane(fb, i))
 			check_ccs_plane(drm_fd, fb, i);
-		else if (igt_fb_is_gen12_ccs_cc_plane(fb, i))
+		else if (igt_fb_is_gen12_ccs_cc_plane(fb, i) && check_cc_plane)
 			check_ccs_cc_plane(drm_fd, fb, i, cc_color);
 	}
 }
@@ -348,7 +348,7 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 		igt_assert_eq(ret, 0);
 
 	if (check_ccs_planes)
-		check_all_ccs_planes(data->drm_fd, fb, cc_color);
+		check_all_ccs_planes(data->drm_fd, fb, cc_color, !(data->flags & TEST_RANDOM));
 
 	fb->fb_id = f.fb_id;
 }
