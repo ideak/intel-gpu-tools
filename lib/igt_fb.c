@@ -801,13 +801,6 @@ static uint64_t calc_plane_size(struct igt_fb *fb, int plane)
 		if (is_gen12_ccs_modifier(fb->modifier))
 			tile_height *= 4;
 
-		/* Special case where the "tile height" represents a
-		 * height-based stride, such as with VC4 SAND tiling modes.
-		 */
-
-		if (tile_height > fb->plane_height[plane])
-			return fb->strides[plane] * tile_height;
-
 		return (uint64_t) fb->strides[plane] *
 			ALIGN(fb->plane_height[plane], tile_height);
 	}
