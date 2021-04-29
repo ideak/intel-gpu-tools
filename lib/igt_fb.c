@@ -2257,7 +2257,8 @@ igt_fb_create_intel_buf(int fd, struct buf_ops *bops,
 						     fb->width, fb->height,
 						     fb->plane_bpp[0], 0,
 						     igt_fb_mod_to_tiling(fb->modifier),
-						     compression, fb->size);
+						     compression, fb->size,
+						     fb->strides[0]);
 	intel_buf_set_name(buf, name);
 
 	/* Make sure we close handle on destroy path */

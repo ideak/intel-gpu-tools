@@ -709,7 +709,7 @@ static void __intel_buf_init(struct buf_ops *bops,
 			     struct intel_buf *buf,
 			     int width, int height, int bpp, int alignment,
 			     uint32_t req_tiling, uint32_t compression,
-			     uint64_t bo_size)
+			     uint64_t bo_size, int bo_stride)
 {
 	uint32_t tiling = req_tiling;
 	uint64_t size;
@@ -741,7 +741,9 @@ static void __intel_buf_init(struct buf_ops *bops,
 		 * CCS units, that is 4 * 64 bytes. These 4 CCS units are in
 		 * turn mapped by one L1 AUX page table entry.
 		 */
-		if (bops->intel_gen >= 12)
+		if (bo_stride)
+			buf->surface[0].stride = bo_stride;
+		else if (bops->intel_gen >= 12)
 			buf->surface[0].stride = ALIGN(width * (bpp / 8), 128 * 4);
 		else
 			buf->surface[0].stride = ALIGN(width * (bpp / 8), 128);
@@ -765,10 +767,16 @@ static void __intel_buf_init(struct buf_ops *bops,
 		if (tiling) {
 			devid =  intel_get_drm_devid(bops->fd);
 			tile_width = get_stride(devid, tiling);
-			buf->surface[0].stride = ALIGN(width * (bpp / 8), tile_width);
+			if (bo_stride)
+				buf->surface[0].stride = bo_stride;
+			else
+				buf->surface[0].stride = ALIGN(width * (bpp / 8), tile_width);
 			align_h = tiling == I915_TILING_X ? 8 : 32;
 		} else {
-			buf->surface[0].stride = ALIGN(width * (bpp / 8), alignment ?: 1);
+			if (bo_stride)
+				buf->surface[0].stride = bo_stride;
+			else
+				buf->surface[0].stride = ALIGN(width * (bpp / 8), alignment ?: 1);
 		}
 
 		buf->surface[0].size = buf->surface[0].stride * height;
@@ -816,7 +824,7 @@ void intel_buf_init(struct buf_ops *bops,
 		    uint32_t tiling, uint32_t compression)
 {
 	__intel_buf_init(bops, 0, buf, width, height, bpp, alignment,
-			 tiling, compression, 0);
+			 tiling, compression, 0, 0);
 
 	intel_buf_set_ownership(buf, true);
 }
@@ -875,7 +883,7 @@ void intel_buf_init_using_handle(struct buf_ops *bops,
 				 uint32_t req_tiling, uint32_t compression)
 {
 	__intel_buf_init(bops, handle, buf, width, height, bpp, alignment,
-			 req_tiling, compression, 0);
+			 req_tiling, compression, 0, 0);
 }
 
 /**
@@ -950,7 +958,8 @@ struct intel_buf *intel_buf_create_using_handle_and_size(struct buf_ops *bops,
 							 int bpp, int alignment,
 							 uint32_t req_tiling,
 							 uint32_t compression,
-							 uint64_t size)
+							 uint64_t size,
+							 int stride)
 {
 	struct intel_buf *buf;
 
@@ -960,7 +969,7 @@ struct intel_buf *intel_buf_create_using_handle_and_size(struct buf_ops *bops,
 	igt_assert(buf);
 
 	__intel_buf_init(bops, handle, buf, width, height, bpp, alignment,
-			 req_tiling, compression, size);
+			 req_tiling, compression, size, stride);
 
 	return buf;
 }

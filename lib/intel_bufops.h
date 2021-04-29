@@ -151,7 +151,8 @@ struct intel_buf *intel_buf_create_using_handle_and_size(struct buf_ops *bops,
 							 int bpp, int alignment,
 							 uint32_t req_tiling,
 							 uint32_t compression,
-							 uint64_t size);
+							 uint64_t size,
+							 int stride);
 void intel_buf_destroy(struct intel_buf *buf);
 
 void *intel_buf_cpu_map(struct intel_buf *buf, bool write);
