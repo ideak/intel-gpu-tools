@@ -78,7 +78,7 @@ intel_buf_ccs_width(int gen, const struct intel_buf *buf)
 	 * main surface.
 	 */
 	if (gen >= 12)
-		return DIV_ROUND_UP(intel_buf_width(buf), 128) * 64;
+		return DIV_ROUND_UP(intel_buf_width(buf), 512 / (buf->bpp / 8)) * 64;
 
 	return DIV_ROUND_UP(intel_buf_width(buf), 1024) * 128;
 }
