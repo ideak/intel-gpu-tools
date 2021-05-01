@@ -28,6 +28,7 @@
 
 #define YCRCB_NORMAL	0
 #define PLANAR_420_8	4
+#define PACKED_444A_8	5
 #define R8G8B8A8_UNORM	8
 #define PLANAR_420_16	12
 
@@ -136,6 +137,7 @@ static bool format_is_interleaved_yuv(int format)
 {
 	switch (format) {
 	case YCRCB_NORMAL:
+	case PACKED_444A_8:
 	case PLANAR_420_8:
 	case PLANAR_420_16:
 		return true;
@@ -279,9 +281,9 @@ void gen12_vebox_copyfunc(struct intel_bb *ibb,
 							 YCRCB_NORMAL;
 		break;
 	case 32:
-		igt_assert(!src->format_is_yuv &&
-			   !src->format_is_yuv_semiplanar);
-		format = R8G8B8A8_UNORM;
+		igt_assert(!src->format_is_yuv_semiplanar);
+		format = src->format_is_yuv ? PACKED_444A_8 :
+					      R8G8B8A8_UNORM;
 		break;
 	default:
 		igt_assert_f(0, "Unsupported bpp: %u\n", src->bpp);

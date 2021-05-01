@@ -34,6 +34,7 @@
 #define AUX_FORMAT_YCRCB	0x03
 #define AUX_FORMAT_P010		0x07
 #define AUX_FORMAT_P016		0x08
+#define AUX_FORMAT_AYUV		0x09
 #define AUX_FORMAT_ARGB_8B	0x0A
 #define AUX_FORMAT_NV12_21	0x0F
 
@@ -303,6 +304,10 @@ static uint64_t pgt_get_l1_flags(const struct intel_buf *buf, int surface_idx)
 		switch (buf->bpp) {
 		case 16:
 			entry.e.format = AUX_FORMAT_YCRCB;
+			entry.e.depth = DEPTH_VAL_RESERVED;
+			break;
+		case 32:
+			entry.e.format = AUX_FORMAT_AYUV;
 			entry.e.depth = DEPTH_VAL_RESERVED;
 			break;
 		default:
