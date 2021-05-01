@@ -80,6 +80,7 @@ static const struct {
 };
 
 static const uint32_t formats[] = {
+	DRM_FORMAT_XYUV8888,
 	DRM_FORMAT_XRGB8888,
 	DRM_FORMAT_YUYV,
 	DRM_FORMAT_NV12,
@@ -90,7 +91,7 @@ static const uint32_t formats[] = {
 static const struct {
 	uint64_t modifier;
 	const char *str;
-} ccs_modifiers[5] = {
+} ccs_modifiers[] = {
 	{LOCAL_I915_FORMAT_MOD_Y_TILED_CCS, "LOCAL_I915_FORMAT_MOD_Y_TILED_CCS"},
 	{LOCAL_I915_FORMAT_MOD_Yf_TILED_CCS, "LOCAL_I915_FORMAT_MOD_Yf_TILED_CCS"},
 	{LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS, "LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS"},
