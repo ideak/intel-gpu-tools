@@ -583,6 +583,7 @@ igt_main
 
 	/* Verify primary plane selective fetch */
 	for (i = 1; i <= MAX_DAMAGE_AREAS; i++) {
+		igt_describe("Test that selective fetch works on primary plane");
 		igt_subtest_f("primary-%s-sf-dmg-area-%d", op_str(data.op), i) {
 			data.damage_area_count = i;
 			data.test_plane_id = DRM_PLANE_TYPE_PRIMARY;
@@ -594,6 +595,7 @@ igt_main
 
 	/* Verify overlay plane selective fetch */
 	for (i = 1; i <= MAX_DAMAGE_AREAS; i++) {
+		igt_describe("Test that selective fetch works on overlay plane");
 		igt_subtest_f("overlay-%s-sf-dmg-area-%d", op_str(data.op), i) {
 			data.damage_area_count = i;
 			data.test_plane_id = DRM_PLANE_TYPE_OVERLAY;
@@ -604,6 +606,7 @@ igt_main
 	}
 
 	/* Verify overlay plane selective fetch */
+	igt_describe("Test that selective fetch works on cursor plane");
 	igt_subtest_f("cursor-%s-sf", op_str(data.op)) {
 		data.damage_area_count = 1;
 		data.test_plane_id = DRM_PLANE_TYPE_CURSOR;
@@ -616,6 +619,7 @@ igt_main
 	data.op = PLANE_MOVE;
 	/* Verify overlay plane move selective fetch */
 	for (i = POS_TOP_LEFT; i <= POS_BOTTOM_RIGHT ; i++) {
+		igt_describe("Test that selective fetch works on moving overlay plane");
 		igt_subtest_f("%s-sf-dmg-area-%d", op_str(data.op), i) {
 			data.pos = i;
 			data.test_plane_id = DRM_PLANE_TYPE_OVERLAY;
@@ -628,6 +632,8 @@ igt_main
 	/* Verify primary plane selective fetch with overplay plane blended */
 	data.op = OVERLAY_PRIM_UPDATE;
 	for (i = 1; i <= MAX_DAMAGE_AREAS; i++) {
+		igt_describe("Test that selective fetch works on primary plane "
+			     "with blended overlay plane");
 		igt_subtest_f("%s-sf-dmg-area-%d", op_str(data.op), i) {
 			data.damage_area_count = i;
 			data.test_plane_id = DRM_PLANE_TYPE_PRIMARY;
