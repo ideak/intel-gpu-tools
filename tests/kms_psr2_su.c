@@ -272,6 +272,7 @@ igt_main
 	}
 
 	for (data.op = PAGE_FLIP; data.op < LAST; data.op++) {
+		igt_describe("Test that selective update works when screen changes");
 		igt_subtest_f("%s", op_str(data.op)) {
 			prepare(&data);
 			run(&data);
