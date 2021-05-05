@@ -1,19 +1,3 @@
-/* basic set of prime tests between intel and nouveau */
-
-/* test list - 
-   1. share buffer from intel -> nouveau.
-   2. share buffer from nouveau -> intel
-   3. share intel->nouveau, map on both, write intel, read nouveau
-   4. share intel->nouveau, blit intel fill, readback on nouveau
-   test 1 + map buffer, read/write, map other size.
-   do some hw actions on the buffer
-   some illegal operations -
-       close prime fd try and map
-
-   TODO add some nouveau rendering tests
-*/
-
-   
 #include "igt.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,6 +12,8 @@
 #include <xf86drmMode.h>
 
 #include "intel_bufmgr.h"
+
+IGT_TEST_DESCRIPTION("Basic set of prime tests between Intel and DisplayLink");
 
 int intel_fd = -1, udl_fd = -1;
 drm_intel_bufmgr *bufmgr;
