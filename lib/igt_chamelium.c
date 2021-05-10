@@ -522,12 +522,29 @@ static xmlrpc_value *chamelium_rpc(struct chamelium *chamelium,
 {
 	xmlrpc_value *res;
 	va_list va_args;
+	int fsm_trials_left = 5;
 
-	va_start(va_args, format_str);
-	res = __chamelium_rpc_va(chamelium, fsm_port, method_name,
-				 format_str, va_args);
-	va_end(va_args);
+	if (strcmp(method_name, "CaptureVideo") == 0
+	    || strcmp(method_name, "StartCapturingVideo") == 0) {
+		while (fsm_trials_left) {
+			va_start(va_args, format_str);
+			res = __chamelium_rpc_va(chamelium, fsm_port,
+						 method_name, format_str,
+						 va_args);
+			va_end(va_args);
 
+			if (!chamelium->env.fault_occurred)
+				break;
+
+			igt_debug("DP FSM failed retrying, tries left %d\n", fsm_trials_left);
+			--fsm_trials_left;
+		}
+	} else {
+		va_start(va_args, format_str);
+		res = __chamelium_rpc_va(chamelium, fsm_port, method_name,
+					 format_str, va_args);
+		va_end(va_args);
+	}
 	igt_assert_f(!chamelium->env.fault_occurred,
 		     "Chamelium RPC call failed: %s\n",
 		     chamelium->env.fault_string);
