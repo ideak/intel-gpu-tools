@@ -100,6 +100,7 @@ run_primary_test(data_t *data, enum pipe pipe, igt_output_t *output)
 	igt_plane_set_fb(primary, NULL);
 	igt_output_set_pipe(output, PIPE_NONE);
 	igt_remove_fb(data->drm_fd, &fb);
+	igt_display_commit2(&data->display, COMMIT_ATOMIC);
 }
 
 static void *fence_inc_thread(void *arg)
@@ -784,7 +785,7 @@ static void collect_crcs_mask(igt_pipe_crc_t **pipe_crcs, unsigned mask, igt_crc
 static void run_modeset_tests(data_t *data, int howmany, bool nonblocking, bool fencing)
 {
 	struct igt_fb fbs[2];
-	int i, j = 0;
+	int i, j;
 	unsigned iter_max;
 	igt_pipe_crc_t *pipe_crcs[IGT_MAX_PIPES] = { 0 };
 	igt_output_t *output;
@@ -793,6 +794,8 @@ static void run_modeset_tests(data_t *data, int howmany, bool nonblocking, bool 
 	for (i = 0; i < data->display.n_outputs; i++)
 		igt_output_set_pipe(&data->display.outputs[i], PIPE_NONE);
 
+retry:
+	j = 0;
 	for_each_connected_output(&data->display, output) {
 		drmModeModeInfo *mode = igt_output_get_mode(output);
 
@@ -839,6 +842,19 @@ static void run_modeset_tests(data_t *data, int howmany, bool nonblocking, bool 
 
 	iter_max = 1 << j;
 
+	if (igt_display_try_commit_atomic(&data->display,
+				DRM_MODE_ATOMIC_TEST_ONLY |
+				DRM_MODE_ATOMIC_ALLOW_MODESET,
+				NULL) != 0) {
+		igt_output_t *out;
+		bool found = igt_override_all_active_output_modes_to_fit_bw(&data->display);
+		igt_require_f(found, "No valid mode combo found.\n");
+
+		for_each_connected_output(&data->display, out)
+			igt_output_set_pipe(out, PIPE_NONE);
+
+		goto retry;
+	}
 	igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
 	for (i = 0; i < iter_max; i++) {
