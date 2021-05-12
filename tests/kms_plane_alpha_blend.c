@@ -237,8 +237,6 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe)
 	}
 
 	igt_plane_set_fb(primary, &data->black_fb);
-	/* reset alpha property to default */
-	reset_alpha(display, pipe);
 }
 
 static void basic_alpha(data_t *data, enum pipe pipe, igt_plane_t *plane)
@@ -506,6 +504,9 @@ static void run_test_on_pipe_planes(data_t *data, enum pipe pipe, bool blend,
 		test(data, pipe, plane);
 		igt_plane_set_fb(plane, NULL);
 	}
+
+	igt_output_set_pipe(output, PIPE_NONE);
+	igt_display_commit2(display, COMMIT_ATOMIC);
 
 	igt_require_f(found, "No planes with %s property found\n",
 		      blend ? "pixel blending mode" : "alpha");
