@@ -915,5 +915,6 @@ void igt_require_pipe(igt_display_t *display,
 
 void igt_dump_connectors_fd(int drmfd);
 void igt_dump_crtcs_fd(int drmfd);
+bool igt_override_all_active_output_modes_to_fit_bw(igt_display_t *display);
 
 #endif /* __IGT_KMS_H__ */

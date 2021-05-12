@@ -4048,6 +4048,85 @@ void igt_output_set_pipe(igt_output_t *output, enum pipe pipe)
 	}
 }
 
+#define for_each_connector_mode(output)		\
+	for (int i__ = 0;  i__ < output->config.connector->count_modes; i__++)
+
+static int sort_drm_modes(const void *a, const void *b)
+{
+	const drmModeModeInfo *mode1 = a, *mode2 = b;
+
+	return (mode1->clock < mode2->clock) - (mode2->clock < mode1->clock);
+}
+
+static
+bool __override_all_active_output_modes_to_fit_bw(igt_display_t *display,
+						  igt_output_t *outputs[IGT_MAX_PIPES],
+						  const int n_outputs,
+						  int base)
+{
+	igt_output_t *output = NULL;
+
+	if (base >= n_outputs)
+		return false;
+
+	output = outputs[base];
+
+	for_each_connector_mode(output) {
+		int ret;
+
+		igt_output_override_mode(output, &output->config.connector->modes[i__]);
+
+		if (__override_all_active_output_modes_to_fit_bw(display, outputs, n_outputs, base + 1))
+			return true;
+
+		if (display->is_atomic)
+			ret = igt_display_try_commit_atomic(display,
+					DRM_MODE_ATOMIC_TEST_ONLY |
+					DRM_MODE_ATOMIC_ALLOW_MODESET,
+					NULL);
+		else
+			ret = igt_display_try_commit2(display, COMMIT_LEGACY);
+
+		if (!ret)
+			return true;
+	}
+
+	return false;
+}
+
+/**
+ * igt_override_all_active_output_modes_to_fit_bw:
+ * @display: a pointer to an #igt_display_t structure
+ *
+ * Override the mode on all active outputs (i.e. pending_pipe != PIPE_NONE)
+ * on basis of bandwidth.
+ *
+ * Returns: true if a valid connector mode combo found, else false
+ */
+bool igt_override_all_active_output_modes_to_fit_bw(igt_display_t *display)
+{
+	int i, n_outputs = 0;
+	igt_output_t *outputs[IGT_MAX_PIPES];
+
+	for (i = 0 ; i < display->n_outputs; i++) {
+		igt_output_t *output = &display->outputs[i];
+
+		if (output->pending_pipe == PIPE_NONE)
+			continue;
+
+		/* Sort the modes in descending order by clock freq. */
+		qsort(output->config.connector->modes,
+		      output->config.connector->count_modes,
+		      sizeof(drmModeModeInfo),
+		      sort_drm_modes);
+
+		outputs[n_outputs++] = output;
+	}
+	igt_require_f(n_outputs, "No active outputs found.\n");
+
+	return __override_all_active_output_modes_to_fit_bw(display, outputs, n_outputs, 0);
+}
+
 /*
  * igt_pipe_refresh:
  * @display: a pointer to an #igt_display_t structure
