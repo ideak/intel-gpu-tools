@@ -98,12 +98,14 @@ static void kms_tests(int fd, int debugfs)
 	igt_display_t display;
 	struct igt_fb fb[IGT_MAX_PIPES];
 	enum pipe pipe;
+	int ret;
 
 	igt_fixture
 		igt_display_require(&display, fd);
 
 	igt_subtest("read_all_entries_display_on") {
 		/* try to light all pipes */
+retry:
 		for_each_pipe(&display, pipe) {
 			igt_output_t *output;
 
@@ -126,6 +128,25 @@ static void kms_tests(int fd, int debugfs)
 				igt_plane_set_fb(primary, &fb[pipe]);
 				break;
 			}
+		}
+
+		if (display.is_atomic)
+			ret = igt_display_try_commit_atomic(&display,
+					DRM_MODE_ATOMIC_TEST_ONLY |
+					DRM_MODE_ATOMIC_ALLOW_MODESET,
+					NULL);
+		else
+			ret = igt_display_try_commit2(&display, COMMIT_LEGACY);
+
+		if (ret) {
+			igt_output_t *output;
+			bool found = igt_override_all_active_output_modes_to_fit_bw(&display);
+			igt_require_f(found, "No valid mode combo found.\n");
+
+			for_each_connected_output(&display, output)
+				igt_output_set_pipe(output, PIPE_NONE);
+
+			goto retry;
 		}
 
 		igt_display_commit2(&display, display.is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
