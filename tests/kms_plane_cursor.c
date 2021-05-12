@@ -93,6 +93,10 @@ static void test_fini(data_t *data)
 {
 	igt_pipe_crc_free(data->pipe_crc);
 	igt_display_reset(&data->display);
+	igt_plane_set_fb(data->primary, NULL);
+	igt_plane_set_fb(data->overlay, NULL);
+	igt_plane_set_fb(data->cursor, NULL);
+	igt_display_commit2(&data->display, COMMIT_ATOMIC);
 }
 
 /* Fills a FB with the solid color given. */
