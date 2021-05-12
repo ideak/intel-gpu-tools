@@ -256,7 +256,11 @@ test_plane_position_with_output(data_t *data,
 	igt_plane_set_fb(sprite, NULL);
 
 	/* reset the constraint on the pipe */
-	igt_output_set_pipe(output, PIPE_ANY);
+	igt_output_set_pipe(output, PIPE_NONE);
+	igt_display_commit2(&data->display, data->display.is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
+
+	igt_remove_fb(data->drm_fd, &primary_fb);
+	igt_remove_fb(data->drm_fd, &sprite_fb);
 }
 
 static void
@@ -293,7 +297,7 @@ test_plane_position(data_t *data, enum pipe pipe, unsigned int flags)
  *     (vdisplay, hdisplay) we do get the same CRC than the full blue fb.
  */
 static void
-create_fb_for_mode__panning(data_t *data, drmModeModeInfo *mode,
+create_fb_for_mode_panning(data_t *data, drmModeModeInfo *mode,
 			    struct igt_fb *fb /* out */)
 {
 	unsigned int fb_id;
@@ -339,7 +343,7 @@ test_plane_panning_with_output(data_t *data,
 	mode = igt_output_get_mode(output);
 	primary = igt_output_get_plane(output, 0);
 
-	create_fb_for_mode__panning(data, mode, &primary_fb);
+	create_fb_for_mode_panning(data, mode, &primary_fb);
 	igt_plane_set_fb(primary, &primary_fb);
 
 	if (flags & TEST_PANNING_TOP_LEFT)
@@ -360,8 +364,11 @@ test_plane_panning_with_output(data_t *data,
 	igt_plane_set_fb(primary, NULL);
 
 	/* reset states to neutral values, assumed by other tests */
-	igt_output_set_pipe(output, PIPE_ANY);
+	igt_output_set_pipe(output, PIPE_NONE);
 	igt_fb_set_position(&primary_fb, primary, 0, 0);
+	igt_display_commit2(&data->display, data->display.is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
+
+	igt_remove_fb(data->drm_fd, &primary_fb);
 }
 
 static void
