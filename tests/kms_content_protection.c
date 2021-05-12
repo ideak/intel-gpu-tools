@@ -452,39 +452,18 @@ static bool sink_hdcp2_capable(igt_output_t *output)
 	return strstr(buf, "HDCP2.2");
 }
 
-static void prepare_modeset_on_mst_output(igt_output_t *output, enum pipe pipe)
+static void prepare_modeset_on_mst_output(igt_output_t *output)
 {
-	drmModeConnectorPtr c = output->config.connector;
 	drmModeModeInfo *mode;
 	igt_plane_t *primary;
-	int i, width, height;
+	int width, height;
+	enum pipe pipe = output->pending_pipe;
 
 	mode = igt_output_get_mode(output);
-
-	/*
-	 * TODO: Add logic to use the highest possible modes on each output.
-	 * Currently using 2k modes by default on all the outputs.
-	 */
-	igt_debug("Before mode override: Output %s Mode hdisplay %d Mode vdisplay %d\n",
-		   output->name, mode->hdisplay, mode->vdisplay);
-
-	if (mode->hdisplay > 1920 && mode->vdisplay > 1080) {
-		for (i = 0; i < c->count_modes; i++) {
-			if (c->modes[i].hdisplay <= 1920 && c->modes[i].vdisplay <= 1080) {
-				mode = &c->modes[i];
-				igt_output_override_mode(output, mode);
-				break;
-			}
-		}
-	}
-
-	igt_debug("After mode overide: Output %s Mode hdisplay %d Mode vdisplay %d\n",
-		   output->name, mode->hdisplay, mode->vdisplay);
 
 	width = mode->hdisplay;
 	height = mode->vdisplay;
 
-	igt_output_set_pipe(output, pipe);
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_plane_set_fb(primary, NULL);
 	igt_plane_set_fb(primary, pipe % 2 ? &data.red : &data.green);
@@ -624,7 +603,8 @@ test_content_protection_mst(int content_type)
 
 		igt_assert_f(igt_pipe_connector_valid(pipe, output), "Output-pipe combination invalid\n");
 
-		prepare_modeset_on_mst_output(output, pipe);
+		igt_output_set_pipe(output, pipe);
+		prepare_modeset_on_mst_output(output);
 		mst_output[dp_mst_outputs++] = output;
 
 		pipe++;
@@ -634,6 +614,17 @@ test_content_protection_mst(int content_type)
 	}
 
 	igt_require_f(dp_mst_outputs > 1, "No DP MST set up with >= 2 outputs found in a single topology\n");
+
+	if (igt_display_try_commit_atomic(display,
+				DRM_MODE_ATOMIC_TEST_ONLY |
+				DRM_MODE_ATOMIC_ALLOW_MODESET,
+				NULL) != 0) {
+		bool found = igt_override_all_active_output_modes_to_fit_bw(display);
+		igt_require_f(found, "No valid mode combo found for MST modeset\n");
+
+		for (count = 0; count < dp_mst_outputs; count++)
+			prepare_modeset_on_mst_output(mst_output[count]);
+	}
 
 	ret = igt_display_try_commit2(display, COMMIT_ATOMIC);
 	igt_require_f(ret == 0, "Commit failure during MST modeset\n");
