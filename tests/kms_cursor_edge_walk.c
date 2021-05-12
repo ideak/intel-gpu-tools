@@ -225,6 +225,7 @@ static void cleanup_crtc(data_t *data)
 
 	igt_remove_fb(data->drm_fd, &data->primary_fb);
 	igt_remove_fb(data->drm_fd, &data->fb);
+	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 }
 
 static void prepare_crtc(data_t *data)
@@ -268,6 +269,8 @@ static void test_crtc(data_t *data, unsigned int edges)
 	create_cursor_fb(data, data->curw, data->curh);
 
 	test_edges(data, edges);
+
+	cleanup_crtc(data);
 }
 
 static int opt_handler(int opt, int opt_index, void *_data)
