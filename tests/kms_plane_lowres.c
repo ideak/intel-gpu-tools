@@ -270,16 +270,13 @@ test_planes_on_pipe(data_t *data, uint64_t modifier)
 	igt_info("Testing connector %s using pipe %s\n",
 		 igt_output_name(data->output), kmstest_pipe_name(data->pipe));
 
-	for_each_plane_on_pipe(&data->display, data->pipe, plane) {
-		data->output = igt_get_single_output_for_pipe(&data->display, data->pipe);
-		igt_require(data->output);
-
+	for_each_plane_on_pipe(&data->display, data->pipe, plane)
 		tested += test_planes_on_pipe_with_output(data, plane, modifier);
-	}
 
-	igt_assert(tested > 0);
 	igt_output_set_pipe(data->output, PIPE_NONE);
 	igt_display_commit2(&data->display, COMMIT_ATOMIC);
+
+	igt_assert(tested > 0);
 }
 
 igt_main
