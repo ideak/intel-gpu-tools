@@ -89,7 +89,7 @@ static void test_panel_fitting(data_t *d)
 
 	for_each_pipe_with_valid_output(display, pipe, output) {
 		drmModeModeInfo *mode, native_mode;
-		uint32_t devid = intel_get_drm_devid(display->drm_fd);
+		bool is_plane_scaling_active = true;
 
 		/* Check that the "scaling mode" property has been set. */
 		if (!igt_output_has_prop(output, IGT_CONNECTOR_SCALING_MODE))
@@ -132,25 +132,26 @@ static void test_panel_fitting(data_t *d)
 		igt_fb_set_size(&d->fb2, d->plane2, d->fb2.width-200, d->fb2.height-200);
 		igt_plane_set_position(d->plane2, 100, 100);
 
-		/*
-		 * Most of gen7 and all of gen8 doesn't support plane scaling
-		 * at all.
-		 *
-		 * gen9 pipe C has only 1 scaler shared with the crtc, which
-		 * means pipe scaling can't work simultaneously with panel
-		 * fitting.
-		 *
-		 * Since this is the legacy path, userspace has to know about
-		 * the HW limitations, whereas atomic can ask.
-		 */
-		if (IS_GEN8(devid) ||
-		    (IS_GEN7(devid) && !IS_IVYBRIDGE(devid)) ||
-		    (IS_GEN9(devid) && pipe == PIPE_C))
-			/* same as visible area of fb => no scaling */
-			igt_plane_set_size(d->plane2,
-					   d->fb2.width-200,
-					   d->fb2.height-200);
-		else
+		if (is_i915_device(display->drm_fd)) {
+			uint32_t devid = intel_get_drm_devid(display->drm_fd);
+			/*
+			 * Most of gen7 and all of gen8 doesn't support plane scaling
+			 * at all.
+			 *
+			 * gen9 pipe C has only 1 scaler shared with the crtc, which
+			 * means pipe scaling can't work simultaneously with panel
+			 * fitting.
+			 *
+			 * Since this is the legacy path, userspace has to know about
+			 * the HW limitations, whereas atomic can ask.
+			 */
+			if (IS_GEN8(devid) ||
+				(IS_GEN7(devid) && !IS_IVYBRIDGE(devid)) ||
+				(IS_GEN9(devid) && pipe == PIPE_C)) {
+				is_plane_scaling_active = false;
+			}
+		}
+		if (is_plane_scaling_active) {
 			/*
 			 * different than visible area of fb => plane scaling
 			 * active
@@ -158,6 +159,13 @@ static void test_panel_fitting(data_t *d)
 			igt_plane_set_size(d->plane2,
 					   mode->hdisplay-200,
 					   mode->vdisplay-200);
+		}
+		else {
+			/* same as visible area of fb => no scaling */
+			igt_plane_set_size(d->plane2,
+				d->fb2.width - 200,
+				d->fb2.height - 200);
+		}
 
 		/* Plane scaling active (if possible), pfit off */
 		igt_display_commit2(display, COMMIT_UNIVERSAL);
@@ -229,13 +237,16 @@ static void test_atomic_fastset(data_t *data)
 	int valid_tests = 0;
 	struct stat sb;
 
-	/* Until this is force enabled, force modeset evasion. */
-	if (stat("/sys/module/i915/parameters/fastboot", &sb) == 0)
-		igt_set_module_param_int(data->drm_fd, "fastboot", 1);
+
+	if (is_i915_device(display->drm_fd)) {
+		/* Until this is force enabled, force modeset evasion. */
+		if (stat("/sys/module/i915/parameters/fastboot", &sb) == 0)
+			igt_set_module_param_int(data->drm_fd, "fastboot", 1);
+
+		igt_require(intel_gen(intel_get_drm_devid(display->drm_fd)) >= 5);
+	}
 
 	igt_require(display->is_atomic);
-	igt_require(intel_gen(intel_get_drm_devid(display->drm_fd)) >= 5);
-
 	for_each_pipe_with_valid_output(display, pipe, output) {
 		if (!igt_output_has_prop(output, IGT_CONNECTOR_SCALING_MODE))
 			continue;
