@@ -168,7 +168,6 @@ static void test_cleanup(data_t *data)
 						    DRM_PLANE_TYPE_PRIMARY);
 		igt_plane_set_fb(primary, NULL);
 		igt_display_commit(&data->display);
-		igt_remove_fb(data->drm_fd, &data->fb_test_pattern);
 	}
 }
 
@@ -185,14 +184,7 @@ static void kms_dp_dsc_exit_handler(int sig)
 static void update_display(data_t *data, enum dsc_test_type test_type)
 {
 	igt_plane_t *primary;
-	data->mode = igt_output_get_mode(data->output);
 	data->connector = data->output->config.connector;
-
-	if (data->connector->connector_type == DRM_MODE_CONNECTOR_DisplayPort &&
-	    data->pipe == PIPE_A) {
-		igt_debug("DSC not supported on Pipe A on external DP\n");
-		return;
-	}
 
 	/* Disable the output first */
 	igt_output_set_pipe(data->output, PIPE_NONE);
@@ -206,11 +198,6 @@ static void update_display(data_t *data, enum dsc_test_type test_type)
 		force_dp_dsc_enable(data);
 
 		igt_output_set_pipe(data->output, data->pipe);
-		igt_create_pattern_fb(data->drm_fd, data->mode->hdisplay,
-				      data->mode->vdisplay,
-				      DRM_FORMAT_XRGB8888,
-				      LOCAL_DRM_FORMAT_MOD_NONE,
-				      &data->fb_test_pattern);
 		primary = igt_output_get_plane_type(data->output,
 						    DRM_PLANE_TYPE_PRIMARY);
 
@@ -241,7 +228,23 @@ static void run_test(data_t *data, igt_output_t *output,
 {
 	enum pipe pipe;
 
+	data->mode = igt_output_get_mode(data->output);
+	igt_create_pattern_fb(data->drm_fd, data->mode->hdisplay,
+			      data->mode->vdisplay,
+			      DRM_FORMAT_XRGB8888,
+			      LOCAL_DRM_FORMAT_MOD_NONE,
+			      &data->fb_test_pattern);
+
 	for_each_pipe(&data->display, pipe) {
+		if (is_i915_device(data->drm_fd)) {
+			uint32_t devid = intel_get_drm_devid(data->drm_fd);
+
+			if (data->connector->connector_type == DRM_MODE_CONNECTOR_DisplayPort &&
+			    data->pipe == PIPE_A && IS_GEN11(devid)) {
+				igt_debug("DSC not supported on Pipe A on external DP in Gen11 platforms\n");
+				continue;
+			}
+		}
 
 		if (igt_pipe_connector_valid(pipe, output)) {
 			data->pipe = pipe;
@@ -250,6 +253,8 @@ static void run_test(data_t *data, igt_output_t *output,
 			test_cleanup(data);
 		}
 	}
+
+	igt_remove_fb(data->drm_fd, &data->fb_test_pattern);
 }
 
 igt_main
