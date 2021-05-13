@@ -285,9 +285,9 @@ igt_main_args("n", NULL, NULL, opt_handler, NULL)
 		fork_cpuhog_helper();
 	}
 
+	igt_describe("Tests that caching mode has become UC/WT and flushed using mmap write");
 	igt_subtest("main") {
 		igt_info("Using %d rounds for the test\n", ROUNDS);
-
 		for (i = 0; i < ROUNDS; i++)
 			run_test(&data);
 	}
