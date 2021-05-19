@@ -156,6 +156,7 @@ static void test_flip_to_scaled(data_t *data, uint32_t index, enum pipe pipe,
 	int ret;
 
 	igt_display_reset(&data->display);
+	igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
 	igt_debug("running on output %s pipe %s\n", output->name,
 		  kmstest_pipe_name(pipe));
@@ -246,6 +247,10 @@ static void test_flip_to_scaled(data_t *data, uint32_t index, enum pipe pipe,
 	data->pipe_crc = NULL;
 
 	clear_lut(data, pipe);
+
+	igt_output_set_pipe(output, PIPE_NONE);
+	igt_plane_set_fb(primary, NULL);
+	igt_display_commit2(&data->display, COMMIT_ATOMIC);
 }
 
 igt_main
