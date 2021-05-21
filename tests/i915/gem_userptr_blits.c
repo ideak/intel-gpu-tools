@@ -2016,6 +2016,7 @@ static void test_set_caching(int i915)
 	};
 	uint32_t handle;
 	void *page;
+	int ret;
 
 	page = mmap(NULL, 4096, PROT_READ | PROT_WRITE,
 		    MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
@@ -2032,15 +2033,37 @@ static void test_set_caching(int i915)
 
 	for (int idx = 0; idx < ARRAY_SIZE(levels); idx++) {
 		gem_userptr(i915, page, 4096, 0, 0, &handle);
-		igt_assert_eq(__gem_set_caching(i915, handle, levels[idx]), 0);
+		ret = __gem_set_caching(i915, handle, levels[idx]);
+		if (levels[idx] == I915_CACHING_NONE) {
+			if(ret != 0)
+				igt_assert_eq(ret, -ENXIO);
+			else
+				igt_warn("Deprecated userptr SET_CACHING behavior\n");
+		} else {
+			igt_assert_eq(ret, 0);
+		}
 		gem_close(i915, handle);
 	}
 
 	gem_userptr(i915, page, 4096, 0, 0, &handle);
-	for (int idx = 0; idx < ARRAY_SIZE(levels); idx++)
-		igt_assert_eq(__gem_set_caching(i915, handle, levels[idx]), 0);
-	for (int idx = 0; idx < ARRAY_SIZE(levels); idx++)
-		igt_assert_eq(__gem_set_caching(i915, handle, levels[idx]), 0);
+	for (int idx = 0; idx < ARRAY_SIZE(levels); idx++) {
+		ret = __gem_set_caching(i915, handle, levels[idx]);
+		if (levels[idx] == I915_CACHING_NONE) {
+			if (ret != 0)
+			        igt_assert_eq(ret, -ENXIO);
+		} else {
+			igt_assert_eq(ret, 0);
+		}
+	}
+	for (int idx = 0; idx < ARRAY_SIZE(levels); idx++) {
+		ret = __gem_set_caching(i915, handle, levels[idx]);
+		if (levels[idx] == I915_CACHING_NONE) {
+			if (ret != 0)
+				igt_assert_eq(ret, -ENXIO);
+		} else {
+			igt_assert_eq(ret, 0);
+		}
+	}
 	gem_close(i915, handle);
 
 	munmap(page, 4096);
