@@ -57,19 +57,9 @@
   #define PAGE_SIZE 4096
 #endif
 
-static uint32_t userptr_flags = I915_USERPTR_UNSYNCHRONIZED;
+static uint32_t userptr_flags = 0;
 
 #define BO_SIZE (65536)
-
-static void gem_userptr_test_unsynchronized(void)
-{
-	userptr_flags = I915_USERPTR_UNSYNCHRONIZED;
-}
-
-static void gem_userptr_test_synchronized(void)
-{
-	userptr_flags = 0;
-}
 
 static void **handle_ptr_map;
 static unsigned int num_handle_ptr_map;
@@ -124,14 +114,10 @@ static int has_userptr(int fd)
 {
 	uint32_t handle = 0;
 	void *ptr;
-	uint32_t oldflags;
 	int ret;
 
 	assert(posix_memalign(&ptr, PAGE_SIZE, PAGE_SIZE) == 0);
-	oldflags = userptr_flags;
-	gem_userptr_test_unsynchronized();
 	ret = __gem_userptr(fd, ptr, PAGE_SIZE, 0, userptr_flags, &handle);
-	userptr_flags = oldflags;
 	if (ret != 0) {
 		free(ptr);
 		return 0;
@@ -464,32 +450,18 @@ static void test_userptr(int fd)
 	test_multiple(fd, 100, 1);
 }
 
-int main(int argc, char **argv)
+igt_main
 {
 	int fd = -1, ret;
 
-	igt_subtest_init(argc, argv);
+	igt_fixture {
+		fd = drm_open_driver(DRIVER_INTEL);
+		igt_assert(fd >= 0);
 
-	fd = drm_open_driver(DRIVER_INTEL);
-	igt_assert(fd >= 0);
-
-	ret = has_userptr(fd);
-	igt_skip_on_f(ret == 0, "No userptr support - %s (%d)\n",
-			strerror(errno), ret);
-
-
-	gem_userptr_test_unsynchronized();
-
-	igt_subtest("userptr-unsync")
-		test_userptr(fd);
-
-	igt_subtest("userptr-impact-unsync")
-		test_impact(fd, "unsync-");
-
-	igt_subtest("userptr-impact-unsync-overlap")
-		test_impact_overlap(fd, "unsync-");
-
-	gem_userptr_test_synchronized();
+		ret = has_userptr(fd);
+		igt_skip_on_f(ret == 0, "No userptr support - %s (%d)\n",
+			      strerror(errno), ret);
+	}
 
 	igt_subtest("userptr-sync")
 		test_userptr(fd);
@@ -500,7 +472,7 @@ int main(int argc, char **argv)
 	igt_subtest("userptr-impact-sync-overlap")
 		test_impact_overlap(fd, "sync-");
 
-	igt_exit();
-
-	return 0;
+	igt_fixture {
+		close(fd);
+	}
 }
