@@ -2,6 +2,7 @@
 
 #include "igt.h"
 #include "igt_vgem.h"
+#include "sw_sync.h"
 
 #include <linux/dma-buf.h>
 #include <sys/poll.h>
@@ -14,6 +15,7 @@ struct igt_dma_buf_sync_file {
 };
 
 #define IGT_DMA_BUF_IOCTL_EXPORT_SYNC_FILE _IOWR(DMA_BUF_BASE, 2, struct igt_dma_buf_sync_file)
+#define IGT_DMA_BUF_IOCTL_IMPORT_SYNC_FILE _IOW(DMA_BUF_BASE, 3, struct igt_dma_buf_sync_file)
 
 static bool has_dmabuf_export_sync_file(int fd)
 {
@@ -48,6 +50,55 @@ static int dmabuf_export_sync_file(int dmabuf, uint32_t flags)
 	do_ioctl(dmabuf, IGT_DMA_BUF_IOCTL_EXPORT_SYNC_FILE, &arg);
 
 	return arg.fd;
+}
+
+static bool has_dmabuf_import_sync_file(int fd)
+{
+	struct vgem_bo bo;
+	int dmabuf, timeline, fence, ret;
+	struct igt_dma_buf_sync_file arg;
+
+	bo.width = 1;
+	bo.height = 1;
+	bo.bpp = 32;
+	vgem_create(fd, &bo);
+
+	dmabuf = prime_handle_to_fd(fd, bo.handle);
+	gem_close(fd, bo.handle);
+
+	timeline = sw_sync_timeline_create();
+	fence = sw_sync_timeline_create_fence(timeline, 1);
+	sw_sync_timeline_inc(timeline, 1);
+
+	arg.flags = DMA_BUF_SYNC_RW;
+	arg.fd = fence;
+
+	ret = igt_ioctl(dmabuf, IGT_DMA_BUF_IOCTL_IMPORT_SYNC_FILE, &arg);
+	close(dmabuf);
+	close(fence);
+	igt_assert(ret == 0 || errno == ENOTTY);
+
+	return ret == 0;
+}
+
+static void dmabuf_import_sync_file(int dmabuf, uint32_t flags, int sync_fd)
+{
+	struct igt_dma_buf_sync_file arg;
+
+	arg.flags = flags;
+	arg.fd = sync_fd;
+	do_ioctl(dmabuf, IGT_DMA_BUF_IOCTL_IMPORT_SYNC_FILE, &arg);
+}
+
+static void
+dmabuf_import_timeline_fence(int dmabuf, uint32_t flags,
+			     int timeline, uint32_t seqno)
+{
+	int fence;
+
+	fence = sw_sync_timeline_create_fence(timeline, seqno);
+	dmabuf_import_sync_file(dmabuf, flags, fence);
+	close(fence);
 }
 
 static bool dmabuf_busy(int dmabuf, uint32_t flags)
@@ -284,6 +335,132 @@ static void test_export_wait_after_attach(int fd)
 	gem_close(fd, bo.handle);
 }
 
+static void test_import_basic(int fd)
+{
+	struct vgem_bo bo;
+	int dmabuf, timeline;
+
+	igt_require_sw_sync();
+	igt_require(has_dmabuf_import_sync_file(fd));
+
+	bo.width = 1;
+	bo.height = 1;
+	bo.bpp = 32;
+	vgem_create(fd, &bo);
+
+	dmabuf = prime_handle_to_fd(fd, bo.handle);
+
+	igt_assert(!dmabuf_busy(dmabuf, DMA_BUF_SYNC_READ));
+	igt_assert(!dmabuf_busy(dmabuf, DMA_BUF_SYNC_WRITE));
+
+	timeline = sw_sync_timeline_create();
+
+	dmabuf_import_timeline_fence(dmabuf, DMA_BUF_SYNC_READ, timeline, 1);
+	igt_assert(!dmabuf_busy(dmabuf, DMA_BUF_SYNC_READ));
+	igt_assert(dmabuf_busy(dmabuf, DMA_BUF_SYNC_WRITE));
+	igt_assert(dmabuf_busy(dmabuf, DMA_BUF_SYNC_RW));
+	igt_assert(!dmabuf_sync_file_busy(dmabuf, DMA_BUF_SYNC_READ));
+	igt_assert(dmabuf_sync_file_busy(dmabuf, DMA_BUF_SYNC_WRITE));
+	igt_assert(dmabuf_sync_file_busy(dmabuf, DMA_BUF_SYNC_RW));
+
+	sw_sync_timeline_inc(timeline, 1);
+	igt_assert(!dmabuf_busy(dmabuf, DMA_BUF_SYNC_READ));
+	igt_assert(!dmabuf_busy(dmabuf, DMA_BUF_SYNC_WRITE));
+	igt_assert(!dmabuf_busy(dmabuf, DMA_BUF_SYNC_RW));
+	igt_assert(!dmabuf_sync_file_busy(dmabuf, DMA_BUF_SYNC_READ));
+	igt_assert(!dmabuf_sync_file_busy(dmabuf, DMA_BUF_SYNC_WRITE));
+	igt_assert(!dmabuf_sync_file_busy(dmabuf, DMA_BUF_SYNC_RW));
+
+	dmabuf_import_timeline_fence(dmabuf, DMA_BUF_SYNC_WRITE, timeline, 2);
+	igt_assert(dmabuf_busy(dmabuf, DMA_BUF_SYNC_READ));
+	igt_assert(dmabuf_busy(dmabuf, DMA_BUF_SYNC_WRITE));
+	igt_assert(dmabuf_busy(dmabuf, DMA_BUF_SYNC_RW));
+	igt_assert(dmabuf_sync_file_busy(dmabuf, DMA_BUF_SYNC_READ));
+	igt_assert(dmabuf_sync_file_busy(dmabuf, DMA_BUF_SYNC_WRITE));
+	igt_assert(dmabuf_sync_file_busy(dmabuf, DMA_BUF_SYNC_RW));
+
+	sw_sync_timeline_inc(timeline, 1);
+	igt_assert(!dmabuf_busy(dmabuf, DMA_BUF_SYNC_READ));
+	igt_assert(!dmabuf_busy(dmabuf, DMA_BUF_SYNC_WRITE));
+	igt_assert(!dmabuf_busy(dmabuf, DMA_BUF_SYNC_RW));
+	igt_assert(!dmabuf_sync_file_busy(dmabuf, DMA_BUF_SYNC_READ));
+	igt_assert(!dmabuf_sync_file_busy(dmabuf, DMA_BUF_SYNC_WRITE));
+	igt_assert(!dmabuf_sync_file_busy(dmabuf, DMA_BUF_SYNC_RW));
+
+	dmabuf_import_timeline_fence(dmabuf, DMA_BUF_SYNC_RW, timeline, 3);
+	igt_assert(dmabuf_busy(dmabuf, DMA_BUF_SYNC_READ));
+	igt_assert(dmabuf_busy(dmabuf, DMA_BUF_SYNC_WRITE));
+	igt_assert(dmabuf_busy(dmabuf, DMA_BUF_SYNC_RW));
+	igt_assert(dmabuf_sync_file_busy(dmabuf, DMA_BUF_SYNC_READ));
+	igt_assert(dmabuf_sync_file_busy(dmabuf, DMA_BUF_SYNC_WRITE));
+	igt_assert(dmabuf_sync_file_busy(dmabuf, DMA_BUF_SYNC_RW));
+
+	sw_sync_timeline_inc(timeline, 1);
+	igt_assert(!dmabuf_busy(dmabuf, DMA_BUF_SYNC_READ));
+	igt_assert(!dmabuf_busy(dmabuf, DMA_BUF_SYNC_WRITE));
+	igt_assert(!dmabuf_busy(dmabuf, DMA_BUF_SYNC_RW));
+	igt_assert(!dmabuf_sync_file_busy(dmabuf, DMA_BUF_SYNC_READ));
+	igt_assert(!dmabuf_sync_file_busy(dmabuf, DMA_BUF_SYNC_WRITE));
+	igt_assert(!dmabuf_sync_file_busy(dmabuf, DMA_BUF_SYNC_RW));
+}
+
+static void test_import_multiple(int fd, bool write)
+{
+	struct vgem_bo bo;
+	int i, dmabuf, read_sync_file, write_sync_file;
+	int write_timeline = -1, read_timelines[32];
+
+	igt_require_sw_sync();
+	igt_require(has_dmabuf_import_sync_file(fd));
+
+	bo.width = 1;
+	bo.height = 1;
+	bo.bpp = 32;
+	vgem_create(fd, &bo);
+
+	dmabuf = prime_handle_to_fd(fd, bo.handle);
+
+	igt_assert(!dmabuf_busy(dmabuf, DMA_BUF_SYNC_READ));
+	igt_assert(!dmabuf_busy(dmabuf, DMA_BUF_SYNC_WRITE));
+
+	for (i = 0; i < ARRAY_SIZE(read_timelines); i++) {
+		read_timelines[i] = sw_sync_timeline_create();
+		dmabuf_import_timeline_fence(dmabuf, DMA_BUF_SYNC_READ,
+					     read_timelines[i], 1);
+	}
+
+	if (write) {
+		write_timeline = sw_sync_timeline_create();
+		dmabuf_import_timeline_fence(dmabuf, DMA_BUF_SYNC_WRITE,
+					     write_timeline, 1);
+	}
+
+	read_sync_file = dmabuf_export_sync_file(dmabuf, DMA_BUF_SYNC_READ);
+	write_sync_file = dmabuf_export_sync_file(dmabuf, DMA_BUF_SYNC_WRITE);
+
+	for (i = ARRAY_SIZE(read_timelines) - 1; i >= 0; i--) {
+		igt_assert_eq(dmabuf_busy(dmabuf, DMA_BUF_SYNC_READ), write);
+		igt_assert_eq(sync_file_busy(read_sync_file), write);
+		igt_assert(dmabuf_busy(dmabuf, DMA_BUF_SYNC_WRITE));
+		igt_assert(sync_file_busy(write_sync_file));
+
+		sw_sync_timeline_inc(read_timelines[i], 1);
+	}
+
+	igt_assert_eq(dmabuf_busy(dmabuf, DMA_BUF_SYNC_READ), write);
+	igt_assert_eq(sync_file_busy(read_sync_file), write);
+	igt_assert_eq(dmabuf_busy(dmabuf, DMA_BUF_SYNC_WRITE), write);
+	igt_assert_eq(sync_file_busy(write_sync_file), write);
+
+	if (write)
+		sw_sync_timeline_inc(write_timeline, 1);
+
+	igt_assert(!dmabuf_busy(dmabuf, DMA_BUF_SYNC_READ));
+	igt_assert(!sync_file_busy(read_sync_file));
+	igt_assert(!dmabuf_busy(dmabuf, DMA_BUF_SYNC_WRITE));
+	igt_assert(!sync_file_busy(write_sync_file));
+}
+
 igt_main
 {
 	int fd;
@@ -313,4 +490,19 @@ igt_main
 	igt_subtest("export-wait-after-attach")
 		test_export_wait_after_attach(fd);
 
+	igt_describe("Sanity test for importing a sync_file into a dma-buf.");
+	igt_subtest("import-basic")
+		test_import_basic(fd);
+
+	igt_describe("Test importing multiple read-only fences into a dma-buf. "
+		     "They should all block any write operations but not other "
+		     "read operations.");
+	igt_subtest("import-multiple-read-only")
+		test_import_multiple(fd, false);
+
+	igt_describe("Test importing multiple read-write fences into a "
+		     "dma-buf. They should all block any read or write "
+		     "operations.");
+	igt_subtest("import-multiple-read-write")
+		test_import_multiple(fd, true);
 }
