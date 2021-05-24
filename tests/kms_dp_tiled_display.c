@@ -481,6 +481,8 @@ igt_main
 	}
 
 	#ifdef HAVE_CHAMELIUM
+        igt_describe("Make sure the Tiled CRTCs are synchronized and we get "
+                     "page flips for all tiled CRTCs in one vblank (executes on chamelium).");
 	igt_subtest_f("basic-test-pattern-with-chamelium") {
 		int i;
 
