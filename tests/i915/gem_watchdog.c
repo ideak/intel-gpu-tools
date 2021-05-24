@@ -631,6 +631,7 @@ igt_main
 
 	igt_fixture {
 		struct drm_i915_query_item item;
+		const unsigned int timeout = 1;
 		char *tmp;
 
 		i915 = drm_open_driver_master(DRIVER_INTEL);
@@ -640,16 +641,13 @@ igt_main
 		igt_require_gem(i915);
 
 		tmp = __igt_params_get(i915, "request_timeout_ms");
-		if (tmp) {
-			const unsigned int timeout = 1;
+		igt_skip_on_f(!tmp || !atoi(tmp),
+			      "Request expiry not supported!\n");
+		free(tmp);
 
-			igt_params_save_and_set(i915, "request_timeout_ms",
-						"%u", timeout * 1000);
-			default_timeout_wait_s = timeout * 5;
-			free(tmp);
-		} else {
-			default_timeout_wait_s = 12;
-		}
+		igt_params_save_and_set(i915, "request_timeout_ms", "%u",
+					timeout * 1000);
+		default_timeout_wait_s = timeout * 5;
 
 		i915 = gem_reopen_driver(i915); /* Apply modparam. */
 
