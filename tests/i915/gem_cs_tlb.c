@@ -50,6 +50,7 @@
 #include <drm.h>
 
 #include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "igt.h"
 
 IGT_TEST_DESCRIPTION("Check whether we correctly invalidate the cs tlb.");

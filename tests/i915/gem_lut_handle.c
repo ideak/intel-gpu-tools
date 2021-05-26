@@ -38,7 +38,7 @@
 #include <sys/time.h>
 
 #include "drm.h"
-#include "i915/gem.h"
+#include "i915/gem_create.h"
 
 IGT_TEST_DESCRIPTION("Exercises the basic execbuffer using the handle LUT"
 		     " interface.");

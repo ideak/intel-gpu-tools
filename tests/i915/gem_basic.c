@@ -37,7 +37,7 @@
 #include <sys/ioctl.h>
 
 #include "drm.h"
-#include "i915/gem.h"
+#include "i915/gem_create.h"
 
 static void
 test_bad_close(int fd)

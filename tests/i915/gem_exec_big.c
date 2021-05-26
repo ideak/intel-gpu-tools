@@ -46,6 +46,7 @@
 
 #include "drm.h"
 #include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "igt.h"
 
 IGT_TEST_DESCRIPTION("Run a large nop batch to stress test the error capture"

@@ -18,6 +18,7 @@
 #include "sync_file.h"
 
 #include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "igt.h"
 #include "igt_rand.h"
 #include "igt_rapl.h"

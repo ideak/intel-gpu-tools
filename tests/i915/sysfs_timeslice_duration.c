@@ -32,6 +32,7 @@
 #include "igt_params.h"
 #include "drmtest.h"
 #include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "i915/gem_engine_topology.h"
 #include "i915/gem_mman.h"
 #include "igt_dummyload.h"

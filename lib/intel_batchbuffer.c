@@ -35,7 +35,7 @@
 
 #include "drm.h"
 #include "drmtest.h"
-#include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "intel_batchbuffer.h"
 #include "intel_bufmgr.h"
 #include "intel_bufops.h"

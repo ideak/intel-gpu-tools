@@ -32,7 +32,7 @@
 #include <pthread.h>
 #include <errno.h>
 
-#include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "igt.h"
 #include "igt_stats.h"
 

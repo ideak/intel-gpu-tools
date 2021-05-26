@@ -43,7 +43,7 @@
 #include <pthread.h>
 
 #include "drm.h"
-#include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "igt_vgem.h"
 
 #define MiB(x) ((x) * 1024 * 1024)

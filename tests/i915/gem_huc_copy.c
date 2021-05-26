@@ -34,6 +34,7 @@
 #include <sys/time.h>
 #include "drm.h"
 #include "i915/gem.h"
+#include "i915/gem_create.h"
 
 IGT_TEST_DESCRIPTION("A very simple workload for the HuC.");
 

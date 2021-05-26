@@ -56,7 +56,7 @@
 #include "igt_perf.h"
 #include "sw_sync.h"
 
-#include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "i915/gem_engine_topology.h"
 #include "i915/gem_mman.h"
 

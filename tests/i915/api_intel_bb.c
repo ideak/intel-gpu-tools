@@ -23,6 +23,7 @@
 
 #include "igt.h"
 #include "i915/gem.h"
+#include "i915/gem_create.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>

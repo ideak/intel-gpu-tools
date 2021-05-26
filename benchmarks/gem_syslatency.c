@@ -44,7 +44,7 @@
 
 #include <linux/unistd.h>
 
-#include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "i915/gem_ring.h"
 
 #define sigev_notify_thread_id _sigev_un._tid

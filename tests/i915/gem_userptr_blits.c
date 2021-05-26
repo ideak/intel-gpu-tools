@@ -59,6 +59,7 @@
 #include "i915_drm.h"
 
 #include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "igt.h"
 #include "igt_sysfs.h"
 #include "sw_sync.h"

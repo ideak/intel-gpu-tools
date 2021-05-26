@@ -40,7 +40,7 @@
 
 #include "drm.h"
 #include "drm_fourcc.h"
-#include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "igt_device.h"
 
 IGT_TEST_DESCRIPTION("Tests GETFB and GETFB2 ioctls.");

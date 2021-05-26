@@ -34,6 +34,7 @@
 #include <time.h>
 
 #include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "igt.h"
 #include "igt_perf.h"
 #include "igt_rapl.h"

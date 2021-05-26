@@ -27,7 +27,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "i915/gem.h"
+#include "i915/gem_create.h"
 
 IGT_TEST_DESCRIPTION("Test big framebuffers");
 

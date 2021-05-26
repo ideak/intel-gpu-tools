@@ -26,6 +26,7 @@
 #include <time.h>
 
 #include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "igt.h"
 #include "igt_vgem.h"
 #include "intel_batchbuffer.h"	/* igt_blitter_src_copy() */

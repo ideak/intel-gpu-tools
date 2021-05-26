@@ -38,7 +38,7 @@
 #include <sys/ioctl.h>
 
 #include "drm.h"
-#include "i915/gem.h"
+#include "i915/gem_create.h"
 
 IGT_TEST_DESCRIPTION("Check that max fence stride works.");
 

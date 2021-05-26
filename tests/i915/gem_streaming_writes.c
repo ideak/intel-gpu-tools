@@ -38,6 +38,7 @@
 
 #include "drm.h"
 #include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "igt.h"
 
 #define OBJECT_SIZE 1024*1024

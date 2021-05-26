@@ -24,6 +24,7 @@
 #include <time.h>
 
 #include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "i915/gem_ring.h"
 #include "igt.h"
 #include "igt_x86.h"

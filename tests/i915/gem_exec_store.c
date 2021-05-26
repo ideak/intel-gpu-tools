@@ -30,6 +30,7 @@
 #include <strings.h>
 
 #include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "igt.h"
 #include "igt_device.h"
 #include "igt_gt.h"

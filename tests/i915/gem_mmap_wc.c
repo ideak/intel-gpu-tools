@@ -38,7 +38,7 @@
 #include <sys/ioctl.h>
 
 #include "drm.h"
-#include "i915/gem.h"
+#include "i915/gem_create.h"
 
 struct local_i915_gem_mmap_v2 {
 	uint32_t handle;

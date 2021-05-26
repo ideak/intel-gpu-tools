@@ -38,6 +38,7 @@
 #include <drm.h>
 
 #include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "i915/gem_engine_topology.h"
 #include "igt.h"
 #include "igt_rand.h"

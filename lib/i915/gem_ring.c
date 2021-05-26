@@ -27,6 +27,7 @@
 #include <sys/time.h>
 
 #include "gem.h"
+#include "gem_create.h"
 #include "gem_ring.h"
 #include "gem_submission.h"
 

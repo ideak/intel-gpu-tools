@@ -44,7 +44,7 @@
 #include <pthread.h>
 
 #include "drm.h"
-#include "i915/gem.h"
+#include "i915/gem_create.h"
 
 IGT_TEST_DESCRIPTION("Check whether prime import/export works on the same"
 		     " device... but with different fds.");

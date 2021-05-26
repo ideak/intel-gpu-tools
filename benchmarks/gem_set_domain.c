@@ -40,7 +40,7 @@
 
 #include "drm.h"
 #include "drmtest.h"
-#include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "igt_aux.h"
 #include "ioctl_wrappers.h"
 

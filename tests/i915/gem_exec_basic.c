@@ -23,7 +23,7 @@
 
 #include "igt.h"
 
-#include "i915/gem.h"
+#include "i915/gem_create.h"
 
 IGT_TEST_DESCRIPTION("Basic sanity check of execbuf-ioctl rings.");
 

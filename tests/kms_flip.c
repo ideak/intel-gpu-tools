@@ -42,7 +42,7 @@
 #include <time.h>
 #include <pthread.h>
 
-#include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "igt_stats.h"
 
 #define TEST_DPMS		(1 << 0)

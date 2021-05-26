@@ -22,6 +22,7 @@
  */
 
 #include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "igt.h"
 
 IGT_TEST_DESCRIPTION("Check that we can issue concurrent writes across the engines.");

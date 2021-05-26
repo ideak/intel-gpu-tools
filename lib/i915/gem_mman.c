@@ -31,7 +31,7 @@
 #include "ioctl_wrappers.h"
 #include "intel_chipset.h"
 
-#include "gem.h"
+#include "gem_create.h"
 #include "gem_mman.h"
 
 #ifdef HAVE_VALGRIND

@@ -45,6 +45,7 @@
 
 #include "drm.h"
 #include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "i915_reg.h"
 #include "igt.h"
 

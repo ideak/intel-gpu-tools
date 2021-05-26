@@ -37,7 +37,7 @@
 #include <sys/ioctl.h>
 
 #include "drm.h"
-#include "i915/gem.h"
+#include "i915/gem_create.h"
 
 #define OBJECT_SIZE 16384
 #define PAGE_SIZE 4096

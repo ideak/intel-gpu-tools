@@ -45,7 +45,7 @@
 #include "intel_chipset.h"
 #include "intel_reg.h"
 #include "igt_stats.h"
-#include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "i915/gem_mman.h"
 
 #define ENGINE_FLAGS  (I915_EXEC_RING_MASK | I915_EXEC_BSD_MASK)

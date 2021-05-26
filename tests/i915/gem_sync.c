@@ -25,6 +25,7 @@
 #include <pthread.h>
 
 #include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "i915/gem_ring.h"
 #include "igt_debugfs.h"
 #include "igt_dummyload.h"

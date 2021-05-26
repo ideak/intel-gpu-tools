@@ -22,6 +22,7 @@
  */
 
 #include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "i915/gem_vm.h"
 #include "i915_drm.h"
 #include "igt.h"

@@ -54,6 +54,7 @@
 #include "igt_dummyload.h"
 #include "igt_x86.h"
 #include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "i915/gem_engine_topology.h"
 #include "i915/gem_mman.h"
 #include "i915_drm.h"

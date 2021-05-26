@@ -32,6 +32,7 @@
 #include "igt.h"
 #include "igt_device.h"
 #include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "sw_sync.h"
 
 #define DERRMR 0x44050

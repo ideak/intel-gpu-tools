@@ -33,7 +33,7 @@
 #include <pixman.h>
 
 #include "drmtest.h"
-#include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "i915/gem_mman.h"
 #include "igt_aux.h"
 #include "igt_color_encoding.h"

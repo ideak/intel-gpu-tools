@@ -24,6 +24,7 @@
 #include <sys/poll.h>
 
 #include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "igt.h"
 
 IGT_TEST_DESCRIPTION("Basic check of polling for prime fences.");

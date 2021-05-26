@@ -24,7 +24,7 @@
 
 #include "igt.h"
 
-#include "i915/gem.h"
+#include "i915/gem_create.h"
 
 #define SDR_PLANE_BASE	3
 

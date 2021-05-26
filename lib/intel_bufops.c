@@ -25,7 +25,7 @@
 #include <sys/ioctl.h>
 #include <cairo.h>
 
-#include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "igt.h"
 #include "igt_x86.h"
 #include "intel_bufops.h"

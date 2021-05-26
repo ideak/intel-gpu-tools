@@ -33,7 +33,7 @@
 #include <fcntl.h>
 #include <limits.h>
 
-#include "i915/gem.h"
+#include "i915/gem_create.h"
 
 igt_simple_main
 {

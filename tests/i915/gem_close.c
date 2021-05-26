@@ -22,6 +22,7 @@
  */
 
 #include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "igt.h"
 
 static int batch_create(int fd)

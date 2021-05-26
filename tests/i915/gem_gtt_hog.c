@@ -40,6 +40,7 @@
 
 #include "drm.h"
 #include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "igt.h"
 
 static const uint32_t canary = 0xdeadbeef;

@@ -45,6 +45,7 @@
 #include <drm.h>
 
 #include "i915/gem.h"
+#include "i915/gem_create.h"
 #include "igt.h"
 
 IGT_TEST_DESCRIPTION("Test doing many blits with a working set larger than the"

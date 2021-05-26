@@ -44,7 +44,7 @@
 #include <sys/ioctl.h>
 
 #include "drm.h"
-#include "i915/gem.h"
+#include "i915/gem_create.h"
 
 #define WIDTH 512
 #define HEIGHT 512
