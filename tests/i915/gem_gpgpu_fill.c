@@ -123,20 +123,27 @@ static void gpgpu_fill(data_t *data, igt_fillfunc_t fill)
 
 	munmap(ptr, buf->surface[0].size);
 }
-
-igt_simple_main
+igt_main
 {
 	data_t data = {0, };
 	igt_fillfunc_t fill_fn = NULL;
 
-	data.drm_fd = drm_open_driver_render(DRIVER_INTEL);
-	data.devid = intel_get_drm_devid(data.drm_fd);
-	igt_require_gem(data.drm_fd);
-	data.bops = buf_ops_create(data.drm_fd);
+	igt_fixture {
+		data.drm_fd = drm_open_driver_render(DRIVER_INTEL);
+		data.devid = intel_get_drm_devid(data.drm_fd);
+		igt_require_gem(data.drm_fd);
+		data.bops = buf_ops_create(data.drm_fd);
 
-	fill_fn = igt_get_gpgpu_fillfunc(data.devid);
+		fill_fn = igt_get_gpgpu_fillfunc(data.devid);
 
-	igt_require_f(fill_fn, "no gpgpu-fill function\n");
+		igt_require_f(fill_fn, "no gpgpu-fill function\n");
 
-	gpgpu_fill(&data, fill_fn);
+	}
+
+	igt_subtest("basic")
+		gpgpu_fill(&data, fill_fn);
+
+	igt_fixture {
+		buf_ops_destroy(data.bops);
+	}
 }
