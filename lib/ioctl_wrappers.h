@@ -38,6 +38,7 @@
 
 #include "i915/gem_context.h"
 #include "i915/gem_scheduler.h"
+#include "i915/intel_memory_region.h"
 
 /**
  * igt_ioctl:
