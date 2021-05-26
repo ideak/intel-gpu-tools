@@ -56,7 +56,8 @@ igt_main
 		igt_assert(query_info);
 
 		set = get_memory_region_set(query_info,
-					    I915_SYSTEM_MEMORY);
+					    I915_SYSTEM_MEMORY,
+					    I915_DEVICE_MEMORY);
 	}
 
 	igt_subtest_with_dynamic("basic") {
