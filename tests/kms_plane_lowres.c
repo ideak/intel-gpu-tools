@@ -59,26 +59,21 @@ get_lowres_mode(int drmfd, igt_output_t *output,
 		const drmModeModeInfo *mode_default)
 {
 	const drmModeModeInfo *mode;
-	bool found = false;
-	int limit = mode_default->vdisplay - SIZE;
+	const drmModeModeInfo *min;
 	int j;
 
+        /* search for lowest mode */
+        min = mode_default;
 	for (j = 0; j < output->config.connector->count_modes; j++) {
 		mode = &output->config.connector->modes[j];
-		if (mode->vdisplay < limit) {
-			found = true;
-			break;
-		}
+		if (mode->vdisplay < min->vdisplay)
+			min = mode;
 	}
 
-	if (!found) {
-		igt_require_f(mode_default->vdisplay - SIZE > 768,
-			      "Current mode not tall enough; plane would still be onscreen after switch to 10x7.\n");
+	igt_require_f(mode_default->vdisplay - min->vdisplay > 2 * SIZE,
+		      "Current mode not tall enough; plane would still be onscreen after switching to lowest mode.\n");
 
-		return *igt_std_1024_mode_get();
-	}
-
-	return *mode;
+	return *min;
 }
 
 static igt_plane_t *first_sdr_plane(igt_output_t *output, uint32_t devid)
@@ -249,6 +244,8 @@ test_planes_on_pipe_with_output(data_t *data, igt_plane_t *plane, uint64_t modif
 	igt_remove_fb(data->drm_fd, &data->fb_primary);
 	igt_remove_fb(data->drm_fd, &data->ref_hires.fb);
 	igt_remove_fb(data->drm_fd, &data->ref_lowres.fb);
+
+	igt_display_reset(&data->display);
 
 	return tested;
 }
