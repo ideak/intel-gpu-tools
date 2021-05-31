@@ -262,7 +262,7 @@ igt_main
 	data_t data = {};
 	igt_output_t *output;
 	drmModeRes *res;
-	drmModeConnector *connector;
+	drmModeConnector *connector = NULL;
 	int i, test_conn_cnt, test_cnt;
 	int tests[] = {DRM_MODE_CONNECTOR_eDP, DRM_MODE_CONNECTOR_DisplayPort};
 
@@ -311,7 +311,8 @@ igt_main
 	}
 
 	igt_fixture {
-		drmModeFreeConnector(connector);
+		if (connector)
+			drmModeFreeConnector(connector);
 		drmModeFreeResources(res);
 		close(data.debugfs_fd);
 		close(data.drm_fd);
