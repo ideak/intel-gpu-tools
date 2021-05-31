@@ -118,7 +118,7 @@ int igt_nouveau_create_bo(int drm_fd, bool sysmem, igt_fb_t *fb)
 {
 	struct igt_nouveau_dev *dev = get_nouveau_dev(drm_fd);
 	struct nouveau_device *nvdev = dev->dev;
-	union nouveau_bo_config config = {0};
+	union nouveau_bo_config config = { };
 	struct igt_nouveau_fb_priv *priv;
 	uint32_t flags = sysmem ? NOUVEAU_BO_GART : NOUVEAU_BO_VRAM;
 

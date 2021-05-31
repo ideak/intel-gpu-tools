@@ -292,7 +292,7 @@ struct edid **igt_kms_get_tiled_edid(uint8_t htile, uint8_t vtile)
 {
 	uint8_t top[2];
 	int edids, i;
-	static  char raw_edid[MAX_EDID][256] = {0};
+	static  char raw_edid[MAX_EDID][256] = { };
 	static struct edid *edid[MAX_EDID];
 
 	top[0] = 0x00;

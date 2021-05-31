@@ -2382,8 +2382,8 @@ static void submit_timeline_execbuf(struct inter_engine_context *context,
 				    uint32_t signal_syncobj,
 				    uint64_t signal_value)
 {
-	uint64_t values[2] = { 0, };
-	struct drm_i915_gem_exec_fence fences[2] = { 0, };
+	uint64_t values[2] = { };
+	struct drm_i915_gem_exec_fence fences[2] = { };
 	struct drm_i915_gem_execbuffer_ext_timeline_fences fence_list = {
 		.base = {
 			.name = DRM_I915_GEM_EXECBUFFER_EXT_TIMELINE_FENCES,
