@@ -505,8 +505,7 @@ static void timeslice(int i915, unsigned int engine)
 	 * switch to the other batch in order to advance.
 	 */
 
-	igt_require(gem_scheduler_has_semaphores(i915));
-	igt_require(gem_scheduler_has_preemption(i915));
+	igt_require(gem_scheduler_has_timeslicing(i915));
 	igt_require(intel_gen(intel_get_drm_devid(i915)) >= 8);
 
 	obj.handle = timeslicing_batches(i915, &offset);
@@ -602,8 +601,7 @@ static void timesliceN(int i915, unsigned int engine, int count)
 	 * switch to the other batch in order to advance.
 	 */
 
-	igt_require(gem_scheduler_has_semaphores(i915));
-	igt_require(gem_scheduler_has_preemption(i915));
+	igt_require(gem_scheduler_has_timeslicing(i915));
 	igt_require(intel_gen(intel_get_drm_devid(i915)) >= 8);
 
 	/* No coupling between requests; free to timeslice */
@@ -635,8 +633,7 @@ static void lateslice(int i915, unsigned int engine, unsigned long flags)
 	igt_spin_t *spin[3];
 	uint32_t ctx;
 
-	igt_require(gem_scheduler_has_semaphores(i915));
-	igt_require(gem_scheduler_has_preemption(i915));
+	igt_require(gem_scheduler_has_timeslicing(i915));
 	igt_require(intel_gen(intel_get_drm_devid(i915)) >= 8);
 
 	ctx = gem_context_create(i915);
@@ -742,8 +739,7 @@ static void submit_slice(int i915,
 	 * especially when that work is coperating with the spinner.
 	 */
 
-	igt_require(gem_scheduler_has_semaphores(i915));
-	igt_require(gem_scheduler_has_preemption(i915));
+	igt_require(gem_scheduler_has_timeslicing(i915));
 	igt_require(intel_gen(intel_get_drm_devid(i915)) >= 8);
 
 	__for_each_physical_engine(i915, cancel) {
@@ -820,7 +816,7 @@ static void semaphore_userlock(int i915, unsigned long flags)
 	igt_spin_t *spin = NULL;
 	uint32_t scratch;
 
-	igt_require(gem_scheduler_has_semaphores(i915));
+	igt_require(gem_scheduler_has_timeslicing(i915));
 
 	/*
 	 * Given the use of semaphores to govern parallel submission
@@ -2873,8 +2869,7 @@ igt_main
 
 		igt_subtest_group {
 			igt_fixture {
-				igt_require(gem_scheduler_has_semaphores(fd));
-				igt_require(gem_scheduler_has_preemption(fd));
+				igt_require(gem_scheduler_has_timeslicing(fd));
 				igt_require(intel_gen(intel_get_drm_devid(fd)) >= 8);
 			}
 
