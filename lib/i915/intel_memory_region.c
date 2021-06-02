@@ -149,6 +149,7 @@ uint8_t gem_get_lmem_region_count(int fd)
 		if (query_info->regions[i].region.memory_class == I915_MEMORY_CLASS_DEVICE)
 			lmem_regions += 1;
 	}
+	free(query_info);
 
 	return lmem_regions;
 }
