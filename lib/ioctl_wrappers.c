@@ -55,6 +55,7 @@
 #include "intel_io.h"
 #include "igt_debugfs.h"
 #include "igt_sysfs.h"
+#include "igt_x86.h"
 #include "config.h"
 #include "i915/gem_mman.h"
 
@@ -385,7 +386,7 @@ static void mmap_read(int fd, uint32_t handle, uint64_t offset, void *buf, uint6
 		gem_set_domain(fd, handle, I915_GEM_DOMAIN_WC, 0);
 	}
 
-	memcpy(buf, map + offset, length);
+	igt_memcpy_from_wc(buf, map + offset, length);
 	munmap(map, offset + length);
 }
 
