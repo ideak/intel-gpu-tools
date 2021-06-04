@@ -788,11 +788,23 @@ static uint64_t calc_plane_size(struct igt_fb *fb, int plane)
 		return (uint64_t) fb->strides[plane] *
 			ALIGN(fb->plane_height[plane], tile_height);
 	} else if (is_gen12_ccs_plane(fb, plane)) {
+		uint64_t size;
+
 		/* The AUX CCS surface must be page aligned */
-		return (uint64_t)fb->strides[plane] *
+		size = (uint64_t)fb->strides[plane] *
 			ALIGN(fb->plane_height[plane], 64);
+
+		/*
+		 * On ADL_P CCS color planes must be 2MB aligned, until remapping
+		 * support is added for CCS FBs.
+		 */
+		if (IS_ALDERLAKE_P(intel_get_drm_devid(fb->fd)))
+			size = ALIGN(size, 2 * 1024 * 1024);
+
+		return size;
 	} else {
 		unsigned int tile_width, tile_height;
+		uint64_t size;
 
 		igt_get_fb_tile_size(fb->fd, fb->modifier, fb->plane_bpp[plane],
 				     &tile_width, &tile_height);
@@ -801,8 +813,18 @@ static uint64_t calc_plane_size(struct igt_fb *fb, int plane)
 		if (is_gen12_ccs_modifier(fb->modifier))
 			tile_height *= 4;
 
-		return (uint64_t) fb->strides[plane] *
+		size = (uint64_t)fb->strides[plane] *
 			ALIGN(fb->plane_height[plane], tile_height);
+
+		/*
+		 * On ADL_P CCS color planes must be 2MB aligned, until remapping
+		 * support is added for CCS FBs.
+		 */
+		if (IS_ALDERLAKE_P(intel_get_drm_devid(fb->fd)) &&
+		    is_ccs_modifier(fb->modifier))
+			size = ALIGN(size, 2 * 1024 * 1024);
+
+		return size;
 	}
 }
 
