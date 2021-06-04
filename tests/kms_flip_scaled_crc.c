@@ -261,7 +261,7 @@ igt_main
 
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
-		data.gen = intel_gen(intel_get_drm_devid(data.drm_fd));
+		data.gen = intel_display_ver(intel_get_drm_devid(data.drm_fd));
 		igt_require(data.gen >= 9);
 		igt_display_require(&data.display, data.drm_fd);
 		igt_require(data.display.is_atomic);

@@ -2647,7 +2647,7 @@ static void scaledprimary_subtest(const struct test_mode *t)
 	struct igt_fb new_fb, *old_fb;
 	struct modeset_params *params = pick_params(t);
 	struct fb_region *reg = &params->primary;
-	int gen = intel_gen(intel_get_drm_devid(drm.fd));
+	int gen = intel_display_ver(intel_get_drm_devid(drm.fd));
 	int src_y_upscale = ALIGN(reg->h / 4, 4);
 
 	igt_require_f(gen >= 9,
@@ -2831,7 +2831,7 @@ static void farfromfence_subtest(const struct test_mode *t)
 	struct draw_pattern_info *pattern = &pattern1;
 	struct fb_region *target;
 	int max_height, assertions = 0;
-	int gen = intel_gen(intel_get_drm_devid(drm.fd));
+	int gen = intel_display_ver(intel_get_drm_devid(drm.fd));
 
 	igt_skip_on(t->method == IGT_DRAW_MMAP_GTT &&
 		    !gem_has_mappable_ggtt(drm.fd));

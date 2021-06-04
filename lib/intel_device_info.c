@@ -535,3 +535,17 @@ unsigned intel_gen(uint16_t devid)
 {
 	return intel_get_device_info(devid)->graphics_ver ?: -1u;
 }
+
+/**
+ * intel_display_ver:
+ * @devid: pci device id
+ *
+ * Computes the Intel GFX display version for the given device id.
+ *
+ * Returns:
+ * The display version on successful lookup, -1u on failure.
+ */
+unsigned intel_display_ver(uint16_t devid)
+{
+	return intel_get_device_info(devid)->display_ver ?: -1u;
+}

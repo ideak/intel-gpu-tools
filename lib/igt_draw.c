@@ -339,7 +339,7 @@ static void draw_rect_mmap_cpu(int fd, struct buf_data *buf, struct rect *rect,
 
 	/* We didn't implement suport for the older tiling methods yet. */
 	if (tiling != I915_TILING_NONE)
-		igt_require(intel_gen(intel_get_drm_devid(fd)) >= 5);
+		igt_require(intel_display_ver(intel_get_drm_devid(fd)) >= 5);
 
 	ptr = gem_mmap__cpu(fd, buf->handle, 0, PAGE_ALIGN(buf->size),
 			    PROT_READ | PROT_WRITE);
@@ -389,7 +389,7 @@ static void draw_rect_mmap_wc(int fd, struct buf_data *buf, struct rect *rect,
 
 	/* We didn't implement suport for the older tiling methods yet. */
 	if (tiling != I915_TILING_NONE)
-		igt_require(intel_gen(intel_get_drm_devid(fd)) >= 5);
+		igt_require(intel_display_ver(intel_get_drm_devid(fd)) >= 5);
 
 	ptr = gem_mmap__wc(fd, buf->handle, 0, PAGE_ALIGN(buf->size),
 			   PROT_READ | PROT_WRITE);
@@ -440,7 +440,7 @@ static void draw_rect_pwrite_tiled(int fd, struct buf_data *buf,
 	int pixels_written = 0;
 
 	/* We didn't implement suport for the older tiling methods yet. */
-	igt_require(intel_gen(intel_get_drm_devid(fd)) >= 5);
+	igt_require(intel_display_ver(intel_get_drm_devid(fd)) >= 5);
 
 	pixel_size = buf->bpp / 8;
 	tmp_size = sizeof(tmp) / pixel_size;

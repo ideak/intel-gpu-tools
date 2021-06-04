@@ -141,7 +141,7 @@ static bool skip_plane(data_t *data, igt_plane_t *plane)
 	if (plane->type == DRM_PLANE_TYPE_CURSOR)
 		return false;
 
-	if (intel_gen(intel_get_drm_devid(data->drm_fd)) < 11)
+	if (intel_display_ver(intel_get_drm_devid(data->drm_fd)) < 11)
 		return false;
 
 	/*

@@ -408,7 +408,7 @@ void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 		break;
 	case LOCAL_I915_FORMAT_MOD_X_TILED:
 		igt_require_intel(fd);
-		if (intel_gen(intel_get_drm_devid(fd)) == 2) {
+		if (intel_display_ver(intel_get_drm_devid(fd)) == 2) {
 			*width_ret = 128;
 			*height_ret = 16;
 		} else {
@@ -422,7 +422,7 @@ void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 	case LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC:
 	case LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS:
 		igt_require_intel(fd);
-		if (intel_gen(intel_get_drm_devid(fd)) == 2) {
+		if (intel_display_ver(intel_get_drm_devid(fd)) == 2) {
 			*width_ret = 128;
 			*height_ret = 16;
 		} else if (IS_915(intel_get_drm_devid(fd))) {
@@ -693,7 +693,7 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 
 	if (fb->modifier != LOCAL_DRM_FORMAT_MOD_NONE &&
 	    is_i915_device(fb->fd) &&
-	    intel_gen(intel_get_drm_devid(fb->fd)) <= 3) {
+	    intel_display_ver(intel_get_drm_devid(fb->fd)) <= 3) {
 		uint32_t stride;
 
 		/* Round the tiling up to the next power-of-two and the region
@@ -758,7 +758,7 @@ static uint64_t calc_plane_size(struct igt_fb *fb, int plane)
 {
 	if (fb->modifier != LOCAL_DRM_FORMAT_MOD_NONE &&
 	    is_i915_device(fb->fd) &&
-	    intel_gen(intel_get_drm_devid(fb->fd)) <= 3) {
+	    intel_display_ver(intel_get_drm_devid(fb->fd)) <= 3) {
 		uint64_t min_size = (uint64_t) fb->strides[plane] *
 			fb->plane_height[plane];
 		uint64_t size;
@@ -2118,12 +2118,12 @@ struct fb_blit_upload {
 
 static bool fast_blit_ok(const struct igt_fb *fb)
 {
-	int gen = intel_gen(intel_get_drm_devid(fb->fd));
+	int ver = intel_display_ver(intel_get_drm_devid(fb->fd));
 
-	if (gen < 9)
+	if (ver < 9)
 		return false;
 
-	if (gen < 12)
+	if (ver < 12)
 		return true;
 
 	return fb->modifier != I915_FORMAT_MOD_X_TILED;

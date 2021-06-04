@@ -245,7 +245,7 @@ static void fill_fb_subtest(void)
 	get_fill_crc(LOCAL_I915_FORMAT_MOD_X_TILED, &crc);
 	igt_assert_crc_equal(&crc, &base_crc);
 
-	if (intel_gen(intel_get_drm_devid(drm_fd)) >= 9) {
+	if (intel_display_ver(intel_get_drm_devid(drm_fd)) >= 9) {
 		get_fill_crc(LOCAL_I915_FORMAT_MOD_Y_TILED, &crc);
 		igt_assert_crc_equal(&crc, &base_crc);
 	}

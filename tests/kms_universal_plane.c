@@ -32,7 +32,7 @@
 typedef struct {
 	int drm_fd;
 	igt_display_t display;
-	int gen;
+	int display_ver;
 } data_t;
 
 typedef struct {
@@ -383,7 +383,7 @@ sanity_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 	 * gen9+).
 	 */
 	igt_plane_set_fb(primary, &test.undersized_fb);
-	expect = (data->gen < 9) ? -EINVAL : 0;
+	expect = (data->display_ver < 9) ? -EINVAL : 0;
 	igt_assert(igt_display_try_commit2(&data->display, COMMIT_UNIVERSAL) == expect);
 
 	/* Same as above, but different plane positioning. */
@@ -393,7 +393,7 @@ sanity_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 	igt_plane_set_position(primary, 0, 0);
 
 	/* Try to use universal plane API to scale down (should fail on pre-gen9) */
-	expect = (data->gen < 9) ? -ERANGE : 0;
+	expect = (data->display_ver < 9) ? -ERANGE : 0;
 	igt_assert(drmModeSetPlane(data->drm_fd, primary->drm_plane->plane_id,
 				   output->config.crtc->crtc_id,
 				   test.oversized_fb.fb_id, 0,
@@ -704,7 +704,7 @@ gen9_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 
 	int ret = 0;
 
-	igt_skip_on(data->gen < 9);
+	igt_skip_on(data->display_ver < 9);
 	igt_require_pipe(&data->display, pipe);
 
 	igt_output_set_pipe(output, pipe);
@@ -798,7 +798,7 @@ igt_main
 
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
-		data.gen = intel_gen(intel_get_drm_devid(data.drm_fd));
+		data.display_ver = intel_display_ver(intel_get_drm_devid(data.drm_fd));
 
 		kmstest_set_vt_graphics_mode();
 

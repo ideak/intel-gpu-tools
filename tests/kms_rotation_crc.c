@@ -517,7 +517,7 @@ static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_form
 			/* Only support partial covering primary plane on gen9+ */
 			if (is_amdgpu_device(data->gfx_fd) ||
 				(plane_type == DRM_PLANE_TYPE_PRIMARY &&
-			    intel_gen(intel_get_drm_devid(data->gfx_fd)) < 9)) {
+			    intel_display_ver(intel_get_drm_devid(data->gfx_fd)) < 9)) {
 				if (i != rectangle)
 					continue;
 				else
@@ -730,12 +730,12 @@ static void test_multi_plane_rotation(data_t *data, enum pipe pipe)
 						 */
 						if (p[0].format == DRM_FORMAT_RGB565 &&
 						     (planeconfigs[i].rotation & (IGT_ROTATION_90 | IGT_ROTATION_270))
-						     && intel_gen(data->devid) < 11)
+						     && intel_display_ver(data->devid) < 11)
 							continue;
 
 						if (p[1].format == DRM_FORMAT_RGB565 &&
 						     (planeconfigs[j].rotation & (IGT_ROTATION_90 | IGT_ROTATION_270))
-						     && intel_gen(data->devid) < 11)
+						     && intel_display_ver(data->devid) < 11)
 							continue;
 						/*
 						 * if using packed formats crc's will be
@@ -1024,7 +1024,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 		data.gfx_fd = drm_open_driver_master(DRIVER_INTEL | DRIVER_AMDGPU);
 		if (is_i915_device(data.gfx_fd)) {
 			data.devid = intel_get_drm_devid(data.gfx_fd);
-			gen = intel_gen(data.devid);
+			gen = intel_display_ver(data.devid);
 		}
 
 		kmstest_set_vt_graphics_mode();

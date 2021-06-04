@@ -52,9 +52,9 @@ static int get_num_scalers(data_t* d, enum pipe pipe)
 	if (!is_i915_device(d->drm_fd))
 		return 1;
 
-	igt_require(intel_gen(d->devid) >= 9);
+	igt_require(intel_display_ver(d->devid) >= 9);
 
-	if (intel_gen(d->devid) >= 10)
+	if (intel_display_ver(d->devid) >= 10)
 		return 2;
 	else if (pipe != PIPE_C)
 		return 2;
@@ -167,7 +167,7 @@ static bool can_rotate(data_t *d, unsigned format, uint64_t tiling,
 
 	switch (format) {
 	case DRM_FORMAT_RGB565:
-		if (intel_gen(d->devid) >= 11)
+		if (intel_display_ver(d->devid) >= 11)
 			break;
 		/* fall through */
 	case DRM_FORMAT_C8:
@@ -198,7 +198,7 @@ static bool can_scale(data_t *d, unsigned format)
 	case DRM_FORMAT_XBGR16161616F:
 	case DRM_FORMAT_ARGB16161616F:
 	case DRM_FORMAT_ABGR16161616F:
-		if (intel_gen(d->devid) >= 11)
+		if (intel_display_ver(d->devid) >= 11)
 			return true;
 		/* fall through */
 	case DRM_FORMAT_C8:

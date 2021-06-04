@@ -87,7 +87,7 @@ hdmi_inject_4k(int drm_fd, drmModeConnector *connector)
 	devid = intel_get_drm_devid(drm_fd);
 
 	/* 4K requires at least HSW */
-	igt_require(IS_HASWELL(devid) || intel_gen(devid) >= 8);
+	igt_require(IS_HASWELL(devid) || intel_display_ver(devid) >= 8);
 
 	edid = igt_kms_get_4k_edid();
 	kmstest_force_edid(drm_fd, connector, edid);

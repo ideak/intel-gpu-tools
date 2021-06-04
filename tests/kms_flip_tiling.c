@@ -155,7 +155,7 @@ igt_main
 {
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
-		data.gen = intel_gen(intel_get_drm_devid(data.drm_fd));
+		data.gen = intel_display_ver(intel_get_drm_devid(data.drm_fd));
 
 		data.testformat = DRM_FORMAT_XRGB8888;
 

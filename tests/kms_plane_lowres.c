@@ -80,14 +80,14 @@ static igt_plane_t *first_sdr_plane(igt_output_t *output, uint32_t devid)
 {
         int index;
 
-        index = intel_gen(devid) <= 9 ? 0 : SDR_PLANE_BASE;
+        index = intel_display_ver(devid) <= 9 ? 0 : SDR_PLANE_BASE;
 
         return igt_output_get_plane(output, index);
 }
 
 static bool is_sdr_plane(const igt_plane_t *plane, uint32_t devid)
 {
-        if (intel_gen(devid) <= 9)
+        if (intel_display_ver(devid) <= 9)
                 return true;
 
         return plane->index >= SDR_PLANE_BASE;

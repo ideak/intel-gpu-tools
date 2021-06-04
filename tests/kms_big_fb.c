@@ -153,7 +153,7 @@ static bool size_ok(data_t *data, uint64_t size)
 	 * The kernel limits scanout to the
 	 * mappable portion of ggtt on gmch platforms.
 	 */
-	if ((intel_gen(data->devid) < 5 ||
+	if ((intel_display_ver(data->devid) < 5 ||
 	     IS_VALLEYVIEW(data->devid) ||
 	     IS_CHERRYVIEW(data->devid)) &&
 	    size > data->mappable_size / 2)
@@ -182,7 +182,7 @@ static void max_fb_size(data_t *data, int *width, int *height,
 	*height = data->max_fb_height;
 
 	/* max fence stride is only 8k bytes on gen3 */
-	if (intel_gen(data->devid) < 4 &&
+	if (intel_display_ver(data->devid) < 4 &&
 	    format == DRM_FORMAT_XRGB8888)
 		*width = min(*width, 8192 / 4);
 
@@ -553,7 +553,7 @@ test_addfb(data_t *data)
 	 * max fb size of 4k pixels, hence we can't test
 	 * with 32bpp and must use 16bpp instead.
 	 */
-	if (intel_gen(data->devid) == 3)
+	if (intel_display_ver(data->devid) == 3)
 		format = DRM_FORMAT_RGB565;
 	else
 		format = DRM_FORMAT_XRGB8888;
@@ -570,7 +570,7 @@ test_addfb(data_t *data)
 	bo = gem_create(data->drm_fd, size);
 	igt_require(bo);
 
-	if (intel_gen(data->devid) < 4)
+	if (intel_display_ver(data->devid) < 4)
 		gem_set_tiling(data->drm_fd, bo,
 			       igt_fb_mod_to_tiling(data->modifier), strides[0]);
 
@@ -660,7 +660,7 @@ igt_main
 		 * On gen2 we could use either, but let's go for the
 		 * blitter there as well.
 		 */
-		if (intel_gen(data.devid) >= 4)
+		if (intel_display_ver(data.devid) >= 4)
 			data.render_copy = igt_get_render_copyfunc(data.devid);
 
 		data.bops = buf_ops_create(data.drm_fd);
