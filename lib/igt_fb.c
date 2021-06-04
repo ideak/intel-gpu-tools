@@ -729,8 +729,16 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 		/* clear color always fixed to 64 bytes */
 		return 64;
 	} else if (is_gen12_ccs_plane(fb, plane)) {
-		/* A main surface using a CCS AUX surface must be 4x4 tiles aligned. */
-		return ALIGN(min_stride, 64);
+		/*
+		 * A main surface using a CCS AUX surface must be 4x4 tiles
+		 * aligned.  On ADL_P the minimum main surface stride is 8
+		 * tiles (2 * 64 byte on CCS surface) and it has to be POT
+		 * aligned.
+		 */
+		if (IS_ALDERLAKE_P(intel_get_drm_devid(fb->fd)))
+			return roundup_power_of_two(max(min_stride, 128u));
+		else
+			return ALIGN(min_stride, 64);
 	} else if (!fb->modifier && is_nouveau_device(fb->fd)) {
 		int align;
 
@@ -743,14 +751,22 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 		return ALIGN(min_stride, align);
 	} else {
 		unsigned int tile_width, tile_height;
+		uint32_t stride;
 
 		igt_get_fb_tile_size(fb->fd, fb->modifier, fb->plane_bpp[plane],
 				     &tile_width, &tile_height);
 
-		if (is_gen12_ccs_modifier(fb->modifier))
-			tile_width *= 4;
+		if (is_gen12_ccs_modifier(fb->modifier)) {
+			stride = ALIGN(min_stride, tile_width * 4);
 
-		return ALIGN(min_stride, tile_width);
+			/* TODO: add support to kernel to POT align CCS format strides */
+			if (IS_ALDERLAKE_P(intel_get_drm_devid(fb->fd)))
+				stride = roundup_power_of_two(max(stride, tile_width * 8));
+		} else {
+			stride = ALIGN(min_stride, tile_width);
+		}
+
+		return stride;
 	}
 }
 
