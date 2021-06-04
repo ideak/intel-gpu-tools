@@ -37,7 +37,8 @@ struct pci_device *intel_get_pci_device(void);
 uint32_t intel_get_drm_devid(int fd);
 
 struct intel_device_info {
-	unsigned gen;
+	unsigned graphics_ver;
+	unsigned display_ver;
 	unsigned gt; /* 0 if unknown */
 	bool is_mobile : 1;
 	bool is_whitney : 1;
@@ -179,8 +180,8 @@ void intel_check_pch(void);
 #define IS_DG1(devid)		(intel_get_device_info(devid)->is_dg1)
 #define IS_ALDERLAKE_S(devid)	(intel_get_device_info(devid)->is_alderlake_s)
 
-#define IS_GEN(devid, x)	(intel_get_device_info(devid)->gen & (1u << ((x)-1)))
-#define AT_LEAST_GEN(devid, x)	(intel_get_device_info(devid)->gen & -(1u << ((x)-1)))
+#define IS_GEN(devid, x)	(intel_get_device_info(devid)->graphics_ver == x)
+#define AT_LEAST_GEN(devid, x)	(intel_get_device_info(devid)->graphics_ver >= x)
 
 #define IS_GEN2(devid)		IS_GEN(devid, 2)
 #define IS_GEN3(devid)		IS_GEN(devid, 3)

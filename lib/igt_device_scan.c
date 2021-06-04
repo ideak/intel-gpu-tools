@@ -208,7 +208,7 @@ static char *devname_intel(uint16_t vendor, uint16_t device)
 		if (devname) {
 			devname[0] = toupper(devname[0]);
 			igt_assert(asprintf(&s, "Intel %s (Gen%u)", devname,
-					    ffs(info->gen)) != -1);
+					    info->graphics_ver) != -1);
 			free(devname);
 		}
 	}

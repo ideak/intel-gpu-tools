@@ -317,14 +317,14 @@ get_device_timestamp_frequency(const struct intel_device_info *devinfo, int drm_
 	if (perf_ioctl(drm_fd, DRM_IOCTL_I915_GETPARAM, &gp) == 0)
 		return timestamp_frequency;
 
-	if (devinfo->gen > 9) {
+	if (devinfo->graphics_ver > 9) {
 		fprintf(stderr, "Unable to query timestamp frequency from i915, please update kernel.\n");
 		return 0;
 	}
 
 	fprintf(stderr, "Warning: unable to query timestamp frequency from i915, guessing values...\n");
 
-	if (devinfo->gen <= 8)
+	if (devinfo->graphics_ver <= 8)
 		return 12500000;
 	if (devinfo->is_broxton)
 		return 19200000;
@@ -878,7 +878,7 @@ main(int argc, char *argv[])
 	}
 
 	fprintf(stdout, "Device name=%s gen=%i gt=%i id=0x%x\n",
-		ctx.devinfo->codename, ctx.devinfo->gen, ctx.devinfo->gt, ctx.devid);
+		ctx.devinfo->codename, ctx.devinfo->graphics_ver, ctx.devinfo->gt, ctx.devid);
 
 	ctx.topology = get_topology(ctx.drm_fd, &ctx.topology_size);
 	if (!ctx.topology) {

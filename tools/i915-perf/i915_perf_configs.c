@@ -228,7 +228,7 @@ main(int argc, char *argv[])
 		return EXIT_FAILURE;
 	}
 
-	fprintf(stdout, "Device gen=%i gt=%i\n", devinfo->gen, devinfo->gt);
+	fprintf(stdout, "Device graphics_ver=%i gt=%i\n", devinfo->graphics_ver, devinfo->gt);
 
 	perf = intel_perf_for_fd(drm_fd);
 	if (!perf) {

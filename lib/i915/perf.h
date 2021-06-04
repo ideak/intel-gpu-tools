@@ -50,7 +50,7 @@ struct intel_perf_devinfo {
 	 * Their values are build up from the topology fields.
 	 */
 	uint32_t devid;
-	uint32_t gen;
+	uint32_t graphics_ver;
 	uint32_t revision;
 	uint64_t timestamp_frequency;
 	uint64_t gt_min_freq;

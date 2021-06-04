@@ -220,8 +220,9 @@ main(int argc, char *argv[])
 
 	devinfo = intel_get_device_info(reader.devinfo.devid);
 
-	fprintf(stdout, "Recorded on device=0x%x(%s) gen=%i\n",
-		reader.devinfo.devid, devinfo->codename, reader.devinfo.gen);
+	fprintf(stdout, "Recorded on device=0x%x(%s) graphics_ver=%i\n",
+		reader.devinfo.devid, devinfo->codename,
+		reader.devinfo.graphics_ver);
 	fprintf(stdout, "Metric used : %s (%s) uuid=%s\n",
 		reader.metric_set->symbol_name, reader.metric_set->name,
 		reader.metric_set->hw_config_guid);

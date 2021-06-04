@@ -310,7 +310,7 @@ static int print_welcome(int fd)
 	int err;
 
 	igt_info("Running on %s (pci-id %04x, gen %d)\n",
-		 info->codename, devid, ffs(info->gen));
+		 info->codename, devid, info->graphics_ver);
 	igt_info("Can use MI_STORE_DWORD(virtual)? %s\n",
 		 gem_can_store_dword(fd, 0) ? "yes" : "no");
 
@@ -320,7 +320,7 @@ static int print_welcome(int fd)
 	igt_info("GPU operation? %s [errno=%d]\n",
 		 err == 0 ? "yes" : "no", err);
 
-	return ffs(info->gen);
+	return info->graphics_ver;
 }
 
 #define test_each_engine(T, i915, e)  \

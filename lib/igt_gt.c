@@ -552,18 +552,18 @@ bool gem_class_can_store_dword(int fd, int class)
 {
 	uint16_t devid = intel_get_drm_devid(fd);
 	const struct intel_device_info *info = intel_get_device_info(devid);
-	const int gen = ffs(info->gen);
+	const int ver = info->graphics_ver;
 
-	if (info->gen == 0) /* unknown, assume it just works */
+	if (ver == 0) /* unknown, assume it just works */
 		return true;
 
-	if (gen <= 2) /* requires physical addresses */
+	if (ver <= 2) /* requires physical addresses */
 		return false;
 
-	if (gen == 3 && (info->is_grantsdale || info->is_alviso))
+	if (ver == 3 && (info->is_grantsdale || info->is_alviso))
 		return false; /* only supports physical addresses */
 
-	if (gen == 6 && class == I915_ENGINE_CLASS_VIDEO)
+	if (ver == 6 && class == I915_ENGINE_CLASS_VIDEO)
 		return false; /* broken, unbelievably broken */
 
 	if (info->is_broadwater)

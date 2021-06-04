@@ -49,13 +49,13 @@ static bool has_known_intel_chipset(int fd)
 		return false;
 	}
 
-	if (!info->gen) {
+	if (!info->graphics_ver) {
 		igt_warn("Unknown PCI-ID: %04x\n", devid);
 		return false;
 	}
 
 	igt_info("PCI-ID: %#04x, gen %d, %s\n",
-		 devid, ffs(info->gen), info->codename);
+		 devid, info->graphics_ver, info->codename);
 	return true;
 }
 

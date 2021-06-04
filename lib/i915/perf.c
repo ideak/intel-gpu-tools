@@ -169,7 +169,7 @@ intel_perf_for_devinfo(uint32_t device_id,
 	 * 2x6 does not have 2 samplers).
 	 */
 	perf->devinfo.devid = device_id;
-	perf->devinfo.gen = devinfo->gen;
+	perf->devinfo.graphics_ver = devinfo->graphics_ver;
 	perf->devinfo.revision = revision;
 	perf->devinfo.timestamp_frequency = timestamp_frequency;
 	perf->devinfo.gt_min_freq = gt_min_freq;
@@ -183,7 +183,7 @@ intel_perf_for_devinfo(uint32_t device_id,
 	/* On Gen11+ the equations from the xml files expect an 8bits
 	 * mask per subslice, versus only 3bits on prior Gens.
 	 */
-	bits_per_subslice = devinfo->gen >= 11 ? 8 : 3;
+	bits_per_subslice = devinfo->graphics_ver >= 11 ? 8 : 3;
 	for (uint32_t s = 0; s < topology->max_slices; s++) {
 		if (!slice_available(topology, s))
 			continue;

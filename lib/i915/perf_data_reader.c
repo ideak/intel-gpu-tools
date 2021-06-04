@@ -45,11 +45,11 @@ oa_report_ctx_is_valid(const struct intel_perf_devinfo *devinfo,
 {
 	const uint32_t *report = (const uint32_t *) _report;
 
-	if (devinfo->gen < 8) {
+	if (devinfo->graphics_ver < 8) {
 		return false; /* TODO */
-	} else if (devinfo->gen == 8) {
+	} else if (devinfo->graphics_ver == 8) {
 		return report[0] & (1ul << 25);
-	} else if (devinfo->gen > 8) {
+	} else if (devinfo->graphics_ver > 8) {
 		return report[0] & (1ul << 16);
 	}
 
