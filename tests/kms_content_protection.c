@@ -402,6 +402,7 @@ static void test_content_protection_on_output(igt_output_t *output,
 static void __debugfs_read(int fd, const char *param, char *buf, int len)
 {
 	len = igt_debugfs_simple_read(fd, param, buf, len);
+	igt_require(len != -ENOENT);
 	if (len < 0)
 		igt_assert_eq(len, -ENODEV);
 }
