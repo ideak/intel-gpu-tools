@@ -154,26 +154,6 @@ igt@gem_tiled_wc
 
 
 ###############################################################################
-# This is a useful test, but it mostly tests the HW rather than the driver.
-# Very few regressions should be caught by this test as the driver code should
-# be relatively left untouched. Hopefully, it will get optimized to be made
-# useful in pre-merge as well:
-#
-# - shard-skl: 1% (~2.5 minutes)
-# - shard-kbl: 1.5% (~2 minutes)
-# - shard-apl: 1.4% (~2.5 minutes)
-# - shard-glk: 2% (~4.5 minutes)
-# - shard-icl: 2.7% (~5.5 minutes)
-# - shard-tgl: 2.3% (~4.5 minutes)
-#
-# Issue: https://gitlab.freedesktop.org/drm/intel/issues/1287
-#
-# Data acquired on 2020-02-20 by Martin Peres
-###############################################################################
-igt@kms_plane@pixel-format-pipe-[b-d]-planes(-source-clamping)?
-
-
-###############################################################################
 # This test is doing nothing more than waiting for the driver to be suspended
 # before issueing a modeset. However, it never failed while testing for this
 # in the past year, so we probably just want to drop the amount of rounds to
