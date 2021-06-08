@@ -39,6 +39,7 @@ typedef struct {
 	igt_display_t display;
 	int gen;
 	uint32_t testformat;
+	struct igt_fb fb[2];
 } data_t;
 
 static igt_pipe_crc_t *_pipe_crc;
@@ -69,7 +70,6 @@ test_flip_tiling(data_t *data, enum pipe pipe, igt_output_t *output, uint64_t ti
 {
 	drmModeModeInfo *mode;
 	igt_plane_t *primary;
-	struct igt_fb fb[2];
 	igt_pipe_crc_t *pipe_crc;
 	igt_crc_t reference_crc, crc;
 	int fb_id, ret, width;
@@ -105,27 +105,27 @@ test_flip_tiling(data_t *data, enum pipe pipe, igt_output_t *output, uint64_t ti
 
 	fb_id = igt_create_pattern_fb(data->drm_fd, width, mode->vdisplay,
 				      data->testformat, tiling[0],
-				      &fb[0]);
+				      &data->fb[0]);
 	igt_assert(fb_id);
 
 	/* Second fb has different background so CRC does not match. */
 	fb_id = igt_create_color_pattern_fb(data->drm_fd, width, mode->vdisplay,
 				      data->testformat, tiling[1],
-				      0.5, 0.5, 0.5, &fb[1]);
+				      0.5, 0.5, 0.5, &data->fb[1]);
 	igt_assert(fb_id);
 
 	/* Set the crtc and generate a reference CRC. */
-	igt_plane_set_fb(primary, &fb[1]);
+	igt_plane_set_fb(primary, &data->fb[1]);
 	igt_display_commit(&data->display);
 	igt_pipe_crc_collect_crc(pipe_crc, &reference_crc);
 
 	/* Commit the first fb. */
-	igt_plane_set_fb(primary, &fb[0]);
+	igt_plane_set_fb(primary, &data->fb[0]);
 	igt_display_commit(&data->display);
 
 	/* Flip to the second fb. */
 	ret = drmModePageFlip(data->drm_fd, output->config.crtc->crtc_id,
-			      fb[1].fb_id, DRM_MODE_PAGE_FLIP_EVENT, NULL);
+			      data->fb[1].fb_id, DRM_MODE_PAGE_FLIP_EVENT, NULL);
 	/*
 	 * Page flip should work but some transitions may be temporarily
 	 * on some kernels.
@@ -137,6 +137,12 @@ test_flip_tiling(data_t *data, enum pipe pipe, igt_output_t *output, uint64_t ti
 	/* Get a crc and compare with the reference. */
 	igt_pipe_crc_collect_crc(pipe_crc, &crc);
 	igt_assert_crc_equal(&reference_crc, &crc);
+}
+
+static void test_cleanup(data_t *data, enum pipe pipe, igt_output_t *output)
+{
+	igt_plane_t *primary;
+	primary = igt_output_get_plane(output, 0);
 
 	/* Clean up. */
 	igt_plane_set_fb(primary, NULL);
@@ -144,8 +150,8 @@ test_flip_tiling(data_t *data, enum pipe pipe, igt_output_t *output, uint64_t ti
 	igt_output_set_pipe(output, PIPE_ANY);
 	igt_display_commit(&data->display);
 
-	igt_remove_fb(data->drm_fd, &fb[0]);
-	igt_remove_fb(data->drm_fd, &fb[1]);
+	igt_remove_fb(data->drm_fd, &data->fb[0]);
+	igt_remove_fb(data->drm_fd, &data->fb[1]);
 }
 
 static data_t data;
@@ -185,6 +191,7 @@ igt_main
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
 				test_flip_tiling(&data, pipe, output, tiling);
+			test_cleanup(&data, pipe, output);
 		}
 	}
 
@@ -204,6 +211,7 @@ igt_main
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
 				test_flip_tiling(&data, pipe, output, tiling);
+			test_cleanup(&data, pipe, output);
 		}
 	}
 
@@ -223,6 +231,7 @@ igt_main
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
 				test_flip_tiling(&data, pipe, output, tiling);
+			test_cleanup(&data, pipe, output);
 		}
 	}
 
@@ -246,6 +255,7 @@ igt_main
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
 				test_flip_tiling(&data, pipe, output, tiling);
+			test_cleanup(&data, pipe, output);
 		}
 	}
 
@@ -265,6 +275,7 @@ igt_main
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
 				test_flip_tiling(&data, pipe, output, tiling);
+			test_cleanup(&data, pipe, output);
 		}
 	}
 
@@ -284,6 +295,7 @@ igt_main
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
 				test_flip_tiling(&data, pipe, output, tiling);
+			test_cleanup(&data, pipe, output);
 		}
 	}
 
@@ -307,6 +319,7 @@ igt_main
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
 				test_flip_tiling(&data, pipe, output, tiling);
+			test_cleanup(&data, pipe, output);
 		}
 	}
 
@@ -326,6 +339,7 @@ igt_main
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
 				test_flip_tiling(&data, pipe, output, tiling);
+			test_cleanup(&data, pipe, output);
 		}
 	}
 
@@ -345,6 +359,7 @@ igt_main
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
 				test_flip_tiling(&data, pipe, output, tiling);
+			test_cleanup(&data, pipe, output);
 		}
 	}
 
