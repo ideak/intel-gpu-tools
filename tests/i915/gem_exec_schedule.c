@@ -1870,55 +1870,11 @@ static void deep(int fd, const intel_ctx_cfg_t *cfg,
 
 	/* Create a deep dependency chain, with a few branches */
 	for (n = 0; n < nreq && igt_seconds_elapsed(&tv) < 2; n++) {
-		const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
-		struct drm_i915_gem_exec_object2 obj[3];
-		struct drm_i915_gem_relocation_entry reloc;
-		struct drm_i915_gem_execbuffer2 eb = {
-			.buffers_ptr = to_user_pointer(obj),
-			.buffer_count = 3,
-			.flags = ring | (gen < 6 ? I915_EXEC_SECURE : 0),
-			.rsvd1 = ctx[n % MAX_CONTEXTS]->id,
-		};
-		uint32_t batch[16];
-		int i;
+		const intel_ctx_t *context = ctx[n % MAX_CONTEXTS];
+		gem_context_set_priority(fd, context->id, MAX_PRIO - nreq + n);
 
-		memset(obj, 0, sizeof(obj));
-		obj[0].handle = plug;
-
-		memset(&reloc, 0, sizeof(reloc));
-		reloc.presumed_offset = 0;
-		reloc.offset = sizeof(uint32_t);
-		reloc.delta = sizeof(uint32_t) * n;
-		reloc.read_domains = I915_GEM_DOMAIN_RENDER;
-		reloc.write_domain = I915_GEM_DOMAIN_RENDER;
-		obj[2].handle = gem_create(fd, 4096);
-		obj[2].relocs_ptr = to_user_pointer(&reloc);
-		obj[2].relocation_count = 1;
-
-		i = 0;
-		batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
-		if (gen >= 8) {
-			batch[++i] = reloc.delta;
-			batch[++i] = 0;
-		} else if (gen >= 4) {
-			batch[++i] = 0;
-			batch[++i] = reloc.delta;
-			reloc.offset += sizeof(uint32_t);
-		} else {
-			batch[i]--;
-			batch[++i] = reloc.delta;
-		}
-		batch[++i] = eb.rsvd1;
-		batch[++i] = MI_BATCH_BUFFER_END;
-		gem_write(fd, obj[2].handle, 0, batch, sizeof(batch));
-
-		gem_context_set_priority(fd, eb.rsvd1, MAX_PRIO - nreq + n);
-		for (int m = 0; m < XS; m++) {
-			obj[1].handle = dep[m];
-			reloc.target_handle = obj[1].handle;
-			gem_execbuf(fd, &eb);
-		}
-		gem_close(fd, obj[2].handle);
+		for (int m = 0; m < XS; m++)
+			store_dword_plug(fd, context, ring, dep[m], 4*n, context->id, plug, I915_GEM_DOMAIN_INSTRUCTION);
 	}
 	igt_info("First deptree: %d requests [%.3fs]\n",
 		 n * XS, 1e-9*igt_nsec_elapsed(&tv));
