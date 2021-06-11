@@ -220,6 +220,22 @@ static const struct format_desc_struct {
 	  .cairo_id = CAIRO_FORMAT_RGBA128F, .convert = true,
 	  .num_planes = 1, .plane_bpp = { 64, },
 	},
+	{ .name = "XRGB16161616", .depth = -1, .drm_id = DRM_FORMAT_XRGB16161616,
+	  .cairo_id = CAIRO_FORMAT_RGBA128F, .convert = true,
+	  .num_planes = 1, .plane_bpp = { 64, },
+	},
+	{ .name = "ARGB16161616", .depth = -1, .drm_id = DRM_FORMAT_ARGB16161616,
+	  .cairo_id = CAIRO_FORMAT_RGBA128F, .convert = true,
+	  .num_planes = 1, .plane_bpp = { 64, },
+	},
+	{ .name = "XBGR16161616", .depth = -1, .drm_id = DRM_FORMAT_XBGR16161616,
+	  .cairo_id = CAIRO_FORMAT_RGBA128F, .convert = true,
+	  .num_planes = 1, .plane_bpp = { 64, },
+	},
+	{ .name = "ABGR16161616", .depth = -1, .drm_id = DRM_FORMAT_ABGR16161616,
+	  .cairo_id = CAIRO_FORMAT_RGBA128F, .convert = true,
+	  .num_planes = 1, .plane_bpp = { 64, },
+	},
 	{ .name = "NV12", .depth = -1, .drm_id = DRM_FORMAT_NV12,
 	  .cairo_id = CAIRO_FORMAT_RGB24, .convert = true,
 	  .num_planes = 2, .plane_bpp = { 8, 16, },
@@ -3406,9 +3422,13 @@ static const unsigned char *rgbx_swizzle(uint32_t format)
 	default:
 	case DRM_FORMAT_XRGB16161616F:
 	case DRM_FORMAT_ARGB16161616F:
+	case DRM_FORMAT_XRGB16161616:
+	case DRM_FORMAT_ARGB16161616:
 		return swizzle_bgrx;
 	case DRM_FORMAT_XBGR16161616F:
 	case DRM_FORMAT_ABGR16161616F:
+	case DRM_FORMAT_XBGR16161616:
+	case DRM_FORMAT_ABGR16161616:
 		return swizzle_rgbx;
 	}
 }
@@ -3489,6 +3509,97 @@ static void convert_float_to_fp16(struct fb_convert *cvt)
 
 		ptr += float_stride;
 		fp16 += fp16_stride;
+	}
+}
+
+static void float_to_uint16(const float *f, uint16_t *h, unsigned int num)
+{
+	for (int i = 0; i < num; i++)
+		h[i] = f[i] * 65535.0f + 0.5f;
+}
+
+static void uint16_to_float(const uint16_t *h, float *f, unsigned int num)
+{
+	for (int i = 0; i < num; i++)
+		f[i] = ((float) h[i]) / 65535.0f;
+}
+
+static void convert_uint16_to_float(struct fb_convert *cvt)
+{
+	int i, j;
+	uint16_t *up16;
+	float *ptr = cvt->dst.ptr;
+	unsigned int float_stride = cvt->dst.fb->strides[0] / sizeof(*ptr);
+	unsigned int up16_stride = cvt->src.fb->strides[0] / sizeof(*up16);
+	const unsigned char *swz = rgbx_swizzle(cvt->src.fb->drm_format);
+	bool needs_reswizzle = swz != swizzle_rgbx;
+
+	uint16_t *buf = convert_src_get(cvt);
+	up16 = buf + cvt->src.fb->offsets[0] / sizeof(*buf);
+
+	for (i = 0; i < cvt->dst.fb->height; i++) {
+		if (needs_reswizzle) {
+			const uint16_t *u16_tmp = up16;
+			float *rgb_tmp = ptr;
+
+			for (j = 0; j < cvt->dst.fb->width; j++) {
+				struct igt_vec4 rgb;
+
+				uint16_to_float(u16_tmp, rgb.d, 4);
+
+				rgb_tmp[0] = rgb.d[swz[0]];
+				rgb_tmp[1] = rgb.d[swz[1]];
+				rgb_tmp[2] = rgb.d[swz[2]];
+				rgb_tmp[3] = rgb.d[swz[3]];
+
+				rgb_tmp += 4;
+				u16_tmp += 4;
+			}
+		} else {
+			uint16_to_float(up16, ptr, cvt->dst.fb->width * 4);
+		}
+
+		ptr += float_stride;
+		up16 += up16_stride;
+	}
+
+	convert_src_put(cvt, buf);
+}
+
+static void convert_float_to_uint16(struct fb_convert *cvt)
+{
+	int i, j;
+	uint16_t *up16 = cvt->dst.ptr + cvt->dst.fb->offsets[0];
+	const float *ptr = cvt->src.ptr;
+	unsigned float_stride = cvt->src.fb->strides[0] / sizeof(*ptr);
+	unsigned up16_stride = cvt->dst.fb->strides[0] / sizeof(*up16);
+	const unsigned char *swz = rgbx_swizzle(cvt->dst.fb->drm_format);
+	bool needs_reswizzle = swz != swizzle_rgbx;
+
+	for (i = 0; i < cvt->dst.fb->height; i++) {
+		if (needs_reswizzle) {
+			const float *rgb_tmp = ptr;
+			uint16_t *u16_tmp = up16;
+
+			for (j = 0; j < cvt->dst.fb->width; j++) {
+				struct igt_vec4 rgb;
+
+				rgb.d[0] = rgb_tmp[swz[0]];
+				rgb.d[1] = rgb_tmp[swz[1]];
+				rgb.d[2] = rgb_tmp[swz[2]];
+				rgb.d[3] = rgb_tmp[swz[3]];
+
+				float_to_uint16(rgb.d, u16_tmp, 4);
+
+				rgb_tmp += 4;
+				u16_tmp += 4;
+			}
+		} else {
+			float_to_uint16(ptr, up16, cvt->dst.fb->width * 4);
+		}
+
+		ptr += float_stride;
+		up16 += up16_stride;
 	}
 }
 
@@ -3601,6 +3712,12 @@ static void fb_convert(struct fb_convert *cvt)
 		case DRM_FORMAT_ABGR16161616F:
 			convert_fp16_to_float(cvt);
 			return;
+		case DRM_FORMAT_XRGB16161616:
+		case DRM_FORMAT_XBGR16161616:
+		case DRM_FORMAT_ARGB16161616:
+		case DRM_FORMAT_ABGR16161616:
+			convert_uint16_to_float(cvt);
+			return;
 		}
 	} else if (cvt->src.fb->drm_format == IGT_FORMAT_FLOAT) {
 		switch (cvt->dst.fb->drm_format) {
@@ -3629,6 +3746,12 @@ static void fb_convert(struct fb_convert *cvt)
 		case DRM_FORMAT_ARGB16161616F:
 		case DRM_FORMAT_ABGR16161616F:
 			convert_float_to_fp16(cvt);
+			return;
+		case DRM_FORMAT_XRGB16161616:
+		case DRM_FORMAT_XBGR16161616:
+		case DRM_FORMAT_ARGB16161616:
+		case DRM_FORMAT_ABGR16161616:
+			convert_float_to_uint16(cvt);
 			return;
 		}
 	}
