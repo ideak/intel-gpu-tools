@@ -165,6 +165,19 @@ static uint32_t batch_create(int i915)
 	return __batch_create(i915, 0);
 }
 
+static int
+__set_param_fresh_context(int i915, struct drm_i915_gem_context_param param)
+{
+	int err;
+
+	igt_assert_eq(param.ctx_id, 0);
+	param.ctx_id = gem_context_create(i915);
+	err = __gem_context_set_param(i915, &param);
+	gem_context_destroy(i915, param.ctx_id);
+
+	return err;
+}
+
 static void invalid_balancer(int i915)
 {
 	I915_DEFINE_CONTEXT_ENGINES_LOAD_BALANCE(balancer, 64);
@@ -192,7 +205,6 @@ static void invalid_balancer(int i915)
 
 		igt_assert_lte(count, 64);
 
-		p.ctx_id = gem_context_create(i915);
 		p.size = (sizeof(struct i915_context_param_engines) +
 			  (count + 1) * sizeof(*engines.engines));
 
@@ -200,13 +212,13 @@ static void invalid_balancer(int i915)
 		engines.engines[0].engine_class = I915_ENGINE_CLASS_INVALID;
 		engines.engines[0].engine_instance = I915_ENGINE_CLASS_INVALID_NONE;
 		memcpy(engines.engines + 1, ci, count * sizeof(*ci));
-		gem_context_set_param(i915, &p);
+		igt_assert_eq(__set_param_fresh_context(i915, p), 0);
 
 		engines.extensions = -1ull;
-		igt_assert_eq(__gem_context_set_param(i915, &p), -EFAULT);
+		igt_assert_eq(__set_param_fresh_context(i915, p), -EFAULT);
 
 		engines.extensions = 1ull;
-		igt_assert_eq(__gem_context_set_param(i915, &p), -EFAULT);
+		igt_assert_eq(__set_param_fresh_context(i915, p), -EFAULT);
 
 		memset(&balancer, 0, sizeof(balancer));
 		balancer.base.name = I915_CONTEXT_ENGINES_EXT_LOAD_BALANCE;
@@ -214,25 +226,25 @@ static void invalid_balancer(int i915)
 		memcpy(balancer.engines, ci, count * sizeof(*ci));
 
 		engines.extensions = to_user_pointer(&balancer);
-		gem_context_set_param(i915, &p);
+		igt_assert_eq(__set_param_fresh_context(i915, p), 0);
 
 		balancer.engine_index = 1;
-		igt_assert_eq(__gem_context_set_param(i915, &p), -EEXIST);
+		igt_assert_eq(__set_param_fresh_context(i915, p), -EEXIST);
 
 		balancer.engine_index = count;
-		igt_assert_eq(__gem_context_set_param(i915, &p), -EEXIST);
+		igt_assert_eq(__set_param_fresh_context(i915, p), -EEXIST);
 
 		balancer.engine_index = count + 1;
-		igt_assert_eq(__gem_context_set_param(i915, &p), -EINVAL);
+		igt_assert_eq(__set_param_fresh_context(i915, p), -EINVAL);
 
 		balancer.engine_index = 0;
-		gem_context_set_param(i915, &p);
+		igt_assert_eq(__set_param_fresh_context(i915, p), 0);
 
 		balancer.base.next_extension = to_user_pointer(&balancer);
-		igt_assert_eq(__gem_context_set_param(i915, &p), -EEXIST);
+		igt_assert_eq(__set_param_fresh_context(i915, p), -EEXIST);
 
 		balancer.base.next_extension = -1ull;
-		igt_assert_eq(__gem_context_set_param(i915, &p), -EFAULT);
+		igt_assert_eq(__set_param_fresh_context(i915, p), -EFAULT);
 
 		handle = gem_create(i915, 4096 * 3);
 		ptr = gem_mmap__device_coherent(i915, handle, 0, 4096 * 3,
@@ -247,44 +259,42 @@ static void invalid_balancer(int i915)
 		memcpy(engines.engines + 2, ci, count * sizeof(ci));
 		p.size = (sizeof(struct i915_context_param_engines) +
 			  (count + 2) * sizeof(*engines.engines));
-		gem_context_set_param(i915, &p);
+		igt_assert_eq(__set_param_fresh_context(i915, p), 0);
 
 		balancer.base.next_extension = 0;
 		balancer.engine_index = 1;
 		engines.extensions = to_user_pointer(&balancer);
-		gem_context_set_param(i915, &p);
+		igt_assert_eq(__set_param_fresh_context(i915, p), 0);
 
 		memcpy(ptr + 4096 - 8, &balancer, sizeof(balancer));
 		memcpy(ptr + 8192 - 8, &balancer, sizeof(balancer));
 		balancer.engine_index = 0;
 
 		engines.extensions = to_user_pointer(ptr) + 4096 - 8;
-		gem_context_set_param(i915, &p);
+		igt_assert_eq(__set_param_fresh_context(i915, p), 0);
 
 		balancer.base.next_extension = engines.extensions;
 		engines.extensions = to_user_pointer(&balancer);
-		gem_context_set_param(i915, &p);
+		igt_assert_eq(__set_param_fresh_context(i915, p), 0);
 
 		munmap(ptr, 4096);
-		igt_assert_eq(__gem_context_set_param(i915, &p), -EFAULT);
+		igt_assert_eq(__set_param_fresh_context(i915, p), -EFAULT);
 		engines.extensions = to_user_pointer(ptr) + 4096 - 8;
-		igt_assert_eq(__gem_context_set_param(i915, &p), -EFAULT);
+		igt_assert_eq(__set_param_fresh_context(i915, p), -EFAULT);
 
 		engines.extensions = to_user_pointer(ptr) + 8192 - 8;
-		gem_context_set_param(i915, &p);
+		igt_assert_eq(__set_param_fresh_context(i915, p), 0);
 
 		balancer.base.next_extension = engines.extensions;
 		engines.extensions = to_user_pointer(&balancer);
-		gem_context_set_param(i915, &p);
+		igt_assert_eq(__set_param_fresh_context(i915, p), 0);
 
 		munmap(ptr + 8192, 4096);
-		igt_assert_eq(__gem_context_set_param(i915, &p), -EFAULT);
+		igt_assert_eq(__set_param_fresh_context(i915, p), -EFAULT);
 		engines.extensions = to_user_pointer(ptr) + 8192 - 8;
-		igt_assert_eq(__gem_context_set_param(i915, &p), -EFAULT);
+		igt_assert_eq(__set_param_fresh_context(i915, p), -EFAULT);
 
 		munmap(ptr + 4096, 4096);
-
-		gem_context_destroy(i915, p.ctx_id);
 		free(ci);
 	}
 }
@@ -294,7 +304,6 @@ static void invalid_bonds(int i915)
 	I915_DEFINE_CONTEXT_ENGINES_BOND(bonds[16], 1);
 	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines, 1);
 	struct drm_i915_gem_context_param p = {
-		.ctx_id = gem_context_create(i915),
 		.param = I915_CONTEXT_PARAM_ENGINES,
 		.value = to_user_pointer(&engines),
 		.size = sizeof(engines),
@@ -303,7 +312,7 @@ static void invalid_bonds(int i915)
 	void *ptr;
 
 	memset(&engines, 0, sizeof(engines));
-	gem_context_set_param(i915, &p);
+	igt_assert_eq(__set_param_fresh_context(i915, p), 0);
 
 	memset(bonds, 0, sizeof(bonds));
 	for (int n = 0; n < ARRAY_SIZE(bonds); n++) {
@@ -313,18 +322,18 @@ static void invalid_bonds(int i915)
 		bonds[n].num_bonds = 1;
 	}
 	engines.extensions = to_user_pointer(&bonds);
-	gem_context_set_param(i915, &p);
+	igt_assert_eq(__set_param_fresh_context(i915, p), 0);
 
 	bonds[0].base.next_extension = -1ull;
-	igt_assert_eq(__gem_context_set_param(i915, &p), -EFAULT);
+	igt_assert_eq(__set_param_fresh_context(i915, p), -EFAULT);
 
 	bonds[0].base.next_extension = to_user_pointer(&bonds[0]);
-	igt_assert_eq(__gem_context_set_param(i915, &p), -E2BIG);
+	igt_assert_eq(__set_param_fresh_context(i915, p), -E2BIG);
 
 	engines.extensions = to_user_pointer(&bonds[1]);
-	igt_assert_eq(__gem_context_set_param(i915, &p), -E2BIG);
+	igt_assert_eq(__set_param_fresh_context(i915, p), -E2BIG);
 	bonds[0].base.next_extension = 0;
-	gem_context_set_param(i915, &p);
+	igt_assert_eq(__set_param_fresh_context(i915, p), 0);
 
 	handle = gem_create(i915, 4096 * 3);
 	ptr = gem_mmap__device_coherent(i915, handle, 0, 4096 * 3, PROT_WRITE);
@@ -332,29 +341,27 @@ static void invalid_bonds(int i915)
 
 	memcpy(ptr + 4096, &bonds[0], sizeof(bonds[0]));
 	engines.extensions = to_user_pointer(ptr) + 4096;
-	gem_context_set_param(i915, &p);
+	igt_assert_eq(__set_param_fresh_context(i915, p), 0);
 
 	memcpy(ptr, &bonds[0], sizeof(bonds[0]));
 	bonds[0].base.next_extension = to_user_pointer(ptr);
 	memcpy(ptr + 4096, &bonds[0], sizeof(bonds[0]));
-	gem_context_set_param(i915, &p);
+	igt_assert_eq(__set_param_fresh_context(i915, p), 0);
 
 	munmap(ptr, 4096);
-	igt_assert_eq(__gem_context_set_param(i915, &p), -EFAULT);
+	igt_assert_eq(__set_param_fresh_context(i915, p), -EFAULT);
 
 	bonds[0].base.next_extension = 0;
 	memcpy(ptr + 8192, &bonds[0], sizeof(bonds[0]));
 	bonds[0].base.next_extension = to_user_pointer(ptr) + 8192;
 	memcpy(ptr + 4096, &bonds[0], sizeof(bonds[0]));
-	gem_context_set_param(i915, &p);
+	igt_assert_eq(__set_param_fresh_context(i915, p), 0);
 
 	munmap(ptr + 8192, 4096);
-	igt_assert_eq(__gem_context_set_param(i915, &p), -EFAULT);
+	igt_assert_eq(__set_param_fresh_context(i915, p), -EFAULT);
 
 	munmap(ptr + 4096, 4096);
-	igt_assert_eq(__gem_context_set_param(i915, &p), -EFAULT);
-
-	gem_context_destroy(i915, p.ctx_id);
+	igt_assert_eq(__set_param_fresh_context(i915, p), -EFAULT);
 }
 
 static void kick_kthreads(void)
