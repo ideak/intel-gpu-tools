@@ -760,7 +760,8 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 			stride = ALIGN(min_stride, tile_width * 4);
 
 			/* TODO: add support to kernel to POT align CCS format strides */
-			if (IS_ALDERLAKE_P(intel_get_drm_devid(fb->fd)))
+			if (is_i915_device(fb->fd) &&
+			    IS_ALDERLAKE_P(intel_get_drm_devid(fb->fd)))
 				stride = roundup_power_of_two(max(stride, tile_width * 8));
 		} else {
 			stride = ALIGN(min_stride, tile_width);
@@ -836,7 +837,8 @@ static uint64_t calc_plane_size(struct igt_fb *fb, int plane)
 		 * On ADL_P CCS color planes must be 2MB aligned, until remapping
 		 * support is added for CCS FBs.
 		 */
-		if (IS_ALDERLAKE_P(intel_get_drm_devid(fb->fd)) &&
+		if (is_i915_device(fb->fd) &&
+		    IS_ALDERLAKE_P(intel_get_drm_devid(fb->fd)) &&
 		    is_ccs_modifier(fb->modifier))
 			size = ALIGN(size, 2 * 1024 * 1024);
 
