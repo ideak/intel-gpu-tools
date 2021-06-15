@@ -473,12 +473,19 @@ static void draw_entire_color_array(data_t *data, cairo_t *cr, uint32_t format,
 	const int color_amount = ARRAY_SIZE(colors_extended);
 	const int x = format == DRM_FORMAT_XRGB8888 ? 0 : data->crop;
 
+	if (format != DRM_FORMAT_XRGB8888) {
+		cairo_rectangle(cr, data->crop, data->crop,
+				fb->width - data->crop * 2,
+				fb->height - data->crop * 2);
+	}
+
+
 	for (int n = 0; n < color_amount; n++) {
 		int y = (fb->height - x * 2) * n / color_amount + x;
 
 		igt_paint_color(cr, x, y,
 				fb->width - x * 2,
-				(fb->height - x * 2) / color_amount,
+				(fb->height - x * 2) / color_amount + 1,
 				colors_extended[n].red,
 				colors_extended[n].green,
 				colors_extended[n].blue);
