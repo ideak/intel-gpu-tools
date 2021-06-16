@@ -166,6 +166,15 @@ static inline void map_entry_free_func(struct igt_map_entry *entry)
 	free(entry->data);
 }
 
+static bool can_report_gtt_size(int fd)
+{
+	struct drm_i915_gem_context_param p = {
+		.param = I915_CONTEXT_PARAM_GTT_SIZE
+	};
+
+	return (__gem_context_get_param(fd, &p) == 0);
+}
+
 static uint64_t __handle_create(struct allocator *al)
 {
 	struct handle_entry *h = malloc(sizeof(*h));
@@ -270,6 +279,8 @@ static struct intel_allocator *intel_allocator_create(int fd,
 						      uint8_t allocator_strategy)
 {
 	struct intel_allocator *ial = NULL;
+
+	igt_assert(can_report_gtt_size(fd));
 
 	switch (allocator_type) {
 	/*
