@@ -9,6 +9,7 @@ if libdrm_amdgpu.found()
 			  'amd_cs_nop',
 			  'amd_info',
 			  'amd_prime',
+			  'amd_module_load',
 			]
 	amdgpu_deps += libdrm_amdgpu
 endif

@@ -433,6 +433,65 @@ igt_i915_driver_unload(void)
 	return IGT_EXIT_SUCCESS;
 }
 
+/**
+ * igt_amdgpu_driver_load:
+ * @opts: options to pass to amdgpu driver
+ *
+ * Returns: IGT_EXIT_SUCCESS or IGT_EXIT_FAILURE.
+ *
+ * Loads the amdgpu driver and its dependencies.
+ *
+ */
+int
+igt_amdgpu_driver_load(const char *opts)
+{
+	if (opts)
+		igt_info("Reloading amdgpu with %s\n\n", opts);
+
+	if (igt_kmod_load("amdgpu", opts)) {
+		igt_warn("Could not load amdgpu\n");
+		return IGT_EXIT_FAILURE;
+	}
+
+	bind_fbcon(true);
+
+	return IGT_EXIT_SUCCESS;
+}
+
+/**
+ * igt_amdgpu_driver_unload:
+ *
+ * Returns: IGT_EXIT_SUCCESS on success, IGT_EXIT_FAILURE on failure
+ * and IGT_EXIT_SKIP if amdgpu could not be unloaded.
+ *
+ * Unloads the amdgpu driver and its dependencies.
+ *
+ */
+int
+igt_amdgpu_driver_unload(void)
+{
+	bind_fbcon(false);
+
+	if (igt_kmod_is_loaded("amdgpu")) {
+		if (igt_kmod_unload("amdgpu", 0)) {
+			igt_warn("Could not unload amdgpu\n");
+			igt_kmod_list_loaded();
+			igt_lsof("/dev/dri");
+			return IGT_EXIT_SKIP;
+		}
+	}
+
+	igt_kmod_unload("drm_kms_helper", 0);
+	igt_kmod_unload("drm", 0);
+
+	if (igt_kmod_is_loaded("amdgpu")) {
+		igt_warn("amdgpu.ko still loaded!\n");
+		return IGT_EXIT_FAILURE;
+	}
+
+	return IGT_EXIT_SUCCESS;
+}
+
 static void kmsg_dump(int fd)
 {
 	char record[4096 + 1];
