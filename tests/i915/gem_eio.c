@@ -77,7 +77,7 @@ static void trigger_reset(int fd)
 
 	/* And just check the gpu is indeed running again */
 	igt_kmsg(KMSG_DEBUG "Checking that the GPU recovered\n");
-	gem_test_engine(fd, ALL_ENGINES);
+	gem_test_all_engines(fd);
 
 	igt_debugfs_dump(fd, "i915_engine_info");
 	igt_drop_caches_set(fd, DROP_ACTIVE);

@@ -1408,7 +1408,7 @@ static void gem_idle_subtest(void)
 
 	sleep(5);
 
-	gem_test_engine(drm_fd, -1);
+	gem_test_all_engines(drm_fd);
 }
 
 static void gem_evict_pwrite_subtest(void)

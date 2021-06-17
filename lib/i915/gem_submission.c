@@ -177,43 +177,41 @@ static bool is_wedged(int i915)
 }
 
 /**
- * gem_test_engine:
+ * gem_test_all_engines:
  * @i915: open i915 drm file descriptor
- * @engine: the engine (I915_EXEC_RING id) to exercise
  *
  * Execute a nop batch on the engine specified, or ALL_ENGINES for all,
  * and check it executes.
  */
-void gem_test_engine(int i915, unsigned int engine)
+void gem_test_all_engines(int i915)
 {
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
+	const struct intel_execution_engine2 *e2;
 	struct drm_i915_gem_exec_object2 obj = { };
 	struct drm_i915_gem_execbuffer2 execbuf = {
 		.buffers_ptr = to_user_pointer(&obj),
 		.buffer_count = 1,
 	};
+	const intel_ctx_t *ctx;
 
 	i915 = gem_reopen_driver(i915);
 	igt_assert(!is_wedged(i915));
 
+	ctx = intel_ctx_create_all_physical(i915);
+	execbuf.rsvd1 = ctx->id;
+
 	obj.handle = gem_create(i915, 4096);
 	gem_write(i915, obj.handle, 0, &bbe, sizeof(bbe));
 
-	if (engine == ALL_ENGINES) {
-		const struct intel_execution_engine2 *e2;
-
-		__for_each_physical_engine(i915, e2) {
-			execbuf.flags = e2->flags;
-			gem_execbuf(i915, &execbuf);
-		}
-	} else {
-		execbuf.flags = engine;
+	for_each_ctx_engine(i915, ctx, e2) {
+		execbuf.flags = e2->flags;
 		gem_execbuf(i915, &execbuf);
 	}
 	gem_sync(i915, obj.handle);
 	gem_close(i915, obj.handle);
 
 	igt_assert(!is_wedged(i915));
+	intel_ctx_destroy(i915, ctx);
 	close(i915);
 }
 
