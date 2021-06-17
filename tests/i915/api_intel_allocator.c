@@ -621,6 +621,43 @@ static void execbuf_with_allocator(int fd)
 	igt_assert(intel_allocator_close(ahnd) == true);
 }
 
+static void fork_reopen_allocator(int fd, uint8_t type)
+{
+	uint64_t p_ahnd, sh_ahnd, fd_ahnd, ctx_ahnd;
+	uint64_t offset;
+
+	intel_allocator_multiprocess_start();
+
+	p_ahnd = intel_allocator_open(fd, 0, type);
+	offset = intel_allocator_alloc(p_ahnd, 1, 123, 0);
+	if (type == INTEL_ALLOCATOR_SIMPLE)
+		igt_assert(intel_allocator_is_allocated(p_ahnd, 1, 123, offset));
+
+	igt_fork(child, 1) {
+		sh_ahnd = intel_allocator_open(fd, 0, type);
+		if (type == INTEL_ALLOCATOR_SIMPLE)
+			igt_assert(intel_allocator_is_allocated(sh_ahnd, 1, 123, offset));
+
+		ctx_ahnd = intel_allocator_open(fd, 1, type);
+		igt_assert(!intel_allocator_is_allocated(ctx_ahnd, 1, 123, offset));
+		intel_allocator_alloc(ctx_ahnd, 2, 123, 0);
+
+		fd = gem_reopen_driver(fd);
+		fd_ahnd = intel_allocator_open(fd, 0, type);
+		igt_assert(!intel_allocator_is_allocated(fd_ahnd, 1, 123, offset));
+		intel_allocator_alloc(fd_ahnd, 2, 123, 0);
+
+		intel_allocator_close(sh_ahnd);
+		intel_allocator_close(ctx_ahnd);
+		intel_allocator_close(fd_ahnd);
+	}
+
+	igt_waitchildren();
+	intel_allocator_close(p_ahnd);
+
+	intel_allocator_multiprocess_stop();
+}
+
 struct allocators {
 	const char *name;
 	uint8_t type;
@@ -672,6 +709,9 @@ igt_main
 				igt_dynamic("reserve")
 					reserve(fd, a->type);
 			}
+
+			igt_dynamic("fork-reopen-allocator")
+				fork_reopen_allocator(fd, a->type);
 		}
 	}
 
