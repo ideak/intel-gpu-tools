@@ -237,7 +237,7 @@ igt_main
 		igt_require_gem(device);
 		gem_submission_print_method(device);
 
-		ring_size = gem_submission_measure(device, ALL_ENGINES);
+		ring_size = gem_submission_measure(device, NULL, ALL_ENGINES);
 
 		igt_info("Ring size: %d batches\n", ring_size);
 		igt_require(ring_size > 0);

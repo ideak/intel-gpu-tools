@@ -306,7 +306,7 @@ static void alarm_handler(int sig)
 }
 
 static unsigned int
-__measure_ringsize(int i915, unsigned int engine)
+__measure_ringsize(int i915, uint32_t ctx_id, unsigned int engine)
 {
 	struct sigaction old_sa, sa = { .sa_handler = alarm_handler };
 	struct drm_i915_gem_exec_object2 obj[2];
@@ -323,6 +323,7 @@ __measure_ringsize(int i915, unsigned int engine)
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(&obj[1]);
 	execbuf.buffer_count = 1;
+	execbuf.rsvd1 = ctx_id;
 	execbuf.flags = engine;
 	gem_execbuf(i915, &execbuf);
 
@@ -372,8 +373,10 @@ __measure_ringsize(int i915, unsigned int engine)
 	return count / 2 - 2;
 }
 
-unsigned int gem_submission_measure(int i915, unsigned int engine)
+unsigned int gem_submission_measure(int i915, const intel_ctx_cfg_t *cfg,
+				    unsigned int engine)
 {
+	const intel_ctx_t *ctx = NULL;
 	unsigned int size;
 	bool nonblock;
 
@@ -381,18 +384,40 @@ unsigned int gem_submission_measure(int i915, unsigned int engine)
 	if (!nonblock)
 		fcntl(i915, F_SETFL, fcntl(i915, F_GETFL) | O_NONBLOCK);
 
+	if (cfg) {
+		if (gem_has_contexts(i915))
+			ctx = intel_ctx_create(i915, cfg);
+		else
+			ctx = intel_ctx_0(i915);
+	}
+
 	if (engine == ALL_ENGINES) {
 		struct intel_execution_engine2 *e;
 
 		size = -1;
-		__for_each_physical_engine(i915, e) {
-			unsigned int this =  __measure_ringsize(i915, e->flags);
-			if (this < size)
-				size = this;
+		if (ctx) {
+			for_each_ctx_engine(i915, ctx, e) {
+				unsigned int this =  __measure_ringsize(i915, ctx->id, e->flags);
+				if (this < size)
+					size = this;
+			}
+		} else {
+			__for_each_physical_engine(i915, e) {
+				unsigned int this =  __measure_ringsize(i915, 0, e->flags);
+				if (this < size)
+					size = this;
+			}
 		}
 	} else {
-		size =  __measure_ringsize(i915, engine);
+		if (ctx)
+			size =  __measure_ringsize(i915, ctx->id, engine);
+		else
+			size =  __measure_ringsize(i915, 0, engine);
 	}
+
+	if (ctx)
+		intel_ctx_destroy(i915, ctx);
+
 
 	if (!nonblock)
 		fcntl(i915, F_SETFL, fcntl(i915, F_GETFL) & ~O_NONBLOCK);

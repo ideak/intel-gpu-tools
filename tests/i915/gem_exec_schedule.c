@@ -1805,7 +1805,7 @@ static void deep(int fd, unsigned ring)
 		ctx[n] = gem_context_clone_with_engines(fd, 0);
 	}
 
-	nreq = gem_submission_measure(fd, ring) / (3 * XS) * MAX_CONTEXTS;
+	nreq = gem_submission_measure(fd, NULL, ring) / (3 * XS) * MAX_CONTEXTS;
 	if (nreq > max_req)
 		nreq = max_req;
 	igt_info("Using %d requests (prio range %d)\n", nreq, max_req);
@@ -1950,7 +1950,7 @@ static int __execbuf(int fd, struct drm_i915_gem_execbuffer2 *execbuf)
 
 static void wide(int fd, unsigned ring)
 {
-	const unsigned int ring_size = gem_submission_measure(fd, ring);
+	const unsigned int ring_size = gem_submission_measure(fd, NULL, ring);
 	struct timespec tv = {};
 	IGT_CORK_FENCE(cork);
 	uint32_t result;
@@ -1995,7 +1995,7 @@ static void wide(int fd, unsigned ring)
 
 static void reorder_wide(int fd, unsigned ring)
 {
-	const unsigned int ring_size = gem_submission_measure(fd, ring);
+	const unsigned int ring_size = gem_submission_measure(fd, NULL, ring);
 	const unsigned int gen = intel_gen(intel_get_drm_devid(fd));
 	const int priorities[] = { MIN_PRIO, MAX_PRIO };
 	struct drm_i915_gem_relocation_entry reloc;

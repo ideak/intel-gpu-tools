@@ -26,6 +26,8 @@
 
 #include <stdint.h>
 
+#include "intel_ctx.h"
+
 #define GEM_SUBMISSION_SEMAPHORES	(1 << 0)
 #define GEM_SUBMISSION_EXECLISTS	(1 << 1)
 #define GEM_SUBMISSION_GUC		(1 << 2)
@@ -46,7 +48,8 @@ static inline bool gem_has_cmdparser(int i915, uint32_t engine)
 bool gem_has_blitter(int i915);
 void gem_require_blitter(int i915);
 
-unsigned int gem_submission_measure(int i915, unsigned int engine);
+unsigned int gem_submission_measure(int i915, const intel_ctx_cfg_t *cfg,
+				    unsigned int engine);
 
 void gem_test_engine(int fd, unsigned int engine);
 bool gem_has_relocations(int fd);
