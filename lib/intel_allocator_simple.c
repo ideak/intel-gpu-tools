@@ -11,17 +11,11 @@
 #include "intel_bufops.h"
 #include "igt_map.h"
 
-/*
- * We limit allocator space to avoid hang when batch would be
- * pinned in the last page.
- */
-#define RESERVED 4096
 
 /* Avoid compilation warning */
-struct intel_allocator *intel_allocator_simple_create(int fd);
 struct intel_allocator *
-intel_allocator_simple_create_full(int fd, uint64_t start, uint64_t end,
-				   enum allocator_strategy strategy);
+intel_allocator_simple_create(int fd, uint64_t start, uint64_t end,
+			      enum allocator_strategy strategy);
 
 struct simple_vma_heap {
 	struct igt_list_head holes;
@@ -425,7 +419,6 @@ static uint64_t intel_allocator_simple_alloc(struct intel_allocator *ial,
 	ials = (struct intel_allocator_simple *) ial->priv;
 	igt_assert(ials);
 	igt_assert(handle);
-	alignment = alignment > 0 ? alignment : 1;
 
 	rec = igt_map_search(ials->objects, &handle);
 	if (rec) {
@@ -734,9 +727,9 @@ static void intel_allocator_simple_print(struct intel_allocator *ial, bool full)
 		 ials->allocated_objects, ials->reserved_areas);
 }
 
-static struct intel_allocator *
-__intel_allocator_simple_create(int fd, uint64_t start, uint64_t end,
-				enum allocator_strategy strategy)
+struct intel_allocator *
+intel_allocator_simple_create(int fd, uint64_t start, uint64_t end,
+			      enum allocator_strategy strategy)
 {
 	struct intel_allocator *ial;
 	struct intel_allocator_simple *ials;
@@ -776,32 +769,4 @@ __intel_allocator_simple_create(int fd, uint64_t start, uint64_t end,
 	ials->reserved_areas = 0;
 
 	return ial;
-}
-
-struct intel_allocator *
-intel_allocator_simple_create(int fd)
-{
-	uint64_t gtt_size = gem_aperture_size(fd);
-
-	if (!gem_uses_full_ppgtt(fd))
-		gtt_size /= 2;
-	else
-		gtt_size -= RESERVED;
-
-	return __intel_allocator_simple_create(fd, 0, gtt_size,
-					       ALLOC_STRATEGY_HIGH_TO_LOW);
-}
-
-struct intel_allocator *
-intel_allocator_simple_create_full(int fd, uint64_t start, uint64_t end,
-				   enum allocator_strategy strategy)
-{
-	uint64_t gtt_size = gem_aperture_size(fd);
-
-	igt_assert(end <= gtt_size);
-	if (!gem_uses_full_ppgtt(fd))
-		gtt_size /= 2;
-	igt_assert(end - start <= gtt_size);
-
-	return __intel_allocator_simple_create(fd, start, end, strategy);
 }

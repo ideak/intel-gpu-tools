@@ -45,6 +45,12 @@ static inline const char *reqstr(enum reqtype request_type)
 #define alloc_debug(...) {}
 #endif
 
+/*
+ * We limit allocator space to avoid hang when batch would be
+ * pinned in the last page.
+ */
+#define RESERVED 4096
+
 struct allocator {
 	int fd;
 	uint32_t ctx;
@@ -58,12 +64,13 @@ struct handle_entry {
 	struct allocator *al;
 };
 
-struct intel_allocator *intel_allocator_reloc_create(int fd);
-struct intel_allocator *intel_allocator_random_create(int fd);
-struct intel_allocator *intel_allocator_simple_create(int fd);
 struct intel_allocator *
-intel_allocator_simple_create_full(int fd, uint64_t start, uint64_t end,
-				   enum allocator_strategy strategy);
+intel_allocator_reloc_create(int fd, uint64_t start, uint64_t end);
+struct intel_allocator *
+intel_allocator_random_create(int fd, uint64_t start, uint64_t end);
+struct intel_allocator *
+intel_allocator_simple_create(int fd, uint64_t start, uint64_t end,
+			      enum allocator_strategy strategy);
 
 /*
  * Instead of trying to find first empty handle just get new one. Assuming
@@ -280,8 +287,6 @@ static struct intel_allocator *intel_allocator_create(int fd,
 {
 	struct intel_allocator *ial = NULL;
 
-	igt_assert(can_report_gtt_size(fd));
-
 	switch (allocator_type) {
 	/*
 	 * Few words of explanation is required here.
@@ -297,17 +302,14 @@ static struct intel_allocator *intel_allocator_create(int fd,
 			     "We cannot use NONE allocator\n");
 		break;
 	case INTEL_ALLOCATOR_RELOC:
-		ial = intel_allocator_reloc_create(fd);
+		ial = intel_allocator_reloc_create(fd, start, end);
 		break;
 	case INTEL_ALLOCATOR_RANDOM:
-		ial = intel_allocator_random_create(fd);
+		ial = intel_allocator_random_create(fd, start, end);
 		break;
 	case INTEL_ALLOCATOR_SIMPLE:
-		if (!start && !end)
-			ial = intel_allocator_simple_create(fd);
-		else
-			ial = intel_allocator_simple_create_full(fd, start, end,
-								 allocator_strategy);
+		ial = intel_allocator_simple_create(fd, start, end,
+						    allocator_strategy);
 		break;
 	default:
 		igt_assert_f(ial, "Allocator type %d not implemented\n",
@@ -888,6 +890,18 @@ static uint64_t __intel_allocator_open_full(int fd, uint32_t ctx,
 				 .open.allocator_type = allocator_type,
 				 .open.allocator_strategy = strategy };
 	struct alloc_resp resp;
+	uint64_t gtt_size;
+
+	if (!start && !end) {
+		igt_assert_f(can_report_gtt_size(fd), "Invalid fd\n");
+		gtt_size = gem_aperture_size(fd);
+		if (!gem_uses_full_ppgtt(fd))
+			gtt_size /= 2;
+		else
+			gtt_size -= RESERVED;
+
+		req.open.end = gtt_size;
+	}
 
 	/* Get child_tid only once at open() */
 	if (child_tid == -1)
@@ -918,6 +932,9 @@ static uint64_t __intel_allocator_open_full(int fd, uint32_t ctx,
  * Returns: unique handle to the currently opened allocator.
  *
  * Notes:
+ *
+ * If start = end = 0, the allocator is opened for the whole available gtt.
+ *
  * Strategy is generally used internally by the underlying allocator:
  *
  * For SIMPLE allocator:
@@ -926,7 +943,7 @@ static uint64_t __intel_allocator_open_full(int fd, uint32_t ctx,
  *   addresses.
  *
  * For RANDOM allocator:
- * - none of strategy is currently implemented.
+ * - no strategy is currently implemented.
  */
 uint64_t intel_allocator_open_full(int fd, uint32_t ctx,
 				   uint64_t start, uint64_t end,
@@ -1067,9 +1084,11 @@ uint64_t __intel_allocator_alloc(uint64_t allocator_handle, uint32_t handle,
 				 .allocator_handle = allocator_handle,
 				 .alloc.handle = handle,
 				 .alloc.size = size,
-				 .alloc.alignment = alignment,
 				 .alloc.strategy = strategy };
 	struct alloc_resp resp;
+
+	igt_assert((alignment & (alignment-1)) == 0);
+	req.alloc.alignment = max(alignment, 1 << 12);
 
 	igt_assert(handle_request(&req, &resp) == 0);
 	igt_assert(resp.response_type == RESP_ALLOC);

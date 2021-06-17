@@ -10,12 +10,11 @@
 #include "igt_rand.h"
 #include "intel_allocator.h"
 
-struct intel_allocator *intel_allocator_reloc_create(int fd);
+struct intel_allocator *
+intel_allocator_reloc_create(int fd, uint64_t start, uint64_t end);
 
 struct intel_allocator_reloc {
-	uint64_t bias;
 	uint32_t prng;
-	uint64_t gtt_size;
 	uint64_t start;
 	uint64_t end;
 	uint64_t offset;
@@ -24,12 +23,8 @@ struct intel_allocator_reloc {
 	uint64_t allocated_objects;
 };
 
-static uint64_t get_bias(int fd)
-{
-	(void) fd;
-
-	return 256 << 10;
-}
+/* Keep the low 256k clear, for negative deltas */
+#define BIAS (256 << 10)
 
 static void intel_allocator_reloc_get_address_range(struct intel_allocator *ial,
 						    uint64_t *startp,
@@ -55,12 +50,15 @@ static uint64_t intel_allocator_reloc_alloc(struct intel_allocator *ial,
 	(void) handle;
 	(void) strategy;
 
-	alignment = max(alignment, 4096);
 	aligned_offset = ALIGN(ialr->offset, alignment);
 
 	/* Check we won't exceed end */
 	if (aligned_offset + size > ialr->end)
 		aligned_offset = ALIGN(ialr->start, alignment);
+
+	/* Check that the object fits in the address range */
+	if (aligned_offset + size > ialr->end)
+		return ALLOC_INVALID_ADDRESS;
 
 	offset = aligned_offset;
 	ialr->offset = offset + size;
@@ -152,8 +150,8 @@ static bool intel_allocator_reloc_is_empty(struct intel_allocator *ial)
 	return !ialr->allocated_objects;
 }
 
-#define RESERVED 4096
-struct intel_allocator *intel_allocator_reloc_create(int fd)
+struct intel_allocator *
+intel_allocator_reloc_create(int fd, uint64_t start, uint64_t end)
 {
 	struct intel_allocator *ial;
 	struct intel_allocator_reloc *ialr;
@@ -177,14 +175,11 @@ struct intel_allocator *intel_allocator_reloc_create(int fd)
 	ialr = ial->priv = calloc(1, sizeof(*ialr));
 	igt_assert(ial->priv);
 	ialr->prng = (uint32_t) to_user_pointer(ial);
-	ialr->gtt_size = gem_aperture_size(fd);
-	igt_debug("Gtt size: %" PRId64 "\n", ialr->gtt_size);
-	if (!gem_uses_full_ppgtt(fd))
-		ialr->gtt_size /= 2;
 
-	ialr->bias = ialr->offset = get_bias(fd);
-	ialr->start = ialr->bias;
-	ialr->end = ialr->gtt_size - RESERVED;
+	start = max(start, BIAS);
+	igt_assert(start < end);
+	ialr->offset = ialr->start = start;
+	ialr->end = end;
 
 	ialr->allocated_objects = 0;
 

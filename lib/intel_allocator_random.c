@@ -10,12 +10,11 @@
 #include "igt_rand.h"
 #include "intel_allocator.h"
 
-struct intel_allocator *intel_allocator_random_create(int fd);
+struct intel_allocator *
+intel_allocator_random_create(int fd, uint64_t start, uint64_t end);
 
 struct intel_allocator_random {
-	uint64_t bias;
 	uint32_t prng;
-	uint64_t gtt_size;
 	uint64_t start;
 	uint64_t end;
 
@@ -23,12 +22,9 @@ struct intel_allocator_random {
 	uint64_t allocated_objects;
 };
 
-static uint64_t get_bias(int fd)
-{
-	(void) fd;
-
-	return 256 << 10;
-}
+/* Keep the low 256k clear, for negative deltas */
+#define BIAS (256 << 10)
+#define RETRIES 8
 
 static void intel_allocator_random_get_address_range(struct intel_allocator *ial,
 						     uint64_t *startp,
@@ -50,6 +46,7 @@ static uint64_t intel_allocator_random_alloc(struct intel_allocator *ial,
 {
 	struct intel_allocator_random *ialr = ial->priv;
 	uint64_t offset;
+	int cnt = RETRIES;
 
 	(void) handle;
 	(void) strategy;
@@ -57,10 +54,17 @@ static uint64_t intel_allocator_random_alloc(struct intel_allocator *ial,
 	/* randomize the address, we try to avoid relocations */
 	do {
 		offset = hars_petruska_f54_1_random64(&ialr->prng);
-		offset += ialr->bias; /* Keep the low 256k clear, for negative deltas */
-		offset &= ialr->gtt_size - 1;
-		offset &= ~(alignment - 1);
-	} while (offset + size > ialr->end);
+		/* maximize the chances of fitting in the last iteration */
+		if (cnt == 1)
+			offset = 0;
+
+		offset %= ialr->end - ialr->start;
+		offset += ialr->start;
+		offset = ALIGN(offset, alignment);
+	} while (offset + size > ialr->end && --cnt);
+
+	if (!cnt)
+		return ALLOC_INVALID_ADDRESS;
 
 	ialr->allocated_objects++;
 
@@ -150,8 +154,8 @@ static bool intel_allocator_random_is_empty(struct intel_allocator *ial)
 	return !ialr->allocated_objects;
 }
 
-#define RESERVED 4096
-struct intel_allocator *intel_allocator_random_create(int fd)
+struct intel_allocator *
+intel_allocator_random_create(int fd, uint64_t start, uint64_t end)
 {
 	struct intel_allocator *ial;
 	struct intel_allocator_random *ialr;
@@ -175,14 +179,11 @@ struct intel_allocator *intel_allocator_random_create(int fd)
 	ialr = ial->priv = calloc(1, sizeof(*ialr));
 	igt_assert(ial->priv);
 	ialr->prng = (uint32_t) to_user_pointer(ial);
-	ialr->gtt_size = gem_aperture_size(fd);
-	igt_debug("Gtt size: %" PRId64 "\n", ialr->gtt_size);
-	if (!gem_uses_full_ppgtt(fd))
-		ialr->gtt_size /= 2;
 
-	ialr->bias = get_bias(fd);
-	ialr->start = ialr->bias;
-	ialr->end = ialr->gtt_size - RESERVED;
+	start = max(start, BIAS);
+	igt_assert(start < end);
+	ialr->start = start;
+	ialr->end = end;
 
 	ialr->allocated_objects = 0;
 
