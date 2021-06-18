@@ -29,6 +29,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <signal.h>
 
 #include "i915/gem.h"
 #include "i915/gem_create.h"
@@ -53,6 +54,7 @@ struct hotunplug {
 	const char *failure;
 	bool need_healthcheck;
 	bool has_intel_perf;
+	bool snd_unload;
 };
 
 /* Helpers */
@@ -138,6 +140,34 @@ static void prepare(struct hotunplug *priv)
 static void driver_unbind(struct hotunplug *priv, const char *prefix,
 			  int timeout)
 {
+	/**
+	 * FIXME: Unbinding the i915 driver on affected platforms with
+	 * audio results in a kernel WARN on "i915 raw-wakerefs=1
+	 * wakelocks=1 on cleanup". The below CI friendly user level
+	 * workaround to unload and de-couple audio from IGT testing,
+	 * prevents the warning from appearing. Drop this hack as soon
+	 * as this is fixed in the kernel. unbind/re-bind validation
+	 * on audio side is not robust and we could have potential
+	 * failures blocking display CI, currently this seems to the
+	 * safest and easiest way out.
+	 */
+	if (priv->snd_unload) {
+		igt_terminate_process(SIGTERM, "alsactl");
+
+		/* unbind snd_hda_intel */
+		kick_snd_hda_intel();
+
+		if (igt_kmod_unload("snd_hda_intel", 0)) {
+			priv->snd_unload = false;
+			igt_warn("Could not unload snd_hda_intel\n");
+			igt_kmod_list_loaded();
+			igt_lsof("/dev/snd");
+			igt_skip("Audio is in use, skipping\n");
+		} else {
+			igt_warn("Preventively unloaded snd_hda_intel\n");
+		}
+	}
+
 	local_debug("%sunbinding the driver from the device\n", prefix);
 	priv->failure = "Driver unbind failure!";
 
@@ -166,6 +196,9 @@ static void driver_bind(struct hotunplug *priv, int timeout)
 	igt_fail_on_f(faccessat(priv->fd.sysfs_drv, priv->dev_bus_addr,
 				F_OK, 0),
 		      "Rebound device not present!\n");
+
+	if (priv->snd_unload)
+		igt_kmod_load("snd_hda_intel", NULL);
 }
 
 /* Remove (virtually unplug) the device from its bus */
@@ -574,6 +607,7 @@ igt_main
 		.failure	= NULL,
 		.need_healthcheck = true,
 		.has_intel_perf = false,
+		.snd_unload	= false,
 	};
 
 	igt_fixture {
@@ -585,23 +619,16 @@ igt_main
 		if (is_i915_device(fd_drm)) {
 			uint32_t devid = intel_get_drm_devid(fd_drm);
 
+			if ((IS_HASWELL(devid) || IS_BROADWELL(devid) ||
+			     IS_DG1(devid)) && (igt_kmod_is_loaded("snd_hda_intel"))) {
+				igt_debug("Enable WA to unload snd driver\n");
+				priv.snd_unload = true;
+			}
+
 			gem_quiescent_gpu(fd_drm);
 			igt_require_gem(fd_drm);
 
 			priv.has_intel_perf = local_i915_perf_healthcheck(fd_drm);
-
-			/**
-			 * FIXME: Unbinding the i915 driver on some Haswell
-			 * platforms with Azalia audio results in a kernel WARN
-			 * on "i915 raw-wakerefs=1 wakelocks=1 on cleanup".  The
-			 * below CI friendly user level workaround prevents the
-			 * warning from appearing.  Drop this hack as soon as
-			 * this is fixed in the kernel.
-			 */
-			if (igt_warn_on_f(IS_HASWELL(devid) ||
-					  IS_BROADWELL(devid),
-			    "Manually enabling audio PM to work around a kernel WARN\n"))
-				igt_pm_enable_audio_runtime_pm();
 		}
 
 		/* Make sure subtests always reopen the same device */
