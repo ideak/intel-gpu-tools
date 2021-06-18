@@ -595,6 +595,28 @@ void gem_sync(int fd, uint32_t handle)
 }
 
 /**
+ * gem_buffer_create_fb_obj:
+ * @fd: open i915 drm file descriptor
+ * @size: desired size of the buffer
+ *
+ * This wraps the GEM_CREATE ioctl, which allocates a new gem buffer object of
+ * @size from file descriptor specific region
+ *
+ * Returns: The file-private handle of the created buffer object
+ */
+uint32_t gem_buffer_create_fb_obj(int fd, uint64_t size)
+{
+	uint32_t handle;
+
+	if (gem_has_lmem(fd))
+		handle = gem_create_in_memory_regions(fd, size, REGION_LMEM(0));
+	else
+		handle = gem_create(fd, size);
+
+	return handle;
+}
+
+/**
  * __gem_execbuf:
  * @fd: open i915 drm file descriptor
  * @execbuf: execbuffer data structure

@@ -629,7 +629,8 @@ test_size_overflow(data_t *data)
 	igt_require(data->max_fb_width >= 16383 &&
 		    data->max_fb_height >= 16383);
 
-	bo = gem_create(data->drm_fd, (1ULL << 32) - 4096);
+	bo = gem_buffer_create_fb_obj(data->drm_fd, (1ULL << 32) - 4096);
+
 	igt_require(bo);
 
 	ret = __kms_addfb(data->drm_fd, bo,
@@ -667,7 +668,7 @@ test_size_offset_overflow(data_t *data)
 					       DRM_FORMAT_NV12,
 					       data->modifier));
 
-	bo = gem_create(data->drm_fd, (1ULL << 32) - 4096);
+	bo = gem_buffer_create_fb_obj(data->drm_fd, (1ULL << 32) - 4096);
 	igt_require(bo);
 
 	offsets[0] = 0;
@@ -726,7 +727,7 @@ test_addfb(data_t *data)
 			 format, data->modifier,
 			 &size, &strides[0]);
 
-	bo = gem_create(data->drm_fd, size);
+	bo = gem_buffer_create_fb_obj(data->drm_fd, size);
 	igt_require(bo);
 
 	if (intel_display_ver(data->devid) < 4)
