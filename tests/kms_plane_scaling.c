@@ -165,6 +165,10 @@ static bool can_rotate(data_t *d, unsigned format, uint64_t tiling,
 	if (!is_i915_device(d->drm_fd))
 		return true;
 
+	if (intel_display_ver(d->devid) >= 13 &&
+		(rot == IGT_ROTATION_90 || rot == IGT_ROTATION_270))
+		return false;
+
 	switch (format) {
 	case DRM_FORMAT_RGB565:
 		if (intel_display_ver(d->devid) >= 11)
