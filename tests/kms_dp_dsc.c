@@ -80,8 +80,6 @@ static bool is_dp_dsc_supported(data_t *data)
 
 	strcpy(file_name, data->conn_name);
 	strcat(file_name, "/i915_dsc_fec_support");
-	igt_require(igt_debugfs_simple_read(data->debugfs_fd, file_name, buf,
-					    sizeof(buf)) > 0);
 	igt_debugfs_read(data->drm_fd, file_name, buf);
 
 	return strstr(buf, "DSC_Sink_Support: yes");
