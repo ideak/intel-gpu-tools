@@ -316,7 +316,7 @@ igt_main_args("", long_opts, help_str, opt_handler, NULL)
 			    temp->modes[i].vdisplay == 1050)
 				break;
 		}
-		igt_assert_f(i != temp->count_modes, "1400x1050 not on mode list\n");
+		igt_require_f(i != temp->count_modes, "1400x1050 not on mode list\n");
 
 		drmModeFreeConnector(temp);
 
