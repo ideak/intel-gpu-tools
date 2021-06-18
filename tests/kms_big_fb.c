@@ -50,6 +50,11 @@ typedef struct {
 	igt_render_copyfunc_t render_copy;
 	struct buf_ops *bops;
 	struct intel_bb *ibb;
+	bool max_hw_stride_test;
+	int hw_stride;
+	int max_hw_fb_width;
+	uint32_t format_override;
+	uint32_t stride_override;
 } data_t;
 
 static struct intel_buf *init_buf(data_t *data,
@@ -81,6 +86,38 @@ static struct intel_buf *init_buf(data_t *data,
 static void fini_buf(struct intel_buf *buf)
 {
 	intel_buf_destroy(buf);
+}
+
+static void setup_fb(data_t *data, struct igt_fb *newfb, uint32_t width,
+		     uint32_t height, uint64_t format, uint64_t modifier, uint64_t stride)
+{
+	struct drm_mode_fb_cmd2 f = {0};
+	cairo_t *cr;
+
+	newfb->strides[0] = stride;
+	igt_create_bo_for_fb(data->drm_fd, width, height, format, modifier,
+			     newfb);
+
+	igt_assert(newfb->gem_handle > 0);
+
+	f.width = newfb->width;
+	f.height = newfb->height;
+	f.pixel_format = newfb->drm_format;
+	f.flags = LOCAL_DRM_MODE_FB_MODIFIERS;
+
+	for (int n = 0; n < newfb->num_planes; n++) {
+		f.handles[n] = newfb->gem_handle;
+		f.modifier[n] = newfb->modifier;
+		f.pitches[n] = newfb->strides[n];
+		f.offsets[n] = newfb->offsets[n];
+	}
+
+	cr = igt_get_cairo_ctx(data->drm_fd, newfb);
+	igt_paint_color(cr, 0, 0, newfb->width, newfb->height, 0, 0, 0);
+	igt_put_cairo_ctx(cr);
+
+	igt_assert(drmIoctl(data->drm_fd, LOCAL_DRM_IOCTL_MODE_ADDFB2, &f) == 0);
+	newfb->fb_id = f.fb_id;
 }
 
 static void copy_pattern(data_t *data,
@@ -178,9 +215,6 @@ static void max_fb_size(data_t *data, int *width, int *height,
 	uint64_t size;
 	int i = 0;
 
-	*width = data->max_fb_width;
-	*height = data->max_fb_height;
-
 	/* max fence stride is only 8k bytes on gen3 */
 	if (intel_display_ver(data->devid) < 4 &&
 	    format == DRM_FORMAT_XRGB8888)
@@ -209,10 +243,17 @@ static void prep_fb(data_t *data)
 	if (data->big_fb.fb_id)
 		return;
 
-	igt_create_fb(data->drm_fd,
-		      data->big_fb_width, data->big_fb_height,
-		      data->format, data->modifier,
-		      &data->big_fb);
+	if (data->hw_stride == 0) {
+		igt_create_fb(data->drm_fd,
+			data->big_fb_width, data->big_fb_height,
+			data->format, data->modifier,
+			&data->big_fb);
+	} else {
+		setup_fb(data, &data->big_fb, data->big_fb_width,
+			 data->big_fb_height, data->format, data->modifier,
+			 data->hw_stride);
+		igt_info("using stride length %d\n", data->hw_stride);
+	}
 
 	generate_pattern(data, &data->big_fb, 640, 480);
 }
@@ -435,6 +476,14 @@ static bool test_pipe(data_t *data)
 
 static void test_scanout(data_t *data)
 {
+	if (data->max_hw_stride_test) {
+		data->big_fb_width = data->max_hw_fb_width;
+		data->big_fb_height = data->max_hw_fb_width;
+	} else {
+		data->big_fb_width = data->max_fb_width;
+		data->big_fb_height = data->max_fb_height;
+	}
+
 	max_fb_size(data, &data->big_fb_width, &data->big_fb_height,
 		    data->format, data->modifier);
 
@@ -586,7 +635,27 @@ test_addfb(data_t *data)
 	gem_close(data->drm_fd, bo);
 }
 
-static data_t data;
+/*
+ * TODO: adapt i9xx_plane_max_stride(..) here from intel_display.c
+ * in kernel sources to support older gen for max hw stride length
+ * testing.
+ */
+static void
+set_max_hw_stride(data_t *data)
+{
+	if (intel_display_ver(data->devid) >= 13) {
+		/*
+		 * The stride in bytes must not exceed of the size
+		 * of 128K bytes. For pixel formats of 64bpp will allow
+		 * for a 16K pixel surface.
+		 */
+		data->hw_stride = 131072;
+	} else {
+		data->hw_stride = 32768;
+	}
+}
+
+static data_t data = {};
 
 static const struct {
 	uint64_t modifier;
@@ -618,6 +687,13 @@ static const struct {
 	{ IGT_ROTATION_270, 270, },
 };
 
+static const struct {
+	igt_rotation_t flip;
+	const char *flipname;
+} fliptab[] = {
+	{ 0, "" },
+	{ IGT_REFLECT_X, "-hflip" },
+};
 igt_main
 {
 	igt_fixture {
@@ -664,6 +740,9 @@ igt_main
 			data.render_copy = igt_get_render_copyfunc(data.devid);
 
 		data.bops = buf_ops_create(data.drm_fd);
+		data.ibb = intel_bb_create(data.drm_fd, 4096);
+
+		data.max_hw_stride_test = false;
 	}
 
 	/*
@@ -730,6 +809,65 @@ igt_main
 				cleanup_fb(&data);
 		}
 	}
+
+	data.max_hw_stride_test = true;
+	// Run max hw stride length tests on gen5 and later.
+	for (int i = 0; i < ARRAY_SIZE(modifiers); i++) {
+		data.modifier = modifiers[i].modifier;
+
+		set_max_hw_stride(&data);
+
+		for (int l = 0; l < ARRAY_SIZE(fliptab); l++) {
+			for (int j = 0; j < ARRAY_SIZE(formats); j++) {
+				/*
+				* try only those formats which can show full length.
+				* Here 32K is used to have CI test results consistent
+				* for all platforms, 32K is smallest number possbily
+				* coming to data.hw_stride from above set_max_hw_stride()
+				*/
+				if (32768 / (formats[j].bpp >> 3) > 8192)
+					continue;
+
+				data.format = formats[j].format;
+
+				for (int k = 0; k < ARRAY_SIZE(rotations); k++) {
+					data.rotation = rotations[k].rotation | fliptab[l].flip;
+
+					// this combination will never happen.
+					if ((data.rotation & (IGT_ROTATION_90 | IGT_ROTATION_270)) ||
+						(fliptab[l].flip == IGT_REFLECT_X && modifiers[i].modifier == DRM_FORMAT_MOD_LINEAR))
+						continue;
+
+					igt_describe("test maximum hardware supported stride length for given bpp and modifiers.");
+					igt_subtest_f("%s-max-hw-stride-%dbpp-rotate-%d%s", modifiers[i].name,
+						formats[j].bpp, rotations[k].angle, fliptab[l].flipname) {
+						igt_require(intel_display_ver(intel_get_drm_devid(data.drm_fd)) >= 5);
+						if (data.format_override != 0) {
+							igt_info("using format override fourcc %.4s\n", (char *)&data.format_override);
+							data.format = data.format_override;
+						}
+						if (data.stride_override != 0) {
+							igt_info("using FB width override %.d\n", data.stride_override);
+							data.hw_stride = data.stride_override;
+							data.max_hw_fb_width = data.stride_override;
+
+						} else {
+							data.max_hw_fb_width = min(data.hw_stride / (formats[j].bpp >> 3), data.max_fb_width);
+						}
+
+						igt_require(data.format == DRM_FORMAT_C8 ||
+							igt_fb_supported_format(data.format));
+						igt_require(igt_display_has_format_mod(&data.display, data.format, data.modifier));
+						test_scanout(&data);
+					}
+				}
+
+				igt_fixture
+					cleanup_fb(&data);
+			}
+		}
+	}
+	data.max_hw_stride_test = false;
 
 	igt_fixture {
 		igt_display_fini(&data.display);
