@@ -248,7 +248,8 @@ static void isolation(int i915)
 
 static void pf_nonblock(int i915)
 {
-	igt_spin_t *spin = igt_spin_new(i915);
+	uint64_t ahnd = get_reloc_ahnd(i915, 0);
+	igt_spin_t *spin = igt_spin_new(i915, .ahnd = ahnd);
 
 	for_each_mmap_offset_type(i915, t) {
 		uint32_t *ptr;
@@ -268,6 +269,7 @@ static void pf_nonblock(int i915)
 	}
 
 	igt_spin_free(i915, spin);
+	put_ahnd(ahnd);
 }
 
 static void *memchr_inv(const void *s, int c, size_t n)
