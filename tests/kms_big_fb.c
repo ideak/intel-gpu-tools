@@ -115,12 +115,15 @@ static void setup_fb(data_t *data, struct igt_fb *newfb, uint32_t width,
 		f.offsets[n] = newfb->offsets[n];
 	}
 
-	cr = igt_get_cairo_ctx(data->drm_fd, newfb);
-	igt_paint_color(cr, 0, 0, newfb->width, newfb->height,
-			data->planeclearrgb[0],
-			data->planeclearrgb[1],
-			data->planeclearrgb[2]);
-	igt_put_cairo_ctx(cr);
+       if (data->planeclearrgb[0] != 0.0 || data->planeclearrgb[1] != 0.0 ||
+           data->planeclearrgb[2] != 0.0) {
+               cr = igt_get_cairo_ctx(data->drm_fd, newfb);
+               igt_paint_color(cr, 0, 0, newfb->width, newfb->height,
+                               data->planeclearrgb[0],
+                               data->planeclearrgb[1],
+                               data->planeclearrgb[2]);
+               igt_put_cairo_ctx(cr);
+       }
 
 	igt_assert(drmIoctl(data->drm_fd, LOCAL_DRM_IOCTL_MODE_ADDFB2, &f) == 0);
 	newfb->fb_id = f.fb_id;
