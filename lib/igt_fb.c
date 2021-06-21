@@ -396,6 +396,19 @@ void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 		vc4_modifier_param = fourcc_mod_broadcom_param(modifier);
 		modifier = fourcc_mod_broadcom_mod(modifier);
 	}
+	// For all non-linear modifiers, AMD uses 64 KiB tiles
+	else if (IS_AMD_FMT_MOD(modifier)) {
+		const int bytes_per_pixel = fb_bpp / 8;
+		const int format_log2 = log2(bytes_per_pixel);
+		const int pixel_log2 = log2(64 * 1024) - format_log2;
+		const int width_log2 = (pixel_log2 + 1) / 2;
+		const int height_log2 = pixel_log2 - width_log2;
+		igt_require_amdgpu(fd);
+
+		*width_ret = bytes_per_pixel << width_log2;
+		*height_ret = 1 << height_log2;
+		return;
+	}
 
 	switch (modifier) {
 	case LOCAL_DRM_FORMAT_MOD_NONE:
