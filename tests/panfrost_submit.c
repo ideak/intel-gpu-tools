@@ -157,6 +157,17 @@ igt_main
                 close(tmpfd);
         }
 
+        igt_subtest("pan-submit-and-close") {
+                /* We need our own FD because we close it right after the job submission */
+                int tmpfd = drm_open_driver(DRIVER_PANFROST);
+                struct panfrost_submit *submit;
+
+                submit = igt_panfrost_job_loop(tmpfd);
+                do_ioctl(tmpfd, DRM_IOCTL_PANFROST_SUBMIT, submit->args);
+                igt_panfrost_free_job(tmpfd, submit);
+                close(tmpfd);
+        }
+
         igt_fixture {
                 close(fd);
         }
