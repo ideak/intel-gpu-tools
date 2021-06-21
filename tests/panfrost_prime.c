@@ -35,13 +35,33 @@
 #include <sys/ioctl.h>
 #include "panfrost_drm.h"
 
+static bool igt_has_dumb(int fd)
+{
+	uint64_t value = 0;
+	int ret;
+
+	ret = drmGetCap(fd, DRM_CAP_DUMB_BUFFER, &value);
+	igt_assert(ret == 0 || errno == EINVAL || errno == EOPNOTSUPP);
+	return value == 1;
+}
+
+static bool igt_has_prime(int fd, uint64_t flags)
+{
+	uint64_t value = 0;
+	int ret;
+
+	ret = drmGetCap(fd, DRM_CAP_PRIME, &value);
+	igt_assert(ret == 0 || errno == EINVAL || errno == EOPNOTSUPP);
+	return (value & flags) == flags;
+}
+
 igt_main
 {
 	int fd, kms_fd;
 
 	igt_fixture {
-		kms_fd = drm_open_driver_master(DRIVER_ANY);
 		fd = drm_open_driver(DRIVER_PANFROST);
+		kms_fd = __drm_open_driver_another(1, DRIVER_ANY);
 	}
 
 	igt_subtest("gem-prime-import") {
@@ -49,6 +69,9 @@ igt_main
 		uint32_t handle, dumb_handle;
 	        struct drm_panfrost_get_bo_offset get_bo_offset = {0,};
 		int dmabuf_fd;
+
+		igt_skip_on(!igt_has_dumb(kms_fd));
+		igt_skip_on(!igt_has_prime(kms_fd, DRM_PRIME_CAP_EXPORT));
 
 		/* Just to be sure that when we import the dumb buffer it has
 		 * a non-NULL address.
