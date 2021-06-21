@@ -72,6 +72,9 @@ igt_panfrost_gem_new(int fd, size_t size)
 void
 igt_panfrost_free_bo(int fd, struct panfrost_bo *bo)
 {
+        if (!bo)
+                return;
+
         if (bo->map)
                 munmap(bo->map, bo->size);
         gem_close(fd, bo->handle);
