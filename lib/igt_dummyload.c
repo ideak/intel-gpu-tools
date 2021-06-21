@@ -119,7 +119,7 @@ emit_recursive_batch(igt_spin_t *spin,
 	 */
 	addr = gem_aperture_size(fd) / 2;
 	if (addr >> 31)
-		addr = 1 << 31;
+		addr = 1u << 31;
 	addr += random() % addr / 2;
 	addr &= -4096;
 
