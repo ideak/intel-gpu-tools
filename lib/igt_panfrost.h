@@ -50,7 +50,6 @@ void igt_panfrost_free_bo(int fd, struct panfrost_bo *bo);
 struct mali_job_descriptor_header *
 igt_panfrost_job_loop_get_job_header(struct panfrost_submit *submit,
                                      unsigned job_idx);
-struct panfrost_submit *igt_panfrost_trivial_job(int fd, bool do_crash, int width, int height, uint32_t color);
 struct panfrost_submit *igt_panfrost_job_loop(int fd);
 struct panfrost_submit *igt_panfrost_null_job(int fd);
 void igt_panfrost_free_job(int fd, struct panfrost_submit *submit);
