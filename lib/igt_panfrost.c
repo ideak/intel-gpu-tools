@@ -207,6 +207,39 @@ struct panfrost_submit *igt_panfrost_job_loop(int fd)
         return submit;
 }
 
+struct panfrost_submit *igt_panfrost_null_job(int fd)
+{
+        struct panfrost_submit *submit;
+        struct mali_job_descriptor_header header = {
+                .job_type = JOB_TYPE_NULL,
+                .job_index = 1,
+                .job_descriptor_size = 1,
+        };
+        uint32_t *bos;
+
+        submit = malloc(sizeof(*submit));
+	memset(submit, 0, sizeof(*submit));
+
+        submit->submit_bo = igt_panfrost_gem_new(fd, sizeof(header));
+        igt_panfrost_bo_mmap(fd, submit->submit_bo);
+
+        memcpy(submit->submit_bo->map, &header, sizeof(header));
+
+        submit->args = malloc(sizeof(*submit->args));
+        memset(submit->args, 0, sizeof(*submit->args));
+        submit->args->jc = submit->submit_bo->offset;
+
+        bos = malloc(sizeof(*bos) * 1);
+        bos[0] = submit->submit_bo->handle;
+
+        submit->args->bo_handles = to_user_pointer(bos);
+        submit->args->bo_handle_count = 1;
+
+        igt_assert_eq(drmSyncobjCreate(fd, DRM_SYNCOBJ_CREATE_SIGNALED, &submit->args->out_sync), 0);
+
+        return submit;
+}
+
 struct panfrost_submit *igt_panfrost_trivial_job(int fd, bool do_crash, int width, int height, uint32_t color)
 {
         struct panfrost_submit *submit;
