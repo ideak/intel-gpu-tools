@@ -130,6 +130,83 @@ void igt_panfrost_bo_mmap(int fd, struct panfrost_bo *bo)
         igt_assert(bo->map);
 }
 
+struct mali_job_descriptor_header *
+igt_panfrost_job_loop_get_job_header(struct panfrost_submit *submit,
+                                     unsigned job_idx)
+{
+        unsigned job_offset = ALIGN(sizeof(struct mali_job_descriptor_header) +
+                                    sizeof(struct mali_payload_set_value),
+                                    64) *
+                              job_idx;
+
+        igt_assert(job_idx <= 1);
+
+        return submit->submit_bo->map + job_offset;
+}
+
+struct panfrost_submit *igt_panfrost_job_loop(int fd)
+{
+        /* We create 2 WRITE_VALUE jobs pointing to each other to form a loop.
+         * Each WRITE_VALUE job resets the ->exception_status field of the
+         * other job to allow re-execution (if we don't do that we end up with
+         * an INVALID_DATA fault on the second execution).
+         */
+        struct panfrost_submit *submit;
+        struct mali_job_descriptor_header header = {
+                .job_type = JOB_TYPE_SET_VALUE,
+                .job_barrier = 1,
+                .unknown_flags = 5,
+                .job_index = 1,
+                .job_descriptor_size = 1,
+        };
+
+        /* .unknow = 3 means write 0 at the address specified in .out */
+        struct mali_payload_set_value payload = {
+                .unknown = 3,
+        };
+        uint32_t *bos;
+        unsigned job1_offset = ALIGN(sizeof(header) + sizeof(payload), 64);
+        unsigned job0_offset = 0;
+
+        submit = malloc(sizeof(*submit));
+	memset(submit, 0, sizeof(*submit));
+
+        submit->submit_bo = igt_panfrost_gem_new(fd, ALIGN(sizeof(header) + sizeof(payload), 64) * 2);
+        igt_panfrost_bo_mmap(fd, submit->submit_bo);
+
+        /* Job 0 points to job 1 and has its WRITE_VALUE pointer pointing to
+         * job 1 execption_status field.
+         */
+        header.next_job_64 = submit->submit_bo->offset + job1_offset;
+        payload.out = submit->submit_bo->offset + job1_offset +
+                      offsetof(struct mali_job_descriptor_header, exception_status);
+        memcpy(submit->submit_bo->map + job0_offset, &header, sizeof(header));
+        memcpy(submit->submit_bo->map + job0_offset + sizeof(header), &payload, sizeof(payload));
+
+        /* Job 1 points to job 0 and has its WRITE_VALUE pointer pointing to
+         * job 0 execption_status field.
+         */
+        header.next_job_64 = submit->submit_bo->offset + job0_offset;
+        payload.out = submit->submit_bo->offset + job0_offset +
+                      offsetof(struct mali_job_descriptor_header, exception_status);
+        memcpy(submit->submit_bo->map + job1_offset, &header, sizeof(header));
+        memcpy(submit->submit_bo->map + job1_offset + sizeof(header), &payload, sizeof(payload));
+
+        submit->args = malloc(sizeof(*submit->args));
+        memset(submit->args, 0, sizeof(*submit->args));
+        submit->args->jc = submit->submit_bo->offset;
+
+        bos = malloc(sizeof(*bos) * 1);
+        bos[0] = submit->submit_bo->handle;
+
+        submit->args->bo_handles = to_user_pointer(bos);
+        submit->args->bo_handle_count = 1;
+
+        igt_assert_eq(drmSyncobjCreate(fd, DRM_SYNCOBJ_CREATE_SIGNALED, &submit->args->out_sync), 0);
+
+        return submit;
+}
+
 struct panfrost_submit *igt_panfrost_trivial_job(int fd, bool do_crash, int width, int height, uint32_t color)
 {
         struct panfrost_submit *submit;
