@@ -40,6 +40,7 @@
 #include "igt_dummyload.h"
 #include "igt_gt.h"
 #include "igt_vgem.h"
+#include "intel_allocator.h"
 #include "intel_chipset.h"
 #include "intel_reg.h"
 #include "ioctl_wrappers.h"
@@ -92,7 +93,8 @@ emit_recursive_batch(igt_spin_t *spin,
 {
 #define SCRATCH 0
 #define BATCH IGT_SPIN_BATCH
-	const int gen = intel_gen(intel_get_drm_devid(fd));
+	const unsigned int devid = intel_get_drm_devid(fd);
+	const unsigned int gen = intel_gen(devid);
 	struct drm_i915_gem_relocation_entry relocs[3], *r;
 	struct drm_i915_gem_execbuffer2 *execbuf;
 	struct drm_i915_gem_exec_object2 *obj;
@@ -381,7 +383,8 @@ emit_recursive_batch(igt_spin_t *spin,
 	for (i = 0; i < ARRAY_SIZE(spin->obj); i++) {
 		spin->obj[i].relocation_count = 0;
 		spin->obj[i].relocs_ptr = 0;
-		spin->obj[i].flags = EXEC_OBJECT_PINNED;
+		spin->obj[i].offset = CANONICAL(spin->obj[i].offset);
+		spin->obj[i].flags |= EXEC_OBJECT_PINNED;
 	}
 
 	spin->cmd_precondition = *spin->condition;
