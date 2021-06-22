@@ -130,26 +130,31 @@ igt_main
         }
 
         igt_subtest("pan-reset") {
-                struct panfrost_submit *submit;
-                struct mali_job_descriptor_header *headers[2];
+                int tmpfd = drm_open_driver(DRIVER_PANFROST);
+                struct panfrost_submit *submit[2];
+                struct mali_job_descriptor_header *headers[3];
 
-                submit = igt_panfrost_job_loop(fd);
-                headers[0] = igt_panfrost_job_loop_get_job_header(submit, 0);
-                headers[1] = igt_panfrost_job_loop_get_job_header(submit, 1);
-                do_ioctl(fd, DRM_IOCTL_PANFROST_SUBMIT, submit->args);
-
-                /* The job should stay active for BAD_JOB_TIME_NSEC until the
-                 * scheduler consider it as a GPU hang and reset the GPU.
-                 * After the reset, the job fence is signaled.
-                 */
-                igt_assert(!syncobj_wait(fd, &submit->args->out_sync, 1,
+                submit[0] = igt_panfrost_job_loop(fd);
+                submit[1] = igt_panfrost_null_job(tmpfd);
+                headers[0] = igt_panfrost_job_loop_get_job_header(submit[0], 0);
+                headers[1] = igt_panfrost_job_loop_get_job_header(submit[0], 1);
+                headers[2] = submit[1]->submit_bo->map;
+                do_ioctl(fd, DRM_IOCTL_PANFROST_SUBMIT, submit[0]->args);
+                do_ioctl(tmpfd, DRM_IOCTL_PANFROST_SUBMIT, submit[1]->args);
+                /* First job should timeout, second job should complete right after the timeout */
+                igt_assert(!syncobj_wait(fd, &submit[0]->args->out_sync, 1,
                                          abs_timeout(SHORT_TIME_NSEC), 0, NULL));
-                igt_assert(syncobj_wait(fd, &submit->args->out_sync, 1,
+                igt_assert(syncobj_wait(fd, &submit[0]->args->out_sync, 1,
                                         abs_timeout(BAD_JOB_TIME_NSEC), 0, NULL));
+                igt_assert(syncobj_wait(tmpfd, &submit[1]->args->out_sync, 1,
+                                        abs_timeout(SHORT_TIME_NSEC), 0, NULL));
 
                 /* At least one job header of the job loop should have its exception status set to 0 */
                 igt_assert(headers[0]->exception_status != 1 || headers[1]->exception_status != 1);
-                igt_panfrost_free_job(fd, submit);
+                check_done(headers[2]);
+                igt_panfrost_free_job(fd, submit[0]);
+                igt_panfrost_free_job(tmpfd, submit[1]);
+                close(tmpfd);
         }
 
         igt_fixture {
