@@ -682,19 +682,14 @@ static void engines(int fd)
 	for (i = 0; i < engines->num_engines; i++) {
 		struct drm_i915_engine_info *engine =
 			(struct drm_i915_engine_info *)&engines->engines[i];
-		I915_DEFINE_CONTEXT_PARAM_ENGINES(p_engines, 1) = {
-			.engines = { engine->engine }
-		};
-		struct drm_i915_gem_context_param param = {
-			.param = I915_CONTEXT_PARAM_ENGINES,
-			.value = to_user_pointer(&p_engines),
-			.size = sizeof(p_engines),
-		};
-
+		const intel_ctx_t *ctx =
+			intel_ctx_create_for_engine(fd, engine->engine.engine_class,
+						    engine->engine.engine_instance);
 		struct drm_i915_gem_exec_object2 obj = {};
 		struct drm_i915_gem_execbuffer2 execbuf = {
 			.buffers_ptr = to_user_pointer(&obj),
 			.buffer_count = 1,
+			.rsvd1 = ctx->id,
 		};
 
 		igt_debug("%u: class=%u instance=%u flags=%llx capabilities=%llx\n",
@@ -703,11 +698,9 @@ static void engines(int fd)
 			  engine->engine.engine_instance,
 			  engine->flags,
 			  engine->capabilities);
-		gem_context_set_param(fd, &param);
 		igt_assert_eq(__gem_execbuf(fd, &execbuf), -ENOENT);
 
-		param.size = 0; /* reset context engine map to defaults */
-		gem_context_set_param(fd, &param);
+		intel_ctx_destroy(fd, ctx);
 	}
 
 	/* Check results match the legacy GET_PARAM (where we can). */
