@@ -277,7 +277,7 @@ intel_perf_for_devinfo(uint32_t device_id,
 		intel_perf_load_metrics_rkl(perf);
 	} else if (devinfo->is_dg1) {
 		intel_perf_load_metrics_dg1(perf);
-	} else if (devinfo->is_alderlake_s) {
+	} else if (devinfo->is_alderlake_s || devinfo->is_alderlake_p) {
 		intel_perf_load_metrics_adl(perf);
 	} else {
 		return unsupported_i915_perf_platform(perf);
