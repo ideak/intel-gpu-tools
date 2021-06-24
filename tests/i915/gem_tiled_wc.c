@@ -147,6 +147,7 @@ igt_simple_main
 	fd = drm_open_driver(DRIVER_INTEL);
 	gem_require_mmap_wc(fd);
 	gem_require_mappable_ggtt(fd);
+	igt_require(gem_has_legacy_mmap(fd));
 	igt_require(gem_available_fences(fd) > 0);
 
 	handle = create_bo(fd);

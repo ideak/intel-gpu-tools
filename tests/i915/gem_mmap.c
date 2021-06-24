@@ -154,8 +154,10 @@ igt_main
 	uint8_t buf[OBJECT_SIZE];
 	uint8_t *addr;
 
-	igt_fixture
+	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require(gem_has_legacy_mmap(fd));
+	}
 
 	igt_subtest("bad-object") {
 		uint32_t real_handle = gem_create(fd, 4096);

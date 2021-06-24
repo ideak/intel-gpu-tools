@@ -45,6 +45,7 @@ void *gem_mmap__cpu_coherent(int fd, uint32_t handle, uint64_t offset,
 bool gem_has_mappable_ggtt(int i915);
 void gem_require_mappable_ggtt(int i915);
 bool gem_has_mmap_offset(int fd);
+bool gem_has_legacy_mmap(int fd);
 
 void *__gem_mmap__gtt(int fd, uint32_t handle, uint64_t size, unsigned prot);
 void *__gem_mmap__cpu(int fd, uint32_t handle, uint64_t offset, uint64_t size, unsigned prot);

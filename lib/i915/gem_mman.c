@@ -63,6 +63,15 @@ bool gem_has_mmap_offset(int fd)
 	return gtt_version >= 4;
 }
 
+bool gem_has_legacy_mmap(int fd)
+{
+	struct drm_i915_gem_mmap arg = { .handle = ~0U };
+
+	igt_assert_eq(igt_ioctl(fd, DRM_IOCTL_I915_GEM_MMAP, &arg), -1);
+
+	return errno != EOPNOTSUPP;
+}
+
 bool gem_has_mmap_offset_type(int fd, const struct mmap_offset *t)
 {
 	return gem_has_mmap_offset(fd) || t->type == I915_MMAP_OFFSET_GTT;
@@ -136,6 +145,9 @@ bool gem_mmap__has_wc(int fd)
 	struct drm_i915_getparam gp;
 	int mmap_version = -1;
 
+	if (gem_mmap_offset__has_wc(fd))
+		return true;
+
 	memset(&gp, 0, sizeof(gp));
 	gp.param = I915_PARAM_MMAP_VERSION;
 	gp.value = &mmap_version;
@@ -204,6 +216,7 @@ static void *__gem_mmap(int fd, uint32_t handle, uint64_t offset, uint64_t size,
 			unsigned int prot, uint64_t flags)
 {
 	struct drm_i915_gem_mmap arg;
+	int ret;
 
 	memset(&arg, 0, sizeof(arg));
 	arg.handle = handle;
@@ -211,7 +224,13 @@ static void *__gem_mmap(int fd, uint32_t handle, uint64_t offset, uint64_t size,
 	arg.size = size;
 	arg.flags = flags;
 
-	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_MMAP, &arg))
+	ret = igt_ioctl(fd, DRM_IOCTL_I915_GEM_MMAP, &arg);
+	if (ret == -1 && errno == EOPNOTSUPP)
+		return __gem_mmap_offset(fd, handle, offset, size, prot,
+					 flags == I915_MMAP_WC ?
+						I915_MMAP_OFFSET_WC :
+						I915_MMAP_OFFSET_WB);
+	else if (ret)
 		return NULL;
 
 	VG(VALGRIND_MAKE_MEM_DEFINED(from_user_pointer(arg.addr_ptr), arg.size));

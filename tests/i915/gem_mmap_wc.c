@@ -504,6 +504,7 @@ igt_main
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
+		igt_require(gem_has_legacy_mmap(fd));
 		gem_require_mmap_wc(fd);
 	}
 
