@@ -50,3 +50,5 @@ results
 build
 patches
 Makefile
+
+.vscode
