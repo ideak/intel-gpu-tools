@@ -98,16 +98,11 @@ static uint64_t div64_u64_round_up(uint64_t x, uint64_t y)
 	return (x + y - 1) / y;
 }
 
-static bool is_icelake(int i915)
-{
-	return intel_get_device_info(intel_get_drm_devid(i915))->is_icelake;
-}
-
 static uint64_t ns_to_ctx_ticks(int i915, uint64_t ns)
 {
 	int f = read_timestamp_frequency(i915);
-	if (is_icelake(i915))
-		f = 12500000; /* icl!!! are you feeling alright? CTX vs CS */
+	if (intel_gen(intel_get_drm_devid(i915)) == 11)
+		f = 12500000; /* gen11!!! are you feeling alright? CTX vs CS */
 	return div64_u64_round_up(ns * f, NSEC64);
 }
 
