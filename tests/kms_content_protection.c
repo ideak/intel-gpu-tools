@@ -296,6 +296,8 @@ static bool write_srm_as_fw(const __u8 *srm, int len)
 
 	fd = open("/lib/firmware/display_hdcp_srm.bin",
 		  O_WRONLY | O_CREAT, S_IRWXU);
+	igt_require_f(fd >= 0, "Cannot write SRM binary to /lib/firmware\n");
+
 	do {
 		ret = write(fd, srm + total, len - total);
 		if (ret < 0)
