@@ -168,6 +168,34 @@ igt_main
                 close(tmpfd);
         }
 
+        igt_subtest("pan-unhandled-pagefault") {
+                struct mali_job_descriptor_header *header;
+                struct panfrost_submit *submit;
+
+                submit = igt_panfrost_write_value_job(fd, true);
+                do_ioctl(fd, DRM_IOCTL_PANFROST_SUBMIT, submit->args);
+                header = submit->submit_bo->map;
+                igt_assert(syncobj_wait(fd, &submit->args->out_sync, 1,
+                                        abs_timeout(SHORT_TIME_NSEC), 0, NULL));
+
+                /* The job should get a JOB_BUS_FAULT, but it's not reflected
+                 * in the job header because the MMU mapping is disabled (to kill
+                 * the job immediately) before the job manager has a chance to
+                 * update the exception status.
+                 */
+                igt_assert(header->exception_status != 1);
+                igt_panfrost_free_job(fd, submit);
+
+                /* Now make sure new jobs on this context get executed properly */
+                submit = igt_panfrost_write_value_job(fd, false);
+                do_ioctl(fd, DRM_IOCTL_PANFROST_SUBMIT, submit->args);
+                header = submit->submit_bo->map;
+                igt_assert(syncobj_wait(fd, &submit->args->out_sync, 1,
+                                        abs_timeout(SHORT_TIME_NSEC), 0, NULL));
+                check_done(header);
+                igt_panfrost_free_job(fd, submit);
+        }
+
         igt_fixture {
                 close(fd);
         }
