@@ -616,9 +616,9 @@ static void recreate_fb(struct test_output *o)
 	o->fb_info[o->current_fb_id].fb_id = new_fb_id;
 }
 
-static igt_hang_t hang_gpu(int fd)
+static igt_hang_t hang_gpu(int fd, uint64_t ahnd)
 {
-	return igt_hang_ring(fd, I915_EXEC_DEFAULT);
+	return igt_hang_ring_with_ahnd(fd, I915_EXEC_DEFAULT, ahnd);
 }
 
 static void unhang_gpu(int fd, igt_hang_t hang)
@@ -675,6 +675,7 @@ static bool run_test_step(struct test_output *o, unsigned int *events)
 	struct vblank_reply vbl_reply;
 	unsigned int target_seq;
 	igt_hang_t hang;
+	uint64_t ahnd = 0;
 
 	target_seq = o->vblank_state.seq_step;
 	/* Absolute waits only works once we have a frame counter. */
@@ -776,8 +777,10 @@ static bool run_test_step(struct test_output *o, unsigned int *events)
 	igt_print_activity();
 
 	memset(&hang, 0, sizeof(hang));
-	if (do_flip && (o->flags & TEST_HANG))
-		hang = hang_gpu(drm_fd);
+	if (do_flip && (o->flags & TEST_HANG)) {
+		ahnd = get_reloc_ahnd(drm_fd, 0);
+		hang = hang_gpu(drm_fd, ahnd);
+	}
 
 	/* try to make sure we can issue two flips during the same frame */
 	if (do_flip && (o->flags & TEST_EBUSY)) {
@@ -847,6 +850,7 @@ static bool run_test_step(struct test_output *o, unsigned int *events)
 		igt_assert(do_page_flip(o, new_fb_id, false) == expected_einval);
 
 	unhang_gpu(drm_fd, hang);
+	put_ahnd(ahnd);
 
 	*events = completed_events;
 
