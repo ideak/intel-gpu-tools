@@ -52,6 +52,7 @@ igt_panfrost_job_loop_get_job_header(struct panfrost_submit *submit,
                                      unsigned job_idx);
 struct panfrost_submit *igt_panfrost_job_loop(int fd);
 struct panfrost_submit *igt_panfrost_null_job(int fd);
+struct panfrost_submit *igt_panfrost_write_value_job(int fd, bool trigger_page_fault);
 void igt_panfrost_free_job(int fd, struct panfrost_submit *submit);
 
 /* IOCTL wrappers */
