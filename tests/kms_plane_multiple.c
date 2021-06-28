@@ -288,6 +288,7 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 	igt_plane_t *plane;
 	int i;
 	int err, c = 0;
+	int crc_enabled = 0;
 	int iterations = opt.iterations < 1 ? 1 : opt.iterations;
 	bool loop_forever;
 	char info[256];
@@ -327,14 +328,16 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 		 igt_output_name(output), kmstest_pipe_name(pipe), c,
 		 info, opt.seed);
 
-	igt_pipe_crc_start(data->pipe_crc);
-
 	i = 0;
 	while (i < iterations || loop_forever) {
 		/* randomize planes and set up the holes */
 		prepare_planes(data, pipe, &blue, tiling, c, output);
 
 		igt_display_commit2(&data->display, COMMIT_ATOMIC);
+		if (!crc_enabled) {
+			igt_pipe_crc_start(data->pipe_crc);
+			crc_enabled = 1;
+		}
 
 		igt_pipe_crc_get_current(data->display.drm_fd, data->pipe_crc, &crc);
 
