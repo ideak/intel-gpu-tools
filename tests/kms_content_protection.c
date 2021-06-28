@@ -180,9 +180,12 @@ static void modeset_with_fb(const enum pipe pipe, igt_output_t *output,
 	igt_output_set_pipe(output, pipe);
 
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
-	igt_display_commit2(display, s);
 	igt_plane_set_fb(primary, &data.red);
 	igt_fb_set_size(&data.red, primary, mode.hdisplay, mode.vdisplay);
+
+	igt_display_commit2(display, s);
+
+	igt_plane_set_fb(primary, &data.green);
 
 	/* Wait for Flip completion before starting the HDCP authentication */
 	commit_display_and_wait_for_flip(s);
