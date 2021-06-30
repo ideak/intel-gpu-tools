@@ -211,10 +211,12 @@ static void test_error_state_capture(const intel_ctx_t *ctx, unsigned ring_id,
 	uint32_t *batch;
 	igt_hang_t hang;
 	uint64_t offset;
+	uint64_t ahnd = get_reloc_ahnd(device, ctx->id);
 
 	clear_error_state();
 
-	hang = igt_hang_ctx(device, ctx->id, ring_id, HANG_ALLOW_CAPTURE);
+	hang = igt_hang_ctx_with_ahnd(device, ahnd, ctx->id, ring_id,
+				      HANG_ALLOW_CAPTURE);
 	offset = hang.spin->obj[IGT_SPIN_BATCH].offset;
 
 	batch = gem_mmap__cpu(device, hang.spin->handle, 0, 4096, PROT_READ);
@@ -224,6 +226,7 @@ static void test_error_state_capture(const intel_ctx_t *ctx, unsigned ring_id,
 
 	check_error_state(ring_name, offset, batch);
 	munmap(batch, 4096);
+	put_ahnd(ahnd);
 }
 
 static void
@@ -234,6 +237,7 @@ test_engine_hang(const intel_ctx_t *ctx,
 	const intel_ctx_t *tmp_ctx;
 	igt_spin_t *spin, *next;
 	IGT_LIST_HEAD(list);
+	uint64_t ahnd = get_reloc_ahnd(device, ctx->id), ahndN;
 
 	igt_skip_on(flags & IGT_SPIN_INVALID_CS &&
 		    gem_engine_has_cmdparser(device, &ctx->cfg, e->flags));
@@ -244,7 +248,10 @@ test_engine_hang(const intel_ctx_t *ctx,
 			continue;
 
 		tmp_ctx = intel_ctx_create(device, &ctx->cfg);
-		spin = __igt_spin_new(device, .ctx = tmp_ctx,
+		ahndN = get_reloc_ahnd(device, tmp_ctx->id);
+		spin = __igt_spin_new(device,
+				      .ahnd = ahndN,
+				      .ctx = tmp_ctx,
 				      .engine = other->flags,
 				      .flags = IGT_SPIN_FENCE_OUT);
 		intel_ctx_destroy(device, tmp_ctx);
@@ -254,6 +261,7 @@ test_engine_hang(const intel_ctx_t *ctx,
 
 	/* And on the target engine, we hang */
 	spin = igt_spin_new(device,
+			    .ahnd = ahnd,
 			    .ctx = ctx,
 			    .engine = e->flags,
 			    .flags = (IGT_SPIN_FENCE_OUT |
@@ -267,13 +275,16 @@ test_engine_hang(const intel_ctx_t *ctx,
 
 	/* But no other engines/clients should be affected */
 	igt_list_for_each_entry_safe(spin, next, &list, link) {
+		ahndN = spin->ahnd;
 		igt_assert(sync_fence_wait(spin->out_fence, 0) == -ETIME);
 		igt_spin_end(spin);
 
 		igt_assert(sync_fence_wait(spin->out_fence, 500) == 0);
 		igt_assert_eq(sync_fence_status(spin->out_fence), 1);
 		igt_spin_free(device, spin);
+		put_ahnd(ahndN);
 	}
+	put_ahnd(ahnd);
 }
 
 /* This test covers the case where we end up in an uninitialised area of the
