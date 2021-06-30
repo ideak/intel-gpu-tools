@@ -2433,12 +2433,20 @@ static void blitcopy(const struct igt_fb *dst_fb,
 		     const struct igt_fb *src_fb)
 {
 	uint32_t src_tiling, dst_tiling;
+	uint32_t ctx = 0;
+	uint64_t ahnd = 0;
 
 	igt_assert_eq(dst_fb->fd, src_fb->fd);
 	igt_assert_eq(dst_fb->num_planes, src_fb->num_planes);
 
 	src_tiling = igt_fb_mod_to_tiling(src_fb->modifier);
 	dst_tiling = igt_fb_mod_to_tiling(dst_fb->modifier);
+
+	if (!gem_has_relocations(dst_fb->fd)) {
+		igt_require(gem_has_contexts(dst_fb->fd));
+		ctx = gem_context_create(dst_fb->fd);
+		ahnd = get_reloc_ahnd(dst_fb->fd, ctx);
+	}
 
 	for (int i = 0; i < dst_fb->num_planes; i++) {
 		igt_assert_eq(dst_fb->plane_bpp[i], src_fb->plane_bpp[i]);
@@ -2451,11 +2459,13 @@ static void blitcopy(const struct igt_fb *dst_fb,
 		 */
 		if (fast_blit_ok(src_fb) && fast_blit_ok(dst_fb)) {
 			igt_blitter_fast_copy__raw(dst_fb->fd,
+						   ahnd, ctx,
 						   src_fb->gem_handle,
 						   src_fb->offsets[i],
 						   src_fb->strides[i],
 						   src_tiling,
 						   0, 0, /* src_x, src_y */
+						   src_fb->size,
 						   dst_fb->plane_width[i],
 						   dst_fb->plane_height[i],
 						   dst_fb->plane_bpp[i],
@@ -2463,7 +2473,8 @@ static void blitcopy(const struct igt_fb *dst_fb,
 						   dst_fb->offsets[i],
 						   dst_fb->strides[i],
 						   dst_tiling,
-						   0, 0 /* dst_x, dst_y */);
+						   0, 0 /* dst_x, dst_y */,
+						   dst_fb->size);
 		} else {
 			igt_blitter_src_copy(dst_fb->fd,
 					     src_fb->gem_handle,
@@ -2481,6 +2492,10 @@ static void blitcopy(const struct igt_fb *dst_fb,
 					     0, 0 /* dst_x, dst_y */);
 		}
 	}
+
+	if (ctx)
+		gem_context_destroy(dst_fb->fd, ctx);
+	put_ahnd(ahnd);
 }
 
 static void free_linear_mapping(struct fb_blit_upload *blit)
