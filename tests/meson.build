@@ -23,6 +23,7 @@ test_progs = [
 	'kms_big_joiner' ,
 	'kms_busy',
 	'kms_ccs',
+	'kms_cdclk',
 	'kms_concurrent',
 	'kms_content_protection',
 	'kms_cursor_crc',
