@@ -37,6 +37,7 @@
 #include "i915/gem_mman.h"
 #include "igt_dummyload.h"
 #include "igt_sysfs.h"
+#include "intel_allocator.h"
 #include "ioctl_wrappers.h"
 #include "intel_chipset.h"
 #include "intel_reg.h"
@@ -371,6 +372,7 @@ static uint64_t __test_timeout(int i915, int engine, unsigned int timeout)
 	igt_spin_t *spin[2];
 	uint64_t elapsed;
 	const intel_ctx_t *ctx[2];
+	uint64_t ahnd[2];
 
 	igt_assert(igt_sysfs_scanf(engine, "class", "%u", &class) == 1);
 	igt_assert(igt_sysfs_scanf(engine, "instance", "%u", &inst) == 1);
@@ -378,15 +380,18 @@ static uint64_t __test_timeout(int i915, int engine, unsigned int timeout)
 	set_timeslice(engine, timeout);
 
 	ctx[0] = create_ctx(i915, class, inst, 0);
-	spin[0] = igt_spin_new(i915, .ctx = ctx[0],
+	ahnd[0] = get_reloc_ahnd(i915, ctx[0]->id);
+	spin[0] = igt_spin_new(i915, .ahnd = ahnd[0], .ctx = ctx[0],
 			       .flags = (IGT_SPIN_NO_PREEMPTION |
 					 IGT_SPIN_POLL_RUN |
 					 IGT_SPIN_FENCE_OUT));
 	igt_spin_busywait_until_started(spin[0]);
 
 	ctx[1] = create_ctx(i915, class, inst, 0);
+	ahnd[1] = get_reloc_ahnd(i915, ctx[1]->id);
 	igt_nsec_elapsed(&ts);
-	spin[1] = igt_spin_new(i915, .ctx = ctx[1], .flags = IGT_SPIN_POLL_RUN);
+	spin[1] = igt_spin_new(i915, .ahnd = ahnd[1], .ctx = ctx[1],
+				.flags = IGT_SPIN_POLL_RUN);
 	igt_spin_busywait_until_started(spin[1]);
 	elapsed = igt_nsec_elapsed(&ts);
 
@@ -399,6 +404,8 @@ static uint64_t __test_timeout(int i915, int engine, unsigned int timeout)
 
 	intel_ctx_destroy(i915, ctx[1]);
 	intel_ctx_destroy(i915, ctx[0]);
+	put_ahnd(ahnd[1]);
+	put_ahnd(ahnd[0]);
 	gem_quiescent_gpu(i915);
 
 	return elapsed;
@@ -460,6 +467,7 @@ static void test_off(int i915, int engine)
 	unsigned int saved;
 	igt_spin_t *spin[2];
 	const intel_ctx_t *ctx[2];
+	uint64_t ahnd[2];
 
 	/*
 	 * As always, there are some who must run uninterrupted and simply do
@@ -482,14 +490,17 @@ static void test_off(int i915, int engine)
 	set_timeslice(engine, 0);
 
 	ctx[0] = create_ctx(i915, class, inst, 0);
-	spin[0] = igt_spin_new(i915, .ctx = ctx[0],
+	ahnd[0] = get_reloc_ahnd(i915, ctx[0]->id);
+	spin[0] = igt_spin_new(i915, .ahnd = ahnd[0], .ctx = ctx[0],
 			       .flags = (IGT_SPIN_NO_PREEMPTION |
 					 IGT_SPIN_POLL_RUN |
 					 IGT_SPIN_FENCE_OUT));
 	igt_spin_busywait_until_started(spin[0]);
 
 	ctx[1] = create_ctx(i915, class, inst, 0);
-	spin[1] = igt_spin_new(i915, .ctx = ctx[1], .flags = IGT_SPIN_POLL_RUN);
+	ahnd[1] = get_reloc_ahnd(i915, ctx[1]->id);
+	spin[1] = igt_spin_new(i915, .ahnd = ahnd[1], .ctx = ctx[1],
+				.flags = IGT_SPIN_POLL_RUN);
 
 	for (int i = 0; i < 150; i++) {
 		igt_assert_eq(sync_fence_status(spin[0]->out_fence), 0);
@@ -508,6 +519,8 @@ static void test_off(int i915, int engine)
 
 	intel_ctx_destroy(i915, ctx[1]);
 	intel_ctx_destroy(i915, ctx[0]);
+	put_ahnd(ahnd[1]);
+	put_ahnd(ahnd[0]);
 
 	igt_assert(enable_hangcheck(i915, true));
 	gem_quiescent_gpu(i915);
