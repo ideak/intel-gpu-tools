@@ -250,6 +250,10 @@ static void load_helper_run(enum load load)
 		igt_spin_t *spin[2] = {};
 		bool prev_load;
 		uint32_t handle;
+		uint64_t ahnd;
+
+		intel_allocator_init();
+		ahnd = get_reloc_ahnd(drm_fd, 0);
 
 		signal(SIGTERM, load_helper_signal_handler);
 		signal(SIGUSR2, load_helper_signal_handler);
@@ -257,9 +261,9 @@ static void load_helper_run(enum load load)
 		igt_debug("Applying %s load...\n", lh.load ? "high" : "low");
 
 		prev_load = lh.load == HIGH;
-		spin[0] = __igt_spin_new(drm_fd);
+		spin[0] = __igt_spin_new(drm_fd, .ahnd = ahnd);
 		if (prev_load)
-			spin[1] = __igt_spin_new(drm_fd);
+			spin[1] = __igt_spin_new(drm_fd, .ahnd = ahnd);
 		prev_load = !prev_load; /* send the initial signal */
 		while (!lh.exit) {
 			bool high_load;
@@ -279,7 +283,7 @@ static void load_helper_run(enum load load)
 			} else {
 				spin[0] = spin[1];
 			}
-			spin[high_load] = __igt_spin_new(drm_fd);
+			spin[high_load] = __igt_spin_new(drm_fd, .ahnd = ahnd);
 
 			if (lh.signal && high_load != prev_load) {
 				write(lh.link, &lh.signal, sizeof(lh.signal));
@@ -310,6 +314,7 @@ static void load_helper_run(enum load load)
 
 		igt_spin_free(drm_fd, spin[1]);
 		igt_spin_free(drm_fd, spin[0]);
+		put_ahnd(ahnd);
 	}
 
 	close(lh.link);
@@ -542,11 +547,13 @@ static void boost_freq(int fd, int *boost_freqs)
 {
 	int64_t timeout = 1;
 	igt_spin_t *load;
+	/* We need to keep dependency spin offset for load->handle */
+	uint64_t ahnd = get_simple_l2h_ahnd(fd, 0);
 
-	load = igt_spin_new(fd);
+	load = igt_spin_new(fd, .ahnd = ahnd);
 
 	/* Strip off extra fences from the object, and keep it from starting */
-	igt_spin_free(fd, igt_spin_new(fd, .dependency = load->handle));
+	igt_spin_free(fd, igt_spin_new(fd, .ahnd = ahnd, .dependency = load->handle));
 
 	/* Waiting will grant us a boost to maximum */
 	gem_wait(fd, load->handle, &timeout);
@@ -558,6 +565,7 @@ static void boost_freq(int fd, int *boost_freqs)
 	igt_spin_end(load);
 	gem_sync(fd, load->handle);
 	igt_spin_free(fd, load);
+	put_ahnd(ahnd);
 }
 
 static void waitboost(int fd, bool reset)
