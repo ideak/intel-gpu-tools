@@ -94,6 +94,7 @@ static int workaround_fail_count(int i915, const intel_ctx_t *ctx)
 	uint32_t *base, *out;
 	igt_spin_t *spin;
 	int fw, fail = 0;
+	uint64_t ahnd = get_reloc_ahnd(i915, ctx->id);
 
 	reloc = calloc(num_wa_regs, sizeof(*reloc));
 	igt_assert(reloc);
@@ -109,7 +110,13 @@ static int workaround_fail_count(int i915, const intel_ctx_t *ctx)
 	gem_set_caching(i915, obj[0].handle, I915_CACHING_CACHED);
 	obj[1].handle = gem_create(i915, batch_sz);
 	obj[1].relocs_ptr = to_user_pointer(reloc);
-	obj[1].relocation_count = num_wa_regs;
+	obj[1].relocation_count = !ahnd ? num_wa_regs : 0;
+	if (ahnd) {
+		obj[0].offset = get_offset(ahnd, obj[0].handle, result_sz, 0);
+		obj[0].flags |= EXEC_OBJECT_PINNED | EXEC_OBJECT_WRITE;
+		obj[1].offset = get_offset(ahnd, obj[1].handle, batch_sz, 0);
+		obj[1].flags |= EXEC_OBJECT_PINNED;
+	}
 
 	out = base =
 		gem_mmap__cpu(i915, obj[1].handle, 0, batch_sz, PROT_WRITE);
@@ -121,9 +128,9 @@ static int workaround_fail_count(int i915, const intel_ctx_t *ctx)
 		reloc[i].delta = i * sizeof(uint32_t);
 		reloc[i].read_domains = I915_GEM_DOMAIN_INSTRUCTION;
 		reloc[i].write_domain = I915_GEM_DOMAIN_INSTRUCTION;
-		*out++ = reloc[i].delta;
+		*out++ = obj[0].offset + reloc[i].delta;
 		if (gen >= 8)
-			*out++ = 0;
+			*out++ = (obj[0].offset + reloc[i].delta) >> 32;
 	}
 	*out++ = MI_BATCH_BUFFER_END;
 	munmap(base, batch_sz);
@@ -136,7 +143,8 @@ static int workaround_fail_count(int i915, const intel_ctx_t *ctx)
 
 	gem_set_domain(i915, obj[0].handle, I915_GEM_DOMAIN_CPU, 0);
 
-	spin = igt_spin_new(i915, .ctx = ctx, .flags = IGT_SPIN_POLL_RUN);
+	spin = igt_spin_new(i915, .ahnd = ahnd, .ctx = ctx,
+			    .flags = IGT_SPIN_POLL_RUN);
 	igt_spin_busywait_until_started(spin);
 
 	fw = igt_open_forcewake_handle(i915);
@@ -172,6 +180,7 @@ static int workaround_fail_count(int i915, const intel_ctx_t *ctx)
 
 	close(fw);
 	igt_spin_free(i915, spin);
+	put_ahnd(ahnd);
 
 	gem_close(i915, obj[1].handle);
 	gem_close(i915, obj[0].handle);
