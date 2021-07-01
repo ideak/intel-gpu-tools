@@ -737,6 +737,14 @@ static void test_multi_plane_rotation(data_t *data, enum pipe pipe)
 						     (planeconfigs[j].rotation & (IGT_ROTATION_90 | IGT_ROTATION_270))
 						     && intel_display_ver(data->devid) < 11)
 							continue;
+
+						if ((planeconfigs[i].rotation & (IGT_ROTATION_90 | IGT_ROTATION_270))
+						    && intel_display_ver(data->devid) >= 13)
+							continue;
+
+						if ((planeconfigs[j].rotation & (IGT_ROTATION_90 | IGT_ROTATION_270))
+						    && intel_display_ver(data->devid) >= 13)
+							continue;
 						/*
 						 * if using packed formats crc's will be
 						 * same and can store them so there's
@@ -1042,8 +1050,8 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 			      rot_test_str(subtest->rot)) {
 			if (is_i915_device(data.gfx_fd)) {
 				igt_require(!(subtest->rot &
-					    (IGT_ROTATION_90 | IGT_ROTATION_270)) ||
-					    gen >= 9);
+                                            (IGT_ROTATION_90 | IGT_ROTATION_270)) ||
+                                            (gen >= 9 && gen < 13));
 			} else if (is_amdgpu_device(data.gfx_fd)) {
 				data.override_fmt = DRM_FORMAT_XRGB8888;
 				if (subtest->rot & (IGT_ROTATION_90 | IGT_ROTATION_270))
@@ -1060,7 +1068,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 
 	igt_describe("Rotation test with 90 degree for a plane of gen9+ with given position");
 	igt_subtest_f("sprite-rotation-90-pos-100-0") {
-		igt_require(gen >= 9);
+		igt_require(gen >=9 && gen < 13);
 		data.rotation = IGT_ROTATION_90;
 		data.pos_x = 100,
 		data.pos_y = 0;
@@ -1075,7 +1083,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 		  * so apart from this, any other gen11+ pixel format
 		  * can be used which doesn't support 90/270 degree
 		  * rotation */
-		igt_require(gen >= 9);
+		igt_require(gen >=9 && gen < 13);
 		data.rotation = IGT_ROTATION_90;
 		data.override_fmt = gen < 11 ? DRM_FORMAT_RGB565 : DRM_FORMAT_Y212;
 		test_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY, true);
@@ -1084,7 +1092,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 
 	igt_describe("Checking unsupported tiling for gen9+ with 90 degree of rotation");
 	igt_subtest_f("bad-tiling") {
-		igt_require(gen >= 9);
+		igt_require(gen >=9 && gen < 13);
 		data.rotation = IGT_ROTATION_90;
 		data.override_tiling = LOCAL_I915_FORMAT_MOD_X_TILED;
 		test_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY, true);
@@ -1100,6 +1108,9 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 				    (IS_CHERRYVIEW(data.devid) && reflect_x->rot == IGT_ROTATION_0
 				     && reflect_x->tiling == LOCAL_I915_FORMAT_MOD_X_TILED));
 			data.rotation = (IGT_REFLECT_X | reflect_x->rot);
+			igt_require(!(gen >= 13 && (data.rotation &
+						    (IGT_ROTATION_90 |
+						     IGT_ROTATION_270))));
 			data.override_tiling = reflect_x->tiling;
 			test_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY, false);
 		}
@@ -1155,7 +1166,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 		enum pipe pipe;
 		igt_output_t *output;
 
-		igt_require(gen >= 9);
+		igt_require(gen >= 9 && gen < 13);
 		igt_display_require_output(&data.display);
 
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
