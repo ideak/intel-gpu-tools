@@ -182,7 +182,7 @@ igt_main
 			run_test(fd, num_fences, 0, flags);
 	}
 	igt_subtest("too-many-fences")
-		run_test(fd, num_fences + 1, intel_gen(devid) >= 4 ? 0 : EDEADLK, 0);
+		run_test(fd, num_fences + 1, intel_gen(devid) >= 4 ? 0 : ENOBUFS, 0);
 
 	igt_fixture
 		close(fd);
