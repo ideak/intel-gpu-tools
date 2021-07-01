@@ -458,7 +458,7 @@ static void rc6_fence(int i915)
 	const intel_ctx_t *ctx;
 	struct power_sample sample[2];
 	unsigned long slept;
-	uint64_t rc6, ts[2];
+	uint64_t rc6, ts[2], ahnd;
 	struct rapl rapl;
 	int fd;
 
@@ -486,6 +486,7 @@ static void rc6_fence(int i915)
 
 	/* Submit but delay execution, we should be idle and conserving power */
 	ctx = intel_ctx_create_all_physical(i915);
+	ahnd = get_reloc_ahnd(i915, ctx->id);
 	for_each_ctx_engine(i915, ctx, e) {
 		igt_spin_t *spin;
 		int timeline;
@@ -493,7 +494,9 @@ static void rc6_fence(int i915)
 
 		timeline = sw_sync_timeline_create();
 		fence = sw_sync_timeline_create_fence(timeline, 1);
-		spin = igt_spin_new(i915, .ctx = ctx,
+		spin = igt_spin_new(i915,
+				    .ahnd = ahnd,
+				    .ctx = ctx,
 				    .engine = e->flags,
 				    .fence = fence,
 				    .flags = IGT_SPIN_FENCE_IN);
@@ -522,6 +525,7 @@ static void rc6_fence(int i915)
 		gem_quiescent_gpu(i915);
 	}
 	intel_ctx_destroy(i915, ctx);
+	put_ahnd(ahnd);
 
 	rapl_close(&rapl);
 	close(fd);
