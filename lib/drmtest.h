@@ -102,6 +102,7 @@ void igt_require_vc4(int fd);
 
 bool is_amdgpu_device(int fd);
 bool is_i915_device(int fd);
+bool is_msm_device(int fd);
 bool is_nouveau_device(int fd);
 bool is_vc4_device(int fd);
 

@@ -114,6 +114,11 @@ bool is_i915_device(int fd)
 	return __is_device(fd, "i915");
 }
 
+bool is_msm_device(int fd)
+{
+	return __is_device(fd, "msm");
+}
+
 bool is_nouveau_device(int fd)
 {
 	/* Currently all nouveau-specific codepaths require libdrm */
