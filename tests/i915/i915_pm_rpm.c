@@ -1178,7 +1178,8 @@ static void gem_pread_subtest(void)
 
 /* Paints a square of color $color, size $width x $height, at position $x x $y
  * of $dst_handle, which contains pitch $pitch. */
-static void submit_blt_cmd(uint32_t dst_handle, uint16_t x, uint16_t y,
+static void submit_blt_cmd(uint32_t dst_handle, int dst_size,
+			   uint16_t x, uint16_t y,
 			   uint16_t width, uint16_t height, uint32_t pitch,
 			   uint32_t color, uint32_t *presumed_dst_offset)
 {
@@ -1190,6 +1191,12 @@ static void submit_blt_cmd(uint32_t dst_handle, uint16_t x, uint16_t y,
 	struct drm_i915_gem_exec_object2 objs[2] = {{}, {}};
 	struct drm_i915_gem_relocation_entry relocs[1] = {{}};
 	struct drm_i915_gem_wait gem_wait;
+	uint64_t ahnd = get_reloc_ahnd(drm_fd, 0), dst_offset;
+
+	if (ahnd)
+		dst_offset = get_offset(ahnd, dst_handle, dst_size, 0);
+	else
+		dst_offset = *presumed_dst_offset;
 
 	i = 0;
 
@@ -1205,9 +1212,9 @@ static void submit_blt_cmd(uint32_t dst_handle, uint16_t x, uint16_t y,
 	batch_buf[i++] = (y << 16) | x;
 	batch_buf[i++] = ((y + height) << 16) | (x + width);
 	reloc_pos = i;
-	batch_buf[i++] = *presumed_dst_offset;
+	batch_buf[i++] = dst_offset;
 	if (intel_gen(ms_data.devid) >= 8)
-		batch_buf[i++] = 0;
+		batch_buf[i++] = dst_offset >> 32;
 	batch_buf[i++] = color;
 
 	batch_buf[i++] = MI_BATCH_BUFFER_END;
@@ -1230,8 +1237,15 @@ static void submit_blt_cmd(uint32_t dst_handle, uint16_t x, uint16_t y,
 	objs[0].alignment = 64;
 
 	objs[1].handle = batch_handle;
-	objs[1].relocation_count = 1;
+	objs[1].relocation_count = !ahnd ? 1 : 0;
 	objs[1].relocs_ptr = (uintptr_t)relocs;
+
+	if (ahnd) {
+		objs[0].offset = dst_offset;
+		objs[0].flags = EXEC_OBJECT_PINNED | EXEC_OBJECT_WRITE;
+		objs[1].offset = get_offset(ahnd, batch_handle, batch_size, 0);
+		objs[1].flags = EXEC_OBJECT_PINNED;
+	}
 
 	execbuf.buffers_ptr = (uintptr_t)objs;
 	execbuf.buffer_count = 2;
@@ -1253,6 +1267,7 @@ static void submit_blt_cmd(uint32_t dst_handle, uint16_t x, uint16_t y,
 	do_ioctl(drm_fd, DRM_IOCTL_I915_GEM_WAIT, &gem_wait);
 
 	gem_close(drm_fd, batch_handle);
+	put_ahnd(ahnd);
 }
 
 /* Make sure we can submit a batch buffer and verify its result. */
@@ -1285,7 +1300,7 @@ static void gem_execbuf_subtest(void)
 	disable_all_screens_and_wait(&ms_data);
 
 	color = 0x12345678;
-	submit_blt_cmd(handle, sq_x, sq_y, sq_w, sq_h, pitch, color,
+	submit_blt_cmd(handle, dst_size, sq_x, sq_y, sq_w, sq_h, pitch, color,
 		       &presumed_offset);
 	igt_assert(wait_for_suspended());
 
@@ -1324,7 +1339,7 @@ static void gem_execbuf_subtest(void)
 	 * suspended. We use the same spot, but a different color. As a bonus,
 	 * we're testing the presumed_offset from the previous command. */
 	color = 0x87654321;
-	submit_blt_cmd(handle, sq_x, sq_y, sq_w, sq_h, pitch, color,
+	submit_blt_cmd(handle, dst_size, sq_x, sq_y, sq_w, sq_h, pitch, color,
 		       &presumed_offset);
 
 	disable_all_screens_and_wait(&ms_data);
