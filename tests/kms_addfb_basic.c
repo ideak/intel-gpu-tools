@@ -310,7 +310,7 @@ static void pitch_tests(int fd)
 			f.pitches[0] = bad_pitches[i];
 			igt_assert_eq(igt_ioctl(fd, DRM_IOCTL_MODE_ADDFB2, &f), -1);
 			igt_assert(errno != 0);
-			if (is_i915_device(fd)) {
+			if (is_i915_device(fd) || is_amdgpu_device(fd) || is_msm_device(fd)) {
 				igt_assert_eq(errno, EINVAL);
 			} else if (is_nouveau_device(fd)) {
 				if (bad_pitches[i] > 4 * 1024)
