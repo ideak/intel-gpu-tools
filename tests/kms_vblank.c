@@ -475,12 +475,8 @@ static void invalid_subtest(data_t *data, int fd)
 {
 	union drm_wait_vblank vbl;
 	unsigned long valid_flags;
-	igt_display_t* display = &data->display;
-	enum pipe pipe = 0;
-	igt_output_t* output = igt_get_single_output_for_pipe(display, pipe);
 
-	igt_display_require_output_on_pipe(display, pipe);
-	prepare_crtc(data, fd, output);
+	igt_display_require_output_on_pipe(&data->display, 0);
 
 	/* First check all is well with a simple query */
 	memset(&vbl, 0, sizeof(vbl));
@@ -515,8 +511,6 @@ static void invalid_subtest(data_t *data, int fd)
 	vbl.request.type |= _DRM_VBLANK_SECONDARY;
 	vbl.request.type |= _DRM_VBLANK_FLAGS_MASK;
 	igt_assert_eq(wait_vblank(fd, &vbl), -EINVAL);
-
-	cleanup_crtc(data, fd, output);
 }
 
 igt_main
