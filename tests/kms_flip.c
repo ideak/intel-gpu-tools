@@ -85,6 +85,8 @@
 #define DRM_CAP_TIMESTAMP_MONOTONIC 6
 #endif
 
+static bool all_pipes = false;
+
 drmModeRes *resources;
 int drm_fd;
 static struct buf_ops *bops;
@@ -1450,6 +1452,11 @@ static int run_test(int duration, int flags)
 	/* Count output configurations to scale test runtime. */
 	for (i = 0; i < resources->count_connectors; i++) {
 		for (n = 0; n < resources->count_crtcs; n++) {
+			/* Limit the execution to 2 CRTCs (first & last) for hang tests */
+			if ((flags & TEST_HANG) && !all_pipes &&
+			    n != 0 && n != (resources->count_crtcs - 1))
+				continue;
+
 			memset(&o, 0, sizeof(o));
 			o.count = 1;
 			o._connector[0] = resources->connectors[i];
@@ -1473,6 +1480,11 @@ static int run_test(int duration, int flags)
 	for (i = 0; i < resources->count_connectors; i++) {
 		for (n = 0; n < resources->count_crtcs; n++) {
 			int crtc_idx;
+
+			/* Limit the execution to 2 CRTCs (first & last) for hang tests */
+			if ((flags & TEST_HANG) && !all_pipes &&
+			    n != 0 && n != (resources->count_crtcs - 1))
+				continue;
 
 			memset(&o, 0, sizeof(o));
 			o.count = 1;
@@ -1604,7 +1616,23 @@ static void test_nonblocking_read(int in)
 	close(fd);
 }
 
-igt_main
+static int opt_handler(int opt, int opt_index, void *data)
+{
+	switch (opt) {
+		case 'e':
+			all_pipes = true;
+			break;
+		default:
+			return IGT_OPT_HANDLER_ERROR;
+	}
+
+	return IGT_OPT_HANDLER_SUCCESS;
+}
+
+const char *help_str =
+	"  -e \tRun on all pipes. (By default subtests will run on two pipes)\n";
+
+igt_main_args("e", NULL, help_str, opt_handler, NULL)
 {
 	struct {
 		int duration;
