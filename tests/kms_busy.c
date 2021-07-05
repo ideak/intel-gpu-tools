@@ -30,6 +30,8 @@
 
 IGT_TEST_DESCRIPTION("Basic check of KMS ABI with busy framebuffers.");
 
+static bool all_pipes = false;
+
 static igt_output_t *
 set_fb_on_crtc(igt_display_t *dpy, int pipe, struct igt_fb *fb)
 {
@@ -287,13 +289,46 @@ static void test_pageflip_modeset_hang(igt_display_t *dpy, enum pipe pipe)
 	igt_remove_fb(dpy->drm_fd, &fb);
 }
 
-igt_main
+static int opt_handler(int opt, int opt_index, void *data)
+{
+	switch (opt) {
+		case 'e':
+			all_pipes = true;
+			break;
+		default:
+			return IGT_OPT_HANDLER_ERROR;
+	}
+
+	return IGT_OPT_HANDLER_SUCCESS;
+}
+
+const char *help_str =
+	"  -e \tRun on all pipes. (By default subtests will run on two pipes)\n";
+
+igt_main_args("e", NULL, help_str, opt_handler, NULL)
 {
 	igt_display_t display = { .drm_fd = -1, .n_pipes = IGT_MAX_PIPES };
-	enum pipe n;
+
+	enum pipe active_pipes[IGT_MAX_PIPES];
+	uint32_t last_pipe = 0;
+	int i;
+	struct {
+		const char *name;
+		bool modeset;
+		bool hang_newfb;
+		bool reset;
+	} tests[] = {
+		{ "extended-pageflip-hang-oldfb", false, false, false },
+		{ "extended-pageflip-hang-newfb", false, true, false },
+		{ "extended-modeset-hang-oldfb", true, false, false },
+		{ "extended-modeset-hang-newfb", true, true, false },
+		{ "extended-modeset-hang-oldfb-with-reset", true, false, true },
+		{ "extended-modeset-hang-newfb-with-reset", true, true, true },
+	};
 
 	igt_fixture {
 		int fd = drm_open_driver_master(DRIVER_INTEL);
+		enum pipe pipe;
 
 		igt_require_gem(fd);
 		gem_require_mmap_wc(fd);
@@ -301,6 +336,11 @@ igt_main
 
 		kmstest_set_vt_graphics_mode();
 		igt_display_require(&display, fd);
+
+		/* Get active pipes. */
+		for_each_pipe(&display, pipe)
+			active_pipes[last_pipe++] = pipe;
+		last_pipe--;
 	}
 
 	/* XXX Extend to cover atomic rendering tests to all planes + legacy */
@@ -319,79 +359,70 @@ igt_main
 		}
 	}
 
-	for_each_pipe_static(n) igt_subtest_group {
-		igt_hang_t hang;
-
+	igt_subtest_with_dynamic("basic-hang") {
+		enum pipe pipe;
+		igt_output_t *output;
+		igt_hang_t hang = igt_allow_hang(display.drm_fd, 0, 0);
 		errno = 0;
 
-		igt_fixture {
-			igt_display_require_output_on_pipe(&display, n);
+		for_each_pipe_with_valid_output(&display, pipe, output) {
+			if (!all_pipes && pipe != active_pipes[0] &&
+					  pipe != active_pipes[last_pipe])
+				continue;
+
+			igt_dynamic_f("flip-pipe-%s", kmstest_pipe_name(pipe))
+				test_flip(&display, pipe, false);
+			igt_dynamic_f("modeset-pipe-%s", kmstest_pipe_name(pipe))
+				test_flip(&display, pipe, true);
 		}
 
-		igt_describe("Tests basic flip on pipe.");
-		igt_subtest_f("basic-flip-pipe-%s", kmstest_pipe_name(n)) {
-			test_flip(&display, n, false);
-		}
-		igt_describe("Tests basic modeset on pipe.");
-		igt_subtest_f("basic-modeset-pipe-%s", kmstest_pipe_name(n)) {
+		igt_disallow_hang(display.drm_fd, hang);
+	}
 
-			test_flip(&display, n, true);
-		}
+	igt_subtest_with_dynamic("extended-pageflip-modeset-hang-oldfb") {
+		enum pipe pipe;
+		igt_output_t *output;
+		igt_hang_t hang = igt_allow_hang(display.drm_fd, 0, 0);
+		errno = 0;
 
-		igt_fixture {
-			hang = igt_allow_hang(display.drm_fd, 0, 0);
-		}
+		for_each_pipe_with_valid_output(&display, pipe, output) {
+			if (!all_pipes && pipe != active_pipes[0] &&
+					  pipe != active_pipes[last_pipe])
+				continue;
 
-		igt_describe("Hang test on pipe with oldfb and extended pageflip modeset.");
-		igt_subtest_f("extended-pageflip-modeset-hang-oldfb-pipe-%s",
-			      kmstest_pipe_name(n)) {
-			test_pageflip_modeset_hang(&display, n);
+			igt_dynamic_f("pipe-%s", kmstest_pipe_name(pipe))
+				test_pageflip_modeset_hang(&display, pipe);
 		}
 
-		igt_fixture
+		igt_disallow_hang(display.drm_fd, hang);
+	}
+
+	for (i = 0; i < sizeof(tests) / sizeof (tests[0]); i++) {
+		igt_subtest_with_dynamic(tests[i].name) {
+			enum pipe pipe;
+			igt_output_t *output;
+			igt_hang_t hang;
+			errno = 0;
+
 			igt_require(display.is_atomic);
+			hang = igt_allow_hang(display.drm_fd, 0, 0);
 
-		igt_describe("Test the results with a single hanging pageflip on pipe with oldfb.");
-		igt_subtest_f("extended-pageflip-hang-oldfb-pipe-%s",
-			      kmstest_pipe_name(n))
-			test_hang(&display, n, false, false);
+			for_each_pipe_with_valid_output(&display, pipe, output) {
+				if (!all_pipes && pipe != active_pipes[0] &&
+						  pipe != active_pipes[last_pipe])
+					continue;
 
-		igt_describe("Test the results with a single hanging pageflip on pipe with newfb.");
-		igt_subtest_f("extended-pageflip-hang-newfb-pipe-%s",
-			      kmstest_pipe_name(n))
-			test_hang(&display, n, false, true);
+				igt_dynamic_f("pipe-%s", kmstest_pipe_name(pipe)) {
+					if (tests[i].reset)
+						igt_set_module_param_int(display.drm_fd, "force_reset_modeset_test", 1);
 
-		igt_describe("Tests modeset disable/enable with hang on pipe with oldfb.");
-		igt_subtest_f("extended-modeset-hang-oldfb-pipe-%s",
-			      kmstest_pipe_name(n))
-			test_hang(&display, n, true, false);
+					test_hang(&display, pipe, tests[i].modeset, tests[i].hang_newfb);
 
-		igt_describe("Tests modeset disable/enable with hang on pipe with newfb.");
-		igt_subtest_f("extended-modeset-hang-newfb-pipe-%s",
-			      kmstest_pipe_name(n))
-			test_hang(&display, n, true, true);
+					if (tests[i].reset)
+						igt_set_module_param_int(display.drm_fd, "force_reset_modeset_test", 0);
+				}
+			}
 
-		igt_describe("Tests modeset disable/enable with hang on reset pipe with oldfb.");
-		igt_subtest_f("extended-modeset-hang-oldfb-with-reset-pipe-%s",
-			      kmstest_pipe_name(n)) {
-			igt_set_module_param_int(display.drm_fd, "force_reset_modeset_test", 1);
-
-			test_hang(&display, n, true, false);
-
-			igt_set_module_param_int(display.drm_fd, "force_reset_modeset_test", 0);
-		}
-
-		igt_describe("Tests modeset disable/enable with hang on reset pipe with newfb.");
-		igt_subtest_f("extended-modeset-hang-newfb-with-reset-pipe-%s",
-			      kmstest_pipe_name(n)) {
-			igt_set_module_param_int(display.drm_fd, "force_reset_modeset_test", 1);
-
-			test_hang(&display, n, true, true);
-
-			igt_set_module_param_int(display.drm_fd, "force_reset_modeset_test", 0);
-		}
-
-		igt_fixture {
 			igt_disallow_hang(display.drm_fd, hang);
 		}
 	}
