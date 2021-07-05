@@ -26,7 +26,7 @@
 
 #include "igt.h"
 
-IGT_TEST_DESCRIPTION("Test cdclk features : squasher and crawling");
+IGT_TEST_DESCRIPTION("Test cdclk features : crawling");
 
 #define HDISPLAY_4K     3840
 #define VDISPLAY_4K     2160
@@ -34,9 +34,8 @@ IGT_TEST_DESCRIPTION("Test cdclk features : squasher and crawling");
 
 /* Test flags */
 enum {
-	TEST_BASIC = 1 << 0,
-	TEST_PLANESCALING = 1 << 1,
-	TEST_MODETRANSITION = 1 << 2,
+	TEST_PLANESCALING = 1 << 0,
+	TEST_MODETRANSITION = 1 << 1,
 };
 
 typedef struct {
@@ -130,45 +129,6 @@ static void do_cleanup_display(igt_display_t *dpy)
 		igt_output_set_pipe(output, PIPE_NONE);
 
 	igt_display_commit2(dpy, dpy->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
-}
-
-static void test_basic(data_t *data, enum pipe pipe, igt_output_t *output)
-{
-	igt_display_t *display = &data->display;
-	int debugfs_fd = data->debugfs_fd;
-	int cdclk_ref, cdclk_new;
-	struct igt_fb fb;
-	igt_plane_t *primary;
-	drmModeModeInfo *mode;
-
-	do_cleanup_display(display);
-	igt_display_reset(display);
-
-	igt_output_set_pipe(output, pipe);
-	mode = get_highres_mode(output);
-	igt_require(mode != NULL);
-	igt_output_override_mode(output, mode);
-
-	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
-
-	igt_create_color_pattern_fb(display->drm_fd,
-				    mode->hdisplay, mode->vdisplay,
-				    DRM_FORMAT_XRGB8888,
-				    I915_TILING_NONE,
-				    0.0, 0.0, 0.0, &fb);
-
-	igt_plane_set_fb(primary, &fb);
-	cdclk_ref = get_current_cdclk_freq(debugfs_fd);
-	igt_display_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
-	cdclk_new = get_current_cdclk_freq(debugfs_fd);
-	igt_info("CD clock frequency %d -> %d\n", cdclk_ref, cdclk_new);
-
-	/* cdclk should bump */
-	igt_assert_lt(cdclk_ref, cdclk_new);
-
-	/* cleanup */
-	do_cleanup_display(display);
-	igt_remove_fb(display->drm_fd, &fb);
 }
 
 static void test_plane_scaling(data_t *data, enum pipe pipe, igt_output_t *output)
@@ -284,8 +244,6 @@ static void run_cdclk_test(data_t *data, uint32_t flags)
 	for_each_pipe_with_valid_output(display, pipe, output) {
 		igt_dynamic_f("%s-pipe-%s", output->name, kmstest_pipe_name(pipe))
 			if (igt_pipe_connector_valid(pipe, output)) {
-				if (flags & TEST_BASIC)
-					test_basic(data, pipe, output);
 				if (flags & TEST_PLANESCALING)
 					test_plane_scaling(data, pipe, output);
 				if (flags & TEST_MODETRANSITION)
@@ -306,22 +264,15 @@ igt_main
 		kmstest_set_vt_graphics_mode();
 		data.devid = intel_get_drm_devid(data.drm_fd);
 		igt_require_f(hardware_supported(&data),
-			      "Hardware doesn't support either squashing "\
-			      "or crawling.\n");
+			      "Hardware doesn't support crawling.\n");
 		igt_display_require(&data.display, data.drm_fd);
 		igt_display_require_output(&data.display);
 	}
 
-	igt_describe("Basic test to validate cdclk frequency change w/o "\
-		     "requiring full modeset.");
-	igt_subtest_with_dynamic("basic")
-		run_cdclk_test(&data, TEST_BASIC);
-	igt_describe("Plane scaling test to validate cdclk frequency change w/o "\
-		     "requiring full modeset.");
+	igt_describe("Plane scaling test to validate cdclk frequency change");
 	igt_subtest_with_dynamic("plane-scaling")
 		run_cdclk_test(&data, TEST_PLANESCALING);
-	igt_describe("Mode transition (low to high) test to validate cdclk frequency "\
-		     "change w/o requiring full modeset.");
+	igt_describe("Mode transition (low to high) test to validate cdclk frequency change");
 	igt_subtest_with_dynamic("mode-transition")
 		run_cdclk_test(&data, TEST_MODETRANSITION);
 
