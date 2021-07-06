@@ -63,21 +63,29 @@ test_retire_vma_not_inactive(int fd)
 {
 	struct intel_execution_engine2 *e;
 	const intel_ctx_t *ctx;
+	uint64_t ahnd, ahndN;
 	igt_spin_t *bg = NULL;
 
 	ctx = intel_ctx_create_all_physical(fd);
+	ahnd = get_reloc_ahnd(fd, ctx->id);
 
 	for_each_ctx_engine(fd, ctx, e) {
 		igt_spin_t *spin;
 		const intel_ctx_t *spin_ctx;
 
 		if (!bg) {
-			bg = igt_spin_new(fd, .ctx = ctx, .engine = e->flags);
+			bg = igt_spin_new(fd,
+					  .ahnd = ahnd,
+					  .ctx = ctx,
+					  .engine = e->flags);
 			continue;
 		}
 
 		spin_ctx = intel_ctx_create(fd, &ctx->cfg);
-		spin = igt_spin_new(fd, .ctx = spin_ctx,
+		ahndN = get_reloc_ahnd(fd, spin_ctx->id);
+		spin = igt_spin_new(fd,
+				    .ahnd = ahndN,
+				    .ctx = spin_ctx,
 				    .engine = e->flags,
 				    .dependency = bg->handle,
 				    .flags = IGT_SPIN_SOFTDEP);
@@ -86,11 +94,13 @@ test_retire_vma_not_inactive(int fd)
 
 		gem_sync(fd, spin->handle);
 		igt_spin_free(fd, spin);
+		put_ahnd(ahndN);
 	}
 
 	igt_drop_caches_set(fd, DROP_RETIRE);
 	igt_spin_free(fd, bg);
 	intel_ctx_destroy(fd, ctx);
+	put_ahnd(ahnd);
 }
 
 int fd;
