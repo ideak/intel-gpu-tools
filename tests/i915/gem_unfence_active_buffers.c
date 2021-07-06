@@ -69,11 +69,13 @@ igt_simple_main
 {
 	int i915, num_fences;
 	igt_spin_t *spin;
+	uint64_t ahnd;
 
 	i915 = drm_open_driver(DRIVER_INTEL);
 	igt_require_gem(i915);
 
-	spin = igt_spin_new(i915);
+	ahnd = get_reloc_ahnd(i915, 0);
+	spin = igt_spin_new(i915, .ahnd = ahnd);
 
 	num_fences = gem_available_fences(i915);
 	igt_require(num_fences);
@@ -96,4 +98,5 @@ igt_simple_main
 	}
 
 	igt_spin_free(i915, spin);
+	put_ahnd(ahnd);
 }
