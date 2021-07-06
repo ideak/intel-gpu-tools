@@ -111,10 +111,13 @@ static void physical(int i915, const intel_ctx_t *ctx)
 	unsigned int num_engines, i, count;
 	const struct intel_execution_engine2 *e;
 	igt_spin_t *spin[GEM_MAX_ENGINES];
+	uint64_t ahnd = get_reloc_ahnd(i915, ctx->id);
 
 	i = 0;
 	for_each_ctx_engine(i915, ctx, e) {
-		spin[i] = igt_spin_new(i915, .ctx = ctx,
+		spin[i] = igt_spin_new(i915,
+				       .ahnd = ahnd,
+				       .ctx = ctx,
 				       .engine = e->flags,
 				       .flags = spin_flags());
 		i++;
@@ -125,6 +128,7 @@ static void physical(int i915, const intel_ctx_t *ctx)
 
 	for (i = 0; i < num_engines; i++)
 		igt_spin_free(i915, spin[i]);
+	put_ahnd(ahnd);
 
 	igt_assert_eq(count, num_engines);
 }
@@ -216,6 +220,7 @@ static void virtual(int i915, const intel_ctx_cfg_t *base_cfg)
 	unsigned int expect = num_engines;
 	intel_ctx_cfg_t cfg = {};
 	const intel_ctx_t *ctx[num_engines];
+	uint64_t ahnd;
 
 	igt_require(gem_has_execlists(i915));
 
@@ -239,10 +244,12 @@ static void virtual(int i915, const intel_ctx_cfg_t *base_cfg)
 			igt_assert(i < num_engines);
 
 			ctx[i] = intel_ctx_create(i915, &cfg);
+			ahnd = get_reloc_ahnd(i915, ctx[i]->id);
 
 			set_load_balancer(i915, ctx[i]->id, ci, count, NULL);
 
 			spin[i] = igt_spin_new(i915,
+					       .ahnd = ahnd,
 					       .ctx = ctx[i],
 					       .flags = spin_flags());
 			i++;
@@ -254,8 +261,10 @@ static void virtual(int i915, const intel_ctx_cfg_t *base_cfg)
 	count = wait_timeout(i915, spin, num_engines, wait_us, expect);
 
 	for (i = 0; i < num_engines && spin[i]; i++) {
+		ahnd = spin[i]->ahnd;
 		igt_spin_free(i915, spin[i]);
 		intel_ctx_destroy(i915, ctx[i]);
+		put_ahnd(ahnd);
 	}
 
 	igt_assert_eq(count, expect);
