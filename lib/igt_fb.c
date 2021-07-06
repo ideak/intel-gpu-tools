@@ -2477,11 +2477,13 @@ static void blitcopy(const struct igt_fb *dst_fb,
 						   dst_fb->size);
 		} else {
 			igt_blitter_src_copy(dst_fb->fd,
+					     ahnd, ctx,
 					     src_fb->gem_handle,
 					     src_fb->offsets[i],
 					     src_fb->strides[i],
 					     src_tiling,
 					     0, 0, /* src_x, src_y */
+					     src_fb->size,
 					     dst_fb->plane_width[i],
 					     dst_fb->plane_height[i],
 					     dst_fb->plane_bpp[i],
@@ -2489,7 +2491,8 @@ static void blitcopy(const struct igt_fb *dst_fb,
 					     dst_fb->offsets[i],
 					     dst_fb->strides[i],
 					     dst_tiling,
-					     0, 0 /* dst_x, dst_y */);
+					     0, 0 /* dst_x, dst_y */,
+					     dst_fb->size);
 		}
 	}
 

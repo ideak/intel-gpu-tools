@@ -207,9 +207,13 @@ static void test_fence_blt(int i915, int vgem)
 
 	igt_fork(child, 1) {
 		uint32_t native;
+		uint64_t ahnd;
 
 		close(master[0]);
 		close(slave[1]);
+
+		intel_allocator_init();
+		ahnd = get_reloc_ahnd(i915, 0);
 
 		native = gem_create(i915, scratch.size);
 
@@ -221,10 +225,11 @@ static void test_fence_blt(int i915, int vgem)
 		write(master[1], &child, sizeof(child));
 		read(slave[0], &child, sizeof(child));
 
-		igt_blitter_src_copy(i915, prime, 0, scratch.pitch,
-				     I915_TILING_NONE, 0, 0, scratch.width,
-				     scratch.height, scratch.bpp, native, 0,
-				     scratch.pitch, I915_TILING_NONE, 0, 0);
+		igt_blitter_src_copy(i915, ahnd, 0, prime, 0, scratch.pitch,
+				     I915_TILING_NONE, 0, 0, scratch.size,
+				     scratch.width, scratch.height, scratch.bpp,
+				     native, 0, scratch.pitch,
+				     I915_TILING_NONE, 0, 0, scratch.size);
 		gem_sync(i915, native);
 
 		for (i = 0; i < scratch.height; i++)
@@ -234,6 +239,7 @@ static void test_fence_blt(int i915, int vgem)
 		munmap(ptr, scratch.size);
 		gem_close(i915, native);
 		gem_close(i915, prime);
+		put_ahnd(ahnd);
 	}
 
 	close(master[1]);
@@ -375,6 +381,7 @@ static void test_blt(int vgem, int i915)
 	uint32_t prime, native;
 	uint32_t *ptr;
 	int dmabuf, i;
+	uint64_t ahnd = get_reloc_ahnd(i915, 0);
 
 	scratch.width = 1024;
 	scratch.height = 1024;
@@ -391,9 +398,11 @@ static void test_blt(int vgem, int i915)
 		ptr[scratch.pitch * i / sizeof(*ptr)] = i;
 	munmap(ptr, scratch.size);
 
-	igt_blitter_src_copy(i915, native, 0, scratch.pitch, I915_TILING_NONE,
-			     0, 0, scratch.width, scratch.height, scratch.bpp,
-			     prime, 0, scratch.pitch, I915_TILING_NONE, 0, 0);
+	igt_blitter_src_copy(i915, ahnd, 0, native, 0, scratch.pitch,
+			     I915_TILING_NONE, 0, 0, scratch.size,
+			     scratch.width, scratch.height, scratch.bpp,
+			     prime, 0, scratch.pitch, I915_TILING_NONE, 0, 0,
+			     scratch.size);
 	prime_sync_start(dmabuf, true);
 	prime_sync_end(dmabuf, true);
 	close(dmabuf);
@@ -405,9 +414,11 @@ static void test_blt(int vgem, int i915)
 	}
 	munmap(ptr, scratch.size);
 
-	igt_blitter_src_copy(i915, prime, 0, scratch.pitch, I915_TILING_NONE,
-			     0, 0, scratch.width, scratch.height, scratch.bpp,
-			     native, 0, scratch.pitch, I915_TILING_NONE, 0, 0);
+	igt_blitter_src_copy(i915, ahnd, 0, prime, 0, scratch.pitch,
+			     I915_TILING_NONE, 0, 0, scratch.size,
+			     scratch.width, scratch.height, scratch.bpp,
+			     native, 0, scratch.pitch, I915_TILING_NONE, 0, 0,
+			     scratch.size);
 	gem_sync(i915, native);
 
 	ptr = gem_mmap__wc(i915, native, 0, scratch.size, PROT_READ);
@@ -418,6 +429,7 @@ static void test_blt(int vgem, int i915)
 	gem_close(i915, native);
 	gem_close(i915, prime);
 	gem_close(vgem, scratch.handle);
+	put_ahnd(ahnd);
 }
 
 static void test_shrink(int vgem, int i915)
@@ -509,6 +521,7 @@ static void test_blt_interleaved(int vgem, int i915)
 	uint32_t prime, native;
 	uint32_t *foreign, *local;
 	int dmabuf, i;
+	uint64_t ahnd = get_reloc_ahnd(i915, 0);
 
 	scratch.width = 1024;
 	scratch.height = 1024;
@@ -525,20 +538,22 @@ static void test_blt_interleaved(int vgem, int i915)
 
 	for (i = 0; i < scratch.height; i++) {
 		local[scratch.pitch * i / sizeof(*local)] = i;
-		igt_blitter_src_copy(i915, native, 0, scratch.pitch,
-				     I915_TILING_NONE, 0, i, scratch.width, 1,
+		igt_blitter_src_copy(i915, ahnd, 0, native, 0, scratch.pitch,
+				     I915_TILING_NONE, 0, i, scratch.size,
+				     scratch.width, 1,
 				     scratch.bpp, prime, 0, scratch.pitch,
-				     I915_TILING_NONE, 0, i);
+				     I915_TILING_NONE, 0, i, scratch.size);
 		prime_sync_start(dmabuf, true);
 		igt_assert_eq_u32(foreign[scratch.pitch * i / sizeof(*foreign)],
 				  i);
 		prime_sync_end(dmabuf, true);
 
 		foreign[scratch.pitch * i / sizeof(*foreign)] = ~i;
-		igt_blitter_src_copy(i915, prime, 0, scratch.pitch,
-				     I915_TILING_NONE, 0, i, scratch.width, 1,
+		igt_blitter_src_copy(i915, ahnd, 0, prime, 0, scratch.pitch,
+				     I915_TILING_NONE, 0, i, scratch.size,
+				     scratch.width, 1,
 				     scratch.bpp, native, 0, scratch.pitch,
-				     I915_TILING_NONE, 0, i);
+				     I915_TILING_NONE, 0, i, scratch.size);
 		gem_sync(i915, native);
 		igt_assert_eq_u32(local[scratch.pitch * i / sizeof(*local)],
 				  ~i);
@@ -551,6 +566,7 @@ static void test_blt_interleaved(int vgem, int i915)
 	gem_close(i915, native);
 	gem_close(i915, prime);
 	gem_close(vgem, scratch.handle);
+	put_ahnd(ahnd);
 }
 
 static bool prime_busy(int fd, bool excl)
@@ -559,7 +575,8 @@ static bool prime_busy(int fd, bool excl)
 	return poll(&pfd, 1, 0) == 0;
 }
 
-static void work(int i915, int dmabuf, const intel_ctx_t *ctx, unsigned ring)
+static void work(int i915, uint64_t ahnd, uint64_t scratch_offset, int dmabuf,
+		 const intel_ctx_t *ctx, unsigned ring)
 {
 	const int SCRATCH = 0;
 	const int BATCH = 1;
@@ -584,9 +601,16 @@ static void work(int i915, int dmabuf, const intel_ctx_t *ctx, unsigned ring)
 	obj[SCRATCH].handle = prime_fd_to_handle(i915, dmabuf);
 
 	obj[BATCH].handle = gem_create(i915, size);
+	obj[BATCH].offset = get_offset(ahnd, obj[BATCH].handle, size, 0);
 	obj[BATCH].relocs_ptr = (uintptr_t)store;
-	obj[BATCH].relocation_count = ARRAY_SIZE(store);
+	obj[BATCH].relocation_count = !ahnd ? ARRAY_SIZE(store) : 0;
 	memset(store, 0, sizeof(store));
+
+	if (ahnd) {
+		obj[SCRATCH].flags = EXEC_OBJECT_PINNED | EXEC_OBJECT_WRITE;
+		obj[SCRATCH].offset = scratch_offset;
+		obj[BATCH].flags = EXEC_OBJECT_PINNED;
+	}
 
 	batch = gem_mmap__wc(i915, obj[BATCH].handle, 0, size, PROT_WRITE);
 	gem_set_domain(i915, obj[BATCH].handle,
@@ -602,8 +626,8 @@ static void work(int i915, int dmabuf, const intel_ctx_t *ctx, unsigned ring)
 		store[count].write_domain = I915_GEM_DOMAIN_INSTRUCTION;
 		batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
 		if (gen >= 8) {
-			batch[++i] = 0;
-			batch[++i] = 0;
+			batch[++i] = scratch_offset + store[count].delta;
+			batch[++i] = (scratch_offset + store[count].delta) >> 32;
 		} else if (gen >= 4) {
 			batch[++i] = 0;
 			batch[++i] = 0;
@@ -626,8 +650,8 @@ static void work(int i915, int dmabuf, const intel_ctx_t *ctx, unsigned ring)
 	batch[i] = MI_BATCH_BUFFER_START;
 	if (gen >= 8) {
 		batch[i] |= 1 << 8 | 1;
-		batch[++i] = 0;
-		batch[++i] = 0;
+		batch[++i] = obj[BATCH].offset;
+		batch[++i] = obj[BATCH].offset >> 32;
 	} else if (gen >= 6) {
 		batch[i] |= 1 << 8;
 		batch[++i] = 0;
@@ -662,14 +686,18 @@ static void test_busy(int i915, int vgem, const intel_ctx_t *ctx, unsigned ring)
 	uint32_t *ptr;
 	int dmabuf;
 	int i;
+	uint64_t ahnd = get_reloc_ahnd(i915, ctx->id), scratch_offset;
 
 	scratch.width = 1024;
 	scratch.height = 1;
 	scratch.bpp = 32;
 	vgem_create(vgem, &scratch);
+	scratch_offset = get_offset(ahnd, scratch.handle, scratch.size, 0);
 	dmabuf = prime_handle_to_fd(vgem, scratch.handle);
 
-	work(i915, dmabuf, ctx, ring);
+	work(i915, ahnd, scratch_offset, dmabuf, ctx, ring);
+
+	put_ahnd(ahnd);
 
 	/* Calling busy in a loop should be enough to flush the rendering */
 	memset(&tv, 0, sizeof(tv));
@@ -691,14 +719,18 @@ static void test_wait(int i915, int vgem, const intel_ctx_t *ctx, unsigned ring)
 	struct pollfd pfd;
 	uint32_t *ptr;
 	int i;
+	uint64_t ahnd = get_reloc_ahnd(i915, ctx->id), scratch_offset;
 
 	scratch.width = 1024;
 	scratch.height = 1;
 	scratch.bpp = 32;
 	vgem_create(vgem, &scratch);
+	scratch_offset = get_offset(ahnd, scratch.handle, scratch.size, 0);
 	pfd.fd = prime_handle_to_fd(vgem, scratch.handle);
 
-	work(i915, pfd.fd, ctx, ring);
+	work(i915, ahnd, scratch_offset, pfd.fd, ctx, ring);
+
+	put_ahnd(ahnd);
 
 	pfd.events = POLLIN;
 	igt_assert_eq(poll(&pfd, 1, 10000), 1);
@@ -718,18 +750,22 @@ static void test_sync(int i915, int vgem, const intel_ctx_t *ctx, unsigned ring)
 	uint32_t *ptr;
 	int dmabuf;
 	int i;
+	uint64_t ahnd = get_reloc_ahnd(i915, ctx->id), scratch_offset;
 
 	scratch.width = 1024;
 	scratch.height = 1;
 	scratch.bpp = 32;
 	vgem_create(vgem, &scratch);
+	scratch_offset = get_offset(ahnd, scratch.handle, scratch.size, 0);
 	dmabuf = prime_handle_to_fd(vgem, scratch.handle);
 
 	ptr = mmap(NULL, scratch.size, PROT_READ, MAP_SHARED, dmabuf, 0);
 	igt_assert(ptr != MAP_FAILED);
 	gem_close(vgem, scratch.handle);
 
-	work(i915, dmabuf, ctx, ring);
+	work(i915, ahnd, scratch_offset, dmabuf, ctx, ring);
+
+	put_ahnd(ahnd);
 
 	prime_sync_start(dmabuf, false);
 	for (i = 0; i < 1024; i++)
@@ -746,12 +782,13 @@ static void test_fence_wait(int i915, int vgem, const intel_ctx_t *ctx, unsigned
 	uint32_t fence;
 	uint32_t *ptr;
 	int dmabuf;
+	uint64_t ahnd = get_reloc_ahnd(i915, ctx->id), scratch_offset;
 
 	scratch.width = 1024;
 	scratch.height = 1;
 	scratch.bpp = 32;
 	vgem_create(vgem, &scratch);
-
+	scratch_offset = get_offset(ahnd, scratch.handle, scratch.size, 0);
 	dmabuf = prime_handle_to_fd(vgem, scratch.handle);
 	fence = vgem_fence_attach(vgem, &scratch, VGEM_FENCE_WRITE);
 	igt_assert(prime_busy(dmabuf, false));
@@ -760,10 +797,14 @@ static void test_fence_wait(int i915, int vgem, const intel_ctx_t *ctx, unsigned
 	ptr = mmap(NULL, scratch.size, PROT_READ, MAP_SHARED, dmabuf, 0);
 	igt_assert(ptr != MAP_FAILED);
 
-	igt_fork(child, 1)
-		work(i915, dmabuf, ctx, ring);
+	igt_fork(child, 1) {
+		ahnd = get_reloc_ahnd(i915, ctx->id);
+		work(i915, ahnd, scratch_offset, dmabuf, ctx, ring);
+		put_ahnd(ahnd);
+	}
 
 	sleep(1);
+	put_ahnd(ahnd);
 
 	/* Check for invalidly completing the task early */
 	for (int i = 0; i < 1024; i++)
@@ -789,11 +830,13 @@ static void test_fence_hang(int i915, int vgem, unsigned flags)
 	uint32_t *ptr;
 	int dmabuf;
 	int i;
+	uint64_t ahnd = get_reloc_ahnd(i915, 0), scratch_offset;
 
 	scratch.width = 1024;
 	scratch.height = 1;
 	scratch.bpp = 32;
 	vgem_create(vgem, &scratch);
+	scratch_offset = get_offset(ahnd, scratch.handle, scratch.size, 0);
 	dmabuf = prime_handle_to_fd(vgem, scratch.handle);
 	vgem_fence_attach(vgem, &scratch, flags | WIP_VGEM_FENCE_NOTIMEOUT);
 
@@ -801,7 +844,9 @@ static void test_fence_hang(int i915, int vgem, unsigned flags)
 	igt_assert(ptr != MAP_FAILED);
 	gem_close(vgem, scratch.handle);
 
-	work(i915, dmabuf, intel_ctx_0(i915), 0);
+	work(i915, ahnd, scratch_offset, dmabuf, intel_ctx_0(i915), 0);
+
+	put_ahnd(ahnd);
 
 	/* The work should have been cancelled */
 
@@ -1146,8 +1191,6 @@ igt_main
 		igt_subtest("basic-fence-blt")
 			test_fence_blt(i915, vgem);
 
-		test_each_engine("fence-wait", vgem, i915, test_fence_wait);
-
 		igt_subtest("basic-fence-flip")
 			test_flip(i915, vgem, 0);
 
@@ -1165,6 +1208,21 @@ igt_main
 				test_flip(i915, vgem, WIP_VGEM_FENCE_NOTIMEOUT);
 		}
 	}
+
+	/* Fence testing, requires multiprocess allocator */
+	igt_subtest_group {
+		igt_fixture {
+			igt_require(vgem_has_fences(vgem));
+			intel_allocator_multiprocess_start();
+		}
+
+		test_each_engine("fence-wait", vgem, i915, test_fence_wait);
+
+		igt_fixture {
+			intel_allocator_multiprocess_stop();
+		}
+	}
+
 
 	igt_fixture {
 		close(i915);
