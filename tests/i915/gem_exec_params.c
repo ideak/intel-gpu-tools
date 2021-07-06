@@ -45,6 +45,8 @@
 #include "igt_device.h"
 #include "sw_sync.h"
 
+#define ALIGNMENT (1 << 22)
+
 static bool has_exec_batch_first(int fd)
 {
 	int val = -1;
@@ -74,24 +76,45 @@ static void test_batch_first(int fd)
 	struct drm_i915_gem_exec_object2 obj[3];
 	struct drm_i915_gem_relocation_entry reloc[2];
 	uint32_t *map, value;
+	uint64_t ahnd;
+	bool do_relocs = !gem_uses_ppgtt(fd);
 	int i;
 
 	igt_require(gem_can_store_dword(fd, 0));
 	igt_require(has_exec_batch_first(fd));
 
+	ahnd = intel_allocator_open(fd, 0, INTEL_ALLOCATOR_SIMPLE);
+
 	memset(obj, 0, sizeof(obj));
 	memset(reloc, 0, sizeof(reloc));
 
 	obj[0].handle = gem_create(fd, 4096);
+	obj[0].offset = intel_allocator_alloc(ahnd, obj[0].handle,
+						4096, ALIGNMENT);
+	obj[0].offset = CANONICAL(obj[0].offset);
+	obj[0].flags = EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 	obj[1].handle = gem_create(fd, 4096);
+	obj[1].offset = intel_allocator_alloc(ahnd, obj[1].handle,
+						4096, ALIGNMENT);
+	obj[1].offset = CANONICAL(obj[1].offset);
+	obj[1].flags = EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 	obj[2].handle = gem_create(fd, 4096);
+	obj[2].offset = intel_allocator_alloc(ahnd, obj[2].handle,
+						4096, ALIGNMENT);
+	obj[2].offset = CANONICAL(obj[2].offset);
+	obj[2].flags = EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 
-	reloc[0].target_handle = obj[1].handle;
-	reloc[0].offset = sizeof(uint32_t);
-	reloc[0].read_domains = I915_GEM_DOMAIN_INSTRUCTION;
-	reloc[0].write_domain = I915_GEM_DOMAIN_INSTRUCTION;
-	obj[0].relocs_ptr = to_user_pointer(&reloc[0]);
-	obj[0].relocation_count = 1;
+	if (do_relocs) {
+		reloc[0].target_handle = obj[1].handle;
+		reloc[0].offset = sizeof(uint32_t);
+		reloc[0].read_domains = I915_GEM_DOMAIN_INSTRUCTION;
+		reloc[0].write_domain = I915_GEM_DOMAIN_INSTRUCTION;
+		obj[0].relocs_ptr = to_user_pointer(&reloc[0]);
+		obj[0].relocation_count = 1;
+	} else {
+		obj[0].flags |= EXEC_OBJECT_PINNED;
+		obj[1].flags |= EXEC_OBJECT_PINNED | EXEC_OBJECT_WRITE;
+	}
 
 	i = 0;
 	map = gem_mmap__cpu(fd, obj[0].handle, 0, 4096, PROT_WRITE);
@@ -99,26 +122,31 @@ static void test_batch_first(int fd)
 			I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
 	map[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
 	if (gen >= 8) {
-		map[++i] = 0;
-		map[++i] = 0;
+		map[++i] = obj[1].offset;
+		map[++i] = obj[1].offset >> 32;
 	} else if (gen >= 4) {
 		map[++i] = 0;
-		map[++i] = 0;
+		map[++i] = obj[1].offset;
 		reloc[0].offset += sizeof(uint32_t);
 	} else {
 		map[i]--;
-		map[++i] = 0;
+		map[++i] = obj[1].offset;
 	}
 	map[++i] = 1;
 	map[++i] = MI_BATCH_BUFFER_END;
 	munmap(map, 4096);
 
-	reloc[1].target_handle = obj[1].handle;
-	reloc[1].offset = sizeof(uint32_t);
-	reloc[1].read_domains = I915_GEM_DOMAIN_INSTRUCTION;
-	reloc[1].write_domain = I915_GEM_DOMAIN_INSTRUCTION;
-	obj[2].relocs_ptr = to_user_pointer(&reloc[1]);
-	obj[2].relocation_count = 1;
+	if (do_relocs) {
+		reloc[1].target_handle = obj[1].handle;
+		reloc[1].offset = sizeof(uint32_t);
+		reloc[1].read_domains = I915_GEM_DOMAIN_INSTRUCTION;
+		reloc[1].write_domain = I915_GEM_DOMAIN_INSTRUCTION;
+		obj[2].relocs_ptr = to_user_pointer(&reloc[1]);
+		obj[2].relocation_count = 1;
+	} else {
+		obj[1].flags |= EXEC_OBJECT_PINNED | EXEC_OBJECT_WRITE;
+		obj[2].flags |= EXEC_OBJECT_PINNED;
+	}
 
 	i = 0;
 	map = gem_mmap__cpu(fd, obj[2].handle, 0, 4096, PROT_WRITE);
@@ -126,15 +154,15 @@ static void test_batch_first(int fd)
 			I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
 	map[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
 	if (gen >= 8) {
-		map[++i] = 0;
-		map[++i] = 0;
+		map[++i] = obj[1].offset;
+		map[++i] = obj[1].offset >> 32;
 	} else if (gen >= 4) {
 		map[++i] = 0;
-		map[++i] = 0;
+		map[++i] = obj[1].offset;
 		reloc[1].offset += sizeof(uint32_t);
 	} else {
 		map[i]--;
-		map[++i] = 0;
+		map[++i] = obj[1].offset;
 	}
 	map[++i] = 2;
 	map[++i] = MI_BATCH_BUFFER_END;
@@ -158,8 +186,12 @@ static void test_batch_first(int fd)
 	igt_assert_eq_u32(value, 1);
 
 	gem_close(fd, obj[2].handle);
+	intel_allocator_free(ahnd, obj[2].handle);
 	gem_close(fd, obj[1].handle);
+	intel_allocator_free(ahnd, obj[1].handle);
 	gem_close(fd, obj[0].handle);
+	intel_allocator_free(ahnd, obj[0].handle);
+	intel_allocator_close(ahnd);
 }
 
 static int has_secure_batches(const int fd)
