@@ -323,18 +323,9 @@ static void maximum(int fd, int ncpus, unsigned mode)
 
 	igt_fork(child, ncpus) {
 		struct timespec start, end;
-		int i915;
-
-		i915 = gem_reopen_driver(fd);
-		/*
-		 * Ensure the gpu is idle by launching
-		 * a nop execbuf and stalling for it.
-		 */
-		gem_quiescent_gpu(i915);
-		gem_context_copy_engines(fd, 0, i915, 0);
 
 		hars_petruska_f54_1_random_perturb(child);
-		obj[0].handle = gem_create(i915, 4096);
+		obj[0].handle = gem_create(fd, 4096);
 
 		clock_gettime(CLOCK_MONOTONIC, &start);
 		for (int repeat = 0; repeat < 3; repeat++) {
@@ -345,13 +336,13 @@ static void maximum(int fd, int ncpus, unsigned mode)
 				execbuf.rsvd1 = contexts[i];
 				for (unsigned long j = 0; j < all_nengine; j++) {
 					execbuf.flags = all_engines[j];
-					gem_execbuf(i915, &execbuf);
+					gem_execbuf(fd, &execbuf);
 				}
 			}
 		}
-		gem_sync(i915, obj[0].handle);
+		gem_sync(fd, obj[0].handle);
 		clock_gettime(CLOCK_MONOTONIC, &end);
-		gem_close(i915, obj[0].handle);
+		gem_close(fd, obj[0].handle);
 
 		igt_info("[%d] Context execution: %.3f us\n", child,
 			 elapsed(&start, &end) / (3 * count * all_nengine) * 1e6);
