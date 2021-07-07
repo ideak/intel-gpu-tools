@@ -150,13 +150,11 @@ static void invalid_tests(int fd)
 	igt_describe("Check if addfb2 with a system memory gem object "
 		     "fails correctly if device requires local memory framebuffers");
 	igt_subtest("invalid-smem-bo-on-discrete") {
-		int devid;
 		uint32_t handle, stride;
 		uint64_t size;
 
 		igt_require_intel(fd);
-		devid = intel_get_drm_devid(fd);
-		igt_require(gem_has_lmem(devid));
+		igt_require(gem_has_lmem(fd));
 		igt_calc_fb_size(fd, f.width, f.height,
 				DRM_FORMAT_XRGB8888, 0, &size, &stride);
 		handle = gem_create_in_memory_regions(fd, size, REGION_SMEM);
