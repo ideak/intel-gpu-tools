@@ -1188,7 +1188,7 @@ igt_main
 		igt_require_gem(i915);
 		gem_require_blitter(i915);
 
-		igt_require(gem_cmdparser_version(i915, I915_EXEC_BLT) >= 10);
+		igt_require(gem_cmdparser_version(i915) >= 10);
 		igt_require(intel_gen(intel_get_drm_devid(i915)) == 9);
 
 		handle = gem_create(i915, HANDLE_SIZE);

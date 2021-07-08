@@ -373,6 +373,7 @@ static void test_nohangcheck_hostile(int i915, const intel_ctx_cfg_t *cfg)
 static void test_nohangcheck_hang(int i915, const intel_ctx_cfg_t *cfg)
 {
 	const struct intel_execution_engine2 *e;
+	int testable_engines = 0;
 	int dir;
 
 	cleanup(i915);
@@ -382,7 +383,11 @@ static void test_nohangcheck_hang(int i915, const intel_ctx_cfg_t *cfg)
 	 * we forcibly terminate that context.
 	 */
 
-	igt_require(!gem_has_cmdparser(i915, ALL_ENGINES));
+	for_each_ctx_cfg_engine(i915, cfg, e) {
+		if (!gem_engine_has_cmdparser(i915, cfg, e->flags))
+			testable_engines++;
+	}
+	igt_require(testable_engines);
 
 	dir = igt_params_open(i915);
 	igt_require(dir != -1);
@@ -391,9 +396,13 @@ static void test_nohangcheck_hang(int i915, const intel_ctx_cfg_t *cfg)
 
 	for_each_ctx_cfg_engine(i915, cfg, e) {
 		int64_t timeout = reset_timeout_ms * NSEC_PER_MSEC;
-		const intel_ctx_t *ctx = intel_ctx_create(i915, cfg);
+		const intel_ctx_t *ctx;
 		igt_spin_t *spin;
 
+		if (!gem_engine_has_cmdparser(i915, cfg, e->flags))
+			continue;
+
+		ctx = intel_ctx_create(i915, cfg);
 		spin = igt_spin_new(i915, .ctx = ctx,
 				    .engine = e->flags,
 				    .flags = IGT_SPIN_INVALID_CS);

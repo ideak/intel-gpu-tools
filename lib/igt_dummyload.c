@@ -251,9 +251,11 @@ emit_recursive_batch(igt_spin_t *spin,
 	/* Allow ourselves to be preempted */
 	if (!(opts->flags & IGT_SPIN_NO_PREEMPTION))
 		*cs++ = MI_ARB_CHK;
-	if (opts->flags & IGT_SPIN_INVALID_CS &&
-	    !gem_has_cmdparser(fd, opts->engine))
-		*cs++ = 0xdeadbeef;
+	if (opts->flags & IGT_SPIN_INVALID_CS) {
+		igt_assert(opts->ctx);
+		if (!gem_engine_has_cmdparser(fd, &opts->ctx->cfg, opts->engine))
+			*cs++ = 0xdeadbeef;
+	}
 
 	/* Pad with a few nops so that we do not completely hog the system.
 	 *
@@ -432,8 +434,11 @@ igt_spin_factory(int fd, const struct igt_spin_factory *opts)
 		igt_require(gem_class_can_store_dword(fd, class));
 	}
 
-	if (opts->flags & IGT_SPIN_INVALID_CS)
-		igt_require(!gem_has_cmdparser(fd, opts->engine));
+	if (opts->flags & IGT_SPIN_INVALID_CS) {
+		igt_assert(opts->ctx);
+		igt_require(!gem_engine_has_cmdparser(fd, &opts->ctx->cfg,
+						      opts->engine));
+	}
 
 	spin = spin_create(fd, opts);
 

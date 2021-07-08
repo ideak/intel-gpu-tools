@@ -236,7 +236,7 @@ test_engine_hang(const intel_ctx_t *ctx,
 	IGT_LIST_HEAD(list);
 
 	igt_skip_on(flags & IGT_SPIN_INVALID_CS &&
-		    gem_has_cmdparser(device, e->flags));
+		    gem_engine_has_cmdparser(device, &ctx->cfg, e->flags));
 
 	/* Fill all the other engines with background load */
 	for_each_ctx_engine(device, ctx, other) {

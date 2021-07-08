@@ -39,11 +39,13 @@ bool gem_has_guc_submission(int fd);
 bool gem_engine_has_mutable_submission(int fd, unsigned int engine);
 bool gem_class_has_mutable_submission(int fd, int class);
 
-int gem_cmdparser_version(int i915, uint32_t engine);
-static inline bool gem_has_cmdparser(int i915, uint32_t engine)
+int gem_cmdparser_version(int i915);
+static inline bool gem_has_cmdparser(int i915)
 {
-	return gem_cmdparser_version(i915, engine) > 0;
+	return gem_cmdparser_version(i915) > 0;
 }
+bool gem_engine_has_cmdparser(int i915, const intel_ctx_cfg_t *cfg,
+			      unsigned int engine);
 
 bool gem_has_blitter(int i915);
 void gem_require_blitter(int i915);

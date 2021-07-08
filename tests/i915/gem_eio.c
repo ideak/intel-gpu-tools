@@ -183,7 +183,7 @@ static igt_spin_t * __spin_poll(int fd, const intel_ctx_t *ctx,
 		.flags = IGT_SPIN_NO_PREEMPTION | IGT_SPIN_FENCE_OUT,
 	};
 
-	if (!gem_has_cmdparser(fd, opts.engine) &&
+	if (!gem_engine_has_cmdparser(fd, &ctx->cfg, opts.engine) &&
 	    intel_gen(intel_get_drm_devid(fd)) != 6)
 		opts.flags |= IGT_SPIN_INVALID_CS;
 

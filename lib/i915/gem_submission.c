@@ -215,7 +215,13 @@ void gem_test_all_engines(int i915)
 	close(i915);
 }
 
-int gem_cmdparser_version(int i915, uint32_t engine)
+/**
+ * gem_cmdparser_version:
+ * @i915: open i915 drm file descriptor
+ *
+ * Returns the command parser version
+ */
+int gem_cmdparser_version(int i915)
 {
 	int version = 0;
 	drm_i915_getparam_t gp = {
@@ -225,6 +231,34 @@ int gem_cmdparser_version(int i915, uint32_t engine)
 
 	ioctl(i915, DRM_IOCTL_I915_GETPARAM, &gp);
 	return version;
+}
+
+/**
+ * gem_engine_has_cmdparser:
+ * @i915: open i915 drm file descriptor
+ * @class: an intel_ctx_cfg_t
+ * @engine: an engine specifier
+ *
+ * Returns true if the given engine has a command parser
+ */
+bool gem_engine_has_cmdparser(int i915, const intel_ctx_cfg_t *cfg,
+			      unsigned int engine)
+{
+	const int gen = intel_gen(intel_get_drm_devid(i915));
+	const int parser_version = gem_cmdparser_version(i915);
+	const int class = intel_ctx_cfg_engine_class(cfg, engine);
+
+	if (parser_version < 0)
+		return false;
+
+	if (gen == 7)
+		return true;
+
+	/* GFX version 9 BLT command parsing was added in parser version 10 */
+	if (gen == 9 && class == I915_ENGINE_CLASS_COPY && parser_version >= 10)
+		return true;
+
+	return false;
 }
 
 bool gem_has_blitter(int i915)
@@ -248,7 +282,7 @@ static bool gem_engine_has_immutable_submission(int i915, int class)
 	const int gen = intel_gen(intel_get_drm_devid(i915));
         int parser_version;
 
-	parser_version = gem_cmdparser_version(i915, 0);
+	parser_version = gem_cmdparser_version(i915);
 	if (parser_version < 0)
 		return false;
 

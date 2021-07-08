@@ -2257,7 +2257,7 @@ static void hangme(int i915)
 			flags = IGT_SPIN_FENCE_IN |
 				IGT_SPIN_FENCE_OUT |
 				IGT_SPIN_NO_PREEMPTION;
-			if (!gem_has_cmdparser(i915, ALL_ENGINES))
+			if (!gem_engine_has_cmdparser(i915, &ctx->cfg, 0))
 				flags |= IGT_SPIN_INVALID_CS;
 			for (int j = 0; j < ARRAY_SIZE(c->spin); j++)  {
 				c->spin[j] = __igt_spin_new(i915, .ctx = ctx,

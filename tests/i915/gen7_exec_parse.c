@@ -463,7 +463,7 @@ igt_main
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
 
-		parser_version = gem_cmdparser_version(fd, 0);
+		parser_version = gem_cmdparser_version(fd);
 		igt_require(parser_version != -1);
 
 		igt_require(gem_uses_ppgtt(fd));
