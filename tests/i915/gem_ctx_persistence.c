@@ -334,8 +334,9 @@ static void test_nonpersistent_hang(int i915, const intel_ctx_cfg_t *cfg,
 	igt_spin_free(i915, spin);
 }
 
-static void test_nohangcheck_hostile(int i915)
+static void test_nohangcheck_hostile(int i915, const intel_ctx_cfg_t *cfg)
 {
+	const struct intel_execution_engine2 *e;
 	int dir;
 
 	cleanup(i915);
@@ -350,15 +351,15 @@ static void test_nohangcheck_hostile(int i915)
 
 	igt_require(__enable_hangcheck(dir, false));
 
-	for_each_physical_ring(e, i915) {
+	for_each_ctx_cfg_engine(i915, cfg, e) {
 		int64_t timeout = reset_timeout_ms * NSEC_PER_MSEC;
-		uint32_t ctx = gem_context_create(i915);
+		const intel_ctx_t *ctx = intel_ctx_create(i915, cfg);
 		igt_spin_t *spin;
 
-		spin = igt_spin_new(i915, ctx,
-				    .engine = eb_ring(e),
+		spin = igt_spin_new(i915, .ctx = ctx,
+				    .engine = e->flags,
 				    .flags = IGT_SPIN_NO_PREEMPTION);
-		gem_context_destroy(i915, ctx);
+		intel_ctx_destroy(i915, ctx);
 
 		igt_assert_eq(gem_wait(i915, spin->handle, &timeout), 0);
 
@@ -369,8 +370,9 @@ static void test_nohangcheck_hostile(int i915)
 	close(dir);
 }
 
-static void test_nohangcheck_hang(int i915)
+static void test_nohangcheck_hang(int i915, const intel_ctx_cfg_t *cfg)
 {
+	const struct intel_execution_engine2 *e;
 	int dir;
 
 	cleanup(i915);
@@ -387,15 +389,15 @@ static void test_nohangcheck_hang(int i915)
 
 	igt_require(__enable_hangcheck(dir, false));
 
-	for_each_physical_ring(e, i915) {
+	for_each_ctx_cfg_engine(i915, cfg, e) {
 		int64_t timeout = reset_timeout_ms * NSEC_PER_MSEC;
-		uint32_t ctx = gem_context_create(i915);
+		const intel_ctx_t *ctx = intel_ctx_create(i915, cfg);
 		igt_spin_t *spin;
 
-		spin = igt_spin_new(i915, ctx,
-				    .engine = eb_ring(e),
+		spin = igt_spin_new(i915, .ctx = ctx,
+				    .engine = e->flags,
 				    .flags = IGT_SPIN_INVALID_CS);
-		gem_context_destroy(i915, ctx);
+		intel_ctx_destroy(i915, ctx);
 
 		igt_assert_eq(gem_wait(i915, spin->handle, &timeout), 0);
 
@@ -1131,6 +1133,7 @@ static void exit_handler(int sig)
 
 igt_main
 {
+	const intel_ctx_cfg_t empty_cfg = {};
 	struct {
 		const char *name;
 		void (*func)(int fd, const intel_ctx_cfg_t *cfg,
@@ -1182,9 +1185,9 @@ igt_main
 		test_userptr(i915);
 
 	igt_subtest("hostile")
-		test_nohangcheck_hostile(i915);
+		test_nohangcheck_hostile(i915, &empty_cfg);
 	igt_subtest("hang")
-		test_nohangcheck_hang(i915);
+		test_nohangcheck_hang(i915, &empty_cfg);
 
 	igt_subtest("heartbeat-stop")
 		test_noheartbeat_many(i915, 1, 0);
@@ -1204,7 +1207,6 @@ igt_main
 		for (test = tests; test->name; test++) {
 			igt_subtest_with_dynamic_f("legacy-engines-%s",
 						   test->name) {
-				const intel_ctx_cfg_t empty_cfg = {};
 				for_each_physical_ring(e, i915) {
 					igt_dynamic_f("%s", e->name) {
 						do_test(test->func, i915,
