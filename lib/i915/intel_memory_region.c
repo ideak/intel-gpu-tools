@@ -119,6 +119,13 @@ struct drm_i915_query_memory_regions *gem_get_query_memory_regions(int fd)
 	memset(&item, 0, sizeof(item));
 	item.query_id = DRM_I915_QUERY_MEMORY_REGIONS;
 	i915_query_items(fd, &item, 1);
+	/*
+	 * Any DRM_I915_QUERY_MEMORY_REGIONS specific errors are encoded in the
+	 * item.length, even though the ioctl might still return success.
+	 */
+	igt_assert_f(item.length > 0,
+		     "DRM_I915_QUERY_MEMORY_REGIONS failed with %d\n",
+		     item.length);
 
 	query_info = calloc(1, item.length);
 
