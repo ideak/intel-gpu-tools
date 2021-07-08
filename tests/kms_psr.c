@@ -416,6 +416,11 @@ static void test_setup(data_t *data)
 	igt_require_f(data->mode,
 		      "No available mode found on %s\n",
 		      data->output->name);
+
+	if (data->op_psr_mode == PSR_MODE_2)
+		igt_require_f(intel_display_ver(intel_get_drm_devid(data->drm_fd)) < 13,
+			      "Intentionally not testing this on Display 13+, Kernel change required to enable testing\n");
+
 	if (data->op_psr_mode == PSR_MODE_2)
 		igt_require(data->supports_psr2);
 
