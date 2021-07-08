@@ -33,6 +33,10 @@ IGT_TEST_DESCRIPTION("Testing the i915 query uAPI.");
  */
 #define MIN_TOPOLOGY_ITEM_SIZE (sizeof(struct drm_i915_query_topology_info) + 3)
 
+/* All devices should have at least one region. */
+#define MIN_REGIONS_ITEM_SIZE (sizeof(struct drm_i915_query_memory_regions) + \
+			       sizeof(struct drm_i915_memory_region_info))
+
 static int
 __i915_query(int fd, struct drm_i915_query *q)
 {
@@ -491,6 +495,119 @@ test_query_topology_known_pci_ids(int fd, int devid)
 	free(topo_info);
 }
 
+static bool query_regions_supported(int fd)
+{
+	struct drm_i915_query_item item = {
+		.query_id = DRM_I915_QUERY_MEMORY_REGIONS,
+	};
+
+	return __i915_query_items(fd, &item, 1) == 0 && item.length > 0;
+}
+
+static void test_query_regions_garbage_items(int fd)
+{
+	struct drm_i915_query_memory_regions *regions;
+	struct drm_i915_query_item item;
+	int i;
+
+	test_query_garbage_items(fd,
+				 DRM_I915_QUERY_MEMORY_REGIONS,
+				 MIN_REGIONS_ITEM_SIZE,
+				 sizeof(struct drm_i915_query_memory_regions));
+
+	memset(&item, 0, sizeof(item));
+	item.query_id = DRM_I915_QUERY_MEMORY_REGIONS;
+	i915_query_items(fd, &item, 1);
+	igt_assert(item.length > 0);
+
+	regions = calloc(1, item.length);
+	item.data_ptr = to_user_pointer(regions);
+
+	/* Bogus; in-MBZ */
+	for (i = 0; i < ARRAY_SIZE(regions->rsvd); i++) {
+		regions->rsvd[i] = 0xdeadbeaf;
+		i915_query_items(fd, &item, 1);
+		igt_assert_eq(item.length, -EINVAL);
+		regions->rsvd[i] = 0;
+	}
+
+	i915_query_items(fd, &item, 1);
+	igt_assert(regions->num_regions);
+	igt_assert(item.length > 0);
+
+	/* Bogus; out-MBZ */
+	for (i = 0; i < regions->num_regions; i++) {
+		struct drm_i915_memory_region_info info = regions->regions[i];
+		int j;
+
+		igt_assert_eq_u32(info.rsvd0, 0);
+
+		for (j = 0; j < ARRAY_SIZE(info.rsvd1); j++)
+			igt_assert_eq_u32(info.rsvd1[j], 0);
+	}
+
+	/* Bogus; kernel is meant to set this */
+	regions->num_regions = 1;
+	i915_query_items(fd, &item, 1);
+	igt_assert_eq(item.length, -EINVAL);
+	regions->num_regions = 0;
+
+	free(regions);
+}
+
+static void test_query_regions_sanity_check(int fd)
+{
+	struct drm_i915_query_memory_regions *regions;
+	struct drm_i915_query_item item;
+	bool found_system;
+	int i;
+
+	memset(&item, 0, sizeof(item));
+	item.query_id = DRM_I915_QUERY_MEMORY_REGIONS;
+	i915_query_items(fd, &item, 1);
+	igt_assert(item.length > 0);
+
+	regions = calloc(1, item.length);
+
+	item.data_ptr = to_user_pointer(regions);
+	i915_query_items(fd, &item, 1);
+
+	/* We should always have at least one region */
+	igt_assert(regions->num_regions);
+
+	found_system = false;
+	for (i = 0; i < regions->num_regions; i++) {
+		struct drm_i915_gem_memory_class_instance r1 =
+			regions->regions[i].region;
+		int j;
+
+		if (r1.memory_class == I915_MEMORY_CLASS_SYSTEM) {
+			igt_assert_eq(r1.memory_instance, 0);
+			found_system = true;
+		}
+
+		igt_assert(r1.memory_class == I915_MEMORY_CLASS_SYSTEM ||
+			   r1.memory_class == I915_MEMORY_CLASS_DEVICE);
+
+		for (j = 0; j < regions->num_regions; j++) {
+			struct drm_i915_gem_memory_class_instance r2 =
+				regions->regions[j].region;
+
+			if (i == j)
+				continue;
+
+			/* All probed class:instance pairs must be unique */
+			igt_assert(!(r1.memory_class == r2.memory_class &&
+				     r1.memory_instance == r2.memory_instance));
+		}
+	}
+
+	/* All devices should at least have system memory */
+	igt_assert(found_system);
+
+	free(regions);
+}
+
 static bool query_engine_info_supported(int fd)
 {
 	struct drm_i915_query_item item = {
@@ -770,6 +887,16 @@ igt_main
 			    IS_SKYLAKE(devid) || IS_KABYLAKE(devid) ||
 			    IS_COFFEELAKE(devid));
 		test_query_topology_known_pci_ids(fd, devid);
+	}
+
+	igt_subtest("query-regions-garbage-items") {
+		igt_require(query_regions_supported(fd));
+		test_query_regions_garbage_items(fd);
+	}
+
+	igt_subtest("query-regions-sanity-check") {
+		igt_require(query_regions_supported(fd));
+		test_query_regions_sanity_check(fd);
 	}
 
 	igt_subtest_group {
