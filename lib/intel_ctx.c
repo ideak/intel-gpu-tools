@@ -268,6 +268,32 @@ const intel_ctx_t *intel_ctx_create_all_physical(int fd)
 }
 
 /**
+ * intel_ctx_cfg_engine_class:
+ * @cfg: an intel_ctx_cfg_t
+ * @engine: an engine specifier
+ *
+ * Returns the class for the given engine.
+ */
+int intel_ctx_cfg_engine_class(const intel_ctx_cfg_t *cfg, unsigned int engine)
+{
+	if (cfg->load_balance) {
+		if (engine == 0) {
+			/* This is our virtual engine */
+			return cfg->engines[0].engine_class;
+		} else {
+			/* This is a physical engine */
+			igt_assert(engine - 1 < cfg->num_engines);
+			return cfg->engines[engine - 1].engine_class;
+		}
+	} else if (cfg->num_engines > 0) {
+		igt_assert(engine < cfg->num_engines);
+		return cfg->engines[engine].engine_class;
+	} else {
+		return gem_execbuf_flags_to_engine_class(engine);
+	}
+}
+
+/**
  * intel_ctx_destroy:
  * @fd: open i915 drm file descriptor
  * @ctx: context to destroy, or NULL
@@ -292,19 +318,5 @@ void intel_ctx_destroy(int fd, const intel_ctx_t *ctx)
  */
 unsigned int intel_ctx_engine_class(const intel_ctx_t *ctx, unsigned int engine)
 {
-	if (ctx->cfg.load_balance) {
-		if (engine == 0) {
-			/* This is our virtual engine */
-			return ctx->cfg.engines[0].engine_class;
-		} else {
-			/* This is a physical engine */
-			igt_assert(engine - 1 < ctx->cfg.num_engines);
-			return ctx->cfg.engines[engine - 1].engine_class;
-		}
-	} else if (ctx->cfg.num_engines) {
-		igt_assert(engine < ctx->cfg.num_engines);
-		return ctx->cfg.engines[engine].engine_class;
-	} else {
-		return gem_execbuf_flags_to_engine_class(engine);
-	}
+	return intel_ctx_cfg_engine_class(&ctx->cfg, engine);
 }
