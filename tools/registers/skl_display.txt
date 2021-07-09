@@ -404,3 +404,11 @@
 ('WM_LINETIME_B', '0x45274', '')
 ('WM_LINETIME_C', '0x45278', '')
 ('WM_MISC', '0x45260', '')
+# VIDEO DIP
+('VIDEO_DIP_CTL_A', '0x60200', '')
+('VIDEO_DIP_CTL_B', '0x61200', '')
+('VIDEO_DIP_CTL_C', '0x62200', '')
+
+# MISC
+('DC_STATE_EN', '0x45504', '')
+('DC_STATE_DEBUG', '0x45520', '')

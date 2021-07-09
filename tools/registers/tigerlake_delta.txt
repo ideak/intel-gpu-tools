@@ -317,3 +317,19 @@
 # WATERMARK
 ('WM_LINETIME_D', '0x4527c', '')
 
+# PSR
+('TRANS_PSR_CTL_A',            '0x60800', '')
+('TRANS_PSR_STATUS_A',         '0x60840', '')
+('TRANS_PSR_EVENT_A',          '0x60848', '')
+('TRANS_PSR_MASK_A',           '0x60860', '')
+('TRANS_PSR2_CTL_A',           '0x60900', '')
+('TRANS_PSR2_MAN_TRK_CTL_A',   '0x60910', '')
+('TRANS_PSR2_STATUS_A',        '0x60940', '')
+('PLANE_SEL_FETCH_CTL_1_A',    '0x70890', '')
+('PLANE_SEL_FETCH_POS_1_A',    '0x70894', '')
+('PLANE_SEL_FETCH_SIZE_1_A',   '0x70898', '')
+('PLANE_SEL_FETCH_OFFSET_1_A', '0x7089C', '')
+
+# MISC
+('DMC_DEBUG_DC5_COUNT', '0x101084', '')
+('DMC_DEBUG_DC6_COUNT', '0x101088', '')
