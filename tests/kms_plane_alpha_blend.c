@@ -442,6 +442,38 @@ static void coverage_7efc(data_t *data, enum pipe pipe, igt_plane_t *plane)
 	igt_pipe_crc_stop(data->pipe_crc);
 }
 
+static bool is_6bpc(igt_display_t *display, enum pipe pipe) {
+	char buf[8192];
+	char *str;
+	bool ret;
+	int debugfs_fd;
+	drmModeConnector *c;
+	igt_output_t *output = igt_get_single_output_for_pipe(display, pipe);
+
+	if (!is_i915_device(display->drm_fd))
+		return false;
+
+	c = output->config.connector;
+	if (c->connector_type != DRM_MODE_CONNECTOR_eDP ||
+		c->connector_type != DRM_MODE_CONNECTOR_DSI)
+		return false;
+
+	debugfs_fd = igt_debugfs_dir(display->drm_fd);
+	if (debugfs_fd < 0)
+		return false;
+
+	igt_debugfs_simple_read(debugfs_fd, "i915_display_info", buf, sizeof(buf));
+
+	str = strstr(buf, "bpp=");
+	if (str && (strncmp(str, "bpp=18", 6) == 0))
+		ret = true;
+	else
+		ret = false;
+
+	close(debugfs_fd);
+	return ret;
+}
+
 static void coverage_premult_constant(data_t *data, enum pipe pipe, igt_plane_t *plane)
 {
 	igt_display_t *display = &data->display;
@@ -454,6 +486,10 @@ static void coverage_premult_constant(data_t *data, enum pipe pipe, igt_plane_t 
 	igt_plane_set_prop_enum(plane, IGT_PLANE_PIXEL_BLEND_MODE, "Coverage");
 	igt_plane_set_fb(plane, &data->argb_fb_cov_7e);
 	igt_display_commit2(display, COMMIT_ATOMIC);
+
+	/* 6bpc panels have dithering ON and CRC might fail, hence skip test */
+	igt_require_f(!is_6bpc(display, pipe), "Test skipped for 6bpc panels\n");
+
 	igt_pipe_crc_start(data->pipe_crc);
 	igt_pipe_crc_get_single(data->pipe_crc, &ref_crc);
 
