@@ -377,6 +377,7 @@ plane_immutable_zpos(igt_display_t *display, igt_pipe_t *pipe,
 	memset(plane_ptr, 0, n_planes * sizeof(igt_plane_t *));
 
 	igt_require(n_planes >= 2);
+	igt_require_pipe_crc(display->drm_fd);
 
 	mode = igt_output_get_mode(output);
 	primary = igt_pipe_get_plane_type(pipe, DRM_PLANE_TYPE_PRIMARY);
