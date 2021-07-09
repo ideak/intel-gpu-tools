@@ -408,6 +408,7 @@ static void size_tests(int fd)
 	struct drm_mode_fb_cmd2 f_16 = {};
 	struct drm_mode_fb_cmd2 f_8 = {};
 	struct drm_mode_fb_cmd2 *framebuffers[] = {&f, &f_16, &f_8};
+	igt_display_t display;
 	int i;
 
 	f.width = 1024;
@@ -426,6 +427,8 @@ static void size_tests(int fd)
 	f_8.pitches[0] = 1024*2;
 
 	igt_fixture {
+		igt_display_require(&display, fd);
+
 		gem_bo = igt_create_bo_with_dimensions(fd, 1024, 1024,
 			DRM_FORMAT_XRGB8888, 0, 0, NULL, NULL, NULL);
 		igt_assert(gem_bo);
@@ -438,17 +441,19 @@ static void size_tests(int fd)
 	f_16.handles[0] = gem_bo;
 	f_8.handles[0] = gem_bo;
 
-	igt_describe("Check if addfb2 call works with max size of  buffer object");
+	igt_describe("Check if addfb2 call works with max size of buffer object");
 	igt_subtest("size-max") {
 		igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_ADDFB2, &f) == 0);
 		igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_RMFB, &f.fb_id) == 0);
 		f.fb_id = 0;
 		igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_ADDFB2, &f_16) == 0);
 		igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_RMFB, &f_16.fb_id) == 0);
-		f.fb_id = 0;
-		igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_ADDFB2, &f_8) == 0);
-		igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_RMFB, &f_8.fb_id) == 0);
-		f.fb_id = 0;
+		f_16.fb_id = 0;
+		if (igt_display_has_format_mod(&display, DRM_FORMAT_C8, 0)) {
+			igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_ADDFB2, &f_8) == 0);
+			igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_RMFB, &f_8.fb_id) == 0);
+			f_8.fb_id = 0;
+		}
 	}
 
 	f.width++;
