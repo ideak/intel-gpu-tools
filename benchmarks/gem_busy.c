@@ -114,13 +114,10 @@ static int sync_merge(int fd1, int fd2)
 
 static uint32_t __syncobj_create(int fd)
 {
-	struct local_syncobj_create {
-		uint32_t handle, flags;
-	} arg;
-#define LOCAL_IOCTL_SYNCOBJ_CREATE        DRM_IOWR(0xBF, struct local_syncobj_create)
+	struct drm_syncobj_create arg;
 
 	memset(&arg, 0, sizeof(arg));
-	ioctl(fd, LOCAL_IOCTL_SYNCOBJ_CREATE, &arg);
+	ioctl(fd, DRM_IOCTL_SYNCOBJ_CREATE, &arg);
 
 	return arg.handle;
 }
