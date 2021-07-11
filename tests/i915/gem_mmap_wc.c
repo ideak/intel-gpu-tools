@@ -40,17 +40,6 @@
 #include "drm.h"
 #include "i915/gem_create.h"
 
-struct local_i915_gem_mmap_v2 {
-	uint32_t handle;
-	uint32_t pad;
-	uint64_t offset;
-	uint64_t size;
-	uint64_t addr_ptr;
-	uint64_t flags;
-#define I915_MMAP_WC 0x1
-};
-#define LOCAL_IOCTL_I915_GEM_MMAP_v2 DRM_IOWR(DRM_COMMAND_BASE + DRM_I915_GEM_MMAP, struct local_i915_gem_mmap_v2)
-
 static int OBJECT_SIZE = 16*1024*1024;
 
 /*
@@ -103,7 +92,7 @@ static void
 test_invalid_flags(int fd)
 {
 	struct drm_i915_getparam gp;
-	struct local_i915_gem_mmap_v2 arg;
+	struct drm_i915_gem_mmap arg;
 	uint64_t flag = I915_MMAP_WC;
 	int val = -1;
 
@@ -128,7 +117,7 @@ test_invalid_flags(int fd)
 		while (flag) {
 			arg.flags = flag;
 			igt_assert(drmIoctl(fd,
-				   LOCAL_IOCTL_I915_GEM_MMAP_v2,
+				   DRM_IOCTL_I915_GEM_MMAP,
 				   &arg) == -1);
 			igt_assert_eq(errno, EINVAL);
 			flag <<= 1;
