@@ -129,7 +129,7 @@ static void invalid_tests(int fd)
 	igt_subtest("unused-modifier") {
 		igt_require_fb_modifiers(fd);
 
-		f.modifier[1] =  LOCAL_I915_FORMAT_MOD_X_TILED;
+		f.modifier[1] =  I915_FORMAT_MOD_X_TILED;
 		igt_assert(drmIoctl(fd, LOCAL_DRM_IOCTL_MODE_ADDFB2, &f) == -1 &&
 			   errno == EINVAL);
 		f.modifier[1] = 0;
@@ -341,12 +341,12 @@ static void tiling_tests(int fd)
 		igt_fixture {
 			igt_require_intel(fd);
 			tiled_x_bo = igt_create_bo_with_dimensions(fd, 1024, 1024,
-				DRM_FORMAT_XRGB8888, LOCAL_I915_FORMAT_MOD_X_TILED,
+				DRM_FORMAT_XRGB8888, I915_FORMAT_MOD_X_TILED,
 				1024*4, NULL, NULL, NULL);
 			igt_assert(tiled_x_bo);
 
 			tiled_y_bo = igt_create_bo_with_dimensions(fd, 1024, 1024,
-				DRM_FORMAT_XRGB8888, LOCAL_I915_FORMAT_MOD_Y_TILED,
+				DRM_FORMAT_XRGB8888, I915_FORMAT_MOD_Y_TILED,
 				1024*4, NULL, NULL, NULL);
 			igt_assert(tiled_y_bo);
 
@@ -547,7 +547,7 @@ static void addfb25_tests(int fd)
 	igt_subtest("addfb25-modifier-no-flag") {
 		igt_require_fb_modifiers(fd);
 
-		f.modifier[0] = LOCAL_I915_FORMAT_MOD_X_TILED;
+		f.modifier[0] = I915_FORMAT_MOD_X_TILED;
 		igt_assert(drmIoctl(fd, LOCAL_DRM_IOCTL_MODE_ADDFB2, &f) < 0 && errno == EINVAL);
 	}
 
@@ -577,7 +577,7 @@ static void addfb25_tests(int fd)
 
 		igt_describe("Check if addfb2 call works for x-tiling");
 		igt_subtest("addfb25-x-tiled-legacy") {
-			f.modifier[0] = LOCAL_I915_FORMAT_MOD_X_TILED;
+			f.modifier[0] = I915_FORMAT_MOD_X_TILED;
 			igt_assert(drmIoctl(fd, LOCAL_DRM_IOCTL_MODE_ADDFB2, &f) == 0);
 			igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_RMFB, &f.fb_id) == 0);
 			f.fb_id = 0;
@@ -585,7 +585,7 @@ static void addfb25_tests(int fd)
 
 		igt_describe("Check if addfb2 call works for relevant combination of tiling and fbs");
 		igt_subtest("addfb25-framebuffer-vs-set-tiling") {
-			f.modifier[0] = LOCAL_I915_FORMAT_MOD_X_TILED;
+			f.modifier[0] = I915_FORMAT_MOD_X_TILED;
 			igt_assert(drmIoctl(fd, LOCAL_DRM_IOCTL_MODE_ADDFB2, &f) == 0);
 			igt_assert(__gem_set_tiling(fd, gem_bo, I915_TILING_X, 512*4) == -EBUSY);
 			igt_assert(__gem_set_tiling(fd, gem_bo, I915_TILING_Y, 1024*4) == -EBUSY);
@@ -635,7 +635,7 @@ static void addfb25_ytile(int fd)
 		igt_require_fb_modifiers(fd);
 		igt_require_intel(fd);
 
-		f.modifier[0] = LOCAL_I915_FORMAT_MOD_Y_TILED;
+		f.modifier[0] = I915_FORMAT_MOD_Y_TILED;
 		igt_assert(drmIoctl(fd, LOCAL_DRM_IOCTL_MODE_ADDFB2, &f) ==
 			   addfb_expected_ret(&display, &f));
 		if (!addfb_expected_ret(&display, &f))
@@ -648,7 +648,7 @@ static void addfb25_ytile(int fd)
 		igt_require_fb_modifiers(fd);
 		igt_require_intel(fd);
 
-		f.modifier[0] = LOCAL_I915_FORMAT_MOD_Yf_TILED;
+		f.modifier[0] = I915_FORMAT_MOD_Yf_TILED;
 		igt_assert(drmIoctl(fd, LOCAL_DRM_IOCTL_MODE_ADDFB2, &f) ==
 			   addfb_expected_ret(&display, &f));
 		if (!addfb_expected_ret(&display, &f))
@@ -661,7 +661,7 @@ static void addfb25_ytile(int fd)
 		igt_require_fb_modifiers(fd);
 		igt_require_intel(fd);
 
-		f.modifier[0] = LOCAL_I915_FORMAT_MOD_Y_TILED;
+		f.modifier[0] = I915_FORMAT_MOD_Y_TILED;
 		f.height = 1023;
 		f.handles[0] = gem_bo_small;
 		igt_require(addfb_expected_ret(&display, &f) == 0);

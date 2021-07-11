@@ -460,9 +460,9 @@ static uint64_t tiling_to_modifier(enum tiling_type tiling)
 	case TILING_LINEAR:
 		return LOCAL_DRM_FORMAT_MOD_NONE;
 	case TILING_X:
-		return LOCAL_I915_FORMAT_MOD_X_TILED;
+		return I915_FORMAT_MOD_X_TILED;
 	case TILING_Y:
-		return LOCAL_I915_FORMAT_MOD_Y_TILED;
+		return I915_FORMAT_MOD_Y_TILED;
 	default:
 		igt_assert(false);
 	}

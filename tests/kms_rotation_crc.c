@@ -271,7 +271,7 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 	 * frame can fit in
 	 */
 	if (data->rotation & (IGT_ROTATION_90 | IGT_ROTATION_270)) {
-		tiling = data->override_tiling ?: LOCAL_I915_FORMAT_MOD_Y_TILED;
+		tiling = data->override_tiling ?: I915_FORMAT_MOD_Y_TILED;
 
 		igt_swap(w, h);
 	}
@@ -676,17 +676,17 @@ static void test_multi_plane_rotation(data_t *data, enum pipe pipe)
 		struct igt_fb fbs[ARRAY_SIZE(formatlist)][2];
 	} planeconfigs[] = {
 	{IGT_ROTATION_0, .2f, .4f, LOCAL_DRM_FORMAT_MOD_NONE },
-	{IGT_ROTATION_0, .2f, .4f, LOCAL_I915_FORMAT_MOD_X_TILED },
-	{IGT_ROTATION_0, .2f, .4f, LOCAL_I915_FORMAT_MOD_Y_TILED },
-	{IGT_ROTATION_0, .2f, .4f, LOCAL_I915_FORMAT_MOD_Yf_TILED },
-	{IGT_ROTATION_90, .2f, .4f, LOCAL_I915_FORMAT_MOD_Y_TILED },
-	{IGT_ROTATION_90, .2f, .4f, LOCAL_I915_FORMAT_MOD_Yf_TILED },
+	{IGT_ROTATION_0, .2f, .4f, I915_FORMAT_MOD_X_TILED },
+	{IGT_ROTATION_0, .2f, .4f, I915_FORMAT_MOD_Y_TILED },
+	{IGT_ROTATION_0, .2f, .4f, I915_FORMAT_MOD_Yf_TILED },
+	{IGT_ROTATION_90, .2f, .4f, I915_FORMAT_MOD_Y_TILED },
+	{IGT_ROTATION_90, .2f, .4f, I915_FORMAT_MOD_Yf_TILED },
 	{IGT_ROTATION_180, .2f, .4f, LOCAL_DRM_FORMAT_MOD_NONE },
-	{IGT_ROTATION_180, .2f, .4f, LOCAL_I915_FORMAT_MOD_X_TILED },
-	{IGT_ROTATION_180, .2f, .4f, LOCAL_I915_FORMAT_MOD_Y_TILED },
-	{IGT_ROTATION_180, .2f, .4f, LOCAL_I915_FORMAT_MOD_Yf_TILED },
-	{IGT_ROTATION_270, .2f, .4f, LOCAL_I915_FORMAT_MOD_Y_TILED },
-	{IGT_ROTATION_270, .2f, .4f, LOCAL_I915_FORMAT_MOD_Yf_TILED },
+	{IGT_ROTATION_180, .2f, .4f, I915_FORMAT_MOD_X_TILED },
+	{IGT_ROTATION_180, .2f, .4f, I915_FORMAT_MOD_Y_TILED },
+	{IGT_ROTATION_180, .2f, .4f, I915_FORMAT_MOD_Yf_TILED },
+	{IGT_ROTATION_270, .2f, .4f, I915_FORMAT_MOD_Y_TILED },
+	{IGT_ROTATION_270, .2f, .4f, I915_FORMAT_MOD_Yf_TILED },
 	};
 
 	for_each_valid_output_on_pipe(display, pipe, output) {
@@ -881,7 +881,7 @@ static void test_plane_rotation_exhaust_fences(data_t *data,
 					       igt_plane_t *plane)
 {
 	igt_display_t *display = &data->display;
-	uint64_t tiling = LOCAL_I915_FORMAT_MOD_Y_TILED;
+	uint64_t tiling = I915_FORMAT_MOD_Y_TILED;
 	uint32_t format = DRM_FORMAT_XRGB8888;
 	int fd = data->gfx_fd;
 	drmModeModeInfo *mode;
@@ -959,11 +959,11 @@ static const char *rot_test_str(igt_rotation_t rot)
 static const char *tiling_test_str(uint64_t tiling)
 {
 	switch (tiling) {
-	case LOCAL_I915_FORMAT_MOD_X_TILED:
+	case I915_FORMAT_MOD_X_TILED:
 		return "x-tiled";
-	case LOCAL_I915_FORMAT_MOD_Y_TILED:
+	case I915_FORMAT_MOD_Y_TILED:
 		return "y-tiled";
-	case LOCAL_I915_FORMAT_MOD_Yf_TILED:
+	case I915_FORMAT_MOD_Yf_TILED:
 		return "yf-tiled";
 	default:
 		igt_assert(0);
@@ -1013,16 +1013,16 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 		uint64_t tiling;
 		igt_rotation_t rot;
 	} *reflect_x, reflect_x_subtests[] = {
-		{ LOCAL_I915_FORMAT_MOD_X_TILED, IGT_ROTATION_0 },
-		{ LOCAL_I915_FORMAT_MOD_X_TILED, IGT_ROTATION_180 },
-		{ LOCAL_I915_FORMAT_MOD_Y_TILED, IGT_ROTATION_0 },
-		{ LOCAL_I915_FORMAT_MOD_Y_TILED, IGT_ROTATION_90 },
-		{ LOCAL_I915_FORMAT_MOD_Y_TILED, IGT_ROTATION_180 },
-		{ LOCAL_I915_FORMAT_MOD_Y_TILED, IGT_ROTATION_270 },
-		{ LOCAL_I915_FORMAT_MOD_Yf_TILED, IGT_ROTATION_0 },
-		{ LOCAL_I915_FORMAT_MOD_Yf_TILED, IGT_ROTATION_90 },
-		{ LOCAL_I915_FORMAT_MOD_Yf_TILED, IGT_ROTATION_180 },
-		{ LOCAL_I915_FORMAT_MOD_Yf_TILED, IGT_ROTATION_270 },
+		{ I915_FORMAT_MOD_X_TILED, IGT_ROTATION_0 },
+		{ I915_FORMAT_MOD_X_TILED, IGT_ROTATION_180 },
+		{ I915_FORMAT_MOD_Y_TILED, IGT_ROTATION_0 },
+		{ I915_FORMAT_MOD_Y_TILED, IGT_ROTATION_90 },
+		{ I915_FORMAT_MOD_Y_TILED, IGT_ROTATION_180 },
+		{ I915_FORMAT_MOD_Y_TILED, IGT_ROTATION_270 },
+		{ I915_FORMAT_MOD_Yf_TILED, IGT_ROTATION_0 },
+		{ I915_FORMAT_MOD_Yf_TILED, IGT_ROTATION_90 },
+		{ I915_FORMAT_MOD_Yf_TILED, IGT_ROTATION_180 },
+		{ I915_FORMAT_MOD_Yf_TILED, IGT_ROTATION_270 },
 		{ 0, 0 }
 	};
 
@@ -1094,7 +1094,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 	igt_subtest_f("bad-tiling") {
 		igt_require(gen >=9 && gen < 13);
 		data.rotation = IGT_ROTATION_90;
-		data.override_tiling = LOCAL_I915_FORMAT_MOD_X_TILED;
+		data.override_tiling = I915_FORMAT_MOD_X_TILED;
 		test_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY, true);
 	}
 	data.override_tiling = 0;
@@ -1106,7 +1106,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 			      rot_test_str(reflect_x->rot)) {
 			igt_require(gen >= 10 ||
 				    (IS_CHERRYVIEW(data.devid) && reflect_x->rot == IGT_ROTATION_0
-				     && reflect_x->tiling == LOCAL_I915_FORMAT_MOD_X_TILED));
+				     && reflect_x->tiling == I915_FORMAT_MOD_X_TILED));
 			data.rotation = (IGT_REFLECT_X | reflect_x->rot);
 			igt_require(!(gen >= 13 && (data.rotation &
 						    (IGT_ROTATION_90 |

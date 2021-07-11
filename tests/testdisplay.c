@@ -671,14 +671,14 @@ static int opt_handler(int opt, int opt_index, void *data)
 		test_preferred_mode = 1;
 		break;
 	case 't':
-		tiling = LOCAL_I915_FORMAT_MOD_X_TILED;
+		tiling = I915_FORMAT_MOD_X_TILED;
 		break;
 	case 'y':
 	case OPT_YB:
-		tiling = LOCAL_I915_FORMAT_MOD_Y_TILED;
+		tiling = I915_FORMAT_MOD_Y_TILED;
 		break;
 	case OPT_YF:
-		tiling = LOCAL_I915_FORMAT_MOD_Yf_TILED;
+		tiling = I915_FORMAT_MOD_Yf_TILED;
 		break;
 	case 'r':
 		qr_code = 1;

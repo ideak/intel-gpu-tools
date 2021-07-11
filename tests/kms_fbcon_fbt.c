@@ -186,7 +186,7 @@ static void set_mode_for_one_screen(struct drm_info *drm,
 
 	buffer_id = igt_create_fb(drm->fd, mode->hdisplay, mode->vdisplay,
 				  DRM_FORMAT_XRGB8888,
-				  LOCAL_I915_FORMAT_MOD_X_TILED, &drm->fb);
+				  I915_FORMAT_MOD_X_TILED, &drm->fb);
 	igt_draw_fill_fb(drm->fd, &drm->fb, 0xFF);
 
 	igt_info("Setting %dx%d mode for %s connector\n",

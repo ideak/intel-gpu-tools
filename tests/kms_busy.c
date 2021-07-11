@@ -44,7 +44,7 @@ set_fb_on_crtc(igt_display_t *dpy, int pipe, struct igt_fb *fb)
 
 	igt_create_pattern_fb(dpy->drm_fd, mode->hdisplay, mode->vdisplay,
 			      DRM_FORMAT_XRGB8888,
-			      LOCAL_I915_FORMAT_MOD_X_TILED, fb);
+			      I915_FORMAT_MOD_X_TILED, fb);
 
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_plane_set_fb(primary, fb);
@@ -147,7 +147,7 @@ static void test_flip(igt_display_t *dpy, int pipe, bool modeset)
 	igt_create_pattern_fb(dpy->drm_fd,
 			      fb[0].width, fb[0].height,
 			      DRM_FORMAT_XRGB8888,
-			      LOCAL_I915_FORMAT_MOD_X_TILED,
+			      I915_FORMAT_MOD_X_TILED,
 			      &fb[1]);
 
 	/* Bind both fb to the display (such that they are ready for future
@@ -228,7 +228,7 @@ static void test_hang(igt_display_t *dpy,
 	igt_create_pattern_fb(dpy->drm_fd,
 			      fb[0].width, fb[0].height,
 			      DRM_FORMAT_XRGB8888,
-			      LOCAL_I915_FORMAT_MOD_X_TILED,
+			      I915_FORMAT_MOD_X_TILED,
 			      &fb[1]);
 
 	if (modeset) {

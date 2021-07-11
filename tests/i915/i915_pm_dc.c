@@ -144,7 +144,7 @@ static void setup_primary(data_t *data)
 	igt_create_color_fb(data->drm_fd,
 			    data->mode->hdisplay, data->mode->vdisplay,
 			    DRM_FORMAT_XRGB8888,
-			    LOCAL_I915_FORMAT_MOD_X_TILED,
+			    I915_FORMAT_MOD_X_TILED,
 			    1.0, 1.0, 1.0,
 			    &data->fb_white);
 	igt_plane_set_fb(primary, &data->fb_white);

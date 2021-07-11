@@ -1592,7 +1592,7 @@ static void cursor_subtest(bool dpms)
 	igt_create_fb(drm_fd, 64, 64, DRM_FORMAT_ARGB8888,
 		      LOCAL_DRM_FORMAT_MOD_NONE, &cursor_fb2);
 	igt_create_fb(drm_fd, 64, 64, DRM_FORMAT_XRGB8888,
-		      LOCAL_I915_FORMAT_MOD_X_TILED, &cursor_fb3);
+		      I915_FORMAT_MOD_X_TILED, &cursor_fb3);
 
 	fill_igt_fb(&cursor_fb1, 0xFF00FFFF);
 	fill_igt_fb(&cursor_fb2, 0xFF00FF00);
@@ -1710,13 +1710,13 @@ static void test_one_plane(bool dpms, uint32_t plane_id,
 		plane_format = DRM_FORMAT_XRGB8888;
 		plane_w = 64;
 		plane_h = 64;
-		tiling = LOCAL_I915_FORMAT_MOD_X_TILED;
+		tiling = I915_FORMAT_MOD_X_TILED;
 		break;
 	case PLANE_PRIMARY:
 		plane_format = DRM_FORMAT_XRGB8888;
 		plane_w = default_mode_params->mode->hdisplay;
 		plane_h = default_mode_params->mode->vdisplay;
-		tiling = LOCAL_I915_FORMAT_MOD_X_TILED;
+		tiling = I915_FORMAT_MOD_X_TILED;
 		break;
 	case PLANE_CURSOR:
 		plane_format = DRM_FORMAT_ARGB8888;
@@ -1935,7 +1935,7 @@ static void fences_subtest(bool dpms)
 	params.connector_id = default_mode_params->connector_id;
 	params.mode = default_mode_params->mode;
 	igt_create_fb(drm_fd, params.mode->hdisplay, params.mode->vdisplay,
-		      DRM_FORMAT_XRGB8888, LOCAL_I915_FORMAT_MOD_X_TILED,
+		      DRM_FORMAT_XRGB8888, I915_FORMAT_MOD_X_TILED,
 		      &params.fb);
 
 	/* Even though we passed "true" as the tiling argument, double-check

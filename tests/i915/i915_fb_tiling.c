@@ -33,7 +33,7 @@ igt_simple_main
 	int ret;
 
 	igt_create_fb(drm_fd, 512, 512, DRM_FORMAT_XRGB8888,
-		      LOCAL_I915_FORMAT_MOD_X_TILED, &fb);
+		      I915_FORMAT_MOD_X_TILED, &fb);
 
 	ret = __gem_set_tiling(drm_fd, fb.gem_handle, I915_TILING_X, fb.strides[0]);
 	igt_assert_eq(ret, 0);

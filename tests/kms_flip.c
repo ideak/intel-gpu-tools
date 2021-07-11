@@ -1278,7 +1278,7 @@ static void __run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
 
 	tiling = LOCAL_DRM_FORMAT_MOD_NONE;
 	if (o->flags & TEST_FENCE_STRESS)
-		tiling = LOCAL_I915_FORMAT_MOD_X_TILED;
+		tiling = I915_FORMAT_MOD_X_TILED;
 
 	/* 256 MB is usually the maximum mappable aperture,
 	 * (make it 4x times that to ensure failure) */

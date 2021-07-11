@@ -134,7 +134,7 @@ static void make_fb(data_t *data, struct igt_fb *fb,
 	rec_width = width / (ARRAY_SIZE(data->bufs) * 2);
 
 	igt_create_fb(data->drm_fd, width, height, DRM_FORMAT_XRGB8888,
-		      LOCAL_I915_FORMAT_MOD_X_TILED, fb);
+		      I915_FORMAT_MOD_X_TILED, fb);
 	igt_draw_fill_fb(data->drm_fd, fb, 0x88);
 	igt_draw_rect_fb(data->drm_fd, NULL, 0, fb, IGT_DRAW_MMAP_CPU,
 			 rec_width * 2 + rec_width * index,
@@ -336,10 +336,10 @@ static void test_invalid(data_t *data)
 	height = data->connector->modes[0].vdisplay;
 
 	igt_require(igt_display_has_format_mod(&data->display, DRM_FORMAT_XRGB8888,
-					       LOCAL_I915_FORMAT_MOD_Y_TILED));
+					       I915_FORMAT_MOD_Y_TILED));
 
 	igt_create_fb(data->drm_fd, width, height, DRM_FORMAT_XRGB8888,
-		      LOCAL_I915_FORMAT_MOD_Y_TILED, &fb);
+		      I915_FORMAT_MOD_Y_TILED, &fb);
 
 	/* Flip with a different fb modifier which is expected to be rejected */
 	ret = drmModePageFlip(data->drm_fd, data->crtc_id,

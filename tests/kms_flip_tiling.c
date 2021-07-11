@@ -80,10 +80,10 @@ test_flip_tiling(data_t *data, enum pipe pipe, igt_output_t *output, uint64_t ti
 	mode = igt_output_get_mode(output);
 
 	/* Interlaced modes don't support Y/Yf tiling */
-	if (tiling[0] == LOCAL_I915_FORMAT_MOD_Y_TILED ||
-	    tiling[0] == LOCAL_I915_FORMAT_MOD_Yf_TILED ||
-	    tiling[1] == LOCAL_I915_FORMAT_MOD_Y_TILED ||
-	    tiling[1] == LOCAL_I915_FORMAT_MOD_Yf_TILED)
+	if (tiling[0] == I915_FORMAT_MOD_Y_TILED ||
+	    tiling[0] == I915_FORMAT_MOD_Yf_TILED ||
+	    tiling[1] == I915_FORMAT_MOD_Y_TILED ||
+	    tiling[1] == I915_FORMAT_MOD_Yf_TILED)
 		igt_require(!(mode->flags & DRM_MODE_FLAG_INTERLACE));
 
 	primary = igt_output_get_plane(output, 0);
@@ -181,7 +181,7 @@ igt_main
 
 	igt_describe("Check pageflip from tiled buffer to linear one works correctly with x tiling");
 	igt_subtest_with_dynamic("flip-changes-tiling") {
-		uint64_t tiling[2] = { LOCAL_I915_FORMAT_MOD_X_TILED,
+		uint64_t tiling[2] = { I915_FORMAT_MOD_X_TILED,
 				       LOCAL_DRM_FORMAT_MOD_NONE };
 		enum pipe pipe;
 
@@ -197,7 +197,7 @@ igt_main
 
 	igt_describe("Check pageflip from tiled buffer to linear one works correctly with y tiling");
 	igt_subtest_with_dynamic("flip-changes-tiling-Y") {
-		uint64_t tiling[2] = { LOCAL_I915_FORMAT_MOD_Y_TILED,
+		uint64_t tiling[2] = { I915_FORMAT_MOD_Y_TILED,
 				       LOCAL_DRM_FORMAT_MOD_NONE };
 		enum pipe pipe;
 
@@ -217,7 +217,7 @@ igt_main
 
 	igt_describe("Check pageflip from tiled buffer to linear one works correctly with yf tiling");
 	igt_subtest_with_dynamic("flip-changes-tiling-Yf") {
-		uint64_t tiling[2] = { LOCAL_I915_FORMAT_MOD_Yf_TILED,
+		uint64_t tiling[2] = { I915_FORMAT_MOD_Yf_TILED,
 				       LOCAL_DRM_FORMAT_MOD_NONE };
 		enum pipe pipe;
 
@@ -245,8 +245,8 @@ igt_main
 
 	igt_describe("Check pageflip from tiled buffer to another tiled one works correctly with x tiling");
 	igt_subtest_with_dynamic("flip-X-tiled") {
-		uint64_t tiling[2] = { LOCAL_I915_FORMAT_MOD_X_TILED,
-				       LOCAL_I915_FORMAT_MOD_X_TILED };
+		uint64_t tiling[2] = { I915_FORMAT_MOD_X_TILED,
+				       I915_FORMAT_MOD_X_TILED };
 		enum pipe pipe;
 
 		for (int i = 0; i < ARRAY_SIZE(tiling); i++)
@@ -261,8 +261,8 @@ igt_main
 
 	igt_describe("Check pageflip from tiled buffer to another tiled one works correctly with y tiling");
 	igt_subtest_with_dynamic("flip-Y-tiled") {
-		uint64_t tiling[2] = { LOCAL_I915_FORMAT_MOD_Y_TILED,
-				       LOCAL_I915_FORMAT_MOD_Y_TILED };
+		uint64_t tiling[2] = { I915_FORMAT_MOD_Y_TILED,
+				       I915_FORMAT_MOD_Y_TILED };
 		enum pipe pipe;
 
 		igt_require_fb_modifiers(data.drm_fd);
@@ -281,8 +281,8 @@ igt_main
 
 	igt_describe("Check pageflip from tiled buffer to another tiled one works correctly with yf tiling");
 	igt_subtest_with_dynamic("flip-Yf-tiled") {
-		uint64_t tiling[2] = { LOCAL_I915_FORMAT_MOD_Yf_TILED,
-				       LOCAL_I915_FORMAT_MOD_Yf_TILED };
+		uint64_t tiling[2] = { I915_FORMAT_MOD_Yf_TILED,
+				       I915_FORMAT_MOD_Yf_TILED };
 		enum pipe pipe;
 
 		igt_require_fb_modifiers(data.drm_fd);
@@ -310,7 +310,7 @@ igt_main
 	igt_describe("Check pageflip from linear buffer to tiled one works correctly with x tiling");
 	igt_subtest_with_dynamic("flip-to-X-tiled") {
 		uint64_t tiling[2] = { LOCAL_DRM_FORMAT_MOD_NONE,
-				       LOCAL_I915_FORMAT_MOD_X_TILED };
+				       I915_FORMAT_MOD_X_TILED };
 		enum pipe pipe;
 
 		for (int i = 0; i < ARRAY_SIZE(tiling); i++)
@@ -326,7 +326,7 @@ igt_main
 	igt_describe("Check pageflip from linear buffer to tiled one works correctly with y tiling");
 	igt_subtest_with_dynamic("flip-to-Y-tiled") {
 		uint64_t tiling[2] = { LOCAL_DRM_FORMAT_MOD_NONE,
-				       LOCAL_I915_FORMAT_MOD_Y_TILED };
+				       I915_FORMAT_MOD_Y_TILED };
 		enum pipe pipe;
 
 		igt_require_fb_modifiers(data.drm_fd);
@@ -346,7 +346,7 @@ igt_main
 	igt_describe("Check pageflip from linear buffer to tiled one works correctly with yf tiling");
 	igt_subtest_with_dynamic("flip-to-Yf-tiled") {
 		uint64_t tiling[2] = { LOCAL_DRM_FORMAT_MOD_NONE,
-				       LOCAL_I915_FORMAT_MOD_Yf_TILED };
+				       I915_FORMAT_MOD_Yf_TILED };
 		enum pipe pipe;
 
 		igt_require_fb_modifiers(data.drm_fd);

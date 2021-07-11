@@ -82,7 +82,7 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 {
 	igt_display_t *display = &data->display;
 	uint64_t tiling = is_i915_device(data->drm_fd) ?
-		LOCAL_I915_FORMAT_MOD_X_TILED : LOCAL_DRM_FORMAT_MOD_NONE;
+		I915_FORMAT_MOD_X_TILED : LOCAL_DRM_FORMAT_MOD_NONE;
 
 	cleanup_crtc(data);
 
@@ -252,7 +252,7 @@ static void test_scaler_with_rotation_pipe(data_t *d, enum pipe pipe,
 	igt_display_t *display = &d->display;
 	igt_plane_t *plane;
 	uint64_t tiling = is_i915_device(d->drm_fd) ?
-		LOCAL_I915_FORMAT_MOD_Y_TILED : LOCAL_DRM_FORMAT_MOD_NONE;
+		I915_FORMAT_MOD_Y_TILED : LOCAL_DRM_FORMAT_MOD_NONE;
 
 	igt_require(get_num_scalers(d, pipe) > 0);
 
@@ -286,9 +286,9 @@ static void test_scaler_with_rotation_pipe(data_t *d, enum pipe pipe,
 
 static const uint64_t tilings[] = {
 	LOCAL_DRM_FORMAT_MOD_NONE,
-	LOCAL_I915_FORMAT_MOD_X_TILED,
-	LOCAL_I915_FORMAT_MOD_Y_TILED,
-	LOCAL_I915_FORMAT_MOD_Yf_TILED
+	I915_FORMAT_MOD_X_TILED,
+	I915_FORMAT_MOD_Y_TILED,
+	I915_FORMAT_MOD_Yf_TILED
 };
 
 static void test_scaler_with_pixel_format_pipe(data_t *d, enum pipe pipe, igt_output_t *output)
@@ -369,7 +369,7 @@ test_plane_scaling_on_pipe(data_t *d, enum pipe pipe, igt_output_t *output)
 	drmModeModeInfo *mode;
 	int primary_plane_scaling = 0; /* For now */
 	uint64_t tiling = is_i915_device(display->drm_fd) ?
-		LOCAL_I915_FORMAT_MOD_X_TILED : LOCAL_DRM_FORMAT_MOD_NONE;
+		I915_FORMAT_MOD_X_TILED : LOCAL_DRM_FORMAT_MOD_NONE;
 
 	igt_require(get_num_scalers(d, pipe) > 0);
 
@@ -559,7 +559,7 @@ test_scaler_with_clipping_clamping_scenario(data_t *d, enum pipe pipe, igt_outpu
 
 		igt_create_pattern_fb(d->drm_fd,
 				      mode->hdisplay, mode->vdisplay, f1,
-				      LOCAL_I915_FORMAT_MOD_X_TILED, &d->fb[1]);
+				      I915_FORMAT_MOD_X_TILED, &d->fb[1]);
 
 		for (int j = 0; j < d->plane2->drm_plane->count_formats; j++) {
 			unsigned f2 = d->plane2->drm_plane->formats[j];
@@ -570,7 +570,7 @@ test_scaler_with_clipping_clamping_scenario(data_t *d, enum pipe pipe, igt_outpu
 
 			igt_create_pattern_fb(d->drm_fd,
 					      mode->hdisplay, mode->vdisplay, f2,
-					      LOCAL_I915_FORMAT_MOD_Y_TILED,
+					      I915_FORMAT_MOD_Y_TILED,
 					      &d->fb[2]);
 
 			__test_scaler_with_clipping_clamping_scenario(d, mode);
@@ -617,7 +617,7 @@ static void test_scaler_with_multi_pipe_plane(data_t *d)
 	drmModeModeInfo *mode1, *mode2;
 	enum pipe pipe1, pipe2;
 	uint64_t tiling = is_i915_device(display->drm_fd) ?
-		LOCAL_I915_FORMAT_MOD_Y_TILED : LOCAL_DRM_FORMAT_MOD_NONE;
+		I915_FORMAT_MOD_Y_TILED : LOCAL_DRM_FORMAT_MOD_NONE;
 
 	cleanup_crtc(d);
 

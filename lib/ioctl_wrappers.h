@@ -179,14 +179,6 @@ struct local_drm_mode_fb_cmd2 {
 		(val & 0x00ffffffffffffffL))
 
 #define LOCAL_DRM_FORMAT_MOD_NONE	(0)
-#define LOCAL_I915_FORMAT_MOD_X_TILED	local_fourcc_mod_code(INTEL, 1)
-#define LOCAL_I915_FORMAT_MOD_Y_TILED	local_fourcc_mod_code(INTEL, 2)
-#define LOCAL_I915_FORMAT_MOD_Yf_TILED	local_fourcc_mod_code(INTEL, 3)
-#define LOCAL_I915_FORMAT_MOD_Y_TILED_CCS	local_fourcc_mod_code(INTEL, 4)
-#define LOCAL_I915_FORMAT_MOD_Yf_TILED_CCS	local_fourcc_mod_code(INTEL, 5)
-#define LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS fourcc_mod_code(INTEL, 6)
-#define LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS fourcc_mod_code(INTEL, 7)
-#define LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC fourcc_mod_code(INTEL, 8)
 #define LOCAL_DRM_IOCTL_MODE_ADDFB2	DRM_IOWR(0xB8,			\
 						 struct local_drm_mode_fb_cmd2)
 

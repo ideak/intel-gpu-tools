@@ -1311,7 +1311,7 @@ pin_scanout(igt_display_t *dpy, igt_output_t *output, struct igt_fb *fb)
 
 	igt_create_pattern_fb(dpy->drm_fd, mode->hdisplay, mode->vdisplay,
 			      DRM_FORMAT_XRGB8888,
-			      LOCAL_I915_FORMAT_MOD_X_TILED, fb);
+			      I915_FORMAT_MOD_X_TILED, fb);
 
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_plane_set_fb(primary, fb);

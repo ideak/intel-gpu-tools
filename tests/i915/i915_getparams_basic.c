@@ -49,8 +49,6 @@ deinit(void)
 	close(drm_fd);
 }
 
-#define LOCAL_I915_PARAM_SUBSLICE_TOTAL	33
-#define LOCAL_I915_PARAM_EU_TOTAL	34
 
 static int
 getparam(int param, int *value)
@@ -74,7 +72,7 @@ subslice_total(void)
 	unsigned int subslice_total = 0;
 	int ret;
 
-	ret = getparam(LOCAL_I915_PARAM_SUBSLICE_TOTAL, (int*)&subslice_total);
+	ret = getparam(I915_PARAM_SUBSLICE_TOTAL, (int*)&subslice_total);
 	igt_skip_on_f(ret == -EINVAL && intel_gen(devid), "Interface not supported by kernel\n");
 
 	if (ret) {
@@ -111,7 +109,7 @@ eu_total(void)
 	unsigned int eu_total = 0;
 	int ret;
 
-	ret = getparam(LOCAL_I915_PARAM_EU_TOTAL, (int*)&eu_total);
+	ret = getparam(I915_PARAM_EU_TOTAL, (int*)&eu_total);
 	igt_skip_on_f(ret == -EINVAL, "Interface not supported by kernel\n");
 
 	if (ret) {

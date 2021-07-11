@@ -303,17 +303,17 @@ igt_main
 		igt_describe("Tests the visibility of the planes when switching between "
 			     "high and low resolution with x-tiling.");
 		igt_subtest_f("pipe-%s-tiling-x", kmstest_pipe_name(pipe))
-			test_planes_on_pipe(&data, LOCAL_I915_FORMAT_MOD_X_TILED);
+			test_planes_on_pipe(&data, I915_FORMAT_MOD_X_TILED);
 
 		igt_describe("Tests the visibility of the planes when switching between "
 			     "high and low resolution with y-tiling.");
 		igt_subtest_f("pipe-%s-tiling-y", kmstest_pipe_name(pipe))
-			test_planes_on_pipe(&data, LOCAL_I915_FORMAT_MOD_Y_TILED);
+			test_planes_on_pipe(&data, I915_FORMAT_MOD_Y_TILED);
 
 		igt_describe("Tests the visibility of the planes when switching between "
 			     "high and low resolution with yf-tiling.");
 		igt_subtest_f("pipe-%s-tiling-yf", kmstest_pipe_name(pipe))
-			test_planes_on_pipe(&data, LOCAL_I915_FORMAT_MOD_Yf_TILED);
+			test_planes_on_pipe(&data, I915_FORMAT_MOD_Yf_TILED);
 	}
 
 	igt_fixture {

@@ -419,7 +419,7 @@ void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 
 		*height_ret = 1;
 		break;
-	case LOCAL_I915_FORMAT_MOD_X_TILED:
+	case I915_FORMAT_MOD_X_TILED:
 		igt_require_intel(fd);
 		if (intel_display_ver(intel_get_drm_devid(fd)) == 2) {
 			*width_ret = 128;
@@ -429,11 +429,11 @@ void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 			*height_ret = 8;
 		}
 		break;
-	case LOCAL_I915_FORMAT_MOD_Y_TILED:
-	case LOCAL_I915_FORMAT_MOD_Y_TILED_CCS:
-	case LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS:
-	case LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC:
-	case LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS:
+	case I915_FORMAT_MOD_Y_TILED:
+	case I915_FORMAT_MOD_Y_TILED_CCS:
+	case I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS:
+	case I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC:
+	case I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS:
 		igt_require_intel(fd);
 		if (intel_display_ver(intel_get_drm_devid(fd)) == 2) {
 			*width_ret = 128;
@@ -446,8 +446,8 @@ void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 			*height_ret = 32;
 		}
 		break;
-	case LOCAL_I915_FORMAT_MOD_Yf_TILED:
-	case LOCAL_I915_FORMAT_MOD_Yf_TILED_CCS:
+	case I915_FORMAT_MOD_Yf_TILED:
+	case I915_FORMAT_MOD_Yf_TILED_CCS:
 		igt_require_intel(fd);
 		switch (fb_bpp) {
 		case 8:
@@ -542,14 +542,14 @@ void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 
 static bool is_gen12_mc_ccs_modifier(uint64_t modifier)
 {
-	return modifier == LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS;
+	return modifier == I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS;
 }
 
 static bool is_gen12_ccs_modifier(uint64_t modifier)
 {
 	return is_gen12_mc_ccs_modifier(modifier) ||
 		modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS ||
-		modifier == LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC;
+		modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC;
 }
 
 static bool is_ccs_modifier(uint64_t modifier)
@@ -579,7 +579,7 @@ static bool is_gen12_ccs_plane(const struct igt_fb *fb, int plane)
 
 static bool is_gen12_ccs_cc_plane(const struct igt_fb *fb, int plane)
 {
-	return fb->modifier == LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC &&
+	return fb->modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC &&
 	       plane == 2;
 }
 
@@ -666,7 +666,7 @@ static int fb_num_planes(const struct igt_fb *fb)
 	if (is_ccs_modifier(fb->modifier))
 		num_planes *= 2;
 
-	if (fb->modifier == LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC)
+	if (fb->modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC)
 		num_planes++;
 
 	return num_planes;
@@ -921,16 +921,16 @@ uint64_t igt_fb_mod_to_tiling(uint64_t modifier)
 	switch (modifier) {
 	case LOCAL_DRM_FORMAT_MOD_NONE:
 		return I915_TILING_NONE;
-	case LOCAL_I915_FORMAT_MOD_X_TILED:
+	case I915_FORMAT_MOD_X_TILED:
 		return I915_TILING_X;
-	case LOCAL_I915_FORMAT_MOD_Y_TILED:
-	case LOCAL_I915_FORMAT_MOD_Y_TILED_CCS:
-	case LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS:
-	case LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC:
-	case LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS:
+	case I915_FORMAT_MOD_Y_TILED:
+	case I915_FORMAT_MOD_Y_TILED_CCS:
+	case I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS:
+	case I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC:
+	case I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS:
 		return I915_TILING_Y;
-	case LOCAL_I915_FORMAT_MOD_Yf_TILED:
-	case LOCAL_I915_FORMAT_MOD_Yf_TILED_CCS:
+	case I915_FORMAT_MOD_Yf_TILED:
+	case I915_FORMAT_MOD_Yf_TILED_CCS:
 		return I915_TILING_Yf;
 	default:
 		igt_assert(0);
@@ -953,11 +953,11 @@ uint64_t igt_fb_tiling_to_mod(uint64_t tiling)
 	case I915_TILING_NONE:
 		return LOCAL_DRM_FORMAT_MOD_NONE;
 	case I915_TILING_X:
-		return LOCAL_I915_FORMAT_MOD_X_TILED;
+		return I915_FORMAT_MOD_X_TILED;
 	case I915_TILING_Y:
-		return LOCAL_I915_FORMAT_MOD_Y_TILED;
+		return I915_FORMAT_MOD_Y_TILED;
 	case I915_TILING_Yf:
-		return LOCAL_I915_FORMAT_MOD_Yf_TILED;
+		return I915_FORMAT_MOD_Yf_TILED;
 	default:
 		igt_assert(0);
 	}
@@ -2335,7 +2335,7 @@ igt_fb_create_intel_buf(int fd, struct buf_ops *bops,
 				 end - fb->offsets[i]);
 	}
 
-	if (fb->modifier == LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC)
+	if (fb->modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC)
 		buf->cc.offset = fb->offsets[2];
 
 	return buf;

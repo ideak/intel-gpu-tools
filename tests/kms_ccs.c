@@ -93,11 +93,11 @@ static const struct {
 	uint64_t modifier;
 	const char *str;
 } ccs_modifiers[] = {
-	{LOCAL_I915_FORMAT_MOD_Y_TILED_CCS, "y_tiled_ccs"},
-	{LOCAL_I915_FORMAT_MOD_Yf_TILED_CCS, "yf_tiled_ccs"},
-	{LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS, "y_tiled_gen12_rc_ccs"},
-	{LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC, "y_tiled_gen12_rc_ccs_cc"},
-	{LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS, "y_tiled_gen12_mc_ccs"},
+	{I915_FORMAT_MOD_Y_TILED_CCS, "y_tiled_ccs"},
+	{I915_FORMAT_MOD_Yf_TILED_CCS, "yf_tiled_ccs"},
+	{I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS, "y_tiled_gen12_rc_ccs"},
+	{I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC, "y_tiled_gen12_rc_ccs_cc"},
+	{I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS, "y_tiled_gen12_mc_ccs"},
 };
 
 static bool check_ccs_planes;
@@ -130,7 +130,7 @@ static void addfb_init(struct igt_fb *fb, struct drm_mode_fb_cmd2 *f)
 
 static bool is_ccs_cc_modifier(uint64_t modifier)
 {
-	return modifier == LOCAL_I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC;
+	return modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC;
 }
 
 /*
@@ -277,7 +277,7 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 	if (fb_flags & FB_COMPRESSED)
 		modifier = data->ccs_modifier;
 	else if (!(fb_flags & FB_HAS_PLANE))
-		modifier = LOCAL_I915_FORMAT_MOD_Y_TILED;
+		modifier = I915_FORMAT_MOD_Y_TILED;
 	else
 		modifier = 0;
 

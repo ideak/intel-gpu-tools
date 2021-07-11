@@ -51,8 +51,8 @@ static const uint32_t formats[N_FORMATS] = {
 #define N_TILING_METHODS 3
 static const uint64_t tilings[N_TILING_METHODS] = {
 	LOCAL_DRM_FORMAT_MOD_NONE,
-	LOCAL_I915_FORMAT_MOD_X_TILED,
-	LOCAL_I915_FORMAT_MOD_Y_TILED,
+	I915_FORMAT_MOD_X_TILED,
+	I915_FORMAT_MOD_Y_TILED,
 };
 
 struct base_crc {
@@ -242,11 +242,11 @@ static void fill_fb_subtest(void)
 	get_fill_crc(LOCAL_DRM_FORMAT_MOD_NONE, &crc);
 	igt_assert_crc_equal(&crc, &base_crc);
 
-	get_fill_crc(LOCAL_I915_FORMAT_MOD_X_TILED, &crc);
+	get_fill_crc(I915_FORMAT_MOD_X_TILED, &crc);
 	igt_assert_crc_equal(&crc, &base_crc);
 
 	if (intel_display_ver(intel_get_drm_devid(drm_fd)) >= 9) {
-		get_fill_crc(LOCAL_I915_FORMAT_MOD_Y_TILED, &crc);
+		get_fill_crc(I915_FORMAT_MOD_Y_TILED, &crc);
 		igt_assert_crc_equal(&crc, &base_crc);
 	}
 
@@ -311,9 +311,9 @@ static const char *tiling_str(int tiling_index)
 	switch (tilings[tiling_index]) {
 	case LOCAL_DRM_FORMAT_MOD_NONE:
 		return "untiled";
-	case LOCAL_I915_FORMAT_MOD_X_TILED:
+	case I915_FORMAT_MOD_X_TILED:
 		return "xtiled";
-	case LOCAL_I915_FORMAT_MOD_Y_TILED:
+	case I915_FORMAT_MOD_Y_TILED:
 		return "ytiled";
 	default:
 		igt_assert(false);
