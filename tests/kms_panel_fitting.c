@@ -61,7 +61,7 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 	igt_create_pattern_fb(data->drm_fd,
 			      mode->hdisplay, mode->vdisplay,
 			      DRM_FORMAT_XRGB8888,
-			      LOCAL_DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_MOD_NONE,
 			      &data->fb1);
 
 	/*
@@ -104,7 +104,7 @@ static void test_panel_fitting(data_t *d)
 		/* allocate fb2 with image */
 		igt_create_pattern_fb(d->drm_fd, mode->hdisplay / 2, mode->vdisplay / 2,
 				      DRM_FORMAT_XRGB8888,
-				      LOCAL_DRM_FORMAT_MOD_NONE, &d->fb2);
+				      DRM_FORMAT_MOD_NONE, &d->fb2);
 
 		/* Set up display to enable panel fitting */
 		mode->hdisplay = 640;
@@ -195,15 +195,15 @@ test_panel_fitting_fastset(igt_display_t *display, const enum pipe pipe, igt_out
 	sprite = igt_output_get_plane_type(output, DRM_PLANE_TYPE_OVERLAY);
 
 	igt_create_color_fb(display->drm_fd, mode.hdisplay, mode.vdisplay,
-			    DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_NONE,
 			    0.f, 0.f, 1.f, &blue);
 
 	igt_create_color_fb(display->drm_fd, 640, 480,
-			    DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_NONE,
 			    1.f, 0.f, 0.f, &red);
 
 	igt_create_color_fb(display->drm_fd, 800, 600,
-			    DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_NONE,
 			    0.f, 1.f, 0.f, &green);
 
 	igt_plane_set_fb(primary, &blue);

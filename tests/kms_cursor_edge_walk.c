@@ -67,7 +67,7 @@ static void create_cursor_fb(data_t *data, int cur_w, int cur_h)
 
 	fb_id = igt_create_fb(data->drm_fd, cur_w, cur_h,
 			      DRM_FORMAT_ARGB8888,
-			      LOCAL_DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_MOD_NONE,
 			      &data->fb);
 	igt_assert(fb_id);
 
@@ -242,7 +242,7 @@ static void prepare_crtc(data_t *data)
 	mode = igt_output_get_mode(data->output);
 	igt_create_pattern_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
 			      DRM_FORMAT_XRGB8888,
-			      LOCAL_DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_MOD_NONE,
 			      &data->primary_fb);
 
 	primary = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_PRIMARY);

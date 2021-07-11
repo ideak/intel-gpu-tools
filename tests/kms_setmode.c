@@ -181,7 +181,7 @@ static void create_fb_for_crtc(struct crtc_config *crtc,
 	fb_id = igt_create_pattern_fb(drm_fd, crtc->mode.hdisplay,
 				      crtc->mode.vdisplay,
 				      igt_bpp_depth_to_drm_format(bpp, depth),
-				      LOCAL_DRM_FORMAT_MOD_NONE,
+				      DRM_FORMAT_MOD_NONE,
 				      fb_info);
 	igt_assert_lt(0, fb_id);
 }

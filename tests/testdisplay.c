@@ -81,7 +81,7 @@ drmModeRes *resources;
 int drm_fd, modes;
 int test_all_modes = 0, test_preferred_mode = 0, force_mode = 0, test_plane,
     test_stereo_modes, test_aspect_ratio;
-uint64_t tiling = LOCAL_DRM_FORMAT_MOD_NONE;
+uint64_t tiling = DRM_FORMAT_MOD_NONE;
 int sleep_between_modes = 0;
 int do_dpms = 0; /* This aliases to DPMS_ON */
 uint32_t depth = 24, stride, bpp;

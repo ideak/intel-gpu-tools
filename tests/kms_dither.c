@@ -123,7 +123,7 @@ static void test_dithering(data_t *data, enum pipe pipe,
 
 	igt_assert(igt_create_fb(data->drm_fd, data->mode->hdisplay,
 				 data->mode->vdisplay, fb_format,
-				 LOCAL_DRM_FORMAT_MOD_NONE, &data->fb));
+				 DRM_FORMAT_MOD_NONE, &data->fb));
 	igt_plane_set_fb(data->primary, &data->fb);
 	igt_plane_set_size(data->primary, data->mode->hdisplay, data->mode->vdisplay);
 

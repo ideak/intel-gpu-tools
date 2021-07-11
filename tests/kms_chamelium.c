@@ -229,7 +229,7 @@ static int chamelium_get_pattern_fb(data_t *data, size_t width, size_t height,
 	igt_assert(fourcc == DRM_FORMAT_XRGB8888);
 
 	fb_id = igt_create_fb(data->drm_fd, width, height, fourcc,
-			      LOCAL_DRM_FORMAT_MOD_NONE, fb);
+			      DRM_FORMAT_MOD_NONE, fb);
 	igt_assert(fb_id > 0);
 
 	ptr = igt_fb_map_buffer(fb->fd, fb);
@@ -688,7 +688,7 @@ static void do_test_display(data_t *data, struct chamelium_port *port,
 	igt_assert(fb_id > 0);
 
 	frame_id = igt_fb_convert(&frame_fb, &fb, fourcc,
-				  LOCAL_DRM_FORMAT_MOD_NONE);
+				  DRM_FORMAT_MOD_NONE);
 	igt_assert(frame_id > 0);
 
 	if (check == CHAMELIUM_CHECK_CRC)
@@ -765,7 +765,7 @@ static void test_display_one_mode(data_t *data, struct chamelium_port *port,
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_assert(primary);
 
-	igt_require(igt_plane_has_format_mod(primary, fourcc, LOCAL_DRM_FORMAT_MOD_NONE));
+	igt_require(igt_plane_has_format_mod(primary, fourcc, DRM_FORMAT_MOD_NONE));
 
 	mode = &connector->modes[0];
 	if (check == CHAMELIUM_CHECK_ANALOG) {
@@ -818,7 +818,7 @@ static void test_display_all_modes(data_t *data, struct chamelium_port *port,
 						    DRM_PLANE_TYPE_PRIMARY);
 		igt_assert(primary);
 		igt_require(igt_plane_has_format_mod(primary, fourcc,
-			    LOCAL_DRM_FORMAT_MOD_NONE));
+			    DRM_FORMAT_MOD_NONE));
 
 		/* we may skip some modes due to above but that's ok */
 		count_modes = connector->count_modes;
@@ -886,7 +886,7 @@ test_display_frame_dump(data_t *data, struct chamelium_port *port)
 		fb_id = igt_create_color_pattern_fb(data->drm_fd,
 						    mode->hdisplay, mode->vdisplay,
 						    DRM_FORMAT_XRGB8888,
-						    LOCAL_DRM_FORMAT_MOD_NONE,
+						    DRM_FORMAT_MOD_NONE,
 						    0, 0, 0, &fb);
 		igt_assert(fb_id > 0);
 
@@ -1023,7 +1023,7 @@ static void test_mode_timings(data_t *data, struct chamelium_port *port)
 		fb_id = igt_create_color_pattern_fb(data->drm_fd,
 						    mode->hdisplay, mode->vdisplay,
 						    DRM_FORMAT_XRGB8888,
-						    LOCAL_DRM_FORMAT_MOD_NONE,
+						    DRM_FORMAT_MOD_NONE,
 						    0, 0, 0, &fb);
 		igt_assert(fb_id > 0);
 
@@ -1134,7 +1134,7 @@ static void test_display_aspect_ratio(data_t *data, struct chamelium_port *port)
 	fb_id = igt_create_color_pattern_fb(data->drm_fd,
 					    mode->hdisplay, mode->vdisplay,
 					    DRM_FORMAT_XRGB8888,
-					    LOCAL_DRM_FORMAT_MOD_NONE,
+					    DRM_FORMAT_MOD_NONE,
 					    0, 0, 0, &fb);
 	igt_assert(fb_id > 0);
 
@@ -1855,7 +1855,7 @@ test_display_audio(data_t *data, struct chamelium_port *port,
 	fb_id = igt_create_color_pattern_fb(data->drm_fd,
 					    mode->hdisplay, mode->vdisplay,
 					    DRM_FORMAT_XRGB8888,
-					    LOCAL_DRM_FORMAT_MOD_NONE,
+					    DRM_FORMAT_MOD_NONE,
 					    0, 0, 0, &fb);
 	igt_assert(fb_id > 0);
 
@@ -1938,7 +1938,7 @@ test_display_audio_edid(data_t *data, struct chamelium_port *port,
 	fb_id = igt_create_color_pattern_fb(data->drm_fd,
 					    mode->hdisplay, mode->vdisplay,
 					    DRM_FORMAT_XRGB8888,
-					    LOCAL_DRM_FORMAT_MOD_NONE,
+					    DRM_FORMAT_MOD_NONE,
 					    0, 0, 0, &fb);
 	igt_assert(fb_id > 0);
 
@@ -2279,7 +2279,7 @@ static void prepare_randomized_plane(data_t *data,
 	randomize_plane_setup(data, plane, mode, &overlay_fb_w, &overlay_fb_h,
 			      &format, &modifier, allow_yuv);
 
-	tiled = (modifier != LOCAL_DRM_FORMAT_MOD_NONE);
+	tiled = (modifier != DRM_FORMAT_MOD_NONE);
 	igt_debug("Plane %d: framebuffer size %dx%d %s format (%s)\n",
 		  index, overlay_fb_w, overlay_fb_h,
 		  igt_format_str(format), tiled ? "tiled" : "linear");
@@ -2383,7 +2383,7 @@ static void test_display_planes_random(data_t *data,
 	/* Get a framebuffer for the cairo composition result. */
 	fb_id = igt_create_fb(data->drm_fd, mode->hdisplay,
 			      mode->vdisplay, DRM_FORMAT_XRGB8888,
-			      LOCAL_DRM_FORMAT_MOD_NONE, &result_fb);
+			      DRM_FORMAT_MOD_NONE, &result_fb);
 	igt_assert(fb_id > 0);
 
 	result_surface = igt_get_cairo_surface(data->drm_fd, &result_fb);
@@ -2814,7 +2814,7 @@ igt_main
 				if (igt_format_is_yuv(primary->formats[k]))
 					continue;
 
-				if (primary->modifiers[k] != LOCAL_DRM_FORMAT_MOD_NONE)
+				if (primary->modifiers[k] != DRM_FORMAT_MOD_NONE)
 					continue;
 
 				igt_dynamic_f("%s", igt_format_str(primary->formats[k]))
@@ -2845,7 +2845,7 @@ igt_main
 				if (!igt_format_is_yuv(primary->formats[k]))
 					continue;
 
-				if (primary->modifiers[k] != LOCAL_DRM_FORMAT_MOD_NONE)
+				if (primary->modifiers[k] != DRM_FORMAT_MOD_NONE)
 					continue;
 
 				igt_dynamic_f("%s", igt_format_str(primary->formats[k]))

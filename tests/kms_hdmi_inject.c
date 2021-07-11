@@ -120,7 +120,7 @@ hdmi_inject_4k(int drm_fd, drmModeConnector *connector)
 	fb_id = igt_create_fb(drm_fd, connector->modes[i].hdisplay,
 			      connector->modes[i].vdisplay,
 			      DRM_FORMAT_XRGB8888,
-			      LOCAL_DRM_FORMAT_MOD_NONE, &fb);
+			      DRM_FORMAT_MOD_NONE, &fb);
 
 	ret = drmModeSetCrtc(drm_fd, config.crtc->crtc_id, fb_id, 0, 0,
 			     &connector->connector_id, 1,
@@ -164,7 +164,7 @@ hdmi_inject_audio(int drm_fd, drmModeConnector *connector)
 	fb_id = igt_create_fb(drm_fd, connector->modes[0].hdisplay,
 			      connector->modes[0].vdisplay,
 			      DRM_FORMAT_XRGB8888,
-			      LOCAL_DRM_FORMAT_MOD_NONE, &fb);
+			      DRM_FORMAT_MOD_NONE, &fb);
 
 	ret = drmModeSetCrtc(drm_fd, config.crtc->crtc_id, fb_id, 0, 0,
 			     &connector->connector_id, 1,

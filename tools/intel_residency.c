@@ -273,7 +273,7 @@ static void setup_modeset(void)
 	draw_rect(&fbs[1], IGT_DRAW_BLT, 0x800000);
 
 	igt_create_fb(drm.fd, 64, 64, DRM_FORMAT_ARGB8888,
-		     LOCAL_DRM_FORMAT_MOD_NONE, &cursor);
+		     DRM_FORMAT_MOD_NONE, &cursor);
 	igt_draw_fill_fb(drm.fd, &cursor, 0xFF008000);
 }
 

@@ -122,7 +122,7 @@ retry:
 				igt_create_pattern_fb(display.drm_fd,
 						      mode->hdisplay, mode->vdisplay,
 						      DRM_FORMAT_XRGB8888,
-						      LOCAL_DRM_FORMAT_MOD_NONE, &fb[pipe]);
+						      DRM_FORMAT_MOD_NONE, &fb[pipe]);
 
 				/* Set a valid fb as some debugfs like to inspect it on a active pipe */
 				igt_plane_set_fb(primary, &fb[pipe]);

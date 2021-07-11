@@ -76,7 +76,7 @@ run_primary_test(data_t *data, enum pipe pipe, igt_output_t *output)
 	igt_skip_on_f(ret == -EINVAL, "Primary plane cannot be disabled separately from output\n");
 
 	igt_create_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
-		      DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE, &fb);
+		      DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_NONE, &fb);
 
 	igt_plane_set_fb(primary, &fb);
 
@@ -234,7 +234,7 @@ static void set_sprite_wh(data_t *data, enum pipe pipe,
 	igt_remove_fb(data->drm_fd, sprite_fb);
 	igt_create_fb(data->drm_fd, w, h,
 		      alpha ? DRM_FORMAT_ARGB8888 : DRM_FORMAT_XRGB8888,
-		      LOCAL_DRM_FORMAT_MOD_NONE, sprite_fb);
+		      DRM_FORMAT_MOD_NONE, sprite_fb);
 }
 
 #define is_atomic_check_failure_errno(errno) \
@@ -283,7 +283,7 @@ static void setup_parms(data_t *data, enum pipe pipe,
 		} else {
 			if (!n_overlays)
 				alpha = igt_plane_has_format_mod(plane,
-					DRM_FORMAT_ARGB8888, LOCAL_DRM_FORMAT_MOD_NONE);
+					DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_NONE);
 			parms[i].fb = sprite_fb;
 			parms[i].mask = 1 << 2;
 
@@ -311,10 +311,10 @@ static void setup_parms(data_t *data, enum pipe pipe,
 	}
 
 	igt_create_fb(data->drm_fd, cursor_width, cursor_height,
-		      DRM_FORMAT_ARGB8888, LOCAL_DRM_FORMAT_MOD_NONE, argb_fb);
+		      DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_NONE, argb_fb);
 
 	igt_create_fb(data->drm_fd, cursor_width, cursor_height,
-		      DRM_FORMAT_ARGB8888, LOCAL_DRM_FORMAT_MOD_NONE, sprite_fb);
+		      DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_NONE, sprite_fb);
 
 	*iter_max = iter_mask + 1;
 	if (!n_overlays)
@@ -507,7 +507,7 @@ run_transition_test(data_t *data, enum pipe pipe, igt_output_t *output,
 	override_mode.flags ^= DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_NHSYNC;
 
 	igt_create_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
-		      DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE, &data->fb);
+		      DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_NONE, &data->fb);
 
 	igt_output_set_pipe(output, pipe);
 

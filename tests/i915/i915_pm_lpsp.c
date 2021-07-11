@@ -111,7 +111,7 @@ static void setup_lpsp_output(data_t *data)
 	igt_create_pattern_fb(data->drm_fd,
 			      data->mode->hdisplay, data->mode->vdisplay,
 			      DRM_FORMAT_XRGB8888,
-			      LOCAL_DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_MOD_NONE,
 			      &data->fb);
 	igt_plane_set_fb(primary, &data->fb);
 	igt_display_commit(&data->display);

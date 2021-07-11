@@ -716,10 +716,10 @@ static void create_fbs(void)
 	}
 
 	igt_create_color_fb(data.drm_fd, width, height,
-			    DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_NONE,
 			    1.f, 0.f, 0.f, &data.red);
 	igt_create_color_fb(data.drm_fd, width, height,
-			    DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_NONE,
 			    0.f, 1.f, 0.f, &data.green);
 }
 

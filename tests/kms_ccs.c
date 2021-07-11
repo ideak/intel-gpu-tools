@@ -118,7 +118,7 @@ static void addfb_init(struct igt_fb *fb, struct drm_mode_fb_cmd2 *f)
 	f->width = fb->width;
 	f->height = fb->height;
 	f->pixel_format = fb->drm_format;
-	f->flags = LOCAL_DRM_MODE_FB_MODIFIERS;
+	f->flags = DRM_MODE_FB_MODIFIERS;
 
 	for (i = 0; i < fb->num_planes; i++) {
 		f->handles[i] = fb->gem_handle;
@@ -341,7 +341,7 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 		}
 	}
 
-	ret = drmIoctl(data->drm_fd, LOCAL_DRM_IOCTL_MODE_ADDFB2, &f);
+	ret = drmIoctl(data->drm_fd, DRM_IOCTL_MODE_ADDFB2, &f);
 	if (data->flags & TEST_FAIL_ON_ADDFB2) {
 		igt_assert_eq(ret, -1);
 		igt_assert_eq(errno, EINVAL);

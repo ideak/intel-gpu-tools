@@ -298,7 +298,7 @@ static void test_cursor(data_t *data)
 	do_or_die(drmGetCap(data->drm_fd, DRM_CAP_CURSOR_WIDTH, &height));
 
 	igt_create_color_fb(data->drm_fd, width, height, DRM_FORMAT_ARGB8888,
-			    LOCAL_DRM_FORMAT_MOD_NONE, 1., 1., 1., &cursor_fb);
+			    DRM_FORMAT_MOD_NONE, 1., 1., 1., &cursor_fb);
 
 	cur.flags = DRM_MODE_CURSOR_BO;
 	cur.crtc_id = data->crtc_id;

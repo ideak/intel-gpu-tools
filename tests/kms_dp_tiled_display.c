@@ -300,7 +300,7 @@ static void setup_framebuffer(data_t *data)
 			      fb_h_size,
 			      fb_v_size,
 			      DRM_FORMAT_XBGR8888,
-			      LOCAL_DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_MOD_NONE,
 			      &data->fb_test_pattern);
 
 	for (count = 0; count < data->num_h_tiles; count++) {

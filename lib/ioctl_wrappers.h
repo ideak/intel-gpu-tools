@@ -147,32 +147,6 @@ off_t prime_get_size(int dma_buf_fd);
 void prime_sync_start(int dma_buf_fd, bool write);
 void prime_sync_end(int dma_buf_fd, bool write);
 
-/* addfb2 fb modifiers */
-struct local_drm_mode_fb_cmd2 {
-	uint32_t fb_id;
-	uint32_t width, height;
-	uint32_t pixel_format;
-	uint32_t flags;
-	uint32_t handles[4];
-	uint32_t pitches[4];
-	uint32_t offsets[4];
-	uint64_t modifier[4];
-};
-
-#define LOCAL_DRM_MODE_FB_MODIFIERS	(1<<1)
-
-#define LOCAL_DRM_FORMAT_MOD_VENDOR_INTEL	0x01
-
-#define local_fourcc_mod_code(vendor, val) \
-		((((uint64_t)LOCAL_DRM_FORMAT_MOD_VENDOR_## vendor) << 56) | \
-		(val & 0x00ffffffffffffffL))
-
-#define LOCAL_DRM_FORMAT_MOD_NONE	(0)
-#define LOCAL_DRM_IOCTL_MODE_ADDFB2	DRM_IOWR(0xB8,			\
-						 struct local_drm_mode_fb_cmd2)
-
-#define LOCAL_DRM_CAP_ADDFB2_MODIFIERS	0x10
-
 bool igt_has_fb_modifiers(int fd);
 void igt_require_fb_modifiers(int fd);
 bool igt_has_drm_cap(int fd, uint64_t capability);

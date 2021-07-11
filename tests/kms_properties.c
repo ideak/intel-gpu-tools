@@ -41,7 +41,7 @@ static void prepare_pipe(igt_display_t *display, enum pipe pipe, igt_output_t *o
 	drmModeModeInfo *mode = igt_output_get_mode(output);
 
 	igt_create_pattern_fb(display->drm_fd, mode->hdisplay, mode->vdisplay,
-			      DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE, fb);
+			      DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_NONE, fb);
 
 	igt_output_set_pipe(output, pipe);
 

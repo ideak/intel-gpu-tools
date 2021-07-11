@@ -106,7 +106,7 @@ static void setup_fb(data_t *data, struct igt_fb *newfb, uint32_t width,
 	f.width = newfb->width;
 	f.height = newfb->height;
 	f.pixel_format = newfb->drm_format;
-	f.flags = LOCAL_DRM_MODE_FB_MODIFIERS;
+	f.flags = DRM_MODE_FB_MODIFIERS;
 
 	for (int n = 0; n < newfb->num_planes; n++) {
 		f.handles[n] = newfb->gem_handle;
@@ -125,7 +125,7 @@ static void setup_fb(data_t *data, struct igt_fb *newfb, uint32_t width,
                igt_put_cairo_ctx(cr);
        }
 
-	igt_assert(drmIoctl(data->drm_fd, LOCAL_DRM_IOCTL_MODE_ADDFB2, &f) == 0);
+	igt_assert(drmIoctl(data->drm_fd, DRM_IOCTL_MODE_ADDFB2, &f) == 0);
 	newfb->fb_id = f.fb_id;
 }
 

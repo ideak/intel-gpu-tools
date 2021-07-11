@@ -89,7 +89,7 @@ static void test_read_crc(data_t *data, enum pipe pipe, unsigned flags)
 		igt_create_color_fb(data->drm_fd,
 					mode->hdisplay, mode->vdisplay,
 					DRM_FORMAT_XRGB8888,
-					LOCAL_DRM_FORMAT_MOD_NONE,
+					DRM_FORMAT_MOD_NONE,
 					colors[c].r,
 					colors[c].g,
 					colors[c].b,
@@ -187,13 +187,13 @@ static void test_compare_crc(data_t *data, enum pipe pipe)
 	igt_create_color_fb(data->drm_fd,
 			mode->hdisplay, mode->vdisplay,
 			DRM_FORMAT_XRGB8888,
-			LOCAL_DRM_FORMAT_MOD_NONE,
+			DRM_FORMAT_MOD_NONE,
 			1.0, 1.0, 1.0,
 			&fb0);
 	igt_create_color_fb(data->drm_fd,
 			mode->hdisplay, mode->vdisplay,
 			DRM_FORMAT_XRGB8888,
-			LOCAL_DRM_FORMAT_MOD_NONE,
+			DRM_FORMAT_MOD_NONE,
 			1.0, 1.0, 1.0,
 			&fb1);
 
@@ -244,7 +244,7 @@ static void test_disable_crc_after_crtc(data_t *data, enum pipe pipe)
 	igt_create_color_fb(data->drm_fd,
 			    mode->hdisplay, mode->vdisplay,
 			    DRM_FORMAT_XRGB8888,
-			    LOCAL_DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_MOD_NONE,
 			    0.0, 1.0, 0.0, &data->fb);
 	igt_plane_set_fb(igt_output_get_plane(output, 0), &data->fb);
 	igt_display_commit(display);

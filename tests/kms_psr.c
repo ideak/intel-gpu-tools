@@ -81,7 +81,7 @@ static void create_cursor_fb(data_t *data)
 	uint32_t fb_id;
 
 	fb_id = igt_create_fb(data->drm_fd, 64, 64,
-			      DRM_FORMAT_ARGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_NONE,
 			      &data->fb_white);
 	igt_assert(fb_id);
 

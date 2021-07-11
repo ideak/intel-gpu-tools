@@ -283,7 +283,7 @@ static bool init_modeset_params_for_type(struct mode_set_data *data,
 		return false;
 
 	igt_create_pattern_fb(drm_fd, mode->hdisplay, mode->vdisplay,
-			      DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_NONE,
 			      &params->fb);
 
 	params->crtc_id = kmstest_find_crtc_for_connector(drm_fd, data->res,
@@ -1588,9 +1588,9 @@ static void cursor_subtest(bool dpms)
 	crtc_id = default_mode_params->crtc_id;
 
 	igt_create_fb(drm_fd, 64, 64, DRM_FORMAT_ARGB8888,
-		      LOCAL_DRM_FORMAT_MOD_NONE, &cursor_fb1);
+		      DRM_FORMAT_MOD_NONE, &cursor_fb1);
 	igt_create_fb(drm_fd, 64, 64, DRM_FORMAT_ARGB8888,
-		      LOCAL_DRM_FORMAT_MOD_NONE, &cursor_fb2);
+		      DRM_FORMAT_MOD_NONE, &cursor_fb2);
 	igt_create_fb(drm_fd, 64, 64, DRM_FORMAT_XRGB8888,
 		      I915_FORMAT_MOD_X_TILED, &cursor_fb3);
 
@@ -1722,7 +1722,7 @@ static void test_one_plane(bool dpms, uint32_t plane_id,
 		plane_format = DRM_FORMAT_ARGB8888;
 		plane_w = 64;
 		plane_h = 64;
-		tiling = LOCAL_DRM_FORMAT_MOD_NONE;
+		tiling = DRM_FORMAT_MOD_NONE;
 		break;
 	default:
 		igt_assert(0);

@@ -71,7 +71,7 @@ static void create_crc_colors(data_t *data,
 				    data->mode->hdisplay,
 				    data->mode->vdisplay,
 				    DRM_FORMAT_XRGB8888,
-				    LOCAL_DRM_FORMAT_MOD_NONE,
+				    DRM_FORMAT_MOD_NONE,
 				    colors[i].r, colors[i].g, colors[i].b,
 				    &colors[i].fb);
 
@@ -356,7 +356,7 @@ igt_main
 					    data.mode->hdisplay,
 					    data.mode->vdisplay,
 					    DRM_FORMAT_XRGB8888,
-					    LOCAL_DRM_FORMAT_MOD_NONE,
+					    DRM_FORMAT_MOD_NONE,
 					    0.0, 0.0, 0.0,
 					    &data.default_fb);
 			igt_plane_set_fb(data.primary, &data.default_fb);

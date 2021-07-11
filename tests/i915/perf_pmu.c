@@ -957,7 +957,7 @@ static void prepare_crtc(data_t *data, int fd, igt_output_t *output)
 	mode = igt_output_get_mode(output);
 	igt_create_color_fb(fd, mode->hdisplay, mode->vdisplay,
 			    DRM_FORMAT_XRGB8888,
-			    LOCAL_DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_MOD_NONE,
 			    0.0, 0.0, 0.0,
 			    &data->primary_fb);
 

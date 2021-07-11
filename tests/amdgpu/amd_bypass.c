@@ -316,7 +316,7 @@ static void bypass_8bpc_test(data_t *data)
 	test_init(data);
 
 	igt_create_fb(data->drm_fd, data->width, data->height,
-		      DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE, &fb);
+		      DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_NONE, &fb);
 
 	/*
 	 * Settings:

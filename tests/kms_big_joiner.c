@@ -288,7 +288,7 @@ igt_main
 		igt_require_f(count > 0, "No output with 5k+ mode found\n");
 
 		igt_create_pattern_fb(data.drm_fd, width, height, DRM_FORMAT_XRGB8888,
-				      LOCAL_DRM_FORMAT_MOD_NONE, &data.fb);
+				      DRM_FORMAT_MOD_NONE, &data.fb);
 	}
 
 	igt_describe("Verify the basic modeset on big joiner mode on all pipes");

@@ -73,7 +73,7 @@ test_output(data_t *data)
 	igt_create_fb(data->drm_fd,
 		      mode.hdisplay, mode.vdisplay,
 		      DRM_FORMAT_XRGB8888,
-		      LOCAL_DRM_FORMAT_MOD_NONE,
+		      DRM_FORMAT_MOD_NONE,
 		      &fb);
 
 	for (i = 0; i < data->res->count_crtcs; i++) {

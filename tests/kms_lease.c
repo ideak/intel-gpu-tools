@@ -47,69 +47,6 @@
 
 IGT_TEST_DESCRIPTION("Test of CreateLease.");
 
-struct local_drm_mode_create_lease {
-        /** Pointer to array of object ids (__u32) */
-        __u64 object_ids;
-        /** Number of object ids */
-        __u32 object_count;
-        /** flags for new FD (O_CLOEXEC, etc) */
-        __u32 flags;
-
-        /** Return: unique identifier for lessee. */
-        __u32 lessee_id;
-        /** Return: file descriptor to new drm_master file */
-        __u32 fd;
-};
-
-struct local_drm_mode_list_lessees {
-        /** Number of lessees.
-         * On input, provides length of the array.
-         * On output, provides total number. No
-         * more than the input number will be written
-         * back, so two calls can be used to get
-         * the size and then the data.
-         */
-        __u32 count_lessees;
-        __u32 pad;
-
-        /** Pointer to lessees.
-         * pointer to __u64 array of lessee ids
-         */
-        __u64 lessees_ptr;
-};
-
-struct local_drm_mode_get_lease {
-        /** Number of leased objects.
-         * On input, provides length of the array.
-         * On output, provides total number. No
-         * more than the input number will be written
-         * back, so two calls can be used to get
-         * the size and then the data.
-         */
-        __u32 count_objects;
-        __u32 pad;
-
-        /** Pointer to objects.
-         * pointer to __u32 array of object ids
-         */
-        __u64 objects_ptr;
-};
-
-/**
- * Revoke lease
- */
-struct local_drm_mode_revoke_lease {
-        /** Unique ID of lessee
-         */
-        __u32 lessee_id;
-};
-
-
-#define LOCAL_DRM_IOCTL_MODE_CREATE_LEASE     DRM_IOWR(0xC6, struct local_drm_mode_create_lease)
-#define LOCAL_DRM_IOCTL_MODE_LIST_LESSEES     DRM_IOWR(0xC7, struct local_drm_mode_list_lessees)
-#define LOCAL_DRM_IOCTL_MODE_GET_LEASE        DRM_IOWR(0xC8, struct local_drm_mode_get_lease)
-#define LOCAL_DRM_IOCTL_MODE_REVOKE_LEASE     DRM_IOWR(0xC9, struct local_drm_mode_revoke_lease)
-
 typedef struct {
 	int fd;
 	uint32_t lessee_id;
@@ -170,7 +107,7 @@ static int prepare_crtc(lease_t *lease, uint32_t connector_id, uint32_t crtc_id)
 	mode = igt_output_get_mode(output);
 	igt_create_color_fb(lease->fd, mode->hdisplay, mode->vdisplay,
 			    DRM_FORMAT_XRGB8888,
-			    LOCAL_DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_MOD_NONE,
 			    0.0, 0.0, 0.0,
 			    &lease->primary_fb);
 
@@ -203,38 +140,38 @@ static void cleanup_crtc(lease_t *lease, igt_output_t *output)
 	igt_display_commit(display);
 }
 
-static int create_lease(int fd, struct local_drm_mode_create_lease *mcl)
+static int create_lease(int fd, struct drm_mode_create_lease *mcl)
 {
 	int err = 0;
 
-	if (igt_ioctl(fd, LOCAL_DRM_IOCTL_MODE_CREATE_LEASE, mcl))
+	if (igt_ioctl(fd, DRM_IOCTL_MODE_CREATE_LEASE, mcl))
 		err = -errno;
 	return err;
 }
 
-static int revoke_lease(int fd, struct local_drm_mode_revoke_lease *mrl)
+static int revoke_lease(int fd, struct drm_mode_revoke_lease *mrl)
 {
 	int err = 0;
 
-	if (igt_ioctl(fd, LOCAL_DRM_IOCTL_MODE_REVOKE_LEASE, mrl))
+	if (igt_ioctl(fd, DRM_IOCTL_MODE_REVOKE_LEASE, mrl))
 		err = -errno;
 	return err;
 }
 
-static int list_lessees(int fd, struct local_drm_mode_list_lessees *mll)
+static int list_lessees(int fd, struct drm_mode_list_lessees *mll)
 {
 	int err = 0;
 
-	if (igt_ioctl(fd, LOCAL_DRM_IOCTL_MODE_LIST_LESSEES, mll))
+	if (igt_ioctl(fd, DRM_IOCTL_MODE_LIST_LESSEES, mll))
 		err = -errno;
 	return err;
 }
 
-static int get_lease(int fd, struct local_drm_mode_get_lease *mgl)
+static int get_lease(int fd, struct drm_mode_get_lease *mgl)
 {
 	int err = 0;
 
-	if (igt_ioctl(fd, LOCAL_DRM_IOCTL_MODE_GET_LEASE, mgl))
+	if (igt_ioctl(fd, DRM_IOCTL_MODE_GET_LEASE, mgl))
 		err = -errno;
 	return err;
 }
@@ -242,7 +179,7 @@ static int get_lease(int fd, struct local_drm_mode_get_lease *mgl)
 static int make_lease(data_t *data, lease_t *lease)
 {
 	uint32_t object_ids[3];
-	struct local_drm_mode_create_lease mcl;
+	struct drm_mode_create_lease mcl;
 	int ret;
 
 	mcl.object_ids = (uint64_t) (uintptr_t) &object_ids[0];
@@ -316,7 +253,7 @@ static void simple_lease(data_t *data)
 static void page_flip_implicit_plane(data_t *data)
 {
 	uint32_t object_ids[3];
-	struct local_drm_mode_create_lease mcl;
+	struct drm_mode_create_lease mcl;
 	drmModePlaneRes *plane_resources;
 	uint32_t wrong_plane_id = 0;
 	int i;
@@ -385,7 +322,7 @@ static void page_flip_implicit_plane(data_t *data)
 static void setcrtc_implicit_plane(data_t *data)
 {
 	uint32_t object_ids[3];
-	struct local_drm_mode_create_lease mcl;
+	struct drm_mode_create_lease mcl;
 	drmModePlaneRes *plane_resources;
 	uint32_t wrong_plane_id = 0;
 	igt_output_t *output =
@@ -444,7 +381,7 @@ static void setcrtc_implicit_plane(data_t *data)
 static void cursor_implicit_plane(data_t *data)
 {
 	uint32_t object_ids[3];
-	struct local_drm_mode_create_lease mcl;
+	struct drm_mode_create_lease mcl;
 
 	mcl.object_ids = (uint64_t) (uintptr_t) &object_ids[0];
 	mcl.object_count = 0;
@@ -480,7 +417,7 @@ static void cursor_implicit_plane(data_t *data)
 static void atomic_implicit_crtc(data_t *data)
 {
 	uint32_t object_ids[3];
-	struct local_drm_mode_create_lease mcl;
+	struct drm_mode_create_lease mcl;
 	drmModeRes *resources;
 	drmModeObjectPropertiesPtr props;
 	uint32_t wrong_crtc_id = 0;
@@ -569,7 +506,7 @@ static void atomic_implicit_crtc(data_t *data)
 static void lessee_list(data_t *data)
 {
 	lease_t lease;
-	struct local_drm_mode_list_lessees mll;
+	struct drm_mode_list_lessees mll;
 	uint32_t lessees[1];
 
 	mll.pad = 0;
@@ -620,7 +557,7 @@ static void lessee_list(data_t *data)
 static void lease_get(data_t *data)
 {
 	lease_t lease;
-	struct local_drm_mode_get_lease mgl;
+	struct drm_mode_get_lease mgl;
 	int num_leased_obj = 3;
 	uint32_t objects[num_leased_obj];
 	int o;
@@ -762,7 +699,7 @@ static void lease_unleased_connector(data_t *data)
 static void lease_revoke(data_t *data)
 {
 	lease_t lease;
-	struct local_drm_mode_revoke_lease mrl;
+	struct drm_mode_revoke_lease mrl;
 	int ret;
 
 	/* Create a valid lease */
@@ -905,7 +842,7 @@ static void run_test(data_t *data, void (*testfunc)(data_t *))
 static void invalid_create_leases(data_t *data)
 {
 	uint32_t object_ids[4];
-	struct local_drm_mode_create_lease mcl;
+	struct drm_mode_create_lease mcl;
 	drmModeRes *resources;
 	int tmp_fd, ret;
 
@@ -1054,7 +991,7 @@ static void check_crtc_masks(int master_fd, int lease_fd, uint32_t crtc_mask)
 static void possible_crtcs_filtering(data_t *data)
 {
 	uint32_t *object_ids;
-	struct local_drm_mode_create_lease mcl;
+	struct drm_mode_create_lease mcl;
 	drmModeRes *resources;
 	drmModePlaneRes *plane_resources;
 	int i;
@@ -1109,7 +1046,7 @@ static bool is_master(int fd)
 static int _create_simple_lease(int master_fd, data_t *data, int expected_ret)
 {
 	uint32_t object_ids[3];
-	struct local_drm_mode_create_lease mcl;
+	struct drm_mode_create_lease mcl;
 
 	object_ids[0] = data->master.display.pipes[0].crtc_id;
 	object_ids[1] = data->master.display.outputs[0].id;
@@ -1198,8 +1135,8 @@ static void multimaster_lease(data_t *data)
 static void implicit_plane_lease(data_t *data)
 {
 	uint32_t object_ids[3];
-	struct local_drm_mode_create_lease mcl;
-	struct local_drm_mode_get_lease mgl;
+	struct drm_mode_create_lease mcl;
+	struct drm_mode_get_lease mgl;
 	int ret;
 	uint32_t cursor_id = igt_pipe_get_plane_type(&data->master.display.pipes[0],
 						     DRM_PLANE_TYPE_CURSOR)->drm_plane->plane_id;
@@ -1247,7 +1184,7 @@ static void implicit_plane_lease(data_t *data)
 static void lease_uevent(data_t *data)
 {
 	int lease_fd;
-	struct local_drm_mode_list_lessees mll;
+	struct drm_mode_list_lessees mll;
 	struct udev_monitor *uevent_monitor;
 
 	uevent_monitor = igt_watch_uevents();

@@ -91,8 +91,8 @@ test_flip_tiling(data_t *data, enum pipe pipe, igt_output_t *output, uint64_t ti
 	width = mode->hdisplay;
 
 	if (tiling[0] != tiling[1] &&
-	    (tiling[0] != LOCAL_DRM_FORMAT_MOD_NONE ||
-	     tiling[1] != LOCAL_DRM_FORMAT_MOD_NONE)) {
+	    (tiling[0] != DRM_FORMAT_MOD_NONE ||
+	     tiling[1] != DRM_FORMAT_MOD_NONE)) {
 		/*
 		 * Since a page flip to a buffer with different stride
 		 * doesn't work, choose width so that the stride of both
@@ -182,7 +182,7 @@ igt_main
 	igt_describe("Check pageflip from tiled buffer to linear one works correctly with x tiling");
 	igt_subtest_with_dynamic("flip-changes-tiling") {
 		uint64_t tiling[2] = { I915_FORMAT_MOD_X_TILED,
-				       LOCAL_DRM_FORMAT_MOD_NONE };
+				       DRM_FORMAT_MOD_NONE };
 		enum pipe pipe;
 
 		for (int i = 0; i < ARRAY_SIZE(tiling); i++)
@@ -198,7 +198,7 @@ igt_main
 	igt_describe("Check pageflip from tiled buffer to linear one works correctly with y tiling");
 	igt_subtest_with_dynamic("flip-changes-tiling-Y") {
 		uint64_t tiling[2] = { I915_FORMAT_MOD_Y_TILED,
-				       LOCAL_DRM_FORMAT_MOD_NONE };
+				       DRM_FORMAT_MOD_NONE };
 		enum pipe pipe;
 
 		igt_require_fb_modifiers(data.drm_fd);
@@ -218,7 +218,7 @@ igt_main
 	igt_describe("Check pageflip from tiled buffer to linear one works correctly with yf tiling");
 	igt_subtest_with_dynamic("flip-changes-tiling-Yf") {
 		uint64_t tiling[2] = { I915_FORMAT_MOD_Yf_TILED,
-				       LOCAL_DRM_FORMAT_MOD_NONE };
+				       DRM_FORMAT_MOD_NONE };
 		enum pipe pipe;
 
 		igt_require_fb_modifiers(data.drm_fd);
@@ -309,7 +309,7 @@ igt_main
 
 	igt_describe("Check pageflip from linear buffer to tiled one works correctly with x tiling");
 	igt_subtest_with_dynamic("flip-to-X-tiled") {
-		uint64_t tiling[2] = { LOCAL_DRM_FORMAT_MOD_NONE,
+		uint64_t tiling[2] = { DRM_FORMAT_MOD_NONE,
 				       I915_FORMAT_MOD_X_TILED };
 		enum pipe pipe;
 
@@ -325,7 +325,7 @@ igt_main
 
 	igt_describe("Check pageflip from linear buffer to tiled one works correctly with y tiling");
 	igt_subtest_with_dynamic("flip-to-Y-tiled") {
-		uint64_t tiling[2] = { LOCAL_DRM_FORMAT_MOD_NONE,
+		uint64_t tiling[2] = { DRM_FORMAT_MOD_NONE,
 				       I915_FORMAT_MOD_Y_TILED };
 		enum pipe pipe;
 
@@ -345,7 +345,7 @@ igt_main
 
 	igt_describe("Check pageflip from linear buffer to tiled one works correctly with yf tiling");
 	igt_subtest_with_dynamic("flip-to-Yf-tiled") {
-		uint64_t tiling[2] = { LOCAL_DRM_FORMAT_MOD_NONE,
+		uint64_t tiling[2] = { DRM_FORMAT_MOD_NONE,
 				       I915_FORMAT_MOD_Yf_TILED };
 		enum pipe pipe;
 

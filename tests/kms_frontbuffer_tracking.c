@@ -458,7 +458,7 @@ static uint64_t tiling_to_modifier(enum tiling_type tiling)
 {
 	switch (tiling) {
 	case TILING_LINEAR:
-		return LOCAL_DRM_FORMAT_MOD_NONE;
+		return DRM_FORMAT_MOD_NONE;
 	case TILING_X:
 		return I915_FORMAT_MOD_X_TILED;
 	case TILING_Y:
@@ -674,7 +674,7 @@ static void create_fbs(enum pixel_format format, enum tiling_type tiling)
 		  prim_mode_params.mode->vdisplay, tiling, PLANE_PRI,
 		  &s->prim_pri);
 	create_fb(format, prim_mode_params.cursor.w,
-		  prim_mode_params.cursor.h, LOCAL_DRM_FORMAT_MOD_NONE,
+		  prim_mode_params.cursor.h, DRM_FORMAT_MOD_NONE,
 		  PLANE_CUR, &s->prim_cur);
 	create_fb(format, prim_mode_params.sprite.w,
 		  prim_mode_params.sprite.h, tiling, PLANE_SPR, &s->prim_spr);
@@ -691,7 +691,7 @@ static void create_fbs(enum pixel_format format, enum tiling_type tiling)
 		  scnd_mode_params.mode->vdisplay, tiling, PLANE_PRI,
 		  &s->scnd_pri);
 	create_fb(format, scnd_mode_params.cursor.w, scnd_mode_params.cursor.h,
-		  LOCAL_DRM_FORMAT_MOD_NONE, PLANE_CUR, &s->scnd_cur);
+		  DRM_FORMAT_MOD_NONE, PLANE_CUR, &s->scnd_cur);
 	create_fb(format, scnd_mode_params.sprite.w, scnd_mode_params.sprite.h,
 		  tiling, PLANE_SPR, &s->scnd_spr);
 }

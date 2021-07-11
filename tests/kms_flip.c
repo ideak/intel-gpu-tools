@@ -1276,7 +1276,7 @@ static void __run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
 	if (o->flags & TEST_PAN)
 		o->fb_width *= 2;
 
-	tiling = LOCAL_DRM_FORMAT_MOD_NONE;
+	tiling = DRM_FORMAT_MOD_NONE;
 	if (o->flags & TEST_FENCE_STRESS)
 		tiling = I915_FORMAT_MOD_X_TILED;
 

@@ -125,7 +125,7 @@ static void prepare_fb(int importer_fd, struct dumb_bo *scratch, struct igt_fb *
 	enum igt_color_range color_range = IGT_COLOR_YCBCR_LIMITED_RANGE;
 
 	igt_init_fb(fb, importer_fd, scratch->width, scratch->height,
-		    DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+		    DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_NONE,
 		    color_encoding, color_range);
 }
 
@@ -215,7 +215,7 @@ static void test_crc(int exporter_fd, int importer_fd)
 
 		igt_create_color_fb(importer_fd,
 				    mode->hdisplay, mode->vdisplay,
-				    DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+				    DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_NONE,
 				    colors[i].r, colors[i].g, colors[i].b,
 				    &fb);
 

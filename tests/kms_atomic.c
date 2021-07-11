@@ -642,7 +642,7 @@ static void plane_cursor(igt_pipe_t *pipe_obj,
 
 	igt_create_color_fb(pipe_obj->display->drm_fd,
 			    width, height, DRM_FORMAT_ARGB8888,
-			    LOCAL_DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_MOD_NONE,
 			    0.0, 0.0, 0.0, &fb);
 
 	/* Flip the cursor plane using the atomic API, and double-check
@@ -1101,7 +1101,7 @@ igt_main
 		igt_create_pattern_fb(display.drm_fd,
 				      mode->hdisplay, mode->vdisplay,
 				      plane_get_igt_format(primary),
-				      LOCAL_DRM_FORMAT_MOD_NONE, &fb);
+				      DRM_FORMAT_MOD_NONE, &fb);
 	}
 
 	igt_describe("Test for KMS atomic modesetting on overlay plane and ensure coherency between "

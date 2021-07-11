@@ -220,7 +220,7 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 	drmModeModeInfo *mode;
 	igt_display_t *display = &data->display;
 	unsigned int w, h, ref_w, ref_h, min_w, min_h;
-	uint64_t tiling = data->override_tiling ?: LOCAL_DRM_FORMAT_MOD_NONE;
+	uint64_t tiling = data->override_tiling ?: DRM_FORMAT_MOD_NONE;
 	uint32_t pixel_format = data->override_fmt ?: DRM_FORMAT_XRGB8888;
 	const float flip_opacity = 0.75;
 
@@ -310,7 +310,7 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 		* Create a reference CRC for a software-rotated fb.
 		*/
 		igt_create_fb(data->gfx_fd, ref_w, ref_h, pixel_format,
-			data->override_tiling ?: LOCAL_DRM_FORMAT_MOD_NONE, &data->fb_reference);
+			data->override_tiling ?: DRM_FORMAT_MOD_NONE, &data->fb_reference);
 		paint_squares(data, data->rotation, &data->fb_reference, 1.0);
 
 		igt_plane_set_fb(plane, &data->fb_reference);
@@ -675,13 +675,13 @@ static void test_multi_plane_rotation(data_t *data, enum pipe pipe)
 		uint64_t tiling;
 		struct igt_fb fbs[ARRAY_SIZE(formatlist)][2];
 	} planeconfigs[] = {
-	{IGT_ROTATION_0, .2f, .4f, LOCAL_DRM_FORMAT_MOD_NONE },
+	{IGT_ROTATION_0, .2f, .4f, DRM_FORMAT_MOD_NONE },
 	{IGT_ROTATION_0, .2f, .4f, I915_FORMAT_MOD_X_TILED },
 	{IGT_ROTATION_0, .2f, .4f, I915_FORMAT_MOD_Y_TILED },
 	{IGT_ROTATION_0, .2f, .4f, I915_FORMAT_MOD_Yf_TILED },
 	{IGT_ROTATION_90, .2f, .4f, I915_FORMAT_MOD_Y_TILED },
 	{IGT_ROTATION_90, .2f, .4f, I915_FORMAT_MOD_Yf_TILED },
-	{IGT_ROTATION_180, .2f, .4f, LOCAL_DRM_FORMAT_MOD_NONE },
+	{IGT_ROTATION_180, .2f, .4f, DRM_FORMAT_MOD_NONE },
 	{IGT_ROTATION_180, .2f, .4f, I915_FORMAT_MOD_X_TILED },
 	{IGT_ROTATION_180, .2f, .4f, I915_FORMAT_MOD_Y_TILED },
 	{IGT_ROTATION_180, .2f, .4f, I915_FORMAT_MOD_Yf_TILED },
@@ -1059,7 +1059,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 						AMD_FMT_MOD_SET(TILE, AMD_FMT_MOD_TILE_GFX9_64K_S) |
 						AMD_FMT_MOD_SET(TILE_VERSION, AMD_FMT_MOD_TILE_VER_GFX9);
 				else
-					data.override_tiling = LOCAL_DRM_FORMAT_MOD_NONE;
+					data.override_tiling = DRM_FORMAT_MOD_NONE;
 			}
 			data.rotation = subtest->rot;
 			test_plane_rotation(&data, subtest->plane, false);

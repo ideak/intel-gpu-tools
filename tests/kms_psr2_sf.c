@@ -223,7 +223,7 @@ static void prepare(data_t *data)
 	igt_create_color_fb(data->drm_fd,
 			    data->mode->hdisplay, data->mode->vdisplay,
 			    DRM_FORMAT_XRGB8888,
-			    LOCAL_DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_MOD_NONE,
 			    0.0, 1.0, 0.0,
 			    &data->fb_primary);
 
@@ -239,7 +239,7 @@ static void prepare(data_t *data)
 				    data->mode->hdisplay/2,
 				    data->mode->vdisplay/2,
 				    DRM_FORMAT_XRGB8888,
-				    LOCAL_DRM_FORMAT_MOD_NONE,
+				    DRM_FORMAT_MOD_NONE,
 				    0.0, 0.0, 1.0,
 				    &data->fb_overlay);
 
@@ -247,7 +247,7 @@ static void prepare(data_t *data)
 				    data->mode->hdisplay/2,
 				    data->mode->vdisplay/2,
 				    DRM_FORMAT_XRGB8888,
-				    LOCAL_DRM_FORMAT_MOD_NONE,
+				    DRM_FORMAT_MOD_NONE,
 				    0.0, 0.0, 1.0,
 				    &data->fb_test);
 
@@ -270,7 +270,7 @@ static void prepare(data_t *data)
 		igt_create_color_fb(data->drm_fd,
 			    data->mode->hdisplay, data->mode->vdisplay,
 			    DRM_FORMAT_XRGB8888,
-			    LOCAL_DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_MOD_NONE,
 			    0.0, 1.0, 0.0,
 			    &data->fb_test);
 
@@ -287,7 +287,7 @@ static void prepare(data_t *data)
 					    data->mode->hdisplay,
 					    data->mode->vdisplay,
 					    DRM_FORMAT_XRGB8888,
-					    LOCAL_DRM_FORMAT_MOD_NONE,
+					    DRM_FORMAT_MOD_NONE,
 					    0.0, 0.0, 1.0,
 					    &data->fb_overlay);
 
@@ -303,14 +303,14 @@ static void prepare(data_t *data)
 		igt_plane_set_position(cursor, 0, 0);
 
 		igt_create_fb(data->drm_fd, CUR_SIZE, CUR_SIZE,
-			      DRM_FORMAT_ARGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_NONE,
 			      &data->fb_cursor);
 
 		draw_rect(data, &data->fb_cursor, 0, 0, CUR_SIZE, CUR_SIZE,
 			    0.0, 0.0, 1.0, 1.0);
 
 		igt_create_fb(data->drm_fd, CUR_SIZE, CUR_SIZE,
-			      DRM_FORMAT_ARGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_NONE,
 			      &data->fb_test);
 
 		draw_rect(data, &data->fb_test, 0, 0, CUR_SIZE, CUR_SIZE,

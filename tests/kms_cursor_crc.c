@@ -381,13 +381,13 @@ static void prepare_crtc(data_t *data, igt_output_t *output,
 	mode = igt_output_get_mode(output);
 	igt_create_color_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
 			    DRM_FORMAT_XRGB8888,
-			    LOCAL_DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_MOD_NONE,
 			    0.0, 0.0, 0.0,
 			    &data->primary_fb[HWCURSORBUFFER]);
 
 	igt_create_color_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
 			    DRM_FORMAT_XRGB8888,
-			    LOCAL_DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_MOD_NONE,
 			    0.0, 0.0, 0.0,
 			    &data->primary_fb[SWCOMPARISONBUFFER]);
 
@@ -447,7 +447,7 @@ static void test_cursor_alpha(data_t *data, double a)
 	/* Alpha cursor fb with white color */
 	fb_id = igt_create_fb(data->drm_fd, curw, curh,
 				    DRM_FORMAT_ARGB8888,
-				    LOCAL_DRM_FORMAT_MOD_NONE,
+				    DRM_FORMAT_MOD_NONE,
 				    &data->fb);
 	igt_assert(fb_id);
 
@@ -506,7 +506,7 @@ static void create_cursor_fb(data_t *data, int cur_w, int cur_h)
 	 */
 	fb_id = igt_create_color_fb(data->drm_fd, cur_w, cur_h + 1,
 				    DRM_FORMAT_ARGB8888,
-				    LOCAL_DRM_FORMAT_MOD_NONE,
+				    DRM_FORMAT_MOD_NONE,
 				    1.0, 1.0, 1.0,
 				    &data->fb);
 
@@ -537,7 +537,7 @@ static void require_cursor_size(data_t *data, int w, int h)
 
 	/* Create temporary primary fb for testing */
 	igt_assert(igt_create_fb(data->drm_fd, mode->hdisplay, mode->vdisplay, DRM_FORMAT_XRGB8888,
-				 LOCAL_DRM_FORMAT_MOD_NONE, &primary_fb));
+				 DRM_FORMAT_MOD_NONE, &primary_fb));
 
 	igt_plane_set_fb(primary, &primary_fb);
 	igt_plane_set_fb(cursor, &data->fb);
@@ -585,7 +585,7 @@ static void test_cursor_size(data_t *data)
 	 * smaller ones to see that the size is applied correctly
 	 */
 	fb_id = igt_create_fb(data->drm_fd, cursor_max_size, cursor_max_size,
-			      DRM_FORMAT_ARGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_NONE,
 			      &data->fb);
 	igt_assert(fb_id);
 

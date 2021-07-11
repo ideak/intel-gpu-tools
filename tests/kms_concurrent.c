@@ -176,7 +176,7 @@ prepare_planes(data_t *data, enum pipe pipe, int max_planes,
 		igt_create_color_fb(data->drm_fd,
 				    size[i], size[i],
 				    data->plane[i]->type == DRM_PLANE_TYPE_CURSOR ? DRM_FORMAT_ARGB8888 : DRM_FORMAT_XRGB8888,
-				    data->plane[i]->type == DRM_PLANE_TYPE_CURSOR ? LOCAL_DRM_FORMAT_MOD_NONE : I915_FORMAT_MOD_X_TILED,
+				    data->plane[i]->type == DRM_PLANE_TYPE_CURSOR ? DRM_FORMAT_MOD_NONE : I915_FORMAT_MOD_X_TILED,
 				    0.0f, 0.0f, 1.0f,
 				    &data->fb[i]);
 

@@ -184,17 +184,17 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe)
 		igt_remove_fb(data->gfx_fd, &data->gray_fb);
 
 		igt_create_fb(data->gfx_fd, w, h,
-			      DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_NONE,
 			      &data->xrgb_fb);
 		draw_gradient(&data->xrgb_fb, w, h, 1.);
 
 		igt_create_fb(data->gfx_fd, w, h,
-			      DRM_FORMAT_ARGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_NONE,
 			      &data->argb_fb_cov_0);
 		draw_gradient_coverage(&data->argb_fb_cov_0, w, h, 0);
 
 		igt_create_fb(data->gfx_fd, w, h,
-			      DRM_FORMAT_ARGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_NONE,
 			      &data->argb_fb_0);
 
 		cr = igt_get_cairo_ctx(data->gfx_fd, &data->argb_fb_0);
@@ -203,36 +203,36 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe)
 		igt_put_cairo_ctx(cr);
 
 		igt_create_fb(data->gfx_fd, w, h,
-			      DRM_FORMAT_ARGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_NONE,
 			      &data->argb_fb_7e);
 		draw_squares(&data->argb_fb_7e, w, h, 126. / 255.);
 
 		igt_create_fb(data->gfx_fd, w, h,
-			      DRM_FORMAT_ARGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_NONE,
 			      &data->argb_fb_cov_7e);
 		draw_squares_coverage(&data->argb_fb_cov_7e, w, h, 0x7e);
 
 		igt_create_fb(data->gfx_fd, w, h,
-			      DRM_FORMAT_ARGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_NONE,
 			      &data->argb_fb_fc);
 		draw_squares(&data->argb_fb_fc, w, h, 252. / 255.);
 
 		igt_create_fb(data->gfx_fd, w, h,
-			      DRM_FORMAT_ARGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_NONE,
 			      &data->argb_fb_cov_fc);
 		draw_squares_coverage(&data->argb_fb_cov_fc, w, h, 0xfc);
 
 		igt_create_fb(data->gfx_fd, w, h,
-			      DRM_FORMAT_ARGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_NONE,
 			      &data->argb_fb_100);
 		draw_gradient(&data->argb_fb_100, w, h, 1.);
 
 		igt_create_fb(data->gfx_fd, w, h,
-			      DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_NONE,
 			      &data->black_fb);
 
 		igt_create_color_fb(data->gfx_fd, w, h,
-				    DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+				    DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_NONE,
 				    .5, .5, .5, &data->gray_fb);
 	}
 

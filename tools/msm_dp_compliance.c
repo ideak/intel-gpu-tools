@@ -155,7 +155,7 @@ uint8_t bitdepth;
 
 drmModeRes *resources;
 int drm_fd, modes, gen;
-uint64_t tiling = LOCAL_DRM_FORMAT_MOD_NONE;
+uint64_t tiling = DRM_FORMAT_MOD_NONE;
 uint32_t depth = 24, stride, bpp;
 int specified_mode_num = -1, specified_disp_id = -1;
 int width, height;
@@ -310,7 +310,7 @@ static int setup_video_pattern_framebuffer(struct connector *dp_conn)
 	dp_conn->test_pattern.fb = igt_create_fb(drm_fd,
 			video_width, video_height,
 			DRM_FORMAT_XRGB8888,
-			LOCAL_DRM_FORMAT_MOD_NONE,
+			DRM_FORMAT_MOD_NONE,
 			&dp_conn->test_pattern.fb_pattern);
 	igt_assert(dp_conn->test_pattern.fb);
 

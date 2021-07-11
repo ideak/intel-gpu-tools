@@ -298,7 +298,7 @@ igt_main
 		igt_describe("Tests the visibility of the planes when switching between "
 			     "high and low resolution with tiling as none.");
 		igt_subtest_f("pipe-%s-tiling-none", kmstest_pipe_name(pipe))
-			test_planes_on_pipe(&data, LOCAL_DRM_FORMAT_MOD_NONE);
+			test_planes_on_pipe(&data, DRM_FORMAT_MOD_NONE);
 
 		igt_describe("Tests the visibility of the planes when switching between "
 			     "high and low resolution with x-tiling.");

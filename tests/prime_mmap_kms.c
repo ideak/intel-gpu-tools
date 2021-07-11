@@ -167,7 +167,7 @@ static void prepare_crtc(gpu_process_t *gpu)
 
 	/* create a white fb and flip to it */
 	igt_create_color_fb(gpu->drm_fd, mode->hdisplay, mode->vdisplay,
-			DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+			DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_NONE,
 			1.0, 1.0, 1.0, &gpu->fb);
 
 	gpu->primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);

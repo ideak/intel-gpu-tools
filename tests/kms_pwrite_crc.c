@@ -58,7 +58,7 @@ static void test(data_t *data)
 
 	/* create a non-white fb where we can pwrite later */
 	igt_create_pattern_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
-			      DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE, fb);
+			      DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_NONE, fb);
 
 	/* flip to it to make it UC/WC and fully flushed */
 	drmModeSetPlane(data->drm_fd,
@@ -113,7 +113,7 @@ static void prepare_crtc(data_t *data)
 
 	/* create a white reference fb and flip to it */
 	igt_create_color_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
-			    DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_NONE,
 			    1.0, 1.0, 1.0, &data->fb[0]);
 
 	data->primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);

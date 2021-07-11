@@ -218,11 +218,11 @@ static void prepare_test(data_t *data, igt_output_t *output, enum pipe pipe)
 
 	/* Prepare resources */
 	igt_create_color_fb(data->drm_fd, mode.hdisplay, mode.vdisplay,
-			    DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_NONE,
 			    0.50, 0.50, 0.50, &data->fb0);
 
 	igt_create_color_fb(data->drm_fd, mode.hdisplay, mode.vdisplay,
-			    DRM_FORMAT_XRGB8888, LOCAL_DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_NONE,
 			    0.50, 0.50, 0.50, &data->fb1);
 
 	cr = igt_get_cairo_ctx(data->drm_fd, &data->fb0);

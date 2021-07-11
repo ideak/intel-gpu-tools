@@ -75,22 +75,22 @@ functional_test_init(functional_test_t *test, igt_output_t *output, enum pipe pi
 	mode = igt_output_get_mode(output);
 	igt_create_color_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
 				DRM_FORMAT_XRGB8888,
-				LOCAL_DRM_FORMAT_MOD_NONE,
+				DRM_FORMAT_MOD_NONE,
 				0.0, 0.0, 0.0,
 				&test->black_fb);
 	igt_create_color_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
 				DRM_FORMAT_XRGB8888,
-				LOCAL_DRM_FORMAT_MOD_NONE,
+				DRM_FORMAT_MOD_NONE,
 				0.0, 0.0, 1.0,
 				&test->blue_fb);
 	igt_create_color_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
 				DRM_FORMAT_XRGB8888,
-				LOCAL_DRM_FORMAT_MOD_NONE,
+				DRM_FORMAT_MOD_NONE,
 				1.0, 1.0, 0.0,
 				&test->yellow_fb);
 	igt_create_color_fb(data->drm_fd, 100, 100,
 				DRM_FORMAT_XRGB8888,
-				LOCAL_DRM_FORMAT_MOD_NONE,
+				DRM_FORMAT_MOD_NONE,
 				1.0, 0.0, 0.0,
 				&test->red_fb);
 
@@ -316,19 +316,19 @@ sanity_test_init(sanity_test_t *test, igt_output_t *output, enum pipe pipe)
 	mode = igt_output_get_mode(output);
 	igt_create_color_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
 			    DRM_FORMAT_XRGB8888,
-			    LOCAL_DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_MOD_NONE,
 			    0.0, 0.0, 1.0,
 			    &test->blue_fb);
 	igt_create_color_fb(data->drm_fd,
 			    mode->hdisplay + 100, mode->vdisplay + 100,
 			    DRM_FORMAT_XRGB8888,
-			    LOCAL_DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_MOD_NONE,
 			    0.0, 0.0, 1.0,
 			    &test->oversized_fb);
 	igt_create_color_fb(data->drm_fd,
 			    mode->hdisplay - 100, mode->vdisplay - 100,
 			    DRM_FORMAT_XRGB8888,
-			    LOCAL_DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_MOD_NONE,
 			    0.0, 0.0, 1.0,
 			    &test->undersized_fb);
 
@@ -445,12 +445,12 @@ pageflip_test_init(pageflip_test_t *test, igt_output_t *output, enum pipe pipe)
 	mode = igt_output_get_mode(output);
 	igt_create_color_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
 			    DRM_FORMAT_XRGB8888,
-			    LOCAL_DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_MOD_NONE,
 			    1.0, 0.0, 0.0,
 			    &test->red_fb);
 	igt_create_color_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
 			    DRM_FORMAT_XRGB8888,
-			    LOCAL_DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_MOD_NONE,
 			    0.0, 0.0, 1.0,
 			    &test->blue_fb);
 }
@@ -664,19 +664,19 @@ gen9_test_init(gen9_test_t *test, igt_output_t *output, enum pipe pipe)
 	/* Initial framebuffer of full CRTC size */
 	igt_create_color_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
 			    DRM_FORMAT_XRGB8888,
-			    LOCAL_DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_MOD_NONE,
 			    0.0, 1.0, 0.0,
 			    &test->biggreen_fb);
 
 	/* Framebuffers that only cover a quarter of the CRTC size */
 	igt_create_color_fb(data->drm_fd, test->w, test->h,
 			    DRM_FORMAT_XRGB8888,
-			    LOCAL_DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_MOD_NONE,
 			    1.0, 0.0, 0.0,
 			    &test->smallred_fb);
 	igt_create_color_fb(data->drm_fd, test->w, test->h,
 			    DRM_FORMAT_XRGB8888,
-			    LOCAL_DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_MOD_NONE,
 			    0.0, 0.0, 1.0,
 			    &test->smallblue_fb);
 }

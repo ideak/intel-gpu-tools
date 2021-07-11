@@ -110,7 +110,7 @@ get_reference_crc(data_t *data, igt_output_t *output, enum pipe pipe,
 
 	igt_create_color_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
 			    DRM_FORMAT_XRGB8888,
-			    LOCAL_DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_MOD_NONE,
 			    color->red, color->green, color->blue,
 			    &data->fb[primary->index]);
 
@@ -240,7 +240,7 @@ prepare_planes(data_t *data, enum pipe pipe_id, color_t *color,
 		data->plane[i] = plane;
 
 		plane_format = data->plane[i]->type == DRM_PLANE_TYPE_CURSOR ? DRM_FORMAT_ARGB8888 : DRM_FORMAT_XRGB8888;
-		plane_tiling = data->plane[i]->type == DRM_PLANE_TYPE_CURSOR ? LOCAL_DRM_FORMAT_MOD_NONE : tiling;
+		plane_tiling = data->plane[i]->type == DRM_PLANE_TYPE_CURSOR ? DRM_FORMAT_MOD_NONE : tiling;
 
 		igt_skip_on(!igt_plane_has_format_mod(plane, plane_format,
 						      plane_tiling));
@@ -393,7 +393,7 @@ run_tests_for_pipe(data_t *data, enum pipe pipe)
 		test_plane_position(data, pipe, I915_FORMAT_MOD_Yf_TILED);
 
 	igt_subtest_f("atomic-pipe-%s-tiling-none", kmstest_pipe_name(pipe))
-		test_plane_position(data, pipe, LOCAL_DRM_FORMAT_MOD_NONE);
+		test_plane_position(data, pipe, DRM_FORMAT_MOD_NONE);
 }
 
 static data_t data;
