@@ -986,34 +986,6 @@ bool gem_has_bsd2(int fd)
 	return has_param(fd, I915_PARAM_HAS_BSD2);
 }
 
-struct local_i915_gem_get_aperture {
-	__u64 aper_size;
-	__u64 aper_available_size;
-	__u64 version;
-	__u64 map_total_size;
-	__u64 stolen_total_size;
-};
-#define DRM_I915_GEM_GET_APERTURE	0x23
-#define LOCAL_IOCTL_I915_GEM_GET_APERTURE DRM_IOR  (DRM_COMMAND_BASE + DRM_I915_GEM_GET_APERTURE, struct local_i915_gem_get_aperture)
-
-/**
- * gem_total_stolen_size:
- * @fd: open i915 drm file descriptor
- *
- * Feature test macro to query the kernel for the total stolen size.
- *
- * Returns: Total stolen memory.
- */
-uint64_t gem_total_stolen_size(int fd)
-{
-	struct local_i915_gem_get_aperture aperture;
-
-	memset(&aperture, 0, sizeof(aperture));
-	do_ioctl(fd, LOCAL_IOCTL_I915_GEM_GET_APERTURE, &aperture);
-
-	return aperture.stolen_total_size;
-}
-
 /**
  * gem_has_softpin:
  * @fd: open i915 drm file descriptor

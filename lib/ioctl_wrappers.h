@@ -89,17 +89,6 @@ int __gem_execbuf(int fd, struct drm_i915_gem_execbuffer2 *execbuf);
 #define I915_GEM_DOMAIN_WC 0x80
 #endif
 
-/**
- * gem_require_stolen_support:
- * @fd: open i915 drm file descriptor
- *
- * Test macro to query whether support for allocating objects from stolen
- * memory is available. Automatically skips through igt_require() if not.
- */
-#define gem_require_stolen_support(fd) \
-			igt_require(gem_create__has_stolen_support(fd) && \
-				    (gem_total_stolen_size(fd) > 0))
-
 int gem_madvise(int fd, uint32_t handle, int state);
 
 void gem_userptr(int fd, void *ptr, uint64_t size, int read_only, uint32_t flags, uint32_t *handle);
