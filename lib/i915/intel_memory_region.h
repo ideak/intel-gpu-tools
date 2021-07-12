@@ -62,6 +62,8 @@ uint8_t gem_get_lmem_region_count(int fd);
 
 bool gem_has_lmem(int fd);
 
+struct drm_i915_gem_memory_class_instance;
+
 int __gem_create_in_memory_region_list(int fd, uint32_t *handle, uint64_t size,
 				       struct drm_i915_gem_memory_class_instance *mem_regions,
 				       int num_regions);
