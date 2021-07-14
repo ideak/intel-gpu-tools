@@ -140,9 +140,11 @@ bool gem_scheduler_has_engine_busy_stats(int fd)
  */
 bool gem_scheduler_has_timeslicing(int fd)
 {
-	return ((gem_scheduler_capability(fd) &
+	return (((gem_scheduler_capability(fd) &
 	        (I915_SCHEDULER_CAP_PREEMPTION |
-		 I915_SCHEDULER_CAP_SEMAPHORES))
+		 I915_SCHEDULER_CAP_SEMAPHORES)) ==
+		(I915_SCHEDULER_CAP_PREEMPTION |
+		I915_SCHEDULER_CAP_SEMAPHORES))
 		|| gem_has_guc_submission(fd));
 }
 
@@ -168,8 +170,6 @@ void gem_scheduler_print_capability(int fd)
 		igt_info(" - With HW semaphores enabled\n");
 	if (caps & I915_SCHEDULER_CAP_ENGINE_BUSY_STATS)
 		igt_info(" - With engine busy statistics\n");
-	if ((caps & (I915_SCHEDULER_CAP_PREEMPTION
-		  | I915_SCHEDULER_CAP_SEMAPHORES))
-		|| gem_has_guc_submission(fd))
+	if (gem_scheduler_has_timeslicing(fd))
 		igt_info(" - With timeslicing enabled\n");
 }
