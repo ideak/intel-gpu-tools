@@ -454,7 +454,7 @@ static bool is_6bpc(igt_display_t *display, enum pipe pipe) {
 		return false;
 
 	c = output->config.connector;
-	if (c->connector_type != DRM_MODE_CONNECTOR_eDP ||
+	if (c->connector_type != DRM_MODE_CONNECTOR_eDP &&
 		c->connector_type != DRM_MODE_CONNECTOR_DSI)
 		return false;
 
