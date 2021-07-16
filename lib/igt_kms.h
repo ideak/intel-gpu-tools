@@ -329,6 +329,11 @@ typedef enum {
 #define IGT_ROTATION_MASK \
 	(IGT_ROTATION_0 | IGT_ROTATION_90 | IGT_ROTATION_180 | IGT_ROTATION_270)
 
+static inline bool igt_rotation_90_or_270(igt_rotation_t rotation)
+{
+	return rotation & (IGT_ROTATION_90 | IGT_ROTATION_270);
+}
+
 typedef struct igt_plane {
 	/*< private >*/
 	igt_pipe_t *pipe;
