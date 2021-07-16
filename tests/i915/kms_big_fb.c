@@ -410,6 +410,8 @@ static bool test_pipe(data_t *data)
 				   IGT_CRTC_GAMMA_LUT))
 		return false;
 
+	data->ibb = intel_bb_create(data->drm_fd, 4096);
+
 	mode = igt_output_get_mode(data->output);
 
 	data->width = mode->hdisplay;
@@ -470,6 +472,8 @@ static bool test_pipe(data_t *data)
 
 	igt_remove_fb(data->drm_fd, &data->small_fb);
 
+	intel_bb_destroy(data->ibb);
+
 	return ret;
 }
 
@@ -491,6 +495,8 @@ max_hw_stride_async_flip_test(data_t *data)
 
 	igt_require_f(igt_display_try_commit2(&data->display, COMMIT_ATOMIC) == 0,
 		      "rotation/flip not supported\n");
+
+	data->ibb = intel_bb_create(data->drm_fd, 4096);
 
 	setup_fb(data, &data->big_fb, data->big_fb_width, data->big_fb_height,
 		 data->format, data->modifier, data->hw_stride);
@@ -559,6 +565,9 @@ max_hw_stride_async_flip_test(data_t *data)
 	igt_remove_fb(data->drm_fd, &data->big_fb);
 	igt_remove_fb(data->drm_fd, &data->big_fb_flip[0]);
 	igt_remove_fb(data->drm_fd, &data->big_fb_flip[1]);
+
+	intel_bb_destroy(data->ibb);
+
 	return true;
 }
 
@@ -842,7 +851,6 @@ igt_main
 			data.render_copy = igt_get_render_copyfunc(data.devid);
 
 		data.bops = buf_ops_create(data.drm_fd);
-		data.ibb = intel_bb_create(data.drm_fd, 4096);
 
 		data.planeclearrgb[0] = 0.0;
 		data.planeclearrgb[1] = 0.0;
@@ -863,9 +871,7 @@ igt_main
 		igt_subtest_f("%s-addfb-size-overflow",
 			      modifiers[i].name) {
 			data.modifier = modifiers[i].modifier;
-			data.ibb = intel_bb_create(data.drm_fd, 4096);
 			test_size_overflow(&data);
-			intel_bb_destroy(data.ibb);
 		}
 	}
 
@@ -874,9 +880,7 @@ igt_main
 		igt_subtest_f("%s-addfb-size-offset-overflow",
 			      modifiers[i].name) {
 			data.modifier = modifiers[i].modifier;
-			data.ibb = intel_bb_create(data.drm_fd, 4096);
 			test_size_offset_overflow(&data);
-			intel_bb_destroy(data.ibb);
 		}
 	}
 
@@ -884,9 +888,7 @@ igt_main
 	for (int i = 0; i < ARRAY_SIZE(modifiers); i++) {
 		igt_subtest_f("%s-addfb", modifiers[i].name) {
 			data.modifier = modifiers[i].modifier;
-			data.ibb = intel_bb_create(data.drm_fd, 4096);
 			test_addfb(&data);
-			intel_bb_destroy(data.ibb);
 		}
 	}
 
@@ -906,9 +908,7 @@ igt_main
 					igt_require(data.format == DRM_FORMAT_C8 ||
 						    igt_fb_supported_format(data.format));
 					igt_require(igt_display_has_format_mod(&data.display, data.format, data.modifier));
-					data.ibb = intel_bb_create(data.drm_fd, 4096);
 					test_scanout(&data);
-					intel_bb_destroy(data.ibb);
 				}
 			}
 
