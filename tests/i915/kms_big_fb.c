@@ -489,6 +489,7 @@ max_hw_stride_async_flip_test(data_t *data)
 
 	primary = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_PRIMARY);
 
+	igt_require(igt_plane_has_rotation(primary, data->rotation));
 	igt_plane_set_rotation(primary, data->rotation);
 
 	igt_require_f(igt_display_try_commit2(&data->display, COMMIT_ATOMIC) == 0,
