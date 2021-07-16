@@ -575,6 +575,11 @@ static void test_scanout(data_t *data)
 {
 	igt_output_t *output;
 
+	igt_require(data->format == DRM_FORMAT_C8 ||
+		    igt_fb_supported_format(data->format));
+
+	igt_require(igt_display_has_format_mod(&data->display, data->format, data->modifier));
+
 	if (data->max_hw_stride_test) {
 		data->big_fb_width = data->max_hw_fb_width;
 		data->big_fb_height = 0;
@@ -904,12 +909,8 @@ igt_main
 				igt_describe("Sanity check if addfb ioctl works correctly for given "
 						"combination of modifier formats and rotation");
 				igt_subtest_f("%s-%dbpp-rotate-%d", modifiers[i].name,
-					      formats[j].bpp, rotations[k].angle) {
-					igt_require(data.format == DRM_FORMAT_C8 ||
-						    igt_fb_supported_format(data.format));
-					igt_require(igt_display_has_format_mod(&data.display, data.format, data.modifier));
+					      formats[j].bpp, rotations[k].angle)
 					test_scanout(&data);
-				}
 			}
 
 			igt_fixture
@@ -962,9 +963,6 @@ igt_main
 							data.max_hw_fb_width = min(data.hw_stride / (formats[j].bpp >> 3), data.max_fb_width);
 						}
 
-						igt_require(data.format == DRM_FORMAT_C8 ||
-							igt_fb_supported_format(data.format));
-						igt_require(igt_display_has_format_mod(&data.display, data.format, data.modifier));
 						test_scanout(&data);
 					}
 
@@ -976,9 +974,6 @@ igt_main
 					igt_describe("test async flip on maximum hardware supported stride length for given bpp and modifiers.");
 					igt_subtest_f("%s-max-hw-stride-%dbpp-rotate-%d%s-async-flip", modifiers[i].name,
 						formats[j].bpp, rotations[k].angle, fliptab[l].flipname) {
-							igt_require(data.format == DRM_FORMAT_C8 ||
-								igt_fb_supported_format(data.format));
-							igt_require(igt_display_has_format_mod(&data.display, data.format, data.modifier));
 							igt_require(igt_has_drm_cap(data.drm_fd, DRM_CAP_ASYNC_PAGE_FLIP));
 							data.max_hw_fb_width = min(data.hw_stride / (formats[j].bpp >> 3), data.max_fb_width);
 							test_scanout(&data);
