@@ -55,8 +55,6 @@ typedef struct {
 	int hw_stride;
 	int max_hw_fb_width;
 	double planeclearrgb[3];
-	uint32_t format_override;
-	uint32_t stride_override;
 } data_t;
 
 static struct intel_buf *init_buf(data_t *data,
@@ -950,18 +948,7 @@ igt_main
 					igt_subtest_f("%s-max-hw-stride-%dbpp-rotate-%d%s", modifiers[i].name,
 						formats[j].bpp, rotations[k].angle, fliptab[l].flipname) {
 						igt_require(intel_display_ver(intel_get_drm_devid(data.drm_fd)) >= 5);
-						if (data.format_override != 0) {
-							igt_info("using format override fourcc %.4s\n", (char *)&data.format_override);
-							data.format = data.format_override;
-						}
-						if (data.stride_override != 0) {
-							igt_info("using FB width override %.d\n", data.stride_override);
-							data.hw_stride = data.stride_override;
-							data.max_hw_fb_width = data.stride_override;
-
-						} else {
-							data.max_hw_fb_width = min(data.hw_stride / (formats[j].bpp >> 3), data.max_fb_width);
-						}
+						data.max_hw_fb_width = min(data.hw_stride / (formats[j].bpp >> 3), data.max_fb_width);
 
 						test_scanout(&data);
 					}
