@@ -612,6 +612,41 @@ const char * const igt_connector_prop_names[IGT_NUM_CONNECTOR_PROPS] = {
 	[IGT_CONNECTOR_DITHERING_MODE] = "dithering mode",
 };
 
+const char * const igt_rotation_names[] = {
+	[0] = "rotate-0",
+	[1] = "rotate-90",
+	[2] = "rotate-180",
+	[3] = "rotate-270",
+	[4] = "reflect-x",
+	[5] = "reflect-y",
+};
+
+static unsigned int
+igt_plane_rotations(igt_display_t *display, igt_plane_t *plane,
+		    drmModePropertyPtr prop)
+{
+	unsigned int rotations = 0;
+
+	igt_assert_eq(prop->flags & DRM_MODE_PROP_LEGACY_TYPE,
+		      DRM_MODE_PROP_BITMASK);
+	igt_assert_eq(prop->count_values, prop->count_enums);
+
+	for (int i = 0; i < ARRAY_SIZE(igt_rotation_names); i++) {
+		for (int j = 0; j < prop->count_enums; j++) {
+			if (strcmp(igt_rotation_names[i], prop->enums[j].name))
+				continue;
+
+			/* various places assume the uabi uses specific bit values */
+			igt_assert_eq(prop->values[j], i);
+
+			rotations |= 1 << i;
+		}
+	}
+	igt_assert_neq(rotations, 0);
+
+	return rotations;
+}
+
 /*
  * Retrieve all the properies specified in props_name and store them into
  * plane->props.
@@ -640,8 +675,14 @@ igt_fill_plane_props(igt_display_t *display, igt_plane_t *plane,
 			break;
 		}
 
+		if (strcmp(prop->name, "rotation") == 0)
+			plane->rotations = igt_plane_rotations(display, plane, prop);
+
 		drmModeFreeProperty(prop);
 	}
+
+	if (!plane->rotations)
+		plane->rotations = IGT_ROTATION_0;
 
 	drmModeFreeObjectProperties(props);
 }

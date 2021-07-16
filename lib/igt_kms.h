@@ -358,6 +358,8 @@ typedef struct igt_plane {
 		uint64_t values[IGT_NUM_COLOR_RANGES];
 	} color_range;
 
+	igt_rotation_t rotations;
+
 	uint64_t changed;
 	uint32_t props[IGT_NUM_PLANE_PROPS];
 	uint64_t values[IGT_NUM_PLANE_PROPS];
@@ -490,6 +492,20 @@ void igt_fb_set_position(struct igt_fb *fb, igt_plane_t *plane,
 	uint32_t x, uint32_t y);
 void igt_fb_set_size(struct igt_fb *fb, igt_plane_t *plane,
 	uint32_t w, uint32_t h);
+
+/**
+ * igt_plane_has_rotation:
+ * @plane: Plane pointer for which rotation is to be queried
+ * @rotation: Plane rotation value (0, 90, 180, 270)
+ *
+ * Check whether @plane potentially supports the given @rotation.
+ * Note that @rotation may still rejected later due to other
+ * constraints (eg. incompatible pixel format or modifier).
+ */
+static inline bool igt_plane_has_rotation(igt_plane_t *plane, igt_rotation_t rotation)
+{
+	return (plane->rotations & rotation) == rotation;
+}
 
 void igt_wait_for_vblank(int drm_fd, int crtc_offset);
 void igt_wait_for_vblank_count(int drm_fd, int crtc_offset, int count);
