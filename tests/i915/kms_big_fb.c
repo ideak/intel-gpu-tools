@@ -57,7 +57,6 @@ typedef struct {
 	double planeclearrgb[3];
 	uint32_t format_override;
 	uint32_t stride_override;
-	uint32_t async_flip_support;
 } data_t;
 
 static struct intel_buf *init_buf(data_t *data,
@@ -800,7 +799,6 @@ igt_main
 {
 	igt_fixture {
 		drmModeResPtr res;
-		struct drm_get_cap cap = { .capability = DRM_CAP_ASYNC_PAGE_FLIP };
 
 		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
 
@@ -851,9 +849,6 @@ igt_main
 
 		data.max_hw_stride_test = false;
 		data.async_flip_test = false;
-
-		igt_ioctl(data.drm_fd, DRM_IOCTL_GET_CAP, &cap);
-		data.async_flip_support = cap.value;
 	}
 
 	/*
@@ -983,7 +978,7 @@ igt_main
 							igt_require(data.format == DRM_FORMAT_C8 ||
 								igt_fb_supported_format(data.format));
 							igt_require(igt_display_has_format_mod(&data.display, data.format, data.modifier));
-							igt_require_f(data.async_flip_support, "Async Flip is not supported\n");
+							igt_require(igt_has_drm_cap(data.drm_fd, DRM_CAP_ASYNC_PAGE_FLIP));
 							data.max_hw_fb_width = min(data.hw_stride / (formats[j].bpp >> 3), data.max_fb_width);
 							test_scanout(&data);
 					}
