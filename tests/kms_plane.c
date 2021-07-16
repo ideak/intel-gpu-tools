@@ -721,7 +721,7 @@ restart_round:
 
 static bool use_multiple_colors(data_t *data, uint32_t format)
 {
-	return igt_format_is_yuv_semiplanar(format);
+	return data->extended || igt_format_is_yuv_semiplanar(format);
 }
 
 static bool test_format_plane_colors(data_t *data, enum pipe pipe,
