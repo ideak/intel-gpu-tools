@@ -270,7 +270,7 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 	 * For 90/270, we will use create smaller fb so that the rotated
 	 * frame can fit in
 	 */
-	if (data->rotation & (IGT_ROTATION_90 | IGT_ROTATION_270)) {
+	if (igt_rotation_90_or_270(data->rotation)) {
 		tiling = data->override_tiling ?: I915_FORMAT_MOD_Y_TILED;
 
 		igt_swap(w, h);
@@ -362,7 +362,7 @@ static void test_single_case(data_t *data, enum pipe pipe,
 	prepare_fbs(data, output, plane, rect, format);
 
 	igt_plane_set_rotation(plane, data->rotation);
-	if (data->rotation & (IGT_ROTATION_90 | IGT_ROTATION_270))
+	if (igt_rotation_90_or_270(data->rotation))
 		igt_plane_set_size(plane, data->fb.height, data->fb.width);
 
 	ret = igt_display_try_commit2(display, COMMIT_ATOMIC);
@@ -396,7 +396,7 @@ static void test_single_case(data_t *data, enum pipe pipe,
 	 */
 	if (data->fb_flip.fb_id) {
 		igt_plane_set_fb(plane, &data->fb_flip);
-		if (data->rotation == IGT_ROTATION_90 || data->rotation == IGT_ROTATION_270)
+		if (igt_rotation_90_or_270(data->rotation))
 			igt_plane_set_size(plane, data->fb.height, data->fb.width);
 
 		if (plane->type != DRM_PLANE_TYPE_PRIMARY) {
@@ -575,7 +575,7 @@ static bool setup_multiplane(data_t *data, planeinfos *planeinfo,
 		w = planeinfo[c].width & ~3;
 		h = planeinfo[c].height & ~3;
 
-		if (planeinfo[c].rotation_sw & (IGT_ROTATION_90 | IGT_ROTATION_270))
+		if (igt_rotation_90_or_270(planeinfo[c].rotation_sw))
 			igt_swap(w, h);
 
 		if (!igt_plane_has_format_mod(planeinfo[c].plane,
@@ -596,7 +596,7 @@ static bool setup_multiplane(data_t *data, planeinfos *planeinfo,
 		}
 		igt_plane_set_fb(planeinfo[c].plane, planes[c]);
 
-		if (planeinfo[c].rotation_hw & (IGT_ROTATION_90 | IGT_ROTATION_270))
+		if (igt_rotation_90_or_270(planeinfo[c].rotation_hw))
 			igt_plane_set_size(planeinfo[c].plane, h, w);
 
 		igt_plane_set_position(planeinfo[c].plane, planeinfo[c].x1,
@@ -729,20 +729,20 @@ static void test_multi_plane_rotation(data_t *data, enum pipe pipe)
 						 * from gen11 onwards.
 						 */
 						if (p[0].format == DRM_FORMAT_RGB565 &&
-						     (planeconfigs[i].rotation & (IGT_ROTATION_90 | IGT_ROTATION_270))
+						     igt_rotation_90_or_270(planeconfigs[i].rotation)
 						     && intel_display_ver(data->devid) < 11)
 							continue;
 
 						if (p[1].format == DRM_FORMAT_RGB565 &&
-						     (planeconfigs[j].rotation & (IGT_ROTATION_90 | IGT_ROTATION_270))
+						     igt_rotation_90_or_270(planeconfigs[j].rotation)
 						     && intel_display_ver(data->devid) < 11)
 							continue;
 
-						if ((planeconfigs[i].rotation & (IGT_ROTATION_90 | IGT_ROTATION_270))
+						if (igt_rotation_90_or_270(planeconfigs[i].rotation)
 						    && intel_display_ver(data->devid) >= 13)
 							continue;
 
-						if ((planeconfigs[j].rotation & (IGT_ROTATION_90 | IGT_ROTATION_270))
+						if (igt_rotation_90_or_270(planeconfigs[j].rotation)
 						    && intel_display_ver(data->devid) >= 13)
 							continue;
 						/*
@@ -1049,12 +1049,11 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 			      plane_test_str(subtest->plane),
 			      rot_test_str(subtest->rot)) {
 			if (is_i915_device(data.gfx_fd)) {
-				igt_require(!(subtest->rot &
-                                            (IGT_ROTATION_90 | IGT_ROTATION_270)) ||
-                                            (gen >= 9 && gen < 13));
+				igt_require(!igt_rotation_90_or_270(subtest->rot) ||
+					    (gen >= 9 && gen < 13));
 			} else if (is_amdgpu_device(data.gfx_fd)) {
 				data.override_fmt = DRM_FORMAT_XRGB8888;
-				if (subtest->rot & (IGT_ROTATION_90 | IGT_ROTATION_270))
+				if (igt_rotation_90_or_270(subtest->rot))
 					data.override_tiling = AMD_FMT_MOD |
 						AMD_FMT_MOD_SET(TILE, AMD_FMT_MOD_TILE_GFX9_64K_S) |
 						AMD_FMT_MOD_SET(TILE_VERSION, AMD_FMT_MOD_TILE_VER_GFX9);
@@ -1108,9 +1107,8 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 				    (IS_CHERRYVIEW(data.devid) && reflect_x->rot == IGT_ROTATION_0
 				     && reflect_x->tiling == I915_FORMAT_MOD_X_TILED));
 			data.rotation = (IGT_REFLECT_X | reflect_x->rot);
-			igt_require(!(gen >= 13 && (data.rotation &
-						    (IGT_ROTATION_90 |
-						     IGT_ROTATION_270))));
+			igt_require(!(gen >= 13 &&
+				      igt_rotation_90_or_270(data.rotation)));
 			data.override_tiling = reflect_x->tiling;
 			test_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY, false);
 		}
