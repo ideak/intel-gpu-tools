@@ -93,6 +93,8 @@ static dither_status_t get_dither_state(data_t *data)
 	dir = igt_debugfs_dir(data->drm_fd);
 	igt_assert(dir >= 0);
 
+	igt_require_intel(data->drm_fd);
+
 	res = igt_debugfs_simple_read(dir, "i915_display_info", buf, sizeof(buf));
 	igt_require(res > 0);
 	close(dir);
@@ -230,7 +232,7 @@ igt_main
 	data_t data = { 0 };
 
 	igt_fixture {
-		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
+		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
 		kmstest_set_vt_graphics_mode();
 
 		igt_display_require(&data.display, data.drm_fd);
