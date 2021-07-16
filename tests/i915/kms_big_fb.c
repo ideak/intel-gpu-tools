@@ -323,14 +323,7 @@ static bool test_plane(data_t *data)
 	if (!igt_plane_has_format_mod(plane, data->format, data->modifier))
 		return false;
 
-	if (data->rotation != IGT_ROTATION_0 &&
-	    !igt_plane_has_prop(plane, IGT_PLANE_ROTATION))
-		return false;
-
-	/* FIXME need atomic on i965/g4x */
-	if (data->rotation != IGT_ROTATION_0 &&
-	    data->rotation != IGT_ROTATION_180 &&
-	    !data->display.is_atomic)
+	if (!igt_plane_has_rotation(plane, data->rotation))
 		return false;
 
 	if (igt_plane_has_prop(plane, IGT_PLANE_ROTATION))
