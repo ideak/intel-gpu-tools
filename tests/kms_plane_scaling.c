@@ -165,10 +165,6 @@ static bool can_rotate(data_t *d, unsigned format, uint64_t tiling,
 	if (!is_i915_device(d->drm_fd))
 		return true;
 
-	if (intel_display_ver(d->devid) >= 13 &&
-		igt_rotation_90_or_270(rot))
-		return false;
-
 	switch (format) {
 	case DRM_FORMAT_RGB565:
 		if (intel_display_ver(d->devid) >= 11)
@@ -272,6 +268,7 @@ static void test_scaler_with_rotation_pipe(data_t *d, enum pipe pipe,
 
 				if (test_format(d, &tested_formats, format) &&
 				    igt_plane_has_format_mod(plane, format, tiling) &&
+				    igt_plane_has_rotation(plane, rot) &&
 				    can_rotate(d, format, tiling, rot) &&
 				    can_scale(d, format))
 					check_scaling_pipe_plane_rot(d, plane, format,
