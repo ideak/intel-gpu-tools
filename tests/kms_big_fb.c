@@ -344,8 +344,7 @@ static bool test_plane(data_t *data)
 
 		/* Hardware limitation */
 		if (data->format == DRM_FORMAT_RGB565 &&
-		    (data->rotation == IGT_ROTATION_90 ||
-		     data->rotation == IGT_ROTATION_270)) {
+		    igt_rotation_90_or_270(data->rotation)) {
 			x &= ~1;
 			y &= ~1;
 		}
@@ -426,8 +425,7 @@ static bool test_pipe(data_t *data)
 
 	width = mode->hdisplay;
 	height = mode->vdisplay;
-	if (data->rotation == IGT_ROTATION_90 ||
-	    data->rotation == IGT_ROTATION_270)
+	if (igt_rotation_90_or_270(data->rotation))
 		igt_swap(width, height);
 
 	igt_create_color_fb(data->drm_fd, width, height,
@@ -954,8 +952,8 @@ igt_main
 					data.rotation = rotations[k].rotation | fliptab[l].flip;
 
 					// this combination will never happen.
-					if ((data.rotation & (IGT_ROTATION_90 | IGT_ROTATION_270)) ||
-						(fliptab[l].flip == IGT_REFLECT_X && modifiers[i].modifier == DRM_FORMAT_MOD_LINEAR))
+					if (igt_rotation_90_or_270(data.rotation) ||
+					    (fliptab[l].flip == IGT_REFLECT_X && modifiers[i].modifier == DRM_FORMAT_MOD_LINEAR))
 						continue;
 
 					igt_describe("test maximum hardware supported stride length for given bpp and modifiers.");
