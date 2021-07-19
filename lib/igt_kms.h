@@ -917,13 +917,13 @@ void igt_dump_connectors_fd(int drmfd);
 void igt_dump_crtcs_fd(int drmfd);
 bool igt_override_all_active_output_modes_to_fit_bw(igt_display_t *display);
 
-bool igt_is_dp_dsc_supported(int drmfd, drmModeConnector *connector);
-bool igt_is_dp_fec_supported(int drmfd, drmModeConnector *connector);
-bool igt_is_dp_dsc_enabled(int drmfd, drmModeConnector *connector);
+bool igt_is_dsc_supported(int drmfd, drmModeConnector *connector);
+bool igt_is_fec_supported(int drmfd, drmModeConnector *connector);
+bool igt_is_dsc_enabled(int drmfd, drmModeConnector *connector);
 bool igt_is_force_dsc_enabled(int drmfd, drmModeConnector *connector);
-int igt_force_dp_dsc_enable(int drmfd, drmModeConnector *connector);
-int igt_force_dp_dsc_enable_bpp(int drmfd, drmModeConnector *connector,
+int igt_force_dsc_enable(int drmfd, drmModeConnector *connector);
+int igt_force_dsc_enable_bpp(int drmfd, drmModeConnector *connector,
 				int bpp);
-int igt_get_dp_dsc_debugfs_fd(int drmfd, drmModeConnector *connector);
+int igt_get_dsc_debugfs_fd(int drmfd, drmModeConnector *connector);
 
 #endif /* __IGT_KMS_H__ */
