@@ -57,7 +57,7 @@ can_bigjoiner(data_t *data)
 		igt_debug("Platform supports uncompressed bigjoiner\n");
 		return true;
 	} else if (intel_display_ver(devid) >= 11) {
-		return igt_is_dp_dsc_supported(data->drm_fd, connector);
+		return igt_is_dsc_supported(data->drm_fd, connector);
 	}
 
 	return false;
