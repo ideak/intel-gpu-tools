@@ -337,7 +337,7 @@ static void cleanup_dc_dpms(data_t *data)
 static void setup_dc_dpms(data_t *data)
 {
 	if (IS_BROXTON(data->devid) || IS_GEMINILAKE(data->devid) ||
-	    AT_LEAST_GEN(data->devid, 11)) {
+	    intel_display_ver(data->devid) >= 11) {
 		igt_disable_runtime_pm();
 		data->runtime_suspend_disabled = true;
 	} else {
