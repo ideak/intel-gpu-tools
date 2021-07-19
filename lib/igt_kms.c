@@ -5183,3 +5183,138 @@ void igt_dump_crtcs_fd(int drmfd)
 
 	drmModeFreeResources(mode_resources);
 }
+
+static
+bool check_dsc_debugfs(int drmfd, drmModeConnector *connector,
+		       const char *check_str)
+{
+	char file_name[128] = {0};
+	char buf[512];
+
+	sprintf(file_name, "%s-%d/i915_dsc_fec_support",
+		kmstest_connector_type_str(connector->connector_type),
+		connector->connector_type_id);
+
+	igt_debugfs_read(drmfd, file_name, buf);
+
+	return strstr(buf, check_str);
+}
+
+static
+int write_dsc_debugfs(int drmfd, drmModeConnector *connector,
+		      const char *file_name,
+		      const char *write_buf)
+{
+	int debugfs_fd = igt_debugfs_dir(drmfd);
+	int len = strlen(write_buf);
+	int ret;
+	char file_path[128] = {0};
+
+	sprintf(file_path, "%s-%d/%s",
+		kmstest_connector_type_str(connector->connector_type),
+		connector->connector_type_id,
+		file_name);
+
+	ret = igt_sysfs_write(debugfs_fd, file_path, write_buf, len);
+
+	close(debugfs_fd);
+
+	return ret;
+}
+
+/*
+ * igt_is_dp_dsc_supported:
+ * @drmfd: A drm file descriptor
+ * @connector: Pointer to libdrm connector
+ *
+ * Returns: True if DSC is supported for the given connector, false otherwise.
+ */
+bool igt_is_dp_dsc_supported(int drmfd, drmModeConnector *connector)
+{
+	return check_dsc_debugfs(drmfd, connector, "DSC_Sink_Support: yes");
+}
+
+/*
+ * igt_is_dp_fec_supported:
+ * @drmfd: A drm file descriptor
+ * @connector: Pointer to libdrm connector
+ *
+ * Returns: True if FEC is supported for the given connector, false otherwise.
+ */
+bool igt_is_dp_fec_supported(int drmfd, drmModeConnector *connector)
+{
+
+	return check_dsc_debugfs(drmfd, connector, "FEC_Sink_Support: yes");
+}
+
+/*
+ * igt_is_dp_dsc_enabled:
+ * @drmfd: A drm file descriptor
+ * @connector: Pointer to libdrm connector
+ *
+ * Returns: True if DSC is enabled for the given connector, false otherwise.
+ */
+bool igt_is_dp_dsc_enabled(int drmfd, drmModeConnector *connector)
+{
+	return check_dsc_debugfs(drmfd, connector, "DSC_Enabled: yes");
+}
+
+/*
+ * igt_is_force_dsc_enabled:
+ * @drmfd: A drm file descriptor
+ * @connector: Pointer to libdrm connector
+ *
+ * Returns: True if DSC is force enabled (via debugfs) for the given connector,
+ * false otherwise.
+ */
+bool igt_is_force_dsc_enabled(int drmfd, drmModeConnector *connector)
+{
+	return check_dsc_debugfs(drmfd, connector, "Force_DSC_Enable: yes");
+}
+
+/*
+ * igt_force_dp_dsc_enable:
+ * @drmfd: A drm file descriptor
+ * @connector: Pointer to libdrm connector
+ *
+ * Returns: 1 on success or negative error code, in case of failure.
+ */
+int igt_force_dp_dsc_enable(int drmfd, drmModeConnector *connector)
+{
+	return write_dsc_debugfs(drmfd, connector, "i915_dsc_fec_support", "1");
+}
+
+/*
+ * igt_force_dp_dsc_enable:
+ * @drmfd: A drm file descriptor
+ * @connector: Pointer to libdrm connector
+ * @bpp: Compressed bpp to be used with DSC
+ *
+ * Returns: No. of bytes written or negative error code, in case of failure.
+ */
+int igt_force_dp_dsc_enable_bpp(int drmfd, drmModeConnector *connector, int bpp)
+{
+	char buf[20] = {0};
+
+	sprintf(buf, "%d", bpp);
+
+	return write_dsc_debugfs(drmfd, connector, "i915_dsc_bpp", buf);
+}
+
+/*
+ * igt_get_dp_dsc_debugfs_fd:
+ * @drmfd: A drm file descriptor
+ * @connector: Pointer to libdrm connector
+ *
+ * Returns: fd of the DSC debugfs for the given connector, else returns -1.
+ */
+int igt_get_dp_dsc_debugfs_fd(int drmfd, drmModeConnector *connector)
+{
+	char file_name[128] = {0};
+
+	sprintf(file_name, "%s-%d/i915_dsc_fec_support",
+		kmstest_connector_type_str(connector->connector_type),
+		connector->connector_type_id);
+
+	return openat(igt_debugfs_dir(drmfd), file_name, O_WRONLY);
+}
