@@ -43,6 +43,25 @@ static bool has_scaling_mode_prop(data_t *data)
 				    "scaling mode",
 				    NULL, NULL, NULL);
 }
+static bool
+can_bigjoiner(data_t *data)
+{
+	drmModeConnector *connector = data->output->config.connector;
+	uint32_t devid = intel_get_drm_devid(data->drm_fd);
+
+	/*
+	 * GEN11 and GEN12 require DSC to support bigjoiner.
+	 * XELPD and later GEN support uncompressed bigjoiner.
+	 */
+	if (intel_display_ver(devid) > 12) {
+		igt_debug("Platform supports uncompressed bigjoiner\n");
+		return true;
+	} else if (intel_display_ver(devid) >= 11) {
+		return igt_is_dp_dsc_supported(data->drm_fd, connector);
+	}
+
+	return false;
+}
 
 static int
 test_output(data_t *data)
@@ -70,11 +89,24 @@ test_output(data_t *data)
 	mode = *igt_output_get_mode(output);
 	mode.clock = data->max_dotclock + 1;
 
+	/*
+	 * Newer platforms can support modes higher than the maximum dot clock
+	 * by using pipe joiner, so set the mode clock twice that of maximum
+	 * dot clock;
+	 */
+	if (can_bigjoiner(data)) {
+		igt_info("Platform supports bigjoiner with %s\n",
+			  output->name);
+		mode.clock *= 2;
+	}
+
 	igt_create_fb(data->drm_fd,
 		      mode.hdisplay, mode.vdisplay,
 		      DRM_FORMAT_XRGB8888,
 		      DRM_FORMAT_MOD_NONE,
 		      &fb);
+
+	kmstest_unset_all_crtcs(data->drm_fd, data->res);
 
 	for (i = 0; i < data->res->count_crtcs; i++) {
 		int ret;
@@ -134,8 +166,6 @@ igt_simple_main
 	igt_display_require(&data.display, data.drm_fd);
 	data.res = drmModeGetResources(data.drm_fd);
 	igt_assert(data.res);
-
-	kmstest_unset_all_crtcs(data.drm_fd, data.res);
 
 	data.max_dotclock = i915_max_dotclock(&data);
 	igt_info("Max dotclock: %d kHz\n", data.max_dotclock);
