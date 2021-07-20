@@ -69,11 +69,13 @@ igt_simple_main
 	struct itimerval itv;
 	igt_spin_t *spin;
 	int i915;
+	uint64_t ahnd;
 
 	i915 = drm_open_driver(DRIVER_INTEL);
 	igt_require_gem(i915);
 
-	spin = igt_spin_new(i915);
+	ahnd = get_reloc_ahnd(i915, 0);
+	spin = igt_spin_new(i915, .ahnd = ahnd);
 	fcntl(i915, F_SETFL, fcntl(i915, F_GETFL) | O_NONBLOCK);
 
 	sigaction(SIGALRM, &sa, &old_sa);
@@ -118,4 +120,5 @@ igt_simple_main
 	sigaction(SIGALRM, &old_sa, NULL);
 
 	igt_spin_free(i915, spin);
+	put_ahnd(ahnd);
 }
