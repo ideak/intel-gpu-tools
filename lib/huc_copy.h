@@ -43,7 +43,7 @@
 #define HUC_VIRTUAL_ADDR_REGION_DST	14
 
 void
-gen9_huc_copyfunc(int fd,
-		struct drm_i915_gem_exec_object2 *obj);
+gen9_huc_copyfunc(int fd, uint64_t ahnd,
+		  struct drm_i915_gem_exec_object2 *obj, uint64_t *objsize);
 
 #endif /* HUC_COPY_H */

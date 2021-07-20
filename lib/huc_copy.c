@@ -23,7 +23,9 @@
  */
 
 #include <i915_drm.h>
+#include "drmtest.h"
 #include "huc_copy.h"
+#include "intel_allocator.h"
 
 static void
 gen9_emit_huc_virtual_addr_state(struct drm_i915_gem_exec_object2 *src,
@@ -40,6 +42,7 @@ gen9_emit_huc_virtual_addr_state(struct drm_i915_gem_exec_object2 *src,
 			buf[(*i)++] = src->offset;
 
 			reloc_src->target_handle = src->handle;
+			reloc_src->presumed_offset = src->offset;
 			reloc_src->delta = 0;
 			reloc_src->offset = (*i - 1) * sizeof(buf[0]);
 			reloc_src->read_domains = 0;
@@ -48,6 +51,7 @@ gen9_emit_huc_virtual_addr_state(struct drm_i915_gem_exec_object2 *src,
 			buf[(*i)++] = dst->offset;
 
 			reloc_dst->target_handle = dst->handle;
+			reloc_dst->presumed_offset = dst->offset;
 			reloc_dst->delta = 0;
 			reloc_dst->offset = (*i - 1) * sizeof(buf[0]);
 			reloc_dst->read_domains = 0;
@@ -61,8 +65,8 @@ gen9_emit_huc_virtual_addr_state(struct drm_i915_gem_exec_object2 *src,
 }
 
 void
-gen9_huc_copyfunc(int fd,
-		struct drm_i915_gem_exec_object2 *obj)
+gen9_huc_copyfunc(int fd, uint64_t ahnd,
+		  struct drm_i915_gem_exec_object2 *obj, uint64_t *objsize)
 {
 	struct drm_i915_gem_relocation_entry reloc[2];
 	struct drm_i915_gem_execbuffer2 execbuf;
@@ -86,6 +90,21 @@ gen9_huc_copyfunc(int fd,
 	buf[i++] = MFX_WAIT;
 
 	memset(reloc, 0, sizeof(reloc));
+
+	if (ahnd) {
+		obj[0].flags = EXEC_OBJECT_PINNED;
+		obj[1].flags = EXEC_OBJECT_PINNED | EXEC_OBJECT_WRITE;
+		obj[2].flags = EXEC_OBJECT_PINNED;
+		obj[0].offset = get_offset(ahnd, obj[0].handle, objsize[0], 0);
+		obj[1].offset = get_offset(ahnd, obj[1].handle, objsize[1], 0);
+		obj[2].offset = get_offset(ahnd, obj[2].handle, objsize[2], 0);
+	} else {
+		obj[0].offset = 1 << 20;
+		obj[1].offset = ALIGN(obj[0].offset + objsize[0], 1 << 20);
+		obj[2].offset = ALIGN(obj[1].offset + objsize[1], 1 << 20);
+		obj[1].flags = EXEC_OBJECT_WRITE;
+	}
+
 	gen9_emit_huc_virtual_addr_state(&obj[0], &obj[1], &reloc[0], &reloc[1], buf, &i);
 
 	buf[i++] = HUC_START;
@@ -94,13 +113,13 @@ gen9_huc_copyfunc(int fd,
 	buf[i++] = MI_BATCH_BUFFER_END;
 
 	gem_write(fd, obj[2].handle, 0, buf, sizeof(buf));
-	obj[2].relocation_count = 2;
+	obj[2].relocation_count = !ahnd ? 2 : 0;
 	obj[2].relocs_ptr = to_user_pointer(reloc);
 
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.buffer_count = 3;
-	execbuf.flags = I915_EXEC_BSD;
+	execbuf.flags = I915_EXEC_BSD | I915_EXEC_NO_RELOC;
 
 	gem_execbuf(fd, &execbuf);
 }

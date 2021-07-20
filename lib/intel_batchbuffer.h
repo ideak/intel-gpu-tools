@@ -679,10 +679,12 @@ void intel_bb_copy_intel_buf(struct intel_bb *ibb,
 /**
  * igt_huc_copyfunc_t:
  * @fd: drm fd
+ * @ahnd: allocator handle, if it is equal to 0 we use relocations
  * @obj: drm_i915_gem_exec_object2 buffer array
  *       obj[0] is source buffer
  *       obj[1] is destination buffer
  *       obj[2] is execution buffer
+ * @objsize: corresponding buffer sizes to @obj
  *
  * This is the type of the per-platform huc copy functions.
  *
@@ -690,8 +692,8 @@ void intel_bb_copy_intel_buf(struct intel_bb *ibb,
  * invoke the HuC Copy kernel to copy 4K bytes from the source buffer
  * to the destination buffer.
  */
-typedef void (*igt_huc_copyfunc_t)(int fd,
-		struct drm_i915_gem_exec_object2 *obj);
+typedef void (*igt_huc_copyfunc_t)(int fd, uint64_t ahnd,
+		struct drm_i915_gem_exec_object2 *obj, uint64_t *objsize);
 
 igt_huc_copyfunc_t	igt_get_huc_copyfunc(int devid);
 #endif
