@@ -335,10 +335,12 @@ test_pf_nonblock(int i915)
 {
 	igt_spin_t *spin;
 	uint32_t *ptr;
+	uint64_t ahnd;
 
 	igt_require(mmap_gtt_version(i915) >= 3);
 
-	spin = igt_spin_new(i915);
+	ahnd = get_reloc_ahnd(i915, 0);
+	spin = igt_spin_new(i915, .ahnd = ahnd);
 
 	igt_set_timeout(1, "initial pagefaulting did not complete within 1s");
 
@@ -349,6 +351,7 @@ test_pf_nonblock(int i915)
 	igt_reset_timeout();
 
 	igt_spin_free(i915, spin);
+	put_ahnd(ahnd);
 }
 
 static void
@@ -741,11 +744,13 @@ test_hang_busy(int i915)
 	igt_spin_t *spin;
 	igt_hang_t hang;
 	uint32_t handle;
+	uint64_t ahnd;
 
 	hang = igt_allow_hang(i915, ctx->id, 0);
 	igt_require(igt_params_set(i915, "reset", "1")); /* global */
 
-	spin = igt_spin_new(i915, .ctx = ctx,
+	ahnd = get_reloc_ahnd(i915, ctx->id);
+	spin = igt_spin_new(i915, .ctx = ctx, .ahnd = ahnd,
 			    .flags = IGT_SPIN_POLL_RUN |
 				     IGT_SPIN_FENCE_OUT |
 				     IGT_SPIN_NO_PREEMPTION);
@@ -788,6 +793,7 @@ test_hang_busy(int i915)
 	munmap(ptr, 4096);
 
 	igt_spin_free(i915, spin);
+	put_ahnd(ahnd);
 	igt_disallow_hang(i915, hang);
 	intel_ctx_destroy(i915, ctx);
 }
@@ -800,11 +806,13 @@ test_hang_user(int i915)
 	igt_spin_t *spin;
 	igt_hang_t hang;
 	uint32_t handle;
+	uint64_t ahnd;
 
 	hang = igt_allow_hang(i915, ctx->id, 0);
 	igt_require(igt_params_set(i915, "reset", "1")); /* global */
 
-	spin = igt_spin_new(i915, .ctx = ctx,
+	ahnd = get_reloc_ahnd(i915, ctx->id);
+	spin = igt_spin_new(i915, .ctx = ctx, .ahnd = ahnd,
 			    .flags = IGT_SPIN_POLL_RUN |
 				     IGT_SPIN_FENCE_OUT |
 				     IGT_SPIN_NO_PREEMPTION);
@@ -843,6 +851,7 @@ test_hang_user(int i915)
 	munmap(ptr, 4096);
 
 	igt_spin_free(i915, spin);
+	put_ahnd(ahnd);
 	igt_disallow_hang(i915, hang);
 	intel_ctx_destroy(i915, ctx);
 }
