@@ -1274,6 +1274,58 @@ extern enum igt_log_level igt_log_level;
 		ret__; \
 	})
 
+/**
+ * igt_debug_on:
+ * @condition: condition to test
+ *
+ * Print a IGT_LOG_DEBUG level message if a condition is met.
+ *
+ * Should be used when something fails in a function that doesn't perform
+ * a long jump in that case, and either performs several operations that
+ * can fail that way or doesn't return unambiguous error codes on failures.
+ * This is useful to streamline the test logic since it allows for
+ * replacing open conding with function calls without loosing ability to
+ * provide debug output with failure details.
+ *
+ * This macro also returns the value of @condition.
+ */
+#define igt_debug_on(condition) ({ \
+		typeof(condition) ret__ = (condition); \
+		if (ret__) \
+			igt_debug("Condition %s occurred in function %s, file %s:%i\n", \
+				  #condition, __func__, __FILE__, __LINE__); \
+		ret__; \
+	})
+
+/**
+ * igt_debug_on_f:
+ * @condition: condition to test
+ * @...: format string and optional arguments
+ *
+ * Print a IGT_LOG_DEBUG level message if a condition is met.
+ *
+ * Should be used when something fails in a function that doesn't perform
+ * a long jump in that case, and performs one or more operations in a
+ * loop, each time with different values of parameters.  This is useful
+ * to streamline the test logic since it allows for replacing open conding
+ * with function calls without loosing ability to provide debug output
+ * with failure details.
+ *
+ * In addition to the plain igt_debug_on() helper this allows to print
+ * additional debug information to help debugging operation failures.
+ *
+ * It also returns the value of @condition.
+ */
+#define igt_debug_on_f(condition, f...) ({ \
+		typeof(condition) ret__ = (condition); \
+		if (ret__) {\
+			igt_debug("condition %s occurred in function %s, file %s:%i\n", \
+				  #condition, __func__, __FILE__, __LINE__); \
+			igt_debug(f); \
+		} \
+		ret__; \
+	})
+
 void igt_set_timeout(unsigned int seconds,
 		     const char *op);
 
