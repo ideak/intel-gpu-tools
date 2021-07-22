@@ -703,7 +703,7 @@ static void __reserve(uint64_t ahnd, int i915, bool pinned,
 		      struct drm_i915_gem_exec_object2 *objects,
 		      int num_obj, uint64_t size)
 {
-	uint64_t gtt = gem_aperture_size(i915);
+	uint64_t start, end;
 	unsigned int flags;
 	int i;
 
@@ -714,13 +714,14 @@ static void __reserve(uint64_t ahnd, int i915, bool pinned,
 		flags |= EXEC_OBJECT_PINNED;
 
 	memset(objects, 0, sizeof(objects) * num_obj);
+	intel_allocator_get_address_range(ahnd, &start, &end);
 
 	for (i = 0; i < num_obj; i++) {
 		objects[i].handle = gem_create(i915, size);
 		if (i < num_obj/2)
-			objects[i].offset = i * size;
+			objects[i].offset = start + i * size;
 		else
-			objects[i].offset = gtt - (i + 1 - num_obj/2) * size;
+			objects[i].offset = end - (i + 1 - num_obj/2) * size;
 		objects[i].flags = flags;
 
 		intel_allocator_reserve(ahnd, objects[i].handle,
