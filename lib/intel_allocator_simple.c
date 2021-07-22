@@ -523,6 +523,8 @@ static bool intel_allocator_simple_reserve(struct intel_allocator *ial,
 	end = DECANONICAL(end);
 	igt_assert(end > start || end == 0);
 	size = get_size(start, end);
+	igt_assert(start + size <= ials->end);
+	igt_assert(start >= ials->start);
 
 	if (simple_vma_heap_alloc_addr(ials, start, size)) {
 		rec = malloc(sizeof(*rec));
