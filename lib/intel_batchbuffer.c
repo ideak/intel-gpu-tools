@@ -679,24 +679,27 @@ static uint32_t fast_copy_dword1(unsigned int src_tiling,
 
 static void
 fill_relocation(struct drm_i915_gem_relocation_entry *reloc,
-		uint32_t gem_handle, uint32_t delta, /* in bytes */
+		uint32_t gem_handle, uint64_t presumed_offset,
+		uint32_t delta, /* in bytes */
 		uint32_t offset, /* in dwords */
 		uint32_t read_domains, uint32_t write_domains)
 {
 	reloc->target_handle = gem_handle;
 	reloc->delta = delta;
 	reloc->offset = offset * sizeof(uint32_t);
-	reloc->presumed_offset = 0;
+	reloc->presumed_offset = presumed_offset;
 	reloc->read_domains = read_domains;
 	reloc->write_domain = write_domains;
 }
 
 static void
-fill_object(struct drm_i915_gem_exec_object2 *obj, uint32_t gem_handle,
+fill_object(struct drm_i915_gem_exec_object2 *obj,
+	    uint32_t gem_handle, uint64_t gem_offset,
 	    struct drm_i915_gem_relocation_entry *relocs, uint32_t count)
 {
 	memset(obj, 0, sizeof(*obj));
 	obj->handle = gem_handle;
+	obj->offset = gem_offset;
 	obj->relocation_count = count;
 	obj->relocs_ptr = to_user_pointer(relocs);
 }
@@ -881,14 +884,14 @@ void igt_blitter_src_copy(int fd,
 	batch_handle = gem_create(fd, 4096);
 	gem_write(fd, batch_handle, 0, batch, sizeof(batch));
 
-	fill_relocation(&relocs[0], dst_handle, dst_delta, dst_reloc_offset,
+	fill_relocation(&relocs[0], dst_handle, -1, dst_delta, dst_reloc_offset,
 			I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER);
-	fill_relocation(&relocs[1], src_handle, src_delta, src_reloc_offset,
+	fill_relocation(&relocs[1], src_handle, -1, src_delta, src_reloc_offset,
 			I915_GEM_DOMAIN_RENDER, 0);
 
-	fill_object(&objs[0], dst_handle, NULL, 0);
-	fill_object(&objs[1], src_handle, NULL, 0);
-	fill_object(&objs[2], batch_handle, relocs, 2);
+	fill_object(&objs[0], dst_handle, 0, NULL, 0);
+	fill_object(&objs[1], src_handle, 0, NULL, 0);
+	fill_object(&objs[2], batch_handle, 0, relocs, 2);
 
 	objs[0].flags |= EXEC_OBJECT_NEEDS_FENCE;
 	objs[1].flags |= EXEC_OBJECT_NEEDS_FENCE;
@@ -978,13 +981,14 @@ void igt_blitter_fast_copy__raw(int fd,
 	batch_handle = gem_create(fd, 4096);
 	gem_write(fd, batch_handle, 0, batch, sizeof(batch));
 
-	fill_relocation(&relocs[0], dst_handle, dst_delta, 4,
+	fill_relocation(&relocs[0], dst_handle, -1, dst_delta, 4,
 			I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER);
-	fill_relocation(&relocs[1], src_handle, src_delta, 8, I915_GEM_DOMAIN_RENDER, 0);
+	fill_relocation(&relocs[1], src_handle, -1, src_delta, 8,
+			I915_GEM_DOMAIN_RENDER, 0);
 
-	fill_object(&objs[0], dst_handle, NULL, 0);
-	fill_object(&objs[1], src_handle, NULL, 0);
-	fill_object(&objs[2], batch_handle, relocs, 2);
+	fill_object(&objs[0], dst_handle, 0, NULL, 0);
+	fill_object(&objs[1], src_handle, 0, NULL, 0);
+	fill_object(&objs[2], batch_handle, 0, relocs, 2);
 
 	exec_blit(fd, objs, 3, intel_gen(intel_get_drm_devid(fd)));
 
