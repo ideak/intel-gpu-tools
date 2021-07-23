@@ -101,7 +101,7 @@ static void prepare_scratch(int exporter_fd, struct dumb_bo *scratch,
 	scratch->bpp = 32;
 
 	scratch->handle = kmstest_dumb_create(exporter_fd,
-			scratch->width,
+			ALIGN(scratch->width, 256),
 			scratch->height,
 			scratch->bpp,
 			&scratch->pitch,
