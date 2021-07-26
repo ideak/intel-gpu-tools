@@ -72,45 +72,6 @@ igt@gem_exec_alignment@.*
 
 
 ###############################################################################
-# These 4 tests are covering an edge case which should never be hit by users
-# unless we already are in a bad situation, yet they are responsible for a
-# significant portion of our execution time:
-#
-# - shard-skl: 2% (~5 minutes)
-# - shard-kbl: 4% (~5 minutes)
-# - shard-apl: 2.7% (~5 minutes)
-# - shard-glk: 4.5% (~10 minutes)
-# - shard-icl: 2.5% (~5 minutes)
-# - shard-tgl: 3.5% (~7 minutes)
-#
-# Issue: https://gitlab.freedesktop.org/drm/intel/issues/1284
-#
-# Data acquired on 2020-02-20 by Martin Peres
-###############################################################################
-igt@kms_flip@flip-vs-modeset-vs-hang(-interruptible)?
-igt@kms_flip@flip-vs-panning-vs-hang(-interruptible)?
-
-
-###############################################################################
-# These 28 tests are covering an edge case which should never be hit by users
-# unless we already are in a bad situation, yet they are responsible for a
-# significant portion of our execution time:
-#
-# - shard-skl: 1.7% (~4 minutes)
-# - shard-kbl: 2.8% (~3.5 minutes)
-# - shard-apl: 2.2% (~4 minutes)
-# - shard-glk: 1.8% (~4 minutes)
-# - shard-icl: 1.9% (~4 minutes)
-# - shard-tgl: 2.8% (~5.5 minutes)
-#
-# Issue: https://gitlab.freedesktop.org/drm/intel/issues/1285
-#
-# Data acquired on 2020-02-20 by Martin Peres
-###############################################################################
-igt@kms_busy@.*hang.*
-
-
-###############################################################################
 # This test is reading one file at a time while being suspended, which makes
 # testing extremelly slow. This is a developer-only feature which is also used
 # by IGT extensively so removing it may make it harder for developers to
