@@ -711,7 +711,7 @@ static void exec_blit(int fd,
 	struct drm_i915_gem_execbuffer2 exec = {
 		.buffers_ptr = to_user_pointer(objs),
 		.buffer_count = count,
-		.flags = gen >= 6 ? I915_EXEC_BLT : 0,
+		.flags = gen >= 6 ? I915_EXEC_BLT : 0 | I915_EXEC_NO_RELOC,
 		.rsvd1 = ctx,
 	};
 
