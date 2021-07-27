@@ -379,6 +379,7 @@ read_ctx_timestamp(int i915, const intel_ctx_t *ctx,
 	const uint32_t runtime = base + (use_64b ? 0x3a8 : 0x358);
 	uint32_t *map, *cs;
 	uint32_t ts;
+	bool has_relocs = gem_has_relocations(i915);
 
 	cs = map = gem_mmap__device_coherent(i915, obj.handle,
 					     0, 4096, PROT_WRITE);
@@ -395,6 +396,11 @@ read_ctx_timestamp(int i915, const intel_ctx_t *ctx,
 	*cs++ = obj.offset >> 32;
 
 	*cs++ = MI_BATCH_BUFFER_END;
+
+	if (!has_relocs) {
+		obj.relocation_count = 0;
+		obj.flags |= EXEC_OBJECT_PINNED;
+	}
 
 	gem_execbuf(i915, &execbuf);
 	gem_sync(i915, obj.handle);
