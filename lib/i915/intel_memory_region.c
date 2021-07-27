@@ -114,7 +114,7 @@ uint32_t gem_get_batch_size(int fd, uint8_t mem_region_type)
 struct drm_i915_query_memory_regions *gem_get_query_memory_regions(int fd)
 {
 	struct drm_i915_query_item item;
-	struct drm_i915_query_memory_regions *query_info;
+	struct drm_i915_query_memory_regions *query_info = NULL;
 
 	memset(&item, 0, sizeof(item));
 	item.query_id = DRM_I915_QUERY_MEMORY_REGIONS;
@@ -123,15 +123,18 @@ struct drm_i915_query_memory_regions *gem_get_query_memory_regions(int fd)
 	 * Any DRM_I915_QUERY_MEMORY_REGIONS specific errors are encoded in the
 	 * item.length, even though the ioctl might still return success.
 	 */
-	igt_assert_f(item.length > 0,
-		     "DRM_I915_QUERY_MEMORY_REGIONS failed with %d\n",
-		     item.length);
+	if (item.length < 0) {
+		igt_critical("DRM_I915_QUERY_MEMORY_REGIONS failed with %d\n",
+			     item.length);
+		goto out;
+	}
 
 	query_info = calloc(1, item.length);
 
 	item.data_ptr = to_user_pointer(query_info);
 	i915_query_items(fd, &item, 1);
 
+out:
 	return query_info;
 }
 
@@ -150,6 +153,9 @@ uint8_t gem_get_lmem_region_count(int fd)
 	uint8_t lmem_regions = 0;
 
 	query_info = gem_get_query_memory_regions(fd);
+	if (!query_info)
+		goto out;
+
 	num_regions = query_info->num_regions;
 
 	for (int i = 0; i < num_regions; i++) {
@@ -158,6 +164,7 @@ uint8_t gem_get_lmem_region_count(int fd)
 	}
 	free(query_info);
 
+out:
 	return lmem_regions;
 }
 
