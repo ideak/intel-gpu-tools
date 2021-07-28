@@ -168,6 +168,7 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe)
 	w = mode->hdisplay;
 	h = mode->vdisplay;
 
+	w = ALIGN(w, 256);
 	/* recreate all fbs if incompatible */
 	if (data->xrgb_fb.width != w || data->xrgb_fb.height != h) {
 		cairo_t *cr;
