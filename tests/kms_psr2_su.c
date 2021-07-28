@@ -149,11 +149,17 @@ static bool update_screen_and_test(data_t *data)
 
 	switch (data->op) {
 	case PAGE_FLIP: {
+		struct drm_mode_rect clip;
 		igt_plane_t *primary;
+
+		clip.x1 = clip.y1 = 0;
+		clip.x2 = clip.y2 = SQUARE_SIZE;
 
 		primary = igt_output_get_plane_type(data->output,
 						    DRM_PLANE_TYPE_PRIMARY);
 
+		igt_plane_replace_prop_blob(primary, IGT_PLANE_FB_DAMAGE_CLIPS,
+					    &clip, sizeof(clip));
 		igt_plane_set_fb(primary, &data->fb[data->screen_changes & 1]);
 		igt_display_commit2(&data->display, COMMIT_ATOMIC);
 		break;
