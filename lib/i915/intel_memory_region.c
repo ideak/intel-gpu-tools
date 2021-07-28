@@ -309,7 +309,7 @@ char *memregion_dynamic_subtest_name(struct igt_collection *set)
  *
  * Outputs memory regions and their sizes.
  */
-void intel_dump_gpu_meminfo(struct drm_i915_query_memory_regions *info)
+void intel_dump_gpu_meminfo(const struct drm_i915_query_memory_regions *info)
 {
 	int i;
 
@@ -336,7 +336,7 @@ void intel_dump_gpu_meminfo(struct drm_i915_query_memory_regions *info)
  *
  * Returns: number of regions for type @memory_class
  */
-uint32_t gpu_meminfo_region_count(struct drm_i915_query_memory_regions *info,
+uint32_t gpu_meminfo_region_count(const struct drm_i915_query_memory_regions *info,
 				  uint16_t memory_class)
 {
 	uint32_t num = 0;
@@ -359,7 +359,7 @@ uint32_t gpu_meminfo_region_count(struct drm_i915_query_memory_regions *info,
  * Returns: total size of all regions which are type @memory_class, -1 when the
  * size of at least one region is unknown
  */
-uint64_t gpu_meminfo_region_total_size(struct drm_i915_query_memory_regions *info,
+uint64_t gpu_meminfo_region_total_size(const struct drm_i915_query_memory_regions *info,
 				       uint16_t memory_class)
 {
 	uint64_t total = 0;
@@ -386,7 +386,7 @@ uint64_t gpu_meminfo_region_total_size(struct drm_i915_query_memory_regions *inf
  * Returns: available size of all regions which are type @memory_class, -1 when
  * the size of at least one region cannot be estimated
  */
-uint64_t gpu_meminfo_region_total_available(struct drm_i915_query_memory_regions *info,
+uint64_t gpu_meminfo_region_total_available(const struct drm_i915_query_memory_regions *info,
 					    uint16_t memory_class)
 {
 	uint64_t avail = 0;
@@ -414,7 +414,7 @@ uint64_t gpu_meminfo_region_total_available(struct drm_i915_query_memory_regions
  * Returns: available size of @memory_instance which type is @memory_class, -1
  * when the size is unknown
  */
-uint64_t gpu_meminfo_region_size(struct drm_i915_query_memory_regions *info,
+uint64_t gpu_meminfo_region_size(const struct drm_i915_query_memory_regions *info,
 				 uint16_t memory_class,
 				 uint16_t memory_instance)
 {
@@ -439,7 +439,7 @@ uint64_t gpu_meminfo_region_size(struct drm_i915_query_memory_regions *info,
  * Returns: available size of @memory_instance region which type is
  * @memory_class, -1 when the size cannot be estimated
  */
-uint64_t gpu_meminfo_region_available(struct drm_i915_query_memory_regions *info,
+uint64_t gpu_meminfo_region_available(const struct drm_i915_query_memory_regions *info,
 				      uint16_t memory_class,
 				      uint16_t memory_instance)
 {
