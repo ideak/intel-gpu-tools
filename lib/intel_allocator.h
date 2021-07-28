@@ -145,13 +145,13 @@ struct intel_allocator {
 			  uint64_t size, uint64_t alignment,
 			  enum allocator_strategy strategy);
 	bool (*is_allocated)(struct intel_allocator *ial, uint32_t handle,
-			     uint64_t size, uint64_t alignment);
+			     uint64_t size, uint64_t offset);
 	bool (*reserve)(struct intel_allocator *ial,
-			uint32_t handle, uint64_t start, uint64_t size);
+			uint32_t handle, uint64_t start, uint64_t end);
 	bool (*unreserve)(struct intel_allocator *ial,
-			  uint32_t handle, uint64_t start, uint64_t size);
+			  uint32_t handle, uint64_t start, uint64_t end);
 	bool (*is_reserved)(struct intel_allocator *ial,
-			    uint64_t start, uint64_t size);
+			    uint64_t start, uint64_t end);
 	bool (*free)(struct intel_allocator *ial, uint32_t handle);
 
 	void (*destroy)(struct intel_allocator *ial);
