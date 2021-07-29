@@ -303,8 +303,13 @@ enum flip_test {
 	flip_test_last = flip_test_atomic_transitions_varying_size
 };
 
-static bool cursor_slowpath(enum flip_test mode)
+static bool cursor_slowpath(igt_display_t *display, enum flip_test mode)
 {
+	/* Intel display 9 and newer will handle cursor movement as fastsets */
+	if (is_i915_device(display->drm_fd) &&
+	    intel_display_ver(intel_get_drm_devid(display->drm_fd)) >= 9)
+	    return true;
+
 	/* cursor moving doesn't take slowpath, everything else does. */
 	if (mode == flip_test_legacy || mode == flip_test_atomic)
 		return false;
@@ -600,7 +605,7 @@ static void basic_flip_cursor(igt_display_t *display,
 
 		if (miss)
 			{ /* compare nothing, already failed */ }
-		else if (!cursor_slowpath(mode))
+		else if (!cursor_slowpath(display, mode))
 			miss = delta != 0;
 		else
 			miss = delta != 0 && delta != 1;
@@ -753,7 +758,7 @@ static void flip_vs_cursor(igt_display_t *display, enum flip_test mode, int nloo
 			do_ioctl(display->drm_fd, DRM_IOCTL_MODE_CURSOR, &arg[nloops & 1]);
 
 		/* Nor should it have delayed the following cursor update */
-		if (!cursor_slowpath(mode))
+		if (!cursor_slowpath(display, mode))
 			igt_assert_eq(kmstest_get_vblank(display->drm_fd, pipe, 0), vblank_start);
 		else
 			igt_assert_lte(kmstest_get_vblank(display->drm_fd, pipe, 0), vblank_start + 1);
@@ -1119,7 +1124,7 @@ static void cursor_vs_flip(igt_display_t *display, enum flip_test mode, int nloo
 			vblank_last = vbl.sequence;
 		}
 
-		if (!cursor_slowpath(mode))
+		if (!cursor_slowpath(display, mode))
 			igt_assert_lte(vbl.sequence, vblank_start + 5 * vrefresh / 8);
 
 		shared[0] = 1;
@@ -1558,12 +1563,11 @@ igt_main
 		igt_subtest_f("%sflip-before-cursor-%s", prefix, modes[i])
 			basic_flip_cursor(&display, i, FLIP_BEFORE_CURSOR, 0);
 
-		if (!cursor_slowpath(i)) {
-			igt_subtest_f("%sbusy-flip-before-cursor-%s", prefix, modes[i]) {
-				igt_require_gem(display.drm_fd);
-				basic_flip_cursor(&display, i, FLIP_BEFORE_CURSOR,
-						  BASIC_BUSY);
-			}
+		igt_subtest_f("%sbusy-flip-before-cursor-%s", prefix, modes[i]) {
+			igt_require(!cursor_slowpath(&display, i));
+			igt_require_gem(display.drm_fd);
+			basic_flip_cursor(&display, i, FLIP_BEFORE_CURSOR,
+					  BASIC_BUSY);
 		}
 	}
 
