@@ -382,9 +382,11 @@ void *__gem_mmap__device_coherent(int fd, uint32_t handle, uint64_t offset,
 {
 	void *ptr = __gem_mmap_offset(fd, handle, offset, size, prot,
 				      I915_MMAP_OFFSET_WC);
+
+	if (!ptr)
+		ptr = __gem_mmap_offset__fixed(fd, handle, offset, size, prot);
 	if (!ptr)
 		ptr = __gem_mmap__wc(fd, handle, offset, size, prot);
-
 	if (!ptr)
 		ptr = __gem_mmap__gtt(fd, handle, size, prot);
 
