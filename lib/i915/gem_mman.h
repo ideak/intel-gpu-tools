@@ -41,6 +41,7 @@ void *gem_mmap_offset__fixed(int fd, uint32_t handle, uint64_t offset,
 			     uint64_t size, unsigned prot);
 void *gem_mmap__device_coherent(int fd, uint32_t handle, uint64_t offset,
 				uint64_t size, unsigned prot);
+bool gem_mmap__has_device_coherent(int fd);
 void *gem_mmap__cpu_coherent(int fd, uint32_t handle, uint64_t offset,
 			     uint64_t size, unsigned prot);
 
@@ -95,6 +96,16 @@ int gem_munmap(void *ptr, uint64_t size);
  * through igt_require() if not.
  */
 #define gem_require_mmap_offset_wc(fd) igt_require(gem_mmap_offset__has_wc(fd))
+
+/**
+ * gem_require_mmap_offset_device_coherent:
+ * @fd: open i915 drm file descriptor
+ *
+ * Feature test macro to query whether direct (i.e. cpu access path, bypassing
+ * the gtt) write-combine memory mappings are available, or fixed mapping for
+ * discrete. Automatically skips through igt_require() if not.
+ */
+#define gem_require_mmap_device_coherent(fd) igt_require(gem_mmap__has_device_coherent(fd))
 
 extern const struct mmap_offset {
 	const char *name;

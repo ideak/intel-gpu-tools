@@ -197,6 +197,45 @@ bool gem_mmap_offset__has_wc(int fd)
 	return has_wc > 0;
 }
 
+bool gem_mmap__has_device_coherent(int fd)
+{
+	struct drm_i915_gem_mmap_offset arg;
+	bool supported;
+
+	if (gem_mmap__has_wc(fd))
+		return true;
+
+	/* Maybe we still have GTT mmaps? */
+	memset(&arg, 0, sizeof(arg));
+	arg.handle = gem_create(fd, 4096);
+	arg.offset = 0;
+	arg.flags = I915_MMAP_OFFSET_GTT;
+	supported = igt_ioctl(fd, DRM_IOCTL_I915_GEM_MMAP_OFFSET,
+			      &arg) == 0;
+	gem_close(fd, arg.handle);
+
+	errno = 0;
+
+	if (supported)
+		return true;
+
+	/*
+	 * Maybe this is a discrete device, which only supports fixed mmaps?
+	 * Such mappings should also be considered device coherent.
+	 */
+	memset(&arg, 0, sizeof(arg));
+	arg.handle = gem_create(fd, 4096);
+	arg.offset = 0;
+	arg.flags = I915_MMAP_OFFSET_FIXED;
+	supported = igt_ioctl(fd, DRM_IOCTL_I915_GEM_MMAP_OFFSET,
+			      &arg) == 0;
+	gem_close(fd, arg.handle);
+
+	errno = 0;
+
+	return supported;
+}
+
 /**
  * __gem_mmap:
  * @fd: open i915 drm file descriptor
