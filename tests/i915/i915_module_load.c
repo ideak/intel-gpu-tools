@@ -172,17 +172,18 @@ static void gem_sanitycheck(void)
 {
 	struct drm_i915_gem_caching args = {};
 	int i915 = __drm_open_driver(DRIVER_INTEL);
+	int expected = gem_has_lmem(i915) ? -ENODEV : -ENOENT;
 	int err;
 
 	err = 0;
 	if (ioctl(i915, DRM_IOCTL_I915_GEM_SET_CACHING, &args))
 		err = -errno;
-	if (err == -ENOENT)
+	if (err == expected)
 		store_all(i915);
 	errno = 0;
 
 	close(i915);
-	igt_assert_eq(err, -ENOENT);
+	igt_assert_eq(err, expected);
 }
 
 static void
