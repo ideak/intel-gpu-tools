@@ -20,6 +20,8 @@ extern "C" {
  * clean these up when kernel uapi headers are sync'd.
  */
 
+#define I915_MMAP_OFFSET_FIXED 4
+
 #if defined(__cplusplus)
 }
 #endif

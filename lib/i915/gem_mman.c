@@ -27,6 +27,7 @@
 #include <errno.h>
 
 #include "igt_core.h"
+#include "igt_gt.h"
 #include "igt_device.h"
 #include "ioctl_wrappers.h"
 #include "intel_chipset.h"
@@ -492,6 +493,41 @@ void *gem_mmap_offset__cpu(int fd, uint32_t handle, uint64_t offset,
 {
 	void *ptr = __gem_mmap_offset(fd, handle, offset, size, prot,
 				      I915_MMAP_OFFSET_WB);
+
+	igt_assert(ptr);
+	return ptr;
+}
+
+void *__gem_mmap_offset__fixed(int fd, uint32_t handle, uint64_t offset,
+			       uint64_t size, unsigned prot)
+{
+	return __gem_mmap_offset(fd, handle, offset, size, prot,
+				 I915_MMAP_OFFSET_FIXED);
+}
+
+/**
+ * gem_mmap_offset__fixed: Used to mmap objects on discrete platforms
+ * @fd: open i915 drm file descriptor
+ * @handle: gem buffer object handle
+ * @offset: offset in the gem buffer of the mmap arena
+ * @size: size of the mmap arena
+ * @prot: memory protection bits as used by mmap()
+ *
+ * Like __gem_mmap_offset__fixed() except we assert on failure.
+ *
+ * For discrete the caching attributes for the pages are fixed at allocation
+ * time, and can't be changed. The FIXED mode will simply use the same caching *
+ * mode of the allocated pages. This mode will always be coherent with GPU
+ * access.
+ *
+ * On non-discrete platforms this mode is not supported.
+ *
+ * Returns: A pointer to the created memory mapping
+ */
+void *gem_mmap_offset__fixed(int fd, uint32_t handle, uint64_t offset,
+			   uint64_t size, unsigned prot)
+{
+	void *ptr = __gem_mmap_offset__fixed(fd, handle, offset, size, prot);
 
 	igt_assert(ptr);
 	return ptr;
