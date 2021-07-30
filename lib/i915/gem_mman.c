@@ -474,8 +474,14 @@ void *gem_mmap__cpu(int fd, uint32_t handle, uint64_t offset, uint64_t size, uns
 void *__gem_mmap_offset__cpu(int fd, uint32_t handle, uint64_t offset,
 			     uint64_t size, unsigned prot)
 {
-	return __gem_mmap_offset(fd, handle, offset, size, prot,
+	void *ptr;
+
+	ptr = __gem_mmap_offset(fd, handle, offset, size, prot,
 				 I915_MMAP_OFFSET_WB);
+	if (!ptr)
+		ptr = __gem_mmap_offset__fixed(fd, handle, offset, size, prot);
+
+	return ptr;
 }
 
 /**
