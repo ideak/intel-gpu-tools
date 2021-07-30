@@ -436,7 +436,13 @@ void *gem_mmap__device_coherent(int fd, uint32_t handle, uint64_t offset,
  */
 void *__gem_mmap__cpu(int fd, uint32_t handle, uint64_t offset, uint64_t size, unsigned prot)
 {
-	return __gem_mmap(fd, handle, offset, size, prot, 0);
+	void *ptr;
+
+	ptr = __gem_mmap(fd, handle, offset, size, prot, 0);
+	if (!ptr)
+		ptr = __gem_mmap_offset__fixed(fd, handle, offset, size, prot);
+
+	return ptr;
 }
 
 /**
