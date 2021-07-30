@@ -339,7 +339,18 @@ static void mmap_write(int fd, uint32_t handle, uint64_t offset,
 	if (!length)
 		return;
 
-	if (is_cache_coherent(fd, handle)) {
+	if (gem_has_lmem(fd)) {
+		/*
+		 * set/get_caching and set_domain are no longer supported on
+		 * discrete, also the only mmap mode supportd is FIXED.
+		 */
+		map = gem_mmap_offset__fixed(fd, handle, 0,
+					     offset + length,
+					     PROT_READ | PROT_WRITE);
+		igt_assert_eq(gem_wait(fd, handle, 0), 0);
+	}
+
+	if (!map && is_cache_coherent(fd, handle)) {
 		/* offset arg for mmap functions must be 0 */
 		map = __gem_mmap__cpu_coherent(fd, handle, 0, offset + length,
 					       PROT_READ | PROT_WRITE);
@@ -369,7 +380,17 @@ static void mmap_read(int fd, uint32_t handle, uint64_t offset, void *buf, uint6
 	if (!length)
 		return;
 
-	if (gem_has_llc(fd) || is_cache_coherent(fd, handle)) {
+	if (gem_has_lmem(fd)) {
+		/*
+		 * set/get_caching and set_domain are no longer supported on
+		 * discrete, also the only supported mmap mode is FIXED.
+		 */
+		map = gem_mmap_offset__fixed(fd, handle, 0,
+					     offset + length, PROT_READ);
+		igt_assert_eq(gem_wait(fd, handle, 0), 0);
+	}
+
+	if (!map && (gem_has_llc(fd) || is_cache_coherent(fd, handle))) {
 		/* offset arg for mmap functions must be 0 */
 		map = __gem_mmap__cpu_coherent(fd, handle, 0,
 					       offset + length, PROT_READ);
