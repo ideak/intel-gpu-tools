@@ -88,7 +88,7 @@ static void draw_squares(struct igt_fb *fb, int w, int h, double a)
 	igt_paint_color_alpha(cr, w / 2, 0,     w / 2, h / 2, 0., 1., 0., a);
 	igt_paint_color_alpha(cr, 0, h / 2,     w / 2, h / 2, 0., 0., 1., a);
 	igt_paint_color_alpha(cr, w / 2, h / 2, w / 4, h / 2, 1., 1., 1., a);
-	igt_paint_color_alpha(cr, 3 * w / 4, h / 2, w / 4, h / 2, 0., 0., 0., a);
+	igt_paint_color_alpha(cr, w * 3 / 4, h / 2, w - (w * 3 / 4), h / 2, 0., 0., 0., a);
 
 	igt_put_cairo_ctx(cr);
 }
