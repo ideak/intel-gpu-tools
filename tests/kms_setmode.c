@@ -46,6 +46,9 @@ static int filter_test_id;
 static bool dry_run;
 static bool all_pipes = false;
 
+static char str_buf[MAX_CRTCS][1024];
+static const char *crtc_strs[MAX_CRTCS];
+
 const drmModeModeInfo mode_640_480 = {
 	.name		= "640x480",
 	.vrefresh	= 60,
@@ -540,12 +543,92 @@ static void check_timings(int crtc_idx, const drmModeModeInfo *kmode)
 		     fabs(mean - expected) / line_time(kmode));
 }
 
+static int sort_drm_modes(const void *a, const void *b)
+{
+	const drmModeModeInfo *mode1 = a, *mode2 = b;
+
+	return (mode1->clock < mode2->clock) - (mode2->clock < mode1->clock);
+}
+
+static
+int __test_crtc_config(struct crtc_config *crtcs, int crtc_count,
+		       const struct test_config *tconf, bool *config_failed,
+		       int base)
+{
+	struct crtc_config *crtc = NULL;
+	int ret = 0;
+
+	crtc = &crtcs[base];
+
+	/* Sort the modes in descending order by clock freq. */
+	qsort(crtc->cconfs->connector->modes,
+		crtc->cconfs->connector->count_modes,
+		sizeof(drmModeModeInfo),
+		sort_drm_modes);
+
+	for (int i = 0; i < crtc->cconfs->connector->count_modes; i++) {
+		uint32_t *ids;
+
+		if (!crtc_supports_mode(crtc, &crtc->cconfs->connector->modes[i]))
+			continue;
+
+		crtc->mode = crtc->cconfs->connector->modes[i];
+
+		get_crtc_config_str(crtc, str_buf[base], sizeof(str_buf[base]));
+		crtc_strs[base] = &str_buf[base][0];
+		igt_info("    %s\n", crtc_strs[base]);
+
+		create_fb_for_crtc(crtc, &crtc->fb_info);
+		paint_fb(&crtc->fb_info, tconf->name, crtc_strs, crtc_count, base);
+
+		ids = get_connector_ids(crtc);
+		if (tconf->flags & TEST_STEALING)
+			ret = test_stealing(drm_fd, crtc, ids);
+		else
+			ret = drmModeSetCrtc(drm_fd, crtc->crtc_id,
+					     crtc->fb_info.fb_id, 0, 0, ids,
+					     crtc->connector_count, &crtc->mode);
+
+		free(ids);
+
+		/* crtcs[base].modes[i] don't fit, try next mode. */
+		if (ret < 0 && errno == ENOSPC)
+			continue;
+
+		if (ret < 0) {
+			igt_assert_eq(errno, EINVAL);
+			*config_failed = true;
+
+			return ret;
+		}
+
+		/* Try all crtcs recursively. */
+		if (base + 1 < crtc_count)
+			ret = __test_crtc_config(crtcs, crtc_count, tconf, config_failed, base + 1);
+
+		/*
+		 * With crtcs[base].modes[i], None of the crtc[base+1] modes fits
+		 * into the link BW.
+		 *
+		 * Lets try with crtcs[base].modes[i+1]
+		 */
+		if (ret < 0 && errno == ENOSPC)
+			continue;
+
+		/*
+		 * ret == 0, (or) ret < 0 && errno == EINVAL
+		 * No need to try other modes of crtcs[base].
+		 */
+		return ret;
+	}
+
+	/* When all crtcs[base].modes are tried & failed to fit into link BW. */
+	return ret;
+}
+
 static void test_crtc_config(const struct test_config *tconf,
 			     struct crtc_config *crtcs, int crtc_count)
 {
-	char str_buf[MAX_CRTCS][1024];
-	const char *crtc_strs[MAX_CRTCS];
-	struct crtc_config *crtc;
 	static int test_id;
 	bool config_failed = false;
 	int ret = 0;
@@ -569,32 +652,9 @@ static void test_crtc_config(const struct test_config *tconf,
 		return;
 	}
 
-	for (i = 0; i < crtc_count; i++) {
-		uint32_t *ids;
-
-		crtc = &crtcs[i];
-
-		igt_info("    %s\n", crtc_strs[i]);
-
-		create_fb_for_crtc(crtc, &crtc->fb_info);
-		paint_fb(&crtc->fb_info, tconf->name, crtc_strs, crtc_count, i);
-
-		ids = get_connector_ids(crtc);
-		if (tconf->flags & TEST_STEALING)
-			ret = test_stealing(drm_fd, crtc, ids);
-		else
-			ret = drmModeSetCrtc(drm_fd, crtc->crtc_id,
-					     crtc->fb_info.fb_id, 0, 0, ids,
-					     crtc->connector_count, &crtc->mode);
-
-		free(ids);
-
-		if (ret < 0) {
-			igt_assert_eq(errno, EINVAL);
-			config_failed = true;
-		}
-	}
-
+	ret = __test_crtc_config(crtcs, crtc_count, tconf, &config_failed, 0);
+	igt_skip_on_f((ret < 0 && errno == ENOSPC),
+			"No suitable mode(s) found to fit into the link BW\n");
 	igt_assert(config_failed == !!(tconf->flags & TEST_INVALID));
 
 	if (ret == 0 && tconf->flags & TEST_TIMINGS)
