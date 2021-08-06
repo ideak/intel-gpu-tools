@@ -128,6 +128,7 @@ static void run(int fd, unsigned ring, int nchild, int timeout,
 		uint32_t *ptr;
 		uint32_t *map;
 		int i;
+		bool has_relocs = gem_has_relocations(fd);
 
 		memset(obj, 0, sizeof(obj));
 		obj[0].handle = gem_create(fd, 4096);
@@ -175,8 +176,20 @@ static void run(int fd, unsigned ring, int nchild, int timeout,
 		gem_write(fd, obj[2].handle, 0, &bbe, sizeof(bbe));
 		igt_require(__gem_execbuf(fd, &execbuf) == 0);
 
-		obj[1].relocation_count = 1;
-		obj[2].relocation_count = 1;
+		if (has_relocs) {
+			obj[1].relocation_count = 1;
+			obj[2].relocation_count = 1;
+		} else {
+			/*
+			 * For gens without relocations we already have
+			 * objects in appropriate place of gtt as warming
+			 * execbuf pins them so just set EXEC_OBJECT_PINNED
+			 * flag.
+			 */
+			obj[0].flags |= EXEC_OBJECT_PINNED;
+			obj[1].flags |= EXEC_OBJECT_PINNED;
+			obj[2].flags |= EXEC_OBJECT_PINNED;
+		}
 
 		ptr = gem_mmap__wc(fd, obj[1].handle, 0, 64*1024,
 				   PROT_WRITE | PROT_READ);
@@ -382,6 +395,7 @@ static void batch(int fd, unsigned ring, int nchild, int timeout,
 		uint32_t *ptr;
 		uint32_t *map;
 		int i;
+		bool has_relocs = gem_has_relocations(fd);
 
 		memset(obj, 0, sizeof(obj));
 		obj[0].handle = gem_create(fd, 4096);
@@ -407,7 +421,11 @@ static void batch(int fd, unsigned ring, int nchild, int timeout,
 		gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
 		igt_require(__gem_execbuf(fd, &execbuf) == 0);
 
-		obj[1].relocation_count = 1;
+		if (!has_relocs) {
+			obj[0].flags |= EXEC_OBJECT_PINNED | EXEC_OBJECT_WRITE;
+			obj[1].flags |= EXEC_OBJECT_PINNED;
+		}
+		obj[1].relocation_count = has_relocs ? 1 : 0;
 		obj[1].relocs_ptr = to_user_pointer(&reloc);
 
 		switch (mode) {
