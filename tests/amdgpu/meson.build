@@ -7,6 +7,7 @@ if libdrm_amdgpu.found()
 			  'amd_bypass',
 			  'amd_color',
 			  'amd_cs_nop',
+			  'amd_hotplug',
 			  'amd_info',
 			  'amd_prime',
 			  'amd_module_load',

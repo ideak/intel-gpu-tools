@@ -20,6 +20,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <fcntl.h>
+#include <sys/stat.h>
+
 #include "igt_amd.h"
 #include "igt.h"
 #include <amdgpu_drm.h>
@@ -245,4 +248,78 @@ bool igt_amd_is_tiled(uint64_t modifier)
 		return true;
 	else
 		return false;
+}
+
+/**
+ * igt_amd_output_has_hpd: check if connector has HPD debugfs entry
+ * @drm_fd: DRM file descriptor
+ * @connector_name: The connector's name, on which we're reading the status
+ */
+static bool igt_amd_output_has_hpd(int drm_fd, char *connector_name)
+{
+	int fd;
+	int res;
+	struct stat stat;
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+	if (fd < 0) {
+		igt_info("output %s: debugfs not found\n", connector_name);
+		return false;
+	}
+
+	res = fstatat(fd, DEBUGFS_HPD_TRIGGER, &stat, 0);
+	if (res != 0) {
+		igt_info("%s debugfs not supported\n", DEBUGFS_HPD_TRIGGER);
+		close(fd);
+		return false;
+	}
+
+	close(fd);
+	return true;
+}
+
+/**
+ * igt_amd_require_hpd: Checks if connectors have HPD debugfs
+ * @display: A pointer to an #igt_display_t structure
+ * @drm_fd: DRM file descriptor
+ *
+ * Checks if the AMDGPU driver has support the 'trigger_hotplug'
+ * entry for HPD. Skip test if HPD is not supported.
+ */
+void igt_amd_require_hpd(igt_display_t *display, int drm_fd)
+{
+	igt_output_t *output;
+
+	for_each_connected_output(display, output) {
+		if (igt_amd_output_has_hpd(drm_fd, output->name))
+			return;
+	}
+
+	igt_skip("No HPD debugfs support.\n");
+}
+
+/**
+ * igt_amd_trigger_hotplut: Triggers a debugfs HPD
+ * @drm_fd: DRM file descriptor
+ * @connector_name: The connector's name, which we trigger the hotplug on
+ *
+ * igt_amd_require_hpd should be called before calling this.
+ */
+int igt_amd_trigger_hotplug(int drm_fd, char *connector_name)
+{
+	int fd, hpd_fd;
+	int wr_len;
+	const char *enable_hpd = "1";
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+	igt_assert(fd >= 0);
+	hpd_fd = openat(fd, DEBUGFS_HPD_TRIGGER, O_WRONLY);
+	close(fd);
+	igt_assert(hpd_fd >= 0);
+
+	wr_len = write(hpd_fd, enable_hpd, strlen(enable_hpd));
+	close(hpd_fd);
+	igt_assert_eq(wr_len, strlen(enable_hpd));
+
+	return 0;
 }

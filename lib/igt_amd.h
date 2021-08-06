@@ -24,7 +24,10 @@
 #define IGT_AMD_H
 
 #include <stdint.h>
+#include "igt.h"
 #include "igt_fb.h"
+
+#define DEBUGFS_HPD_TRIGGER "trigger_hotplug"
 
 uint32_t igt_amd_create_bo(int fd, uint64_t size);
 void *igt_amd_mmap_bo(int fd, uint32_t handle, uint64_t size, int prot);
@@ -40,4 +43,9 @@ void igt_amd_fb_to_tiled(struct igt_fb *dst, void *dst_buf, struct igt_fb *src,
 void igt_amd_fb_convert_plane_to_tiled(struct igt_fb *dst, void *dst_buf,
 				       struct igt_fb *src, void *src_buf);
 bool igt_amd_is_tiled(uint64_t modifier);
+
+/* IGT HPD helper functions */
+void igt_amd_require_hpd(igt_display_t *display, int drm_fd);
+int igt_amd_trigger_hotplug(int drm_fd, char *connector_name);
+
 #endif /* IGT_AMD_H */
