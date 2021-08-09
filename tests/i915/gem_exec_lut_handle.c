@@ -99,6 +99,7 @@ igt_simple_main
 
 	fd = drm_open_driver(DRIVER_INTEL);
 	igt_require_gem(fd);
+	igt_require(gem_has_relocations(fd));
 
 	memset(gem_exec, 0, sizeof(gem_exec));
 	for (n = 0; n < MAX_NUM_EXEC; n++)
