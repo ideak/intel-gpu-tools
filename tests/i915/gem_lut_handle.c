@@ -170,6 +170,7 @@ igt_simple_main
 	int fd, i;
 
 	fd = drm_open_driver(DRIVER_INTEL);
+	igt_require(gem_has_relocations(fd));
 
 	handle = gem_create(fd, 4096);
 	gem_write(fd, handle, 0, batch, sizeof(batch));
