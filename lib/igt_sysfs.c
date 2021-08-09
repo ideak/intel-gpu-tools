@@ -100,10 +100,10 @@ char *igt_sysfs_path(int device, char *path, int pathlen)
 {
 	struct stat st;
 
-	if (device < 0)
+	if (igt_debug_on(device < 0))
 		return NULL;
 
-	if (fstat(device, &st) || !S_ISCHR(st.st_mode))
+	if (igt_debug_on(fstat(device, &st)) || igt_debug_on(!S_ISCHR(st.st_mode)))
 		return NULL;
 
 	snprintf(path, pathlen, "/sys/dev/char/%d:%d",
@@ -129,7 +129,7 @@ int igt_sysfs_open(int device)
 {
 	char path[80];
 
-	if (!igt_sysfs_path(device, path, sizeof(path)))
+	if (igt_debug_on(!igt_sysfs_path(device, path, sizeof(path))))
 		return -1;
 
 	return open(path, O_RDONLY);
@@ -152,7 +152,7 @@ int igt_sysfs_write(int dir, const char *attr, const void *data, int len)
 	int fd;
 
 	fd = openat(dir, attr, O_WRONLY);
-	if (fd < 0)
+	if (igt_debug_on(fd < 0))
 		return -errno;
 
 	len = writeN(fd, data, len);
@@ -178,7 +178,7 @@ int igt_sysfs_read(int dir, const char *attr, void *data, int len)
 	int fd;
 
 	fd = openat(dir, attr, O_RDONLY);
-	if (fd < 0)
+	if (igt_debug_on(fd < 0))
 		return -errno;
 
 	len = readN(fd, data, len);
@@ -222,21 +222,21 @@ char *igt_sysfs_get(int dir, const char *attr)
 	int ret, fd;
 
 	fd = openat(dir, attr, O_RDONLY);
-	if (fd < 0)
+	if (igt_debug_on(fd < 0))
 		return NULL;
 
 	offset = 0;
 	len = 64;
 	rem = len - offset - 1;
 	buf = malloc(len);
-	if (!buf)
+	if (igt_debug_on(!buf))
 		goto out;
 
 	while ((ret = readN(fd, buf + offset, rem)) == rem) {
 		char *newbuf;
 
 		newbuf = realloc(buf, 2*len);
-		if (!newbuf)
+		if (igt_debug_on(!newbuf))
 			break;
 
 		buf = newbuf;
@@ -276,11 +276,11 @@ int igt_sysfs_scanf(int dir, const char *attr, const char *fmt, ...)
 	int ret = -1;
 
 	fd = openat(dir, attr, O_RDONLY);
-	if (fd < 0)
+	if (igt_debug_on(fd < 0))
 		return -1;
 
 	file = fdopen(fd, "r");
-	if (file) {
+	if (!igt_debug_on(!file)) {
 		va_list ap;
 
 		va_start(ap, fmt);
@@ -302,24 +302,24 @@ int igt_sysfs_vprintf(int dir, const char *attr, const char *fmt, va_list ap)
 	int ret, fd;
 
 	fd = openat(dir, attr, O_WRONLY);
-	if (fd < 0)
+	if (igt_debug_on(fd < 0))
 		return -errno;
 
 	va_copy(tmp, ap);
 	ret = vsnprintf(buf, sizeof(stack), fmt, tmp);
 	va_end(tmp);
-	if (ret < 0)
+	if (igt_debug_on(ret < 0))
 		return -EINVAL;
 
 	if (ret > sizeof(stack)) {
 		unsigned int len = ret + 1;
 
 		buf = malloc(len);
-		if (!buf)
+		if (igt_debug_on(!buf))
 			return -ENOMEM;
 
 		ret = vsnprintf(buf, ret, fmt, ap);
-		if (ret > len) {
+		if (igt_debug_on(ret > len)) {
 			free(buf);
 			return -EINVAL;
 		}
@@ -372,7 +372,7 @@ uint32_t igt_sysfs_get_u32(int dir, const char *attr)
 {
 	uint32_t result;
 
-	if (igt_sysfs_scanf(dir, attr, "%u", &result) != 1)
+	if (igt_debug_on(igt_sysfs_scanf(dir, attr, "%u", &result) != 1))
 		return 0;
 
 	return result;
@@ -392,7 +392,7 @@ uint64_t igt_sysfs_get_u64(int dir, const char *attr)
 {
 	uint64_t result;
 
-	if (igt_sysfs_scanf(dir, attr, "%"PRIu64, &result) != 1)
+	if (igt_debug_on(igt_sysfs_scanf(dir, attr, "%"PRIu64, &result) != 1))
 		return 0;
 
 	return result;
@@ -446,7 +446,7 @@ bool igt_sysfs_get_boolean(int dir, const char *attr)
 	char *buf;
 
 	buf = igt_sysfs_get(dir, attr);
-	if (!buf)
+	if (igt_debug_on(!buf))
 		return false;
 
 	if (sscanf(buf, "%d", &result) != 1) {
