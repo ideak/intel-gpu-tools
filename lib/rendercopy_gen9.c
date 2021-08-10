@@ -23,6 +23,7 @@
 #include "gen9_render.h"
 #include "intel_reg.h"
 #include "igt_aux.h"
+#include "intel_chipset.h"
 
 #define VERTEX_SIZE (3*4)
 
@@ -115,12 +116,42 @@ static const uint32_t gen12_render_copy[][4] = {
 	{ 0x80040131, 0x00000004, 0x50007144, 0x00c40000 },
 };
 
+
+/*
+ * Gen >= 12 onwards don't have a setting for PTE,
+ * so using I915_MOCS_PTE as mocs index may lead to
+ * some undefined MOCS behavior.
+ * Correct MOCS index should be referred from BSpec
+ * and programmed accordingly.
+ * This helper function is providing appropriate UC index.
+ */
+static uint8_t
+intel_get_uc_mocs(int fd) {
+
+	uint16_t devid = intel_get_drm_devid(fd);
+	uint8_t  uc_index;
+
+	if (IS_DG1(devid))
+		uc_index = 1;
+	else if (IS_GEN12(devid))
+		uc_index = 3;
+	else
+		uc_index = I915_MOCS_PTE;
+
+	/*
+	 * BitField [6:1] represents index to MOCS Tables
+	 * BitField [0] represents Encryption/Decryption
+	 */
+	return uc_index << 1;
+}
+
 /* Mostly copy+paste from gen6, except height, width, pitch moved */
 static uint32_t
 gen8_bind_buf(struct intel_bb *ibb, const struct intel_buf *buf, int is_dst) {
 	struct gen9_surface_state *ss;
 	uint32_t write_domain, read_domain;
 	uint64_t address;
+	int i915 = buf_ops_get_fd(buf->bops);
 
 	igt_assert_lte(buf->surface[0].stride, 256*1024);
 	igt_assert_lte(intel_buf_width(buf), 16384);
@@ -151,7 +182,7 @@ gen8_bind_buf(struct intel_bb *ibb, const struct intel_buf *buf, int is_dst) {
 	else if (buf->tiling != I915_TILING_NONE)
 		ss->ss0.tiled_mode = 3;
 
-	ss->ss1.memory_object_control = I915_MOCS_PTE << 1;
+	ss->ss1.memory_object_control = intel_get_uc_mocs(i915);
 
 	if (buf->tiling == I915_TILING_Yf)
 		ss->ss5.trmode = 1;
