@@ -40,6 +40,7 @@ set_fb_on_crtc(igt_display_t *dpy, int pipe, struct igt_fb *fb)
 	igt_output_t *output;
 
 	output = igt_get_single_output_for_pipe(dpy, pipe);
+	igt_require(output);
 
 	igt_output_set_pipe(output, pipe);
 	mode = igt_output_get_mode(output);
@@ -345,6 +346,7 @@ igt_main_args("e", NULL, help_str, opt_handler, NULL)
 
 		kmstest_set_vt_graphics_mode();
 		igt_display_require(&display, fd);
+		igt_display_require_output(&display);
 
 		/* Get active pipes. */
 		for_each_pipe(&display, pipe)
@@ -357,9 +359,8 @@ igt_main_args("e", NULL, help_str, opt_handler, NULL)
 	igt_describe("Test for basic check of KMS ABI with busy framebuffers.");
 	igt_subtest_with_dynamic("basic") { /* just run on the first pipe */
 		enum pipe pipe;
-		igt_output_t *output;
 
-		for_each_pipe_with_valid_output(&display, pipe, output) {
+		for_each_pipe(&display, pipe) {
 			igt_dynamic("flip")
 				test_flip(&display, pipe, false);
 			igt_dynamic("modeset")
@@ -370,11 +371,10 @@ igt_main_args("e", NULL, help_str, opt_handler, NULL)
 
 	igt_subtest_with_dynamic("basic-hang") {
 		enum pipe pipe;
-		igt_output_t *output;
 		igt_hang_t hang = igt_allow_hang(display.drm_fd, 0, 0);
 		errno = 0;
 
-		for_each_pipe_with_valid_output(&display, pipe, output) {
+		for_each_pipe(&display, pipe) {
 			if (!all_pipes && pipe != active_pipes[0] &&
 					  pipe != active_pipes[last_pipe])
 				continue;
@@ -390,11 +390,10 @@ igt_main_args("e", NULL, help_str, opt_handler, NULL)
 
 	igt_subtest_with_dynamic("extended-pageflip-modeset-hang-oldfb") {
 		enum pipe pipe;
-		igt_output_t *output;
 		igt_hang_t hang = igt_allow_hang(display.drm_fd, 0, 0);
 		errno = 0;
 
-		for_each_pipe_with_valid_output(&display, pipe, output) {
+		for_each_pipe(&display, pipe) {
 			if (!all_pipes && pipe != active_pipes[0] &&
 					  pipe != active_pipes[last_pipe])
 				continue;
@@ -409,14 +408,13 @@ igt_main_args("e", NULL, help_str, opt_handler, NULL)
 	for (i = 0; i < sizeof(tests) / sizeof (tests[0]); i++) {
 		igt_subtest_with_dynamic(tests[i].name) {
 			enum pipe pipe;
-			igt_output_t *output;
 			igt_hang_t hang;
 			errno = 0;
 
 			igt_require(display.is_atomic);
 			hang = igt_allow_hang(display.drm_fd, 0, 0);
 
-			for_each_pipe_with_valid_output(&display, pipe, output) {
+			for_each_pipe(&display, pipe) {
 				if (!all_pipes && pipe != active_pipes[0] &&
 						  pipe != active_pipes[last_pipe])
 					continue;
