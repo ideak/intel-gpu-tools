@@ -350,7 +350,7 @@ struct edid {
 	uint8_t features;
 	/* Color characteristics */
 	uint8_t red_green_lo;
-	uint8_t black_white_lo;
+	uint8_t blue_white_lo;
 	uint8_t red_x;
 	uint8_t red_y;
 	uint8_t green_x;
