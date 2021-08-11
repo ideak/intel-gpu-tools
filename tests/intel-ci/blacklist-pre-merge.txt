@@ -1,26 +1,4 @@
 ###############################################################################
-# This test has caught regressions in the past, but the feature is rarely used
-# by our users, yet it is responsible a significant portion of our execution
-# time:
-#
-# - shard-skl: 10.2% (~22 minutes)
-# - shard-kbl: 6% (~8 minutes)
-# - shard-apl: 3.9% (~7 minutes)
-# - shard-glk: 8% (~18 minutes)
-# - shard-icl: 11% (~22 minutes)
-# - shard-tgl: 7.1% (~14 minutes)
-#
-# Some patches already appeared to reduce the run time so this will likely not
-# remain for long.
-#
-# Issue: https://gitlab.freedesktop.org/drm/intel/issues/1280
-#
-# Data acquired on 2020-02-19 by Martin Peres
-###############################################################################
-igt@kms_rotation_crc@.*
-
-
-###############################################################################
 # These 4 tests catching a lot of unrelated issues and are responsible for a
 # significant portion of our execution time:
 #
