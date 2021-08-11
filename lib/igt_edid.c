@@ -31,6 +31,7 @@
 #include <time.h>
 #include <xf86drmMode.h>
 
+#include "igt_aux.h"
 #include "igt_core.h"
 #include "igt_edid.h"
 
@@ -183,10 +184,14 @@ void detailed_timing_set_string(struct detailed_timing *dt,
 
 	np->type = type;
 
-	strncpy(ds->str, str, sizeof(ds->str));
-	len = strlen(str);
+	len = min(strlen(str), sizeof(ds->str));
+	memcpy(ds->str, str, len);
+
 	if (len < sizeof(ds->str))
-		ds->str[len] = '\n';
+		ds->str[len++] = '\n';
+
+	while (len < sizeof(ds->str))
+		ds->str[len++] = ' ';
 }
 
 /**
