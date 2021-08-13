@@ -35,6 +35,7 @@ IGT_TEST_DESCRIPTION("Test atomic mode setting with multiple planes.");
 #define SIZE_PLANE      256
 #define SIZE_CURSOR     128
 #define LOOP_FOREVER     -1
+#define DEFAULT_N_PLANES  3
 
 typedef struct {
 	float red;
@@ -56,8 +57,10 @@ struct {
 	int iterations;
 	unsigned int seed;
 	bool user_seed;
+	bool all_planes;
 } opt = {
 	.iterations = 1,
+	.all_planes = false,
 };
 
 /*
@@ -361,7 +364,8 @@ static void
 test_plane_position(data_t *data, enum pipe pipe, uint64_t tiling)
 {
 	igt_output_t *output;
-	int n_planes = data->display.pipes[pipe].n_planes;
+	int n_planes = opt.all_planes ?
+			data->display.pipes[pipe].n_planes : DEFAULT_N_PLANES;
 
 	output = igt_get_single_output_for_pipe(&data->display, pipe);
 	igt_require(output);
@@ -401,6 +405,9 @@ static data_t data;
 static int opt_handler(int option, int option_index, void *input)
 {
 	switch (option) {
+	case 'a':
+		opt.all_planes = true;
+		break;
 	case 'i':
 		opt.iterations = strtol(optarg, NULL, 0);
 
@@ -423,11 +430,13 @@ static int opt_handler(int option, int option_index, void *input)
 
 const char *help_str =
 	"  --iterations Number of iterations for test coverage. -1 loop forever, default 64 iterations\n"
-	"  --seed       Seed for random number generator\n";
+	"  --seed       Seed for random number generator\n"
+	"  --all-planes Test with all available planes";
 
 struct option long_options[] = {
 	{ "iterations", required_argument, NULL, 'i'},
 	{ "seed",    required_argument, NULL, 's'},
+	{ "all-planes", no_argument, NULL, 'a'},
 	{ 0, 0, 0, 0 }
 };
 
