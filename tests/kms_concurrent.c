@@ -104,8 +104,7 @@ create_fb_for_mode_position(data_t *data, drmModeModeInfo *mode,
 
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 
-	fb_id = igt_create_fb(data->drm_fd,
-			      mode->hdisplay, mode->vdisplay,
+	fb_id = igt_create_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
 			      DRM_FORMAT_XRGB8888,
 			      tiling,
 			      &data->fb[primary->index]);
@@ -138,6 +137,7 @@ prepare_planes(data_t *data, enum pipe pipe, int max_planes,
 	int *y;
 	int *size;
 	int i;
+	int format, modifier;
 
 	igt_output_set_pipe(output, pipe);
 
@@ -161,24 +161,25 @@ prepare_planes(data_t *data, enum pipe pipe, int max_planes,
 	for (i = 0; i < max_planes; i++) {
 		igt_plane_t *plane = igt_output_get_plane(output, i);
 
-		if (plane->type == DRM_PLANE_TYPE_PRIMARY)
+		if (plane->type == DRM_PLANE_TYPE_PRIMARY) {
 			continue;
-		else if (plane->type == DRM_PLANE_TYPE_CURSOR)
+		} else if (plane->type == DRM_PLANE_TYPE_CURSOR) {
 			size[i] = SIZE_CURSOR;
-		else
+			format = DRM_FORMAT_ARGB8888;
+			modifier = DRM_FORMAT_MOD_NONE;
+		} else {
 			size[i] = SIZE_PLANE;
+			format = DRM_FORMAT_XRGB8888;
+			modifier = DRM_FORMAT_MOD_NONE;
+		}
 
 		x[i] = rand() % (mode->hdisplay - size[i]);
 		y[i] = rand() % (mode->vdisplay - size[i]);
 
 		data->plane[i] = plane;
 
-		igt_create_color_fb(data->drm_fd,
-				    size[i], size[i],
-				    data->plane[i]->type == DRM_PLANE_TYPE_CURSOR ? DRM_FORMAT_ARGB8888 : DRM_FORMAT_XRGB8888,
-				    data->plane[i]->type == DRM_PLANE_TYPE_CURSOR ? DRM_FORMAT_MOD_NONE : I915_FORMAT_MOD_X_TILED,
-				    0.0f, 0.0f, 1.0f,
-				    &data->fb[i]);
+		igt_create_color_fb(data->drm_fd, size[i], size[i], format, modifier,
+				    0.0f, 0.0f, 1.0f, &data->fb[i]);
 
 		igt_plane_set_position(data->plane[i], x[i], y[i]);
 		igt_plane_set_fb(data->plane[i], &data->fb[i]);
@@ -186,8 +187,7 @@ prepare_planes(data_t *data, enum pipe pipe, int max_planes,
 
 	/* primary plane */
 	data->plane[primary->index] = primary;
-	create_fb_for_mode_position(data, mode, x, y, size, size,
-				    I915_FORMAT_MOD_X_TILED,
+	create_fb_for_mode_position(data, mode, x, y, size, size, DRM_FORMAT_MOD_LINEAR,
 				    max_planes, output);
 
 	igt_plane_set_fb(data->plane[primary->index], &data->fb[primary->index]);
@@ -268,6 +268,7 @@ test_resolution_with_output(data_t *data, enum pipe pipe, int max_planes, igt_ou
 
 		/* switch to lower resolution */
 		igt_output_override_mode(output, mode_lo);
+		igt_output_set_pipe(output, PIPE_NONE);
 		igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
 		/* switch back to higher resolution */
