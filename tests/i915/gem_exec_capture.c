@@ -612,7 +612,6 @@ static void prioinv(int fd, int dir, const intel_ctx_t *ctx,
 	gem_quiescent_gpu(fd);
 	put_offset(ahnd, obj.handle);
 	put_ahnd(ahnd);
-	intel_allocator_multiprocess_stop();
 }
 
 static void userptr(int fd, int dir)
