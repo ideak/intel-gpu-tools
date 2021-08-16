@@ -98,11 +98,12 @@ static void exec1(int fd, uint32_t handle, uint64_t reloc_ofs, unsigned flags, c
 
 	gem_execbuf(fd, &execbuf);
 
-	igt_warn_on(gem_reloc[0].presumed_offset == -1);
 	gem_set_domain(fd, gem_exec[0].handle, I915_GEM_DOMAIN_WC, 0);
 
 	if (!has_relocs)
 		return;
+
+	igt_warn_on(gem_reloc[0].presumed_offset == -1);
 
 	if (use_64bit_relocs) {
 		uint64_t tmp;
