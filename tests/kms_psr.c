@@ -259,6 +259,27 @@ static bool drrs_disabled(data_t *data)
 	return !strstr(buf, "DRRS Enabled : Yes\n");
 }
 
+static void fb_dirty_fb_ioctl(data_t *data, struct igt_fb *fb)
+{
+	int ret;
+	drmModeClip clip = {
+		.x1 = 0,
+		.x2 = fb->width,
+		.y1 = 0,
+		.y2 = fb->height
+	};
+
+	/* Cursor planes don't support frontbuffer rendering */
+	if (data->test_plane->type == DRM_PLANE_TYPE_CURSOR) {
+		igt_plane_set_fb(data->test_plane, &data->fb_white);
+		igt_display_commit(&data->display);
+		return;
+	}
+
+	ret = drmModeDirtyFB(data->drm_fd, fb->fb_id, &clip, 1);
+	igt_assert(ret == 0 || ret == -ENOSYS);
+}
+
 static void run_test(data_t *data)
 {
 	uint32_t handle = data->fb_white.gem_handle;
@@ -299,6 +320,7 @@ static void run_test(data_t *data)
 			       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 		memset(ptr, 0xcc, data->mod_size);
 		munmap(ptr, data->mod_size);
+		fb_dirty_fb_ioctl(data, &data->fb_white);
 		expected = "BLACK or TRANSPARENT mark on top of plane in test";
 		break;
 	case MMAP_CPU:
@@ -309,14 +331,17 @@ static void run_test(data_t *data)
 		memset(ptr, 0, data->mod_size);
 		munmap(ptr, data->mod_size);
 		gem_sw_finish(data->drm_fd, handle);
+		fb_dirty_fb_ioctl(data, &data->fb_white);
 		expected = "BLACK or TRANSPARENT mark on top of plane in test";
 		break;
 	case BLT:
 		fill_blt(data, &data->fb_white, 0);
+		fb_dirty_fb_ioctl(data, &data->fb_white);
 		expected = "BLACK or TRANSPARENT mark on top of plane in test";
 		break;
 	case RENDER:
 		fill_render(data, &data->fb_white, 0);
+		fb_dirty_fb_ioctl(data, &data->fb_white);
 		expected = "BLACK or TRANSPARENT mark on top of plane in test";
 		break;
 	case PLANE_MOVE:
