@@ -586,6 +586,11 @@ igt_main
 		igt_subtest_group
 			run_subtests(&data, pipe);
 
-	igt_fixture
+	igt_fixture {
+		igt_display_reset(&data.display);
+		igt_display_commit2(&data.display, data.display.is_atomic ?
+				    COMMIT_ATOMIC : COMMIT_LEGACY);
+
 		igt_display_fini(&data.display);
+	}
 }
