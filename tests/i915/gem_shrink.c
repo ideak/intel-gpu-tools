@@ -369,6 +369,7 @@ static void reclaim(unsigned engine, int timeout)
 	int debugfs = igt_debugfs_dir(fd);
 	igt_spin_t *spin;
 	volatile uint32_t *shared;
+	uint64_t ahnd = get_reloc_ahnd(fd, 0);
 
 	shared = mmap(0, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 	igt_assert(shared != MAP_FAILED);
@@ -380,9 +381,9 @@ static void reclaim(unsigned engine, int timeout)
 		} while (!*shared);
 	}
 
-	spin = igt_spin_new(fd, .engine = engine);
+	spin = igt_spin_new(fd, .ahnd = ahnd, .engine = engine);
 	igt_until_timeout(timeout) {
-		igt_spin_t *next = __igt_spin_new(fd, .engine = engine);
+		igt_spin_t *next = __igt_spin_new(fd, .ahnd = ahnd, .engine = engine);
 
 		igt_spin_set_timeout(spin, timeout_100ms);
 		gem_sync(fd, spin->handle);
@@ -391,6 +392,7 @@ static void reclaim(unsigned engine, int timeout)
 		spin = next;
 	}
 	igt_spin_free(fd, spin);
+	put_ahnd(ahnd);
 
 	*shared = 1;
 	igt_waitchildren();
