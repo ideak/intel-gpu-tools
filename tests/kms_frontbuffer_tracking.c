@@ -1123,6 +1123,17 @@ static void fill_fb_region(struct fb_region *region, enum color ecolor)
 			 color);
 }
 
+static void _fb_dirty_ioctl(struct fb_region *region)
+{
+	struct rect rect;
+
+	rect.x = region->x;
+	rect.y = region->y;
+	rect.w = region->w;
+	rect.h = region->h;
+	fb_dirty_ioctl(region, &rect);
+}
+
 static void unset_all_crtcs(void)
 {
 	igt_display_reset(&drm.display);
@@ -2122,6 +2133,7 @@ static void multidraw_subtest(const struct test_mode *t)
 			}
 
 			fill_fb_region(target, COLOR_PRIM_BG);
+			_fb_dirty_ioctl(target);
 
 			update_wanted_crc(t, &blue_crcs[t->format].crc);
 			do_assertions(ASSERT_NO_ACTION_CHANGE);
