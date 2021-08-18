@@ -374,6 +374,8 @@ plane_immutable_zpos(igt_display_t *display, igt_pipe_t *pipe,
 	struct igt_fb fb_lower, fb_upper;
 	uint32_t w_lower, h_lower, w_upper, h_upper;
 
+	memset(plane_ptr, 0, n_planes * sizeof(igt_plane_t *));
+
 	igt_require(n_planes >= 2);
 
 	mode = igt_output_get_mode(output);
