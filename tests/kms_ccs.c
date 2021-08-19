@@ -621,10 +621,12 @@ igt_main_args("cs:", NULL, help_str, opt_handler, &data)
 	for_each_pipe_static(pipe) {
 		data.pipe = pipe;
 
-		for (int c = 0; c < ARRAY_SIZE(tests); c++) {
-			data.flags = tests[c].flags;
-			igt_describe(tests[c].description);
-			test_output(&data, tests[c].testname);
+		igt_subtest_group {
+			for (int c = 0; c < ARRAY_SIZE(tests); c++) {
+				data.flags = tests[c].flags;
+				igt_describe(tests[c].description);
+				test_output(&data, tests[c].testname);
+			}
 		}
 	}
 
