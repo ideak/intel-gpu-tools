@@ -513,6 +513,7 @@ static void test_output(data_t *data, const char* testformatstring)
 	igt_fixture {
 		data->output = igt_get_single_output_for_pipe(&data->display,
 							      data->pipe);
+		igt_require(data->output);
 		igt_output_set_pipe(data->output, data->pipe);
 	}
 
@@ -611,6 +612,7 @@ igt_main_args("cs:", NULL, help_str, opt_handler, &data)
 		igt_require_pipe_crc(data.drm_fd);
 
 		igt_display_require(&data.display, data.drm_fd);
+		igt_display_require_output(&data.display);
 
 		if (!data.user_seed)
 			data.seed = time(NULL);
