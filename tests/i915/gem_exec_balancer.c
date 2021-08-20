@@ -337,6 +337,7 @@ static void invalid_bonds(int i915)
 	};
 	uint32_t handle;
 	void *ptr;
+	int ret;
 
 	memset(&engines, 0, sizeof(engines));
 	igt_assert_eq(__set_param_fresh_context(i915, p), 0);
@@ -349,7 +350,9 @@ static void invalid_bonds(int i915)
 		bonds[n].num_bonds = 1;
 	}
 	engines.extensions = to_user_pointer(&bonds);
-	igt_assert_eq(__set_param_fresh_context(i915, p), 0);
+	ret = __set_param_fresh_context(i915, p);
+	igt_skip_on_f(ret  == -ENODEV, "Bonding not supported\n");
+	igt_assert_eq(ret, 0);
 
 	bonds[0].base.next_extension = -1ull;
 	igt_assert_eq(__set_param_fresh_context(i915, p), -EFAULT);
