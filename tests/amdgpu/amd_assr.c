@@ -40,6 +40,14 @@ typedef struct data {
 	int fd;
 } data_t;
 
+/* Test flags. */
+enum {
+	TEST_NONE = 1 << 0,
+	TEST_DPMS = 1 << 1,
+	TEST_SUSPEND = 1 << 2,
+};
+
+
 /* Common test setup. */
 static void test_init(data_t *data)
 {
@@ -184,7 +192,25 @@ static void present_visual_pattern(data_t *data, igt_output_t *output)
 	igt_display_commit2(&data->display, COMMIT_ATOMIC);
 }
 
-static void test_assr(data_t *data, igt_output_t *output)
+static void test_cycle_flags(data_t *data, igt_output_t *output,
+				uint32_t test_flags)
+{
+	if (test_flags & TEST_DPMS) {
+		igt_info("Link DPMS off then on\n");
+		kmstest_set_connector_dpms(data->fd,
+					   output->config.connector,
+					   DRM_MODE_DPMS_OFF);
+		kmstest_set_connector_dpms(data->fd,
+					   output->config.connector,
+					   DRM_MODE_DPMS_ON);
+	}
+
+	if (test_flags & TEST_SUSPEND)
+		igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
+					      SUSPEND_TEST_NONE);
+}
+
+static void test_assr(data_t *data, igt_output_t *output, uint32_t test_flags)
 {
 	drmModeConnector *connector = output->config.connector;
 	int connector_type = connector->connector_type;
@@ -193,6 +219,8 @@ static void test_assr(data_t *data, igt_output_t *output)
 	bool is_internal_display;
 
 	igt_info("Test ASSR on link %s\n", output->name);
+
+	test_cycle_flags(data, output, test_flags);
 
 	igt_assert_f(find_aux_dev(data, output, aux_dev, sizeof(aux_dev)),
 			"Cannot find AUX device for link %s\n", output->name);
@@ -217,7 +245,7 @@ static void test_assr(data_t *data, igt_output_t *output)
 		igt_assert(!assr_enabled);
 }
 
-static void test_assr_links(data_t *data)
+static void test_assr_links(data_t *data, uint32_t test_flags)
 {
 	for (int i = 0; i < data->display.n_outputs; ++i) {
 		igt_output_t *output = &data->display.outputs[i];
@@ -232,7 +260,7 @@ static void test_assr_links(data_t *data)
 
 		test_init(data);
 
-		test_assr(data, output);
+		test_assr(data, output, test_flags);
 
 		test_fini(data);
 	}
@@ -260,7 +288,13 @@ igt_main
 
 	igt_describe("Test ASSR on connected DP/eDP links");
 	igt_subtest("assr-links")
-		test_assr_links(&data);
+		test_assr_links(&data, TEST_NONE);
+	igt_describe("Test ASSR with DPMS ");
+	igt_subtest("assr-links-dpms")
+		test_assr_links(&data, TEST_DPMS);
+	igt_describe("Test ASSR with suspend ");
+	igt_subtest("assr-links-suspend")
+		test_assr_links(&data, TEST_SUSPEND);
 
 	igt_fixture
 	{
