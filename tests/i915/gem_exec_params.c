@@ -334,11 +334,11 @@ static void test_larger_than_life_batch(int fd)
 	const intel_ctx_t *ctx = intel_ctx_create_all_physical(fd);
 	struct drm_i915_gem_exec_object2 exec = {
 		.handle = batch_create_size(fd, size),
-		.rsvd1 = ctx->id,
 	};
 	struct drm_i915_gem_execbuffer2 execbuf = {
 		.buffers_ptr = to_user_pointer(&exec),
 		.buffer_count = 1,
+		.rsvd1 = ctx->id,
 	};
 
 	/*
