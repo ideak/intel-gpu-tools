@@ -49,7 +49,6 @@ static int block_plane(igt_display_t *display, igt_output_t *output, enum plane_
 
 		if (test_type == test_legacy_modeset || test_type == test_atomic_modeset) {
 			igt_output_set_pipe(output, PIPE_NONE);
-			igt_plane_set_fb(plane, NULL);
 		}
 		igt_plane_set_fence_fd(plane, sw_sync_timeline_create_fence(timeline, 1));
 
