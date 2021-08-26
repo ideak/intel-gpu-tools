@@ -749,6 +749,7 @@ static void sequential(int fd, uint32_t handle,
 	execbuf.buffer_count = 2;
 	execbuf.flags |= I915_EXEC_HANDLE_LUT;
 	execbuf.flags |= I915_EXEC_NO_RELOC;
+	execbuf.rsvd1 = ctx->id;
 	igt_require(__gem_execbuf(fd, &execbuf) == 0);
 
 	if (flags & CONTEXT) {
