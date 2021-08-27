@@ -569,9 +569,6 @@ int __test_crtc_config(struct crtc_config *crtcs, int crtc_count,
 	for (int i = 0; i < crtc->cconfs->connector->count_modes; i++) {
 		uint32_t *ids;
 
-		if (!crtc_supports_mode(crtc, &crtc->cconfs->connector->modes[i]))
-			continue;
-
 		crtc->mode = crtc->cconfs->connector->modes[i];
 
 		get_crtc_config_str(crtc, str_buf[base], sizeof(str_buf[base]));
