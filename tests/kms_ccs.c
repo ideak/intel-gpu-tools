@@ -307,7 +307,7 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 		if (fb_flags & FB_SMALL_AUX_STRIDE) {
 			igt_skip_on_f(width <= 1024,
 				      "FB already has the smallest possible stride\n");
-			f.pitches[index] = ALIGN(f.pitches[1]/2, 128);
+			f.pitches[index] = ALIGN(f.pitches[index]/2, 128);
 		}
 
 		if (fb_flags & FB_ZERO_AUX_STRIDE)
