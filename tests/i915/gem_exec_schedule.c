@@ -390,6 +390,7 @@ static void independent(int fd, const intel_ctx_t *ctx, unsigned int engine,
 			struct drm_i915_gem_execbuffer2 eb = {
 				.buffer_count = 1,
 				.buffers_ptr = to_user_pointer(&spin->obj[IGT_SPIN_BATCH]),
+				.rsvd1 = ctx->id,
 				.flags = e->flags,
 			};
 			gem_execbuf(fd, &eb);
