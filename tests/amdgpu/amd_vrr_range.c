@@ -40,6 +40,12 @@ typedef struct range {
 	unsigned int max;
 } range_t;
 
+/* Test flags. */
+enum {
+	TEST_NONE = 1 << 0,
+	TEST_SUSPEND = 1 << 1,
+};
+
 struct {
 	const char *name;
 	uint32_t connector_type;
@@ -193,11 +199,24 @@ static range_t get_freesync_range(data_t *data, igt_output_t *output)
 	return range;
 }
 
+static void trigger_edid_parse(data_t *data, uint32_t test_flags)
+{
+	if (test_flags & TEST_SUSPEND)
+		igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
+					      SUSPEND_TEST_NONE);
+	else
+		igt_amd_trigger_hotplug(data->fd, data->output->name);
+
+	/* more safe margin until resume and hotplug is completed */
+	usleep(1500000);
+}
+
 /* Check if EDID parsing is correctly reporting Freesync capability
  * by overriding EDID with ones from golden sample. Display under test
  * must still support Freesync.
  */
-static void test_freesync_parsing(data_t *data, uint32_t connector_type)
+static void test_freesync_parsing(data_t *data, uint32_t connector_type,
+		uint32_t test_flags)
 {
 	const struct edid *edid;
 	range_t range, expected_range;
@@ -214,7 +233,7 @@ static void test_freesync_parsing(data_t *data, uint32_t connector_type)
 
 	kmstest_force_edid(data->fd, data->output->config.connector, edid);
 
-	igt_amd_trigger_hotplug(data->fd, data->output->name);
+	trigger_edid_parse(data, test_flags);
 
 	range = get_freesync_range(data, data->output);
 
@@ -242,7 +261,8 @@ static bool has_vrr(igt_output_t *output)
 /* More relaxed checking on Freesync capability.
  * Only checks if frame rate range is within legal range.
  */
-static void test_freesync_range(data_t *data, uint32_t connector_type)
+static void test_freesync_range(data_t *data, uint32_t connector_type,
+		uint32_t test_flags)
 {
 	range_t range;
 
@@ -254,7 +274,7 @@ static void test_freesync_range(data_t *data, uint32_t connector_type)
 			"connector %s is not VRR capable\n",
 			data->output->name);
 
-	igt_amd_trigger_hotplug(data->fd, data->output->name);
+	trigger_edid_parse(data, test_flags);
 
 	range = get_freesync_range(data, data->output);
 
@@ -289,17 +309,31 @@ igt_main
 
 	igt_describe("Freesync EDID parsing on HDMI");
 	igt_subtest("freesync-parsing-hdmi") test_freesync_parsing(&data,
-			DRM_MODE_CONNECTOR_HDMIA);
+			DRM_MODE_CONNECTOR_HDMIA, TEST_NONE);
 	igt_describe("Freesync EDID parsing on DP");
 	igt_subtest("freesync-parsing-dp") test_freesync_parsing(&data,
-			DRM_MODE_CONNECTOR_DisplayPort);
+			DRM_MODE_CONNECTOR_DisplayPort, TEST_NONE);
+
+	igt_describe("Freesync EDID parsing on HDMI after suspend");
+	igt_subtest("freesync-parsing-hdmi-suspend") test_freesync_parsing(&data,
+			DRM_MODE_CONNECTOR_HDMIA, TEST_SUSPEND);
+	igt_describe("Freesync EDID parsing on DP after suspend");
+	igt_subtest("freesync-parsing-dp-suspend") test_freesync_parsing(&data,
+			DRM_MODE_CONNECTOR_DisplayPort, TEST_SUSPEND);
 
 	igt_describe("Freesync range on HDMI");
 	igt_subtest("freesync-range-hdmi") test_freesync_range(&data,
-			DRM_MODE_CONNECTOR_HDMIA);
+			DRM_MODE_CONNECTOR_HDMIA, TEST_NONE);
 	igt_describe("Freesync range on DP");
 	igt_subtest("freesync-range-dp") test_freesync_range(&data,
-			DRM_MODE_CONNECTOR_DisplayPort);
+			DRM_MODE_CONNECTOR_DisplayPort, TEST_NONE);
+
+	igt_describe("Freesync range on HDMI after suspend");
+	igt_subtest("freesync-range-hdmi-suspend") test_freesync_range(&data,
+			DRM_MODE_CONNECTOR_HDMIA, TEST_SUSPEND);
+	igt_describe("Freesync range on DP after suspend");
+	igt_subtest("freesync-range-dp-suspend") test_freesync_range(&data,
+			DRM_MODE_CONNECTOR_DisplayPort, TEST_SUSPEND);
 
 	igt_fixture
 	{
