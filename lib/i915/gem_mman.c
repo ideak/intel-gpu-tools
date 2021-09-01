@@ -73,9 +73,27 @@ bool gem_has_legacy_mmap(int fd)
 	return errno != EOPNOTSUPP;
 }
 
+/**
+ * gem_has_mmap_offset_type:
+ * @fd: open i915 drm file descriptor
+ * @*t: pointer to mmap_offset
+ *
+ * This functions checks the mmap offset type is supported or not.
+ * For discrete memory only FIXED mmap_offset type is supported
+ * and for non-discrete memory all other offset type except FIXED
+ * are supported.
+ *
+ * Returns: True if supported or False if not.
+ */
 bool gem_has_mmap_offset_type(int fd, const struct mmap_offset *t)
 {
-	return gem_has_mmap_offset(fd) || t->type == I915_MMAP_OFFSET_GTT;
+	if (gem_has_mmap_offset(fd))
+		if (gem_has_lmem(fd))
+			return t->type == I915_MMAP_OFFSET_FIXED;
+		else
+			return t->type != I915_MMAP_OFFSET_FIXED;
+	else
+		return t->type == I915_MMAP_OFFSET_GTT;
 }
 
 /**
