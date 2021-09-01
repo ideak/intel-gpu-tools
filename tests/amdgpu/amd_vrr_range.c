@@ -232,6 +232,42 @@ static void test_freesync_parsing(data_t *data, uint32_t connector_type)
 	igt_info("Freesync range: %d-%d\n", range.min, range.max);
 }
 
+/* Returns true if an output supports VRR. */
+static bool has_vrr(igt_output_t *output)
+{
+	return igt_output_has_prop(output, IGT_CONNECTOR_VRR_CAPABLE) &&
+	       igt_output_get_prop(output, IGT_CONNECTOR_VRR_CAPABLE);
+}
+
+/* More relaxed checking on Freesync capability.
+ * Only checks if frame rate range is within legal range.
+ */
+static void test_freesync_range(data_t *data, uint32_t connector_type)
+{
+	range_t range;
+
+	test_init(data, connector_type);
+
+	igt_amd_require_hpd(&data->display, data->fd);
+
+	igt_assert_f(has_vrr(data->output),
+			"connector %s is not VRR capable\n",
+			data->output->name);
+
+	igt_amd_trigger_hotplug(data->fd, data->output->name);
+
+	range = get_freesync_range(data, data->output);
+
+	test_fini(data);
+
+	igt_assert_f(range.min != 0 &&
+			range.max != 0 &&
+			range.max - range.min > 10,
+			"Invalid Freesync range %d-%d\n",
+			range.min, range.max);
+	igt_info("Freesync range: %d-%d\n", range.min, range.max);
+}
+
 igt_main
 {
 	data_t data;
@@ -256,6 +292,13 @@ igt_main
 			DRM_MODE_CONNECTOR_HDMIA);
 	igt_describe("Freesync EDID parsing on DP");
 	igt_subtest("freesync-parsing-dp") test_freesync_parsing(&data,
+			DRM_MODE_CONNECTOR_DisplayPort);
+
+	igt_describe("Freesync range on HDMI");
+	igt_subtest("freesync-range-hdmi") test_freesync_range(&data,
+			DRM_MODE_CONNECTOR_HDMIA);
+	igt_describe("Freesync range on DP");
+	igt_subtest("freesync-range-dp") test_freesync_range(&data,
 			DRM_MODE_CONNECTOR_DisplayPort);
 
 	igt_fixture
