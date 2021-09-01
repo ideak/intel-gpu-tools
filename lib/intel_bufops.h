@@ -125,6 +125,11 @@ static inline void intel_buf_set_ownership(struct intel_buf *buf, bool is_owner)
 void intel_buf_init(struct buf_ops *bops, struct intel_buf *buf,
 		    int width, int height, int bpp, int alignment,
 		    uint32_t tiling, uint32_t compression);
+void intel_buf_init_in_region(struct buf_ops *bops,
+			      struct intel_buf *buf,
+			      int width, int height, int bpp, int alignment,
+			      uint32_t tiling, uint32_t compression,
+			      uint32_t region);
 void intel_buf_close(struct buf_ops *bops, struct intel_buf *buf);
 
 void intel_buf_init_using_handle(struct buf_ops *bops,

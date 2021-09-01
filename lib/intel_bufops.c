@@ -730,7 +730,8 @@ static void __intel_buf_init(struct buf_ops *bops,
 			     struct intel_buf *buf,
 			     int width, int height, int bpp, int alignment,
 			     uint32_t req_tiling, uint32_t compression,
-			     uint64_t bo_size, int bo_stride)
+			     uint64_t bo_size, int bo_stride,
+			     uint32_t region)
 {
 	uint32_t tiling = req_tiling;
 	uint64_t size;
@@ -818,7 +819,7 @@ static void __intel_buf_init(struct buf_ops *bops,
 	if (handle)
 		buf->handle = handle;
 	else
-		buf->handle = gem_create(bops->fd, size);
+		buf->handle = gem_create_in_memory_regions(bops->fd, size, region);
 
 	set_hw_tiled(bops, buf);
 }
@@ -845,7 +846,24 @@ void intel_buf_init(struct buf_ops *bops,
 		    uint32_t tiling, uint32_t compression)
 {
 	__intel_buf_init(bops, 0, buf, width, height, bpp, alignment,
-			 tiling, compression, 0, 0);
+			 tiling, compression, 0, 0, I915_SYSTEM_MEMORY);
+
+	intel_buf_set_ownership(buf, true);
+}
+
+/**
+ * intel_buf_init_in_region
+ *
+ * Same as intel_buf_init with the additional region argument
+ */
+void intel_buf_init_in_region(struct buf_ops *bops,
+			      struct intel_buf *buf,
+			      int width, int height, int bpp, int alignment,
+			      uint32_t tiling, uint32_t compression,
+			      uint32_t region)
+{
+	__intel_buf_init(bops, 0, buf, width, height, bpp, alignment,
+			 tiling, compression, 0, 0, region);
 
 	intel_buf_set_ownership(buf, true);
 }
@@ -904,7 +922,7 @@ void intel_buf_init_using_handle(struct buf_ops *bops,
 				 uint32_t req_tiling, uint32_t compression)
 {
 	__intel_buf_init(bops, handle, buf, width, height, bpp, alignment,
-			 req_tiling, compression, 0, 0);
+			 req_tiling, compression, 0, 0, -1);
 }
 
 /**
@@ -990,7 +1008,7 @@ struct intel_buf *intel_buf_create_using_handle_and_size(struct buf_ops *bops,
 	igt_assert(buf);
 
 	__intel_buf_init(bops, handle, buf, width, height, bpp, alignment,
-			 req_tiling, compression, size, stride);
+			 req_tiling, compression, size, stride, -1);
 
 	return buf;
 }
