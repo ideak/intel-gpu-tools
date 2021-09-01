@@ -12,6 +12,7 @@ if libdrm_amdgpu.found()
 			  'amd_info',
 			  'amd_prime',
 			  'amd_module_load',
+			  'amd_mem_leak',
 			]
 	amdgpu_deps += libdrm_amdgpu
 endif
