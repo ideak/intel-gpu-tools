@@ -250,6 +250,15 @@ static void simple_lease(data_t *data)
 	terminate_lease(&lease);
 }
 
+static void empty_lease(data_t *data)
+{
+	struct drm_mode_create_lease mcl = {0};
+
+	igt_assert_eq(create_lease(data->master.fd, &mcl), 0);
+
+	close(mcl.fd);
+}
+
 static void page_flip_implicit_plane(data_t *data)
 {
 	uint32_t object_ids[3];
@@ -842,15 +851,9 @@ static void run_test(data_t *data, void (*testfunc)(data_t *))
 static void invalid_create_leases(data_t *data)
 {
 	uint32_t object_ids[4];
-	struct drm_mode_create_lease mcl;
+	struct drm_mode_create_lease mcl = {0};
 	drmModeRes *resources;
 	int tmp_fd, ret;
-
-	/* empty lease */
-	mcl.object_ids = 0;
-	mcl.object_count = 0;
-	mcl.flags = 0;
-	igt_assert_eq(create_lease(data->master.fd, &mcl), -EINVAL);
 
 	/* NULL array pointer */
 	mcl.object_count = 1;
@@ -1221,6 +1224,7 @@ igt_main
 		const char *desc;
 	} funcs[] = {
 		{ "simple_lease", simple_lease, "Check if create lease ioctl call works" },
+		{ "empty_lease", empty_lease, "Check that creating an empty lease works" },
 		{ "lessee_list", lessee_list, "Check if listed lease is same as created one" },
 		{ "lease_get", lease_get, "Tests getting the required contents of a lease" },
 		{ "lease_unleased_connector", lease_unleased_connector, "Negative test by trying to"
