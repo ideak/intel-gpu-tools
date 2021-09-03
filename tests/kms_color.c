@@ -639,6 +639,26 @@ static void test_pipe_limited_range_ctm(data_t *data,
 #endif
 
 static void
+prep_pipe(data_t *data, enum pipe p)
+{
+	igt_require_pipe(&data->display, p);
+
+	if (igt_pipe_obj_has_prop(&data->display.pipes[p], IGT_CRTC_DEGAMMA_LUT_SIZE)) {
+		data->degamma_lut_size =
+			igt_pipe_obj_get_prop(&data->display.pipes[p],
+					      IGT_CRTC_DEGAMMA_LUT_SIZE);
+		igt_assert_lt(0, data->degamma_lut_size);
+	}
+
+	if (igt_pipe_obj_has_prop(&data->display.pipes[p], IGT_CRTC_GAMMA_LUT_SIZE)) {
+		data->gamma_lut_size =
+			igt_pipe_obj_get_prop(&data->display.pipes[p],
+					      IGT_CRTC_GAMMA_LUT_SIZE);
+		igt_assert_lt(0, data->gamma_lut_size);
+	}
+}
+
+static void
 run_tests_for_pipe(data_t *data, enum pipe p)
 {
 	igt_pipe_t *pipe;
@@ -652,9 +672,9 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 	};
 
 	igt_fixture {
-		igt_require_pipe_crc(data->drm_fd);
+		prep_pipe(data, p);
 
-		igt_require_pipe(&data->display, p);
+		igt_require_pipe_crc(data->drm_fd);
 
 		pipe = &data->display.pipes[p];
 		igt_require(pipe->n_planes >= 0);
@@ -664,20 +684,6 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 		data->pipe_crc = igt_pipe_crc_new(data->drm_fd,
 						  primary->pipe->pipe,
 						  INTEL_PIPE_CRC_SOURCE_AUTO);
-
-		if (igt_pipe_obj_has_prop(&data->display.pipes[p], IGT_CRTC_DEGAMMA_LUT_SIZE)) {
-			data->degamma_lut_size =
-				igt_pipe_obj_get_prop(&data->display.pipes[p],
-						      IGT_CRTC_DEGAMMA_LUT_SIZE);
-			igt_assert_lt(0, data->degamma_lut_size);
-		}
-
-		if (igt_pipe_obj_has_prop(&data->display.pipes[p], IGT_CRTC_GAMMA_LUT_SIZE)) {
-			data->gamma_lut_size =
-				igt_pipe_obj_get_prop(&data->display.pipes[p],
-						      IGT_CRTC_GAMMA_LUT_SIZE);
-			igt_assert_lt(0, data->gamma_lut_size);
-		}
 
 		igt_display_require_output_on_pipe(&data->display, p);
 	}
@@ -865,6 +871,25 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 	}
 }
 
+static void
+run_invalid_tests_for_pipe(data_t *data, enum pipe p)
+{
+	igt_fixture
+		prep_pipe(data, p);
+
+	igt_describe("Negative check for invalid gamma lut sizes");
+	igt_subtest_f("pipe-%s-invalid-gamma-lut-sizes", kmstest_pipe_name(p))
+		invalid_gamma_lut_sizes(data, p);
+
+	igt_describe("Negative check for invalid degamma lut sizes");
+	igt_subtest_f("pipe-%s-invalid-degamma-lut-sizes", kmstest_pipe_name(p))
+		invalid_degamma_lut_sizes(data, p);
+
+	igt_describe("Negative check for color tranformation matrix sizes");
+	igt_subtest_f("pipe-%s-invalid-ctm-matrix-sizes", kmstest_pipe_name(p))
+		invalid_ctm_matrix_sizes(data, p);
+}
+
 igt_main
 {
 	data_t data = {};
@@ -879,21 +904,13 @@ igt_main
 		igt_display_require(&data.display, data.drm_fd);
 	}
 
-	for_each_pipe_static(pipe)
+	for_each_pipe_static(pipe) {
 		igt_subtest_group
 			run_tests_for_pipe(&data, pipe);
 
-	igt_describe("Negative check for invalid gamma lut sizes");
-	igt_subtest_f("pipe-invalid-gamma-lut-sizes")
-		invalid_gamma_lut_sizes(&data);
-
-	igt_describe("Negative check for invalid degamma lut sizes");
-	igt_subtest_f("pipe-invalid-degamma-lut-sizes")
-		invalid_degamma_lut_sizes(&data);
-
-	igt_describe("Negative check for color tranformation matrix sizes");
-	igt_subtest_f("pipe-invalid-ctm-matrix-sizes")
-		invalid_ctm_matrix_sizes(&data);
+		igt_subtest_group
+			run_invalid_tests_for_pipe(&data, pipe);
+	}
 
 	igt_fixture {
 		igt_display_fini(&data.display);

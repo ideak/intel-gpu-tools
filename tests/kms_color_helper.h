@@ -103,8 +103,9 @@ int pipe_set_property_blob_id(igt_pipe_t *pipe,
 int pipe_set_property_blob(igt_pipe_t *pipe,
 			   enum igt_atomic_crtc_properties prop,
 			   void *ptr, size_t length);
-void invalid_gamma_lut_sizes(data_t *data);
-void invalid_degamma_lut_sizes(data_t *data);
-void invalid_ctm_matrix_sizes(data_t *data);
+void invalid_gamma_lut_sizes(data_t *data, enum pipe p);
+void invalid_degamma_lut_sizes(data_t *data, enum pipe p);
+void invalid_ctm_matrix_sizes(data_t *data, enum pipe p);
+
 #endif
 
