@@ -32,6 +32,8 @@ igt_simple_main
 	struct igt_fb fb;
 	int ret;
 
+	igt_require(gem_available_fences(drm_fd) > 0);
+
 	igt_create_fb(drm_fd, 512, 512, DRM_FORMAT_XRGB8888,
 		      I915_FORMAT_MOD_X_TILED, &fb);
 
