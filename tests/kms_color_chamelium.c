@@ -754,17 +754,6 @@ igt_main
 	for_each_pipe_static(pipe)
 		igt_subtest_group
 			run_tests_for_pipe(&data, pipe);
-	igt_describe("Negative test case gamma lut size");
-	igt_subtest_f("pipe-invalid-gamma-lut-sizes")
-		invalid_gamma_lut_sizes(&data);
-
-	igt_describe("Negative test case degamma lut size");
-	igt_subtest_f("pipe-invalid-degamma-lut-sizes")
-		invalid_degamma_lut_sizes(&data);
-
-	igt_describe("Negative test case ctm matrix size");
-	igt_subtest_f("pipe-invalid-ctm-matrix-sizes")
-		invalid_ctm_matrix_sizes(&data);
 
 	igt_fixture {
 		igt_display_fini(&data.display);
