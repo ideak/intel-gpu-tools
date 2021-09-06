@@ -759,10 +759,13 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 		return 64;
 	} else if (is_gen12_ccs_plane(fb, plane)) {
 		/*
-		 * A main surface using a CCS AUX surface must be 4x4 tiles
-		 * aligned.  On ADL_P the minimum main surface stride is 8
-		 * tiles (2 * 64 byte on CCS surface) and it has to be POT
-		 * aligned.
+		 * The CCS surface stride is
+		 *    ccs_stride = main_surface_stride_in_bytes / 512 * 64.
+		 *
+		 * On ADL_P this stride must be minimum 128 bytes corresponding
+		 * to 8 tiles on the main surface and it must be power-of-two
+		 * sized. The allocated main surface stride doesn't need to be
+		 * POT sized, which is auto-padded by the kernel to the POT size.
 		 */
 		if (IS_ALDERLAKE_P(intel_get_drm_devid(fb->fd)))
 			return roundup_power_of_two(max(min_stride, 128u));
@@ -780,23 +783,27 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 		return ALIGN(min_stride, align);
 	} else {
 		unsigned int tile_width, tile_height;
-		uint32_t stride;
+		int tile_align = 1;
 
 		igt_get_fb_tile_size(fb->fd, fb->modifier, fb->plane_bpp[plane],
 				     &tile_width, &tile_height);
 
 		if (is_gen12_ccs_modifier(fb->modifier)) {
-			stride = ALIGN(min_stride, tile_width * 4);
-
-			/* TODO: add support to kernel to POT align CCS format strides */
-			if (is_i915_device(fb->fd) &&
-			    IS_ALDERLAKE_P(intel_get_drm_devid(fb->fd)))
-				stride = roundup_power_of_two(max(stride, tile_width * 8));
-		} else {
-			stride = ALIGN(min_stride, tile_width);
+			if (IS_ALDERLAKE_P(intel_get_drm_devid(fb->fd)))
+				/*
+				 * The main surface stride must be aligned to the CCS AUX
+				 * page table block size (covered by one AUX PTE). This
+				 * block size is 64kb -> 16 tiles.
+				 * We can do away padding an 8 tile stride to 16, since in
+				 * this case one AUX PTE entry will cover 2 main surface
+				 * tile rows.
+				 */
+				tile_align = (min_stride <= 8 * tile_width) ? 8 : 16;
+			else
+				tile_align = 4;
 		}
 
-		return stride;
+		return ALIGN(min_stride, tile_width * tile_align);
 	}
 }
 
@@ -840,13 +847,6 @@ static uint64_t calc_plane_size(struct igt_fb *fb, int plane)
 		size = (uint64_t)fb->strides[plane] *
 			ALIGN(fb->plane_height[plane], 64);
 
-		/*
-		 * On ADL_P CCS color planes must be 2MB aligned, until remapping
-		 * support is added for CCS FBs.
-		 */
-		if (IS_ALDERLAKE_P(intel_get_drm_devid(fb->fd)))
-			size = ALIGN(size, 2 * 1024 * 1024);
-
 		return size;
 	} else {
 		unsigned int tile_width, tile_height;
@@ -861,15 +861,6 @@ static uint64_t calc_plane_size(struct igt_fb *fb, int plane)
 
 		size = (uint64_t)fb->strides[plane] *
 			ALIGN(fb->plane_height[plane], tile_height);
-
-		/*
-		 * On ADL_P CCS color planes must be 2MB aligned, until remapping
-		 * support is added for CCS FBs.
-		 */
-		if (is_i915_device(fb->fd) &&
-		    IS_ALDERLAKE_P(intel_get_drm_devid(fb->fd)) &&
-		    is_ccs_modifier(fb->modifier))
-			size = ALIGN(size, 2 * 1024 * 1024);
 
 		return size;
 	}

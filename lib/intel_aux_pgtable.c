@@ -7,6 +7,8 @@
 #include "intel_bufops.h"
 #include "ioctl_wrappers.h"
 
+#include "lib/intel_chipset.h"
+
 #include "i915/gem_mman.h"
 
 #define BITS_PER_LONG_LONG	(sizeof(long long) * 8)
@@ -356,22 +358,70 @@ pgt_populate_entries_for_buf(struct pgtable *pgt,
 	uint64_t aux_addr = buf->addr.offset + buf->ccs[surface_idx].offset;
 	uint64_t l1_flags = pgt_get_l1_flags(buf, surface_idx);
 	uint64_t lx_flags = pgt_get_lx_flags();
+	int surface_tile_align;
+	int surface_src_row_tiles = buf->surface[surface_idx].stride / 128;
+	/*
+	 * The span of tiles in the FB object mapped by one AUX PTE
+	 * entry, which can be one or more tile rows.
+	 */
+	int surface_src_span_tiles = ALIGN(surface_src_row_tiles, 16);
+	int surface_src_span_size = surface_src_span_tiles * 4096;
+	/*
+	 * The number of tiles in a tile row on the surface auto-padded by
+	 * the kernel if necessary (to a power-of-two size on ADL-P).
+	 */
+	int surface_dst_row_tiles;
+	/*
+	 * The span of tiles on the auto-padded surface, including the
+	 * tiles in the FB object accounted by surface_src_span_tiles and
+	 * any padding tiles.
+	 */
+	int surface_dst_span_tiles;
+	/*
+	 * The size of CCS data mapping a surface_dst_span_tiles sized area
+	 * on the main surface.
+	 */
+	int aux_dst_span_size;
+	int surface_span_offset = 0;
+	int aux_span_offset = 0;
 
-	igt_assert(!(buf->surface[surface_idx].stride % 512));
-	igt_assert_eq(buf->ccs[surface_idx].stride,
-		      buf->surface[surface_idx].stride / 512 * 64);
+	if (IS_ALDERLAKE_P(buf->ibb->devid)) {
+		surface_tile_align = surface_src_row_tiles <= 8 ? 8 : 16;
+		surface_dst_row_tiles = roundup_power_of_two(surface_src_row_tiles);
+		surface_dst_span_tiles = roundup_power_of_two(surface_src_span_tiles);
+	} else {
+		surface_tile_align = 4;
+		surface_dst_row_tiles = surface_src_row_tiles;
+		surface_dst_span_tiles = surface_src_span_tiles;
+	}
 
-	for (; surface_addr < surface_end;
-	     surface_addr += MAIN_SURFACE_BLOCK_SIZE,
-	     aux_addr += AUX_CCS_BLOCK_SIZE) {
+	aux_dst_span_size = surface_dst_span_tiles / 16 * AUX_CCS_BLOCK_SIZE;
+
+	igt_assert_eq(buf->surface[surface_idx].stride % (128 * surface_tile_align), 0);
+	igt_assert_eq(buf->ccs[surface_idx].stride, surface_dst_row_tiles / 4 * 64);
+
+	while (surface_addr + surface_span_offset < surface_end) {
 		uint64_t table = top_table;
 		int level;
 
 		for (level = pgt->levels - 1; level >= 1; level--)
 			table = pgt_get_child_table(pgt, table, level,
-						    surface_addr, lx_flags);
+						    surface_addr + surface_span_offset, lx_flags);
 
-		pgt_set_l1_entry(pgt, table, surface_addr, aux_addr, l1_flags);
+		pgt_set_l1_entry(pgt, table,
+				 surface_addr + surface_span_offset,
+				 aux_addr + aux_span_offset, l1_flags);
+
+		surface_span_offset += MAIN_SURFACE_BLOCK_SIZE;
+		aux_span_offset += AUX_CCS_BLOCK_SIZE;
+
+		if (surface_span_offset >= surface_src_span_size) {
+			surface_addr += surface_src_span_size;
+			surface_span_offset = 0;
+
+			aux_addr += aux_dst_span_size;
+			aux_span_offset = 0;
+		}
 	}
 }
 
