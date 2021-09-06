@@ -715,6 +715,55 @@ void igt_init_fb(struct igt_fb *fb, int fd, int width, int height,
 	}
 }
 
+static bool adlp_ccs_remap_supported(int drm_fd)
+{
+	uint64_t modifier = I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS;
+	uint64_t size;
+	uint32_t width = 48 * 32;	/* Min stride with remapping to 48->64 tiles */
+	uint32_t height = 32 * 32;	/* 4 tile aligned height */
+	uint32_t format = DRM_FORMAT_XRGB8888;
+	uint32_t strides[4] = {};
+	uint32_t offsets[4] = {};
+	uint32_t bo;
+	uint32_t fb_id;
+	static int supported = -1;
+
+	if (supported != -1)
+		return supported;
+
+	strides[0] = width * 4;
+	strides[1] = roundup_power_of_two(strides[0] / 512) * 64;
+
+	offsets[0] = 0;
+	/* Ensure CCS plane 1 is misaligned. */
+	offsets[1] = ALIGN(offsets[0] + strides[0] * height, 2 * 1024 * 1024) + 4096;
+
+	size = offsets[1] + strides[1] * height / 32;
+
+	bo = gem_buffer_create_fb_obj(drm_fd, size);
+	igt_assert(bo);
+
+	if (__kms_addfb(drm_fd, bo,
+			width, height,
+			format, modifier,
+			strides, offsets,
+			2,
+			DRM_MODE_FB_MODIFIERS, &fb_id) != 0) {
+		supported = 0;
+		igt_debug("CCS framebuffer remapping not supported.\n");
+
+		return false;
+	}
+
+	igt_ioctl(drm_fd, DRM_IOCTL_MODE_RMFB, &fb_id);
+	gem_close(drm_fd, bo);
+
+	supported = 1;
+	igt_debug("CCS framebuffer remapping supported\n");
+
+	return true;
+}
+
 static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 {
 	uint32_t min_stride = fb->plane_width[plane] *
@@ -787,7 +836,7 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 				     &tile_width, &tile_height);
 
 		if (is_gen12_ccs_modifier(fb->modifier)) {
-			if (IS_ALDERLAKE_P(intel_get_drm_devid(fb->fd)))
+			if (IS_ALDERLAKE_P(intel_get_drm_devid(fb->fd))) {
 				/*
 				 * The main surface stride must be aligned to the CCS AUX
 				 * page table block size (covered by one AUX PTE). This
@@ -797,8 +846,13 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 				 * tile rows.
 				 */
 				tile_align = (min_stride <= 8 * tile_width) ? 8 : 16;
-			else
+				if (!adlp_ccs_remap_supported(fb->fd)) {
+					tile_align = roundup_power_of_two(min_stride) / 128;
+					tile_align = max(tile_align, 8);
+				}
+			} else {
 				tile_align = 4;
+			}
 		}
 
 		return ALIGN(min_stride, tile_width * tile_align);
@@ -845,6 +899,10 @@ static uint64_t calc_plane_size(struct igt_fb *fb, int plane)
 		size = (uint64_t)fb->strides[plane] *
 			ALIGN(fb->plane_height[plane], 64);
 
+		if (IS_ALDERLAKE_P(intel_get_drm_devid(fb->fd)) &&
+		    !adlp_ccs_remap_supported(fb->fd))
+			size = ALIGN(size, 2 * 1024 * 1024);
+
 		return size;
 	} else {
 		unsigned int tile_width, tile_height;
@@ -859,6 +917,11 @@ static uint64_t calc_plane_size(struct igt_fb *fb, int plane)
 
 		size = (uint64_t)fb->strides[plane] *
 			ALIGN(fb->plane_height[plane], tile_height);
+
+		if (is_ccs_modifier(fb->modifier) &&
+		    IS_ALDERLAKE_P(intel_get_drm_devid(fb->fd)) &&
+		    !adlp_ccs_remap_supported(fb->fd))
+			size = ALIGN(size, 2 * 1024 * 1024);
 
 		return size;
 	}
