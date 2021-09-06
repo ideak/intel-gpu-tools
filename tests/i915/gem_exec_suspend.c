@@ -114,7 +114,8 @@ static void run_test(int fd, const intel_ctx_t *ctx,
 
 	memset(obj, 0, sizeof(obj));
 	obj[0].handle = gem_create(fd, 4096);
-	gem_set_caching(fd, obj[0].handle, !!(flags & CACHED));
+	if (!gem_has_lmem(fd))
+		gem_set_caching(fd, obj[0].handle, !!(flags & CACHED));
 	obj[0].flags |= EXEC_OBJECT_WRITE;
 	obj[1].handle = gem_create(fd, 4096);
 	gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));
@@ -178,7 +179,8 @@ static void run_test(int fd, const intel_ctx_t *ctx,
 	}
 
 	if (flags & HANG)
-		spin = igt_spin_new(fd, .ahnd = ahnd, .engine = engine);
+		spin = igt_spin_new(fd, .ahnd = ahnd, .engine = engine,
+			.ctx = ctx);
 
 	switch (mode(flags)) {
 	case NOSLEEP:
@@ -318,7 +320,18 @@ igt_main
 		run_test(fd, ctx, ALL_ENGINES, HIBERNATE);
 
 	for (m = modes; m->suffix; m++) {
+		igt_subtest_with_dynamic_f("fixed%s", m->suffix) {
+			igt_require(gem_has_lmem(fd));
+			for_each_ctx_engine(fd, ctx, e) {
+				if (!gem_class_can_store_dword(fd, e->class))
+					continue;
+				igt_dynamic_f("%s", e->name)
+					run_test(fd, ctx, e->flags, m->mode);
+			}
+		}
+
 		igt_subtest_with_dynamic_f("uncached%s", m->suffix) {
+			igt_require(!gem_has_lmem(fd));
 			for_each_ctx_engine(fd, ctx, e) {
 				if (!gem_class_can_store_dword(fd, e->class))
 					continue;
@@ -328,6 +341,7 @@ igt_main
 		}
 
 		igt_subtest_with_dynamic_f("cached%s", m->suffix) {
+			igt_require(!gem_has_lmem(fd));
 			for_each_ctx_engine(fd, ctx, e) {
 				if (!gem_class_can_store_dword(fd, e->class))
 					continue;
