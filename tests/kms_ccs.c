@@ -329,15 +329,22 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 		srand(data->seed);
 		fill_fb_random(data->drm_fd, fb);
 	} else if (!(data->flags & TEST_BAD_PIXEL_FORMAT)) {
+		bool do_fast_clear = is_ccs_cc_modifier(data->ccs_modifier);
+		bool do_solid_fill = do_fast_clear || data->plane;
 		int c = !!data->plane;
 
-		if (is_ccs_cc_modifier(modifier)) {
+		if (do_fast_clear && (fb_flags & FB_COMPRESSED)) {
 			fast_clear_fb(data->drm_fd, fb, cc_color);
 		} else {
 			cr = igt_get_cairo_ctx(data->drm_fd, fb);
-			igt_paint_color(cr, 0, 0, width, height,
-					colors[c].r, colors[c].g, colors[c].b);
-					igt_put_cairo_ctx(cr);
+
+			if (do_solid_fill)
+				igt_paint_color(cr, 0, 0, width, height,
+						colors[c].r, colors[c].g, colors[c].b);
+			else
+				igt_paint_test_pattern(cr, width, height);
+
+			igt_put_cairo_ctx(cr);
 		}
 	}
 
