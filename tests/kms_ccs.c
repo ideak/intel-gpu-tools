@@ -343,8 +343,14 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 
 	ret = drmIoctl(data->drm_fd, DRM_IOCTL_MODE_ADDFB2, &f);
 	if (data->flags & TEST_FAIL_ON_ADDFB2) {
+		int addfb_errno = errno;
+
+		if (f.handles[index])
+			gem_close(data->drm_fd, f.handles[index]);
+
 		igt_assert_eq(ret, -1);
-		igt_assert_eq(errno, EINVAL);
+		igt_assert_eq(addfb_errno, EINVAL);
+
 		return;
 	} else
 		igt_assert_eq(ret, 0);
@@ -387,7 +393,8 @@ static bool try_config(data_t *data, enum test_fb_flags fb_flags,
 	drmModeModeInfo *drm_mode = igt_output_get_mode(data->output);
 	int fb_width = drm_mode->hdisplay;
 	enum igt_commit_style commit;
-	struct igt_fb fb, fb_sprite;
+	struct igt_fb fb = {};
+	struct igt_fb fb_sprite = {};
 	int ret;
 
 	if (data->display.is_atomic)
@@ -443,14 +450,9 @@ static bool try_config(data_t *data, enum test_fb_flags fb_flags,
 		igt_plane_set_rotation(primary, IGT_ROTATION_90);
 
 	ret = igt_display_try_commit2(display, commit);
-	if (data->flags & TEST_BAD_ROTATION_90) {
-		igt_assert_eq(ret, -EINVAL);
-	} else {
-		igt_assert_eq(ret, 0);
 
-		if (crc)
-			igt_pipe_crc_collect_crc(data->pipe_crc, crc);
-	}
+	if (ret == 0 && !(fb_flags & TEST_BAD_ROTATION_90) && crc)
+		igt_pipe_crc_collect_crc(data->pipe_crc, crc);
 
 	igt_debug_wait_for_keypress("ccs");
 
@@ -458,15 +460,16 @@ static bool try_config(data_t *data, enum test_fb_flags fb_flags,
 		igt_plane_set_position(data->plane, 0, 0);
 		igt_plane_set_size(data->plane, 0, 0);
 		igt_plane_set_fb(data->plane, NULL);
-		igt_remove_fb(display->drm_fd, &fb_sprite);
 	}
 
 	igt_plane_set_fb(primary, NULL);
 	igt_plane_set_rotation(primary, IGT_ROTATION_0);
 	igt_display_commit2(display, commit);
 
-	if (data->flags & TEST_CRC)
-		igt_remove_fb(data->drm_fd, &fb);
+	igt_remove_fb(data->drm_fd, &fb_sprite);
+	igt_remove_fb(data->drm_fd, &fb);
+
+	igt_assert_eq(ret, data->flags & TEST_BAD_ROTATION_90 ? -EINVAL : 0);
 
 	return true;
 }
