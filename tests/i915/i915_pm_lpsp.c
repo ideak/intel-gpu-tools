@@ -210,7 +210,7 @@ igt_main
 
 	igt_fixture {
 		free(data.pwr_dmn_info);
-		close(data.drm_fd);
 		igt_display_fini(&data.display);
+		close(data.drm_fd);
 	}
 }
