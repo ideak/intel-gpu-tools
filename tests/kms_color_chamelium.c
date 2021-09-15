@@ -398,6 +398,8 @@ static void test_pipe_limited_range_ctm(data_t *data,
 	struct chamelium_port *port;
 	char *connected_ports[4];
 
+	igt_require(igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_CTM));
+
 	degamma_linear = generate_table(data->degamma_lut_size, 1.0);
 	gamma_linear = generate_table(data->gamma_lut_size, 1.0);
 
