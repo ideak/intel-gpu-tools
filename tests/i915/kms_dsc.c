@@ -244,14 +244,12 @@ static void run_test(data_t *data, enum dsc_test_type test_type)
 			      &data->fb_test_pattern);
 
 	for_each_pipe(&data->display, pipe) {
-		if (is_i915_device(data->drm_fd)) {
-			uint32_t devid = intel_get_drm_devid(data->drm_fd);
+		uint32_t devid = intel_get_drm_devid(data->drm_fd);
 
-			if (data->output->config.connector->connector_type == DRM_MODE_CONNECTOR_DisplayPort &&
-			    pipe == PIPE_A && IS_GEN11(devid)) {
-				igt_debug("DSC not supported on Pipe A on external DP in Gen11 platforms\n");
-				continue;
-			}
+		if (data->output->config.connector->connector_type == DRM_MODE_CONNECTOR_DisplayPort &&
+		    pipe == PIPE_A && IS_GEN11(devid)) {
+			igt_debug("DSC not supported on Pipe A on external DP in Gen11 platforms\n");
+			continue;
 		}
 
 		snprintf(test_name, sizeof(test_name), "-%dbpp", data->compression_bpp);
@@ -279,8 +277,7 @@ igt_main
 	drmModeConnector *connector = NULL;
 	int i, j;
 	igt_fixture {
-		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
-		igt_require_intel(data.drm_fd);
+		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
 		data.devid = intel_get_drm_devid(data.drm_fd);
 		kmstest_set_vt_graphics_mode();
 		igt_install_exit_handler(kms_dsc_exit_handler);

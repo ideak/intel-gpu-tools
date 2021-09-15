@@ -382,6 +382,7 @@ sanity_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 	 * doesn't cover CRTC (should fail on pre-gen9 and succeed on
 	 * gen9+).
 	 */
+	igt_require_intel(data->drm_fd);
 	igt_plane_set_fb(primary, &test.undersized_fb);
 	expect = (data->display_ver < 9) ? -EINVAL : 0;
 	igt_assert(igt_display_try_commit2(&data->display, COMMIT_UNIVERSAL) == expect);
@@ -579,6 +580,7 @@ cursor_leak_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 
 	igt_require_pipe(display, pipe);
 	igt_require(display->has_cursor_plane);
+	igt_require_intel(data->drm_fd);
 
 	igt_output_set_pipe(output, pipe);
 	mode = igt_output_get_mode(output);
@@ -704,6 +706,7 @@ gen9_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 
 	int ret = 0;
 
+	igt_require_intel(data->drm_fd);
 	igt_skip_on(data->display_ver < 9);
 	igt_require_pipe(&data->display, pipe);
 
@@ -797,8 +800,9 @@ igt_main
 	enum pipe pipe;
 
 	igt_fixture {
-		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
-		data.display_ver = intel_display_ver(intel_get_drm_devid(data.drm_fd));
+		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
+		if (is_i915_device(data.drm_fd))
+			data.display_ver = intel_display_ver(intel_get_drm_devid(data.drm_fd));
 
 		kmstest_set_vt_graphics_mode();
 

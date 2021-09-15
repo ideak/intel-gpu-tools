@@ -34,7 +34,7 @@ igt_main
 	drmModeConnector *tv_connector = NULL, *temp;
 
 	igt_fixture {
-		drm_fd = drm_open_driver_master(DRIVER_INTEL);
+		drm_fd = drm_open_driver_master(DRIVER_ANY);
 
 		res = drmModeGetResources(drm_fd);
 		igt_require(res);

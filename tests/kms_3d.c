@@ -34,7 +34,7 @@ igt_simple_main
 	const struct edid *edid;
 	int mode_count, connector_id;
 
-	drm_fd = drm_open_driver_master(DRIVER_INTEL);
+	drm_fd = drm_open_driver_master(DRIVER_ANY);
 
 	res = drmModeGetResources(drm_fd);
 	igt_require(res);

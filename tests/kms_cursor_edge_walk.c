@@ -312,9 +312,10 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 	igt_fixture {
 		int ret;
 
-		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
+		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
 
-		data.devid = intel_get_drm_devid(data.drm_fd);
+		if (is_i915_device(data.drm_fd))
+			data.devid = intel_get_drm_devid(data.drm_fd);
 
 		ret = drmGetCap(data.drm_fd, DRM_CAP_CURSOR_WIDTH, &max_curw);
 		igt_assert(ret == 0 || errno == EINVAL);

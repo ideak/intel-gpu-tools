@@ -82,12 +82,13 @@ hdmi_inject_4k(int drm_fd, drmModeConnector *connector)
 	int fb_id;
 	struct igt_fb fb;
 	uint8_t found_4k_mode = 0;
-	uint32_t devid;
 
-	devid = intel_get_drm_devid(drm_fd);
+	if (is_i915_device(drm_fd)) {
+		uint32_t devid = intel_get_drm_devid(drm_fd);
 
-	/* 4K requires at least HSW */
-	igt_require(IS_HASWELL(devid) || intel_display_ver(devid) >= 8);
+		/* 4K requires at least HSW */
+		igt_require(IS_HASWELL(devid) || intel_display_ver(devid) >= 8);
+	}
 
 	edid = igt_kms_get_4k_edid();
 	kmstest_force_edid(drm_fd, connector, edid);
@@ -195,7 +196,7 @@ igt_main
 	drmModeConnector *connector;
 
 	igt_fixture {
-		drm_fd = drm_open_driver_master(DRIVER_INTEL);
+		drm_fd = drm_open_driver_master(DRIVER_ANY);
 
 		res = drmModeGetResources(drm_fd);
 		igt_require(res);

@@ -37,7 +37,7 @@ static void reset_connectors(void)
 	drmModeRes *res;
 	drmModeConnector *connector = NULL;
 
-	drm_fd = drm_open_driver_master(DRIVER_INTEL);
+	drm_fd = drm_open_driver_master(DRIVER_ANY);
 	res = drmModeGetResources(drm_fd);
 
 	for (int i = 0; i < res->count_connectors; i++) {
@@ -86,7 +86,7 @@ igt_main_args("", long_opts, help_str, opt_handler, NULL)
 	igt_fixture {
 		unsigned connector_id = 0;
 
-		drm_fd = drm_open_driver_master(DRIVER_INTEL);
+		drm_fd = drm_open_driver_master(DRIVER_ANY);
 
 		res = drmModeGetResources(drm_fd);
 		igt_require(res);
