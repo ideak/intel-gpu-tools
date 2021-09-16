@@ -13,6 +13,7 @@ if libdrm_amdgpu.found()
 			  'amd_prime',
 			  'amd_module_load',
 			  'amd_mem_leak',
+			  'amd_link_settings',
 			  'amd_vrr_range',
 			]
 	amdgpu_deps += libdrm_amdgpu

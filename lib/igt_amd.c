@@ -323,3 +323,122 @@ int igt_amd_trigger_hotplug(int drm_fd, char *connector_name)
 
 	return 0;
 }
+
+/*
+ * igt_amd_read_link_settings:
+ * @drm_fd: DRM file descriptor
+ * @connector_name: The name of the connector to read the link_settings
+ * @lane_count: Lane count
+ * @link_rate: Link rate
+ * @link_spread: Spread spectrum
+ *
+ * The indices of @lane_count, @link_rate, and @link_spread correspond to the
+ * values of "Current", "Verified", "Reported", and "Preferred", respectively.
+ */
+void igt_amd_read_link_settings(
+	int drm_fd, char *connector_name, int *lane_count, int *link_rate, int *link_spread)
+{
+	int fd, ret;
+	char buf[101];
+	int i = 0;
+	char *token_end, *val_token;
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+	if (fd < 0) {
+		igt_info("Could not open connector %s debugfs directory\n",
+			 connector_name);
+		return;
+	}
+	ret = igt_debugfs_simple_read(fd, DEBUGFS_DP_LINK_SETTINGS, buf, sizeof(buf));
+	igt_assert_f(ret >= 0, "Reading %s for connector %s failed.\n",
+		     DEBUGFS_DP_LINK_SETTINGS, connector_name);
+
+	close(fd);
+
+	/* Between current, verified, reported, and preferred are null terminators,
+	 * replace them with ';' to use as the delimiter for strtok. */
+	while (strlen(buf) < sizeof(buf) - 1 && buf[strlen(buf)] == '\0')
+		buf[strlen(buf)] = ';';
+
+	/* Parse values read from file. */
+	for (char *token = strtok_r(buf, ";", &token_end);
+	     token != NULL;
+	     token = strtok_r(NULL, ";", &token_end))
+	{
+		strtok_r(token, ": ", &val_token);
+		lane_count[i] = strtol(val_token, &val_token, 10);
+		link_rate[i] = strtol(val_token, &val_token, 10);
+		link_spread[i] = strtol(val_token, &val_token, 10);
+		i++;
+
+		if (i > 3) return;
+	}
+}
+
+/*
+ * igt_amd_write_link_settings:
+ * @drm_fd: DRM file descriptor
+ * @connector_name: The name of the connector to write the link_settings
+ * @lane_count: Lane count
+ * @link_rate: Link rate
+ * @training_type: Link training type
+ */
+void igt_amd_write_link_settings(
+	int drm_fd, char *connector_name, enum dc_lane_count lane_count,
+	enum dc_link_rate link_rate, enum dc_link_training_type training_type)
+{
+	int ls_fd, fd;
+	const int buf_len = 40;
+	char buf[buf_len];
+	int wr_len = 0;
+
+	memset(buf, '\0', sizeof(char) * buf_len);
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+	igt_assert(fd >= 0);
+	ls_fd = openat(fd, DEBUGFS_DP_LINK_SETTINGS, O_WRONLY);
+	close(fd);
+	igt_assert(ls_fd >= 0);
+
+	/* dp_link_settings_write expects a \n at the end or else it will
+	 * dereference a null pointer.
+	 */
+	if (training_type == LINK_TRAINING_DEFAULT)
+		snprintf(buf, sizeof(buf), "%02x %02x \n", lane_count, link_rate);
+	else
+		snprintf(buf, sizeof(buf), "%02x %02x %02x \n", lane_count,
+			 link_rate, training_type);
+
+	wr_len = write(ls_fd, buf, strlen(buf));
+	igt_assert_eq(wr_len, strlen(buf));
+
+	close(ls_fd);
+}
+
+/**
+ * igt_amd_output_has_link_settings: check if connector has link_settings debugfs entry
+ * @drm_fd: DRM file descriptor
+ * @connector_name: The connector's name, on which we're reading the status
+ */
+bool igt_amd_output_has_link_settings(int drm_fd, char *connector_name)
+{
+	int fd;
+	int res;
+	struct stat stat;
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+	if (fd < 0) {
+		igt_info("output %s: debugfs not found\n", connector_name);
+		return false;
+	}
+
+	res = fstatat(fd, DEBUGFS_DP_LINK_SETTINGS, &stat, 0);
+	if (res != 0) {
+		igt_info("output %s: %s debugfs not supported\n", connector_name, DEBUGFS_DP_LINK_SETTINGS);
+		close(fd);
+		return false;
+	}
+
+	close(fd);
+	return true;
+}
