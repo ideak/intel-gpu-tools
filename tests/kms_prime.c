@@ -100,18 +100,27 @@ static void prepare_scratch(int exporter_fd, struct dumb_bo *scratch,
 	scratch->height = mode->vdisplay;
 	scratch->bpp = 32;
 
-	scratch->handle = kmstest_dumb_create(exporter_fd,
-			ALIGN(scratch->width, 256),
-			scratch->height,
-			scratch->bpp,
-			&scratch->pitch,
-			&scratch->size);
+	if (!is_i915_device(exporter_fd)) {
+		scratch->handle = kmstest_dumb_create(exporter_fd,
+						      ALIGN(scratch->width, 256),
+						      scratch->height, scratch->bpp,
+						      &scratch->pitch, &scratch->size);
 
+		ptr = kmstest_dumb_map_buffer(exporter_fd, scratch->handle,
+					      scratch->size, PROT_WRITE);
+	} else {
+		igt_calc_fb_size(exporter_fd, mode->hdisplay, mode->vdisplay, DRM_FORMAT_XRGB8888,
+				 DRM_FORMAT_MOD_NONE, &scratch->size, &scratch->pitch);
+		if (gem_has_lmem(exporter_fd))
+			scratch->handle = gem_create_in_memory_regions(exporter_fd, scratch->size,
+								       REGION_LMEM(0), REGION_SMEM);
+		else
+			scratch->handle = gem_create_in_memory_regions(exporter_fd, scratch->size,
+								       REGION_SMEM);
 
-	ptr = kmstest_dumb_map_buffer(exporter_fd,
-				      scratch->handle,
-				      scratch->size,
-				      PROT_WRITE);
+		ptr = gem_mmap__device_coherent(exporter_fd, scratch->handle, 0, scratch->size,
+						PROT_WRITE | PROT_READ);
+	}
 
 	for (size_t idx = 0; idx < scratch->size / sizeof(*ptr); ++idx)
 		ptr[idx] = color;
