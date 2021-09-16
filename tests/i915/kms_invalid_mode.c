@@ -69,7 +69,9 @@ can_bigjoiner(data_t *data)
 static bool
 adjust_mode_clock_too_high(data_t *data, drmModeModeInfoPtr mode)
 {
-	igt_require(data->max_dotclock != 0);
+	int max_dotclock = data->max_dotclock;
+
+	igt_require(max_dotclock != 0);
 
 	/*
 	 * FIXME When we have a fixed mode, the kernel will ignore
@@ -82,7 +84,18 @@ adjust_mode_clock_too_high(data_t *data, drmModeModeInfoPtr mode)
 	if (has_scaling_mode_prop(data))
 		return false;
 
-	mode->clock = data->max_dotclock + 1;
+	/*
+	 * Newer platforms can support modes higher than the maximum dot clock
+	 * by using pipe joiner, so set the mode clock twice that of maximum
+	 * dot clock;
+	 */
+	if (can_bigjoiner(data)) {
+		igt_info("Platform supports bigjoiner with %s\n",
+			 data->output->name);
+		max_dotclock *= 2;
+	}
+
+	mode->clock = max_dotclock + 1;
 
 	return true;
 }
@@ -102,17 +115,6 @@ test_output(data_t *data)
 	mode = *igt_output_get_mode(output);
 	if (!data->adjust_mode(data, &mode))
 		return 0;
-
-	/*
-	 * Newer platforms can support modes higher than the maximum dot clock
-	 * by using pipe joiner, so set the mode clock twice that of maximum
-	 * dot clock;
-	 */
-	if (can_bigjoiner(data)) {
-		igt_info("Platform supports bigjoiner with %s\n",
-			  output->name);
-		mode.clock *= 2;
-	}
 
 	igt_create_fb(data->drm_fd,
 		      mode.hdisplay, mode.vdisplay,
