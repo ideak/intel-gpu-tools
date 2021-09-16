@@ -217,7 +217,7 @@ static void test_fence_blt(int i915, int vgem)
 
 		native = gem_create(i915, scratch.size);
 
-		ptr = gem_mmap__wc(i915, native, 0, scratch.size, PROT_READ);
+		ptr = gem_mmap__device_coherent(i915, native, 0, scratch.size, PROT_READ);
 		for (i = 0; i < scratch.height; i++)
 			igt_assert_eq_u32(ptr[scratch.pitch * i / sizeof(*ptr)],
 					  0);
@@ -393,7 +393,7 @@ static void test_blt(int vgem, int i915)
 
 	native = gem_create(i915, scratch.size);
 
-	ptr = gem_mmap__wc(i915, native, 0, scratch.size, PROT_WRITE);
+	ptr = gem_mmap__device_coherent(i915, native, 0, scratch.size, PROT_WRITE);
 	for (i = 0; i < scratch.height; i++)
 		ptr[scratch.pitch * i / sizeof(*ptr)] = i;
 	munmap(ptr, scratch.size);
@@ -421,7 +421,7 @@ static void test_blt(int vgem, int i915)
 			     scratch.size);
 	gem_sync(i915, native);
 
-	ptr = gem_mmap__wc(i915, native, 0, scratch.size, PROT_READ);
+	ptr = gem_mmap__device_coherent(i915, native, 0, scratch.size, PROT_READ);
 	for (i = 0; i < scratch.height; i++)
 		igt_assert_eq_u32(ptr[scratch.pitch * i / sizeof(*ptr)], ~i);
 	munmap(ptr, scratch.size);
@@ -534,7 +534,7 @@ static void test_blt_interleaved(int vgem, int i915)
 	native = gem_create(i915, scratch.size);
 
 	foreign = vgem_mmap(vgem, &scratch, PROT_WRITE);
-	local = gem_mmap__wc(i915, native, 0, scratch.size, PROT_WRITE);
+	local = gem_mmap__device_coherent(i915, native, 0, scratch.size, PROT_WRITE);
 
 	for (i = 0; i < scratch.height; i++) {
 		local[scratch.pitch * i / sizeof(*local)] = i;
@@ -612,7 +612,7 @@ static void work(int i915, uint64_t ahnd, uint64_t scratch_offset, int dmabuf,
 		obj[BATCH].flags = EXEC_OBJECT_PINNED;
 	}
 
-	batch = gem_mmap__wc(i915, obj[BATCH].handle, 0, size, PROT_WRITE);
+	batch = gem_mmap__device_coherent(i915, obj[BATCH].handle, 0, size, PROT_WRITE);
 	gem_set_domain(i915, obj[BATCH].handle,
 		       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 
@@ -1125,7 +1125,7 @@ igt_main
 		i915 = drm_open_driver_master(DRIVER_INTEL);
 		igt_require_gem(i915);
 		igt_require(has_prime_import(i915));
-		gem_require_mmap_wc(i915);
+		gem_require_mmap_device_coherent(i915);
 	}
 
 	igt_subtest("basic-read")
