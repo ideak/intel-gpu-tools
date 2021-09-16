@@ -23,6 +23,7 @@
  */
 
 #include "igt.h"
+#include <limits.h>
 #include <stdbool.h>
 
 IGT_TEST_DESCRIPTION("Make sure all modesets are rejected when the requested mode is invalid");
@@ -104,6 +105,20 @@ static bool
 adjust_mode_zero_clock(data_t *data, drmModeModeInfoPtr mode)
 {
 	mode->clock = 0;
+	return true;
+}
+
+static bool
+adjust_mode_int_max_clock(data_t *data, drmModeModeInfoPtr mode)
+{
+	mode->clock = INT_MAX;
+	return true;
+}
+
+static bool
+adjust_mode_uint_max_clock(data_t *data, drmModeModeInfoPtr mode)
+{
+	mode->clock = UINT_MAX;
 	return true;
 }
 
@@ -243,6 +258,12 @@ static const struct {
 	},
 	{ .name = "zero-clock",
 	  .adjust_mode = adjust_mode_zero_clock,
+	},
+	{ .name = "int-max-clock",
+	  .adjust_mode = adjust_mode_int_max_clock,
+	},
+	{ .name = "uint-max-clock",
+	  .adjust_mode = adjust_mode_uint_max_clock,
 	},
 	{ .name = "zero-hdisplay",
 	  .adjust_mode = adjust_mode_zero_hdisplay,
