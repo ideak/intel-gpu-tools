@@ -818,8 +818,12 @@ static void __intel_buf_init(struct buf_ops *bops,
 
 	if (handle)
 		buf->handle = handle;
-	else
-		buf->handle = gem_create_in_memory_regions(bops->fd, size, region);
+	else {
+		if (!__gem_create_in_memory_regions(bops->fd, &handle, size, region))
+			buf->handle = handle;
+		else
+			buf->handle = gem_create(bops->fd, size);
+	}
 
 	set_hw_tiled(bops, buf);
 }
