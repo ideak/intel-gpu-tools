@@ -717,7 +717,7 @@ sema_wait(int gem_fd, const intel_ctx_t *ctx,
 	bb_offset = get_offset(ahnd, bb_handle, 4096, 0);
 	obj_offset = get_offset(ahnd, obj_handle, 4096, 0);
 
-	obj_ptr = gem_mmap__wc(gem_fd, obj_handle, 0, 4096, PROT_WRITE);
+	obj_ptr = gem_mmap__device_coherent(gem_fd, obj_handle, 0, 4096, PROT_WRITE);
 
 	batch[0] = MI_STORE_DWORD_IMM;
 	batch[1] = obj_offset + sizeof(*obj_ptr);
@@ -877,7 +877,7 @@ __sema_busy(int gem_fd, uint64_t ahnd, int pmu, const intel_ctx_t *ctx,
 
 	gem_quiescent_gpu(gem_fd);
 
-	map = gem_mmap__wc(gem_fd, obj.handle, 0, 4096, PROT_WRITE);
+	map = gem_mmap__device_coherent(gem_fd, obj.handle, 0, 4096, PROT_WRITE);
 	gem_execbuf(gem_fd, &eb);
 	spin = igt_spin_new(gem_fd, .ahnd = ahnd, .ctx = ctx, .engine = e->flags);
 

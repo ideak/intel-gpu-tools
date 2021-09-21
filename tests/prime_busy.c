@@ -83,7 +83,7 @@ static void busy(int fd, const intel_ctx_t *ctx, unsigned ring, unsigned flags)
 		pfd[BATCH].fd = prime_handle_to_fd(fd, obj[BATCH].handle);
 	}
 
-	batch = gem_mmap__wc(fd, obj[BATCH].handle, 0, size, PROT_WRITE);
+	batch = gem_mmap__device_coherent(fd, obj[BATCH].handle, 0, size, PROT_WRITE);
 	gem_set_domain(fd, obj[BATCH].handle,
 			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 
@@ -175,7 +175,7 @@ static void busy(int fd, const intel_ctx_t *ctx, unsigned ring, unsigned flags)
 	igt_assert(!prime_busy(&pfd[SCRATCH], true));
 
 	munmap(batch, size);
-	batch = gem_mmap__wc(fd, obj[SCRATCH].handle, 0, 4096, PROT_READ);
+	batch = gem_mmap__device_coherent(fd, obj[SCRATCH].handle, 0, 4096, PROT_READ);
 	for (i = 0; i < 1024; i++)
 		igt_assert_eq_u32(batch[i], i);
 	munmap(batch, 4096);
@@ -237,7 +237,7 @@ igt_main
 		};
 
 		igt_fixture
-			gem_require_mmap_wc(fd);
+			gem_require_mmap_device_coherent(fd);
 
 		for (const struct mode *m = modes; m->name; m++) {
 			igt_subtest_with_dynamic(m->name)

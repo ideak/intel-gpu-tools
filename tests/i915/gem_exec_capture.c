@@ -107,7 +107,7 @@ static void __capture1(int fd, int dir, uint64_t ahnd, const intel_ctx_t *ctx,
 	reloc[1].read_domains = I915_GEM_DOMAIN_RENDER;
 	reloc[1].write_domain = I915_GEM_DOMAIN_RENDER;
 
-	seqno = gem_mmap__wc(fd, obj[SCRATCH].handle, 0, 4096, PROT_READ);
+	seqno = gem_mmap__device_coherent(fd, obj[SCRATCH].handle, 0, 4096, PROT_READ);
 	gem_set_domain(fd, obj[SCRATCH].handle,
 			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 
@@ -278,7 +278,7 @@ static struct offset {
 		obj[count + 1].relocation_count = ARRAY_SIZE(reloc);
 	}
 
-	seqno = gem_mmap__wc(fd, obj[0].handle, 0, 4096, PROT_READ);
+	seqno = gem_mmap__device_coherent(fd, obj[0].handle, 0, 4096, PROT_READ);
 	gem_set_domain(fd, obj[0].handle,
 			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 

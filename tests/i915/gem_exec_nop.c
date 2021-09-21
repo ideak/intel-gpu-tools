@@ -132,7 +132,7 @@ static void poll_ring(int fd, const intel_ctx_t *ctx,
 	obj.relocation_count = ARRAY_SIZE(reloc);
 
 	r = memset(reloc, 0, sizeof(reloc));
-	batch = gem_mmap__wc(fd, obj.handle, 0, 4096, PROT_WRITE);
+	batch = gem_mmap__device_coherent(fd, obj.handle, 0, 4096, PROT_WRITE);
 
 	for (unsigned int start_offset = 0;
 	     start_offset <= 128;
@@ -257,7 +257,7 @@ static void poll_sequential(int fd, const intel_ctx_t *ctx,
 	obj[1].relocation_count = ARRAY_SIZE(reloc);
 
 	r = memset(reloc, 0, sizeof(reloc));
-	batch = gem_mmap__wc(fd, obj[1].handle, 0, 4096, PROT_WRITE);
+	batch = gem_mmap__device_coherent(fd, obj[1].handle, 0, 4096, PROT_WRITE);
 
 	for (unsigned int start_offset = 0;
 	     start_offset <= 128;
@@ -313,7 +313,7 @@ static void poll_sequential(int fd, const intel_ctx_t *ctx,
 	if (cached)
 		state = gem_mmap__cpu(fd, obj[0].handle, 0, 4096, PROT_READ);
 	else
-		state = gem_mmap__wc(fd, obj[0].handle, 0, 4096, PROT_READ);
+		state = gem_mmap__device_coherent(fd, obj[0].handle, 0, 4096, PROT_READ);
 
 	memset(&execbuf, 0, sizeof(execbuf));
 	execbuf.buffers_ptr = to_user_pointer(obj);
@@ -972,6 +972,7 @@ igt_main
 
 		device = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(device);
+		gem_require_mmap_device_coherent(device);
 		gem_submission_print_method(device);
 		gem_scheduler_print_capability(device);
 
