@@ -1335,6 +1335,7 @@ __intel_bb_create(int i915, uint32_t ctx, uint32_t size, bool do_relocs,
 
 	igt_assert(ibb);
 
+	ibb->allows_obj_alignment = gem_allows_obj_alignment(i915);
 	ibb->uses_full_ppgtt = gem_uses_full_ppgtt(i915);
 	ibb->devid = intel_get_drm_devid(i915);
 	ibb->gen = intel_gen(ibb->devid);
@@ -1783,6 +1784,7 @@ __add_to_cache(struct intel_bb *ibb, uint32_t handle)
 	igt_assert(object);
 
 	object->handle = handle;
+	object->alignment = 0;
 	found = tsearch((void *) object, &ibb->root, __compare_objects);
 
 	if (*found == object) {
@@ -1905,7 +1907,7 @@ intel_bb_add_object(struct intel_bb *ibb, uint32_t handle, uint64_t size,
 		   || ALIGN(offset, alignment) == offset);
 
 	object = __add_to_cache(ibb, handle);
-	object->alignment = alignment ?: 4096;
+	alignment = alignment ?: 4096;
 	__add_to_objects(ibb, object);
 
 	/*
@@ -1917,7 +1919,7 @@ intel_bb_add_object(struct intel_bb *ibb, uint32_t handle, uint64_t size,
 	if (INVALID_ADDR(object->offset)) {
 		if (INVALID_ADDR(offset)) {
 			offset = __intel_bb_get_offset(ibb, handle, size,
-						       object->alignment);
+						       alignment);
 		} else {
 			offset = offset & (ibb->gtt_size - 1);
 
@@ -1961,6 +1963,9 @@ intel_bb_add_object(struct intel_bb *ibb, uint32_t handle, uint64_t size,
 
 	if (ibb->uses_full_ppgtt && !ibb->enforce_relocs)
 		object->flags |= EXEC_OBJECT_PINNED;
+
+	if (ibb->allows_obj_alignment)
+		object->alignment = alignment;
 
 	return object;
 }

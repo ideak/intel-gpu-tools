@@ -476,6 +476,7 @@ struct intel_bb {
 	uint64_t gtt_size;
 	bool supports_48b_address;
 	bool uses_full_ppgtt;
+	bool allows_obj_alignment;
 
 	struct igt_pxp pxp;
 	uint32_t ctx;
