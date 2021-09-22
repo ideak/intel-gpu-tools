@@ -102,7 +102,6 @@ static void run_on_ring(int fd, const intel_ctx_t *ctx,
 	} obj[2];
 	unsigned i;
 
-	gem_require_ring(fd, ring_id);
 	igt_require(has_softpin(fd));
 
 	for (i = 0; i < 2; i++) {
