@@ -688,6 +688,7 @@ pipe_crc_new(int fd, enum pipe pipe, const char *source, int flags)
 	igt_assert(debugfs != -1);
 
 	pipe_crc = calloc(1, sizeof(struct _igt_pipe_crc));
+	igt_assert(pipe_crc);
 
 	sprintf(buf, "crtc-%d/crc/control", pipe);
 	pipe_crc->ctl_fd = openat(debugfs, buf, O_WRONLY);
