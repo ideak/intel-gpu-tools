@@ -472,3 +472,35 @@ bool gem_has_relocations(int i915)
 
 	return has_relocs;
 }
+
+/**
+ * gem_allows_obj_alignment
+ * @fd: opened i915 drm file descriptor
+ *
+ * Check does i915 driver allows setting object alignment in exec object to
+ * handle in kernel and adjust object offset accordingly.
+ *
+ * Returns: true if kernel supports setting offset to be aligned, otherwise
+ * false.
+ */
+bool gem_allows_obj_alignment(int fd)
+{
+	struct drm_i915_gem_exec_object2 obj = {
+		.handle = gem_create(fd, 4096),
+	};
+	struct drm_i915_gem_execbuffer2 execbuf = {
+		.buffers_ptr = to_user_pointer(&obj),
+		.buffer_count = 1,
+	};
+	bool ret;
+	const uint32_t bbe = MI_BATCH_BUFFER_END;
+
+	gem_write(fd, obj.handle, 0, &bbe, sizeof(bbe));
+	gem_execbuf(fd, &execbuf);
+
+	obj.alignment = 0x2000;
+	ret = __gem_execbuf(fd, &execbuf) == 0;
+	gem_close(fd, obj.handle);
+
+	return ret;
+}

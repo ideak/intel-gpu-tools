@@ -55,5 +55,6 @@ unsigned int gem_submission_measure(int i915, const intel_ctx_cfg_t *cfg,
 
 void gem_test_all_engines(int fd);
 bool gem_has_relocations(int fd);
+bool gem_allows_obj_alignment(int fd);
 
 #endif /* GEM_SUBMISSION_H */
