@@ -308,17 +308,10 @@ static void pitch_tests(int fd)
 		igt_subtest_f("bad-pitch-%i", bad_pitches[i]) {
 			f.pitches[0] = bad_pitches[i];
 			igt_assert_eq(igt_ioctl(fd, DRM_IOCTL_MODE_ADDFB2, &f), -1);
-			igt_assert(errno != 0);
-			if (is_i915_device(fd) || is_amdgpu_device(fd) || is_msm_device(fd)) {
+			if (is_nouveau_device(fd) && bad_pitches[i] > 4 * 1024)
+				igt_assert_eq(errno, ERANGE);
+			else
 				igt_assert_eq(errno, EINVAL);
-			} else if (is_nouveau_device(fd)) {
-				if (bad_pitches[i] > 4 * 1024)
-					igt_assert_eq(errno, ERANGE);
-				else
-					igt_assert_eq(errno, EINVAL);
-			} else {
-				igt_info("Unknown vendor; errno unchecked (returned %i)", errno);
-			}
 			errno = 0;
 		}
 	}
@@ -484,13 +477,10 @@ static void size_tests(int fd)
 		for (i = 0; i < ARRAY_SIZE(framebuffers); i++) {
 			igt_debug("Checking framebuffer %i\n", i);
 			igt_assert_eq(igt_ioctl(fd, DRM_IOCTL_MODE_ADDFB2, framebuffers[i]), -1);
-			igt_assert(errno != 0);
-			if (is_i915_device(fd))
-				igt_assert_eq(errno, EINVAL);
-			else if (is_nouveau_device(fd))
+			if (is_nouveau_device(fd))
 				igt_assert_eq(errno, ERANGE);
 			else
-				igt_info("Unknown vendor; errno unchecked (returned %i)", errno);
+				igt_assert_eq(errno, EINVAL);
 			errno = 0;
 		}
 	}
@@ -500,12 +490,10 @@ static void size_tests(int fd)
 	igt_subtest("bo-too-small") {
 		igt_assert_eq(igt_ioctl(fd, DRM_IOCTL_MODE_ADDFB2, &f), -1);
 		igt_assert(errno != 0);
-		if (is_i915_device(fd))
-			igt_assert_eq(errno, EINVAL);
-		else if (is_nouveau_device(fd))
+		if (is_nouveau_device(fd))
 			igt_assert_eq(errno, ERANGE);
 		else
-			igt_info("Unknown vendor; errno unchecked (returned %i)", errno);
+			igt_assert_eq(errno, EINVAL);
 		errno = 0;
 	}
 
