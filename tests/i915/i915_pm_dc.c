@@ -50,7 +50,7 @@ typedef struct {
 	int msr_fd;
 	int debugfs_fd;
 	uint32_t devid;
-	char *pwr_dmn_info;
+	char *debugfs_dump;
 	igt_display_t display;
 	struct igt_fb fb_white, fb_rgb, fb_rgr;
 	enum psr_mode op_psr_mode;
@@ -217,7 +217,7 @@ static void check_dc_counter(data_t *data, int dc_flag, uint32_t prev_dc_count)
 		(dc_flag & CHECK_DC5 ? "DC5" : "DC6"));
 	igt_assert_f(dc_state_wait_entry(data->debugfs_fd, dc_flag, prev_dc_count),
 		     "%s state is not achieved\n%s:\n%s\n", tmp, PWR_DOMAIN_INFO,
-		     data->pwr_dmn_info = igt_sysfs_get(data->debugfs_fd, PWR_DOMAIN_INFO));
+		     data->debugfs_dump = igt_sysfs_get(data->debugfs_fd, PWR_DOMAIN_INFO));
 }
 
 static void setup_videoplayback(data_t *data)
@@ -504,7 +504,7 @@ int main(int argc, char *argv[])
 	}
 
 	igt_fixture {
-		free(data.pwr_dmn_info);
+		free(data.debugfs_dump);
 		close(data.debugfs_fd);
 		close(data.msr_fd);
 		display_fini(&data);
