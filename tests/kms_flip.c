@@ -1266,6 +1266,27 @@ static bool needs_retry_after_link_reset(struct udev_monitor *mon)
 	return hotplug_detected;
 }
 
+static void discard_any_stale_events(void) {
+	fd_set fds;
+	int ret;
+	struct timeval timeout = { .tv_sec = 0, .tv_usec = 20000 };
+	FD_ZERO(&fds);
+	FD_SET(drm_fd, &fds);
+	ret = select(drm_fd + 1, &fds, NULL, NULL, &timeout);
+
+	if (ret > 0) {
+		drmEventContext evctx;
+		memset(&evctx, 0, sizeof evctx);
+		evctx.version = 2;
+		igt_info("Stale Event found - Discarding now\n");
+		drmHandleEvent(drm_fd, &evctx);
+	}
+	else {
+		igt_debug("No stale events found\n");
+	}
+}
+
+
 static void __run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
 				   int crtc_count, int duration_ms)
 {
@@ -1317,6 +1338,9 @@ static void __run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
 		kmstest_dump_mode(&o->kmode[i]);
 
 retry:
+	/* Discard any pending event that hasn't been consumed from a previous retry or subtest. */
+	discard_any_stale_events();
+
 	memset(&o->vblank_state, 0, sizeof(o->vblank_state));
 	memset(&o->flip_state, 0, sizeof(o->flip_state));
 	o->flip_state.name = "flip";
