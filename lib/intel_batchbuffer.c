@@ -2020,9 +2020,6 @@ __intel_bb_add_intel_buf(struct intel_bb *ibb, struct intel_buf *buf,
 				  buf->addr.offset, alignment, write);
 	buf->addr.offset = obj->offset;
 
-	if (!ibb->enforce_relocs)
-		obj->alignment = alignment;
-
 	if (igt_list_empty(&buf->link)) {
 		igt_list_add_tail(&buf->link, &ibb->intel_bufs);
 		buf->ibb = ibb;
