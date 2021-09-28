@@ -530,6 +530,7 @@ igt_main
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
+		igt_require(gem_allows_obj_alignment(fd));
 	}
 
 	igt_subtest("single") /* basic! */
