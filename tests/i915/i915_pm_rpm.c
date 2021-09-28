@@ -1234,7 +1234,7 @@ static void submit_blt_cmd(uint32_t dst_handle, int dst_size,
 	relocs[0].write_domain = I915_GEM_DOMAIN_RENDER;
 
 	objs[0].handle = dst_handle;
-	objs[0].alignment = 64;
+	objs[0].alignment = 0;
 
 	objs[1].handle = batch_handle;
 	objs[1].relocation_count = !ahnd ? 1 : 0;
