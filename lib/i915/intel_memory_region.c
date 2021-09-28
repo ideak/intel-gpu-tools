@@ -183,7 +183,7 @@ bool gem_has_lmem(int fd)
 
 /* A version of gem_create_in_memory_region_list which can be allowed to
    fail so that the object creation can be retried */
-int __gem_create_in_memory_region_list(int fd, uint32_t *handle, uint64_t size,
+int __gem_create_in_memory_region_list(int fd, uint32_t *handle, uint64_t *size,
 				       struct drm_i915_gem_memory_class_instance *mem_regions,
 				       int num_regions)
 {
@@ -193,7 +193,7 @@ int __gem_create_in_memory_region_list(int fd, uint32_t *handle, uint64_t size,
 		.regions = to_user_pointer(mem_regions),
 	};
 
-	return __gem_create_ext(fd, &size, handle, &ext_regions.base);
+	return __gem_create_ext(fd, size, handle, &ext_regions.base);
 }
 
 /* gem_create_in_memory_region_list:
@@ -202,7 +202,7 @@ int __gem_create_in_memory_region_list(int fd, uint32_t *handle, uint64_t size,
  * @mem_regions: memory regions array (priority list)
  * @num_regions: @mem_regions length
  */
-uint32_t gem_create_in_memory_region_list(int fd, uint64_t size,
+uint32_t gem_create_in_memory_region_list(int fd, uint64_t *size,
 					  struct drm_i915_gem_memory_class_instance *mem_regions,
 					  int num_regions)
 {
