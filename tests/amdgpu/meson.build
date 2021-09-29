@@ -11,6 +11,7 @@ if libdrm_amdgpu.found()
 			  'amd_hotplug',
 			  'amd_info',
 			  'amd_prime',
+			  'amd_max_bpc',
 			  'amd_module_load',
 			  'amd_mem_leak',
 			  'amd_link_settings',
