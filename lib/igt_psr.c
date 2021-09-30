@@ -167,7 +167,7 @@ static bool psr_set(int device, int debugfs_fd, int mode)
 		}
 
 		ret = psr_write(debugfs_fd, debug_val);
-		igt_assert(ret > 0);
+		igt_require_f(ret > 0, "PSR2 SF feature not available\n");
 	}
 
 	/* Restore original value on exit */
