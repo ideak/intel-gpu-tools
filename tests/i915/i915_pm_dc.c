@@ -419,7 +419,7 @@ static void setup_dc9_dpms(data_t *data, int dc_target)
 {
 	int prev_dc, sysfs_fd;
 
-	igt_require((sysfs_fd = open(KMS_HELPER, O_RDWR)) >= 0);
+	igt_require((sysfs_fd = open(KMS_HELPER, O_RDONLY)) >= 0);
 	kms_poll_saved_state = igt_sysfs_get_boolean(sysfs_fd, "poll");
 	igt_sysfs_set_boolean(sysfs_fd, "poll", KMS_POLL_DISABLE);
 	close(sysfs_fd);
@@ -449,7 +449,7 @@ static void kms_poll_state_restore(int sig)
 {
 	int sysfs_fd;
 
-	sysfs_fd = open(KMS_HELPER, O_WRONLY);
+	sysfs_fd = open(KMS_HELPER, O_RDONLY);
 	if (sysfs_fd >= 0) {
 		igt_sysfs_set_boolean(sysfs_fd, "poll", kms_poll_saved_state);
 		close(sysfs_fd);
