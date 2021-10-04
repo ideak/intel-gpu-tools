@@ -19,6 +19,7 @@ test_progs = [
 	'kms_atomic',
 	'kms_atomic_interruptible',
 	'kms_atomic_transition',
+	'kms_bw',
 	'kms_concurrent',
 	'kms_content_protection',
 	'kms_cursor_crc',
