@@ -251,6 +251,9 @@ igt_main
 					       data.debugfs_fd, PSR_MODE_2),
 			      "Sink does not support PSR2\n");
 
+		igt_require_f(intel_display_ver(intel_get_drm_devid(data.drm_fd)) < 13,
+			      "Registers used by this test do not work on display 13\n");
+
 		display_init(&data);
 
 		/* Test if PSR2 can be enabled */
@@ -280,6 +283,21 @@ igt_main
 	for (data.op = PAGE_FLIP; data.op < LAST; data.op++) {
 		igt_describe("Test that selective update works when screen changes");
 		igt_subtest_f("%s", op_str(data.op)) {
+
+			if (data.op == FRONTBUFFER &&
+			    intel_display_ver(intel_get_drm_devid(data.drm_fd)) >= 12) {
+				/*
+				 * FIXME: Display 12+ platforms now have PSR2
+				 * selective fetch enabled by default but we
+				 * still can't properly handle frontbuffer
+				 * rendering, so right it does full frame
+				 * fetches at every frontbuffer rendering.
+				 * So it is expected that this test will fail
+				 * in display 12+ platform fow now.
+				 */
+				igt_skip("PSR2 selective fetch is doing full frame fetches for frontbuffer rendering\n");
+			}
+
 			prepare(&data);
 			run(&data);
 			cleanup(&data);
