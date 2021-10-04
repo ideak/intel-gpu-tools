@@ -2016,7 +2016,7 @@ __intel_bb_add_intel_buf(struct intel_bb *ibb, struct intel_buf *buf,
 		}
 	}
 
-	obj = intel_bb_add_object(ibb, buf->handle, intel_buf_size(buf),
+	obj = intel_bb_add_object(ibb, buf->handle, intel_buf_bo_size(buf),
 				  buf->addr.offset, alignment, write);
 	buf->addr.offset = obj->offset;
 
@@ -2056,7 +2056,7 @@ bool intel_bb_remove_intel_buf(struct intel_bb *ibb, struct intel_buf *buf)
 
 	removed = intel_bb_remove_object(ibb, buf->handle,
 					 buf->addr.offset,
-					 intel_buf_size(buf));
+					 intel_buf_bo_size(buf));
 	if (removed) {
 		buf->addr.offset = INTEL_BUF_INVALID_ADDRESS;
 		buf->ibb = NULL;

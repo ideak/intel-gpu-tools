@@ -813,17 +813,16 @@ static void __intel_buf_init(struct buf_ops *bops,
 		size = bo_size;
 	}
 
-	/* Store real bo size to avoid mistakes in calculating it again */
+	/* Store buffer size to avoid mistakes in calculating it again */
 	buf->size = size;
+	buf->handle = handle;
 
-	if (handle)
-		buf->handle = handle;
-	else {
-		if (!__gem_create_in_memory_regions(bops->fd, &handle, &size, region))
-			buf->handle = handle;
-		else
-			buf->handle = gem_create(bops->fd, size);
-	}
+	if (!handle)
+		if (__gem_create_in_memory_regions(bops->fd, &buf->handle, &size, region))
+			igt_assert_eq(__gem_create(bops->fd, &size, &buf->handle), 0);
+
+	/* Store gem bo size */
+	buf->bo_size = size;
 
 	set_hw_tiled(bops, buf);
 }
@@ -1096,10 +1095,11 @@ void intel_buf_print(const struct intel_buf *buf)
 {
 	igt_info("[name: %s]\n", buf->name);
 	igt_info("[%u]: w: %u, h: %u, stride: %u, size: %" PRIx64
-		 ", buf-size: %" PRIx64 ", bpp: %u, tiling: %u, compress: %u\n",
+		 ", buf-size: %" PRIx64 ", bo-size: %" PRIx64
+		 ", bpp: %u, tiling: %u, compress: %u\n",
 		 buf->handle, intel_buf_width(buf), intel_buf_height(buf),
 		 buf->surface[0].stride, buf->surface[0].size,
-		 intel_buf_size(buf), buf->bpp,
+		 intel_buf_size(buf), intel_buf_bo_size(buf), buf->bpp,
 		 buf->tiling, buf->compression);
 	igt_info(" ccs <offset: %u, stride: %u, w: %u, h: %u> cc <offset: %u>\n",
 		 buf->ccs[0].offset,
@@ -1305,6 +1305,11 @@ static void idempotency_selftest(struct buf_ops *bops, uint32_t tiling)
 uint64_t intel_buf_size(const struct intel_buf *buf)
 {
 	return buf->size;
+}
+
+uint64_t intel_buf_bo_size(const struct intel_buf *buf)
+{
+	return buf->bo_size;
 }
 
 static struct buf_ops *__buf_ops_create(int fd, bool check_idempotency)

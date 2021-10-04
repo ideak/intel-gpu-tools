@@ -42,6 +42,8 @@ struct intel_buf {
 		uint32_t ctx;
 	} addr;
 
+	uint64_t bo_size;
+
 	/* Tracking */
 	struct intel_bb *ibb;
 	struct igt_list_head link;
@@ -98,6 +100,7 @@ intel_buf_ccs_height(int gen, const struct intel_buf *buf)
 }
 
 uint64_t intel_buf_size(const struct intel_buf *buf);
+uint64_t intel_buf_bo_size(const struct intel_buf *buf);
 
 struct buf_ops *buf_ops_create(int fd);
 struct buf_ops *buf_ops_create_with_selftest(int fd);
