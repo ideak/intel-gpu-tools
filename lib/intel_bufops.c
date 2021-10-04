@@ -1096,10 +1096,10 @@ void intel_buf_print(const struct intel_buf *buf)
 {
 	igt_info("[name: %s]\n", buf->name);
 	igt_info("[%u]: w: %u, h: %u, stride: %u, size: %" PRIx64
-		 ", bo-size: %" PRIx64 ", bpp: %u, tiling: %u, compress: %u\n",
+		 ", buf-size: %" PRIx64 ", bpp: %u, tiling: %u, compress: %u\n",
 		 buf->handle, intel_buf_width(buf), intel_buf_height(buf),
 		 buf->surface[0].stride, buf->surface[0].size,
-		 intel_buf_bo_size(buf), buf->bpp,
+		 intel_buf_size(buf), buf->bpp,
 		 buf->tiling, buf->compression);
 	igt_info(" ccs <offset: %u, stride: %u, w: %u, h: %u> cc <offset: %u>\n",
 		 buf->ccs[0].offset,
@@ -1113,7 +1113,7 @@ void intel_buf_print(const struct intel_buf *buf)
 void intel_buf_dump(const struct intel_buf *buf, const char *filename)
 {
 	int i915 = buf_ops_get_fd(buf->bops);
-	uint64_t size = intel_buf_bo_size(buf);
+	uint64_t size = intel_buf_size(buf);
 	FILE *out;
 	void *ptr;
 
@@ -1141,7 +1141,7 @@ static void __intel_buf_write_to_png(struct buf_ops *bops,
 	int format, width, height, stride, offset;
 	int gen = bops->intel_gen;
 
-	igt_assert_eq(posix_memalign(&linear, 16, intel_buf_bo_size(buf)), 0);
+	igt_assert_eq(posix_memalign(&linear, 16, intel_buf_size(buf)), 0);
 
 	format = write_ccs ? CAIRO_FORMAT_A8 : CAIRO_FORMAT_RGB24;
 	width = write_ccs ? intel_buf_ccs_width(gen, buf) : intel_buf_width(buf);
@@ -1302,7 +1302,7 @@ static void idempotency_selftest(struct buf_ops *bops, uint32_t tiling)
 	buf_ops_set_software_tiling(bops, tiling, false);
 }
 
-uint64_t intel_buf_bo_size(const struct intel_buf *buf)
+uint64_t intel_buf_size(const struct intel_buf *buf)
 {
 	return buf->size;
 }

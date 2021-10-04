@@ -103,11 +103,11 @@ static void *linear_copy_ccs(data_t *data, struct intel_buf *buf)
 	unsigned int gen = intel_gen(data->devid);
 	int ccs_size = intel_buf_ccs_width(gen, buf) *
 		intel_buf_ccs_height(gen, buf);
-	int bo_size = intel_buf_bo_size(buf);
+	int buf_size = intel_buf_size(buf);
 
 	ccs_data = alloc_aligned(ccs_size);
-	linear = alloc_aligned(bo_size);
-	memset(linear, 0, bo_size);
+	linear = alloc_aligned(buf_size);
+	memset(linear, 0, buf_size);
 
 	intel_buf_to_linear(data->bops, buf, linear);
 	igt_memcpy_from_wc(ccs_data, linear + buf->ccs[0].offset, ccs_size);
@@ -185,7 +185,7 @@ scratch_buf_copy(data_t *data,
 
 	igt_assert_eq(intel_buf_width(dst), intel_buf_width(src));
 	igt_assert_eq(intel_buf_height(dst), intel_buf_height(src));
-	igt_assert_eq(intel_buf_bo_size(dst), intel_buf_bo_size(src));
+	igt_assert_eq(intel_buf_size(dst), intel_buf_size(src));
 	igt_assert_eq(dst->bpp, src->bpp);
 
 	w = min(w, width - sx);
@@ -194,8 +194,8 @@ scratch_buf_copy(data_t *data,
 	h = min(h, height - sy);
 	h = min(h, height - dy);
 
-	linear_dst = alloc_aligned(intel_buf_bo_size(dst));
-	linear_src = alloc_aligned(intel_buf_bo_size(src));
+	linear_dst = alloc_aligned(intel_buf_size(dst));
+	linear_src = alloc_aligned(intel_buf_size(src));
 	intel_buf_to_linear(data->bops, src, linear_src);
 	intel_buf_to_linear(data->bops, dst, linear_dst);
 
@@ -319,7 +319,7 @@ dump_intel_buf_to_file(data_t *data, struct intel_buf *buf, const char *filename
 {
 	FILE *out;
 	void *ptr;
-	uint32_t size = intel_buf_bo_size(buf);
+	uint32_t size = intel_buf_size(buf);
 
 	gem_set_domain(data->drm_fd, buf->handle,
 		       I915_GEM_DOMAIN_CPU, 0);

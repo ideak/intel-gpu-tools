@@ -1055,11 +1055,11 @@ static void offset_control(struct buf_ops *bops)
 	dst1 = create_buf(bops, WIDTH, HEIGHT, COLOR_00);
 	dst2 = create_buf(bops, WIDTH, HEIGHT, COLOR_77);
 
-	intel_bb_add_object(ibb, src->handle, intel_buf_bo_size(src),
+	intel_bb_add_object(ibb, src->handle, intel_buf_size(src),
 			    src->addr.offset, 0, false);
-	intel_bb_add_object(ibb, dst1->handle, intel_buf_bo_size(dst1),
+	intel_bb_add_object(ibb, dst1->handle, intel_buf_size(dst1),
 			    dst1->addr.offset, 0, true);
-	intel_bb_add_object(ibb, dst2->handle, intel_buf_bo_size(dst2),
+	intel_bb_add_object(ibb, dst2->handle, intel_buf_size(dst2),
 			    dst2->addr.offset, 0, true);
 
 	intel_bb_out(ibb, MI_BATCH_BUFFER_END);
@@ -1080,13 +1080,13 @@ static void offset_control(struct buf_ops *bops)
 	intel_bb_reset(ibb, true);
 
 	dst3 = create_buf(bops, WIDTH, HEIGHT, COLOR_33);
-	intel_bb_add_object(ibb, dst3->handle, intel_buf_bo_size(dst3),
+	intel_bb_add_object(ibb, dst3->handle, intel_buf_size(dst3),
 			    dst3->addr.offset, 0, true);
-	intel_bb_add_object(ibb, src->handle, intel_buf_bo_size(src),
+	intel_bb_add_object(ibb, src->handle, intel_buf_size(src),
 			    src->addr.offset, 0, false);
-	intel_bb_add_object(ibb, dst1->handle, intel_buf_bo_size(dst1),
+	intel_bb_add_object(ibb, dst1->handle, intel_buf_size(dst1),
 			    dst1->addr.offset, 0, true);
-	intel_bb_add_object(ibb, dst2->handle, intel_buf_bo_size(dst2),
+	intel_bb_add_object(ibb, dst2->handle, intel_buf_size(dst2),
 			    dst2->addr.offset, 0, true);
 
 	intel_bb_out(ibb, MI_BATCH_BUFFER_END);
@@ -1140,7 +1140,7 @@ static void delta_check(struct buf_ops *bops)
 
 	buf = create_buf(bops, 0x1000, 0x10, COLOR_CC);
 	buf->addr.offset = 0xfffff000;
-	intel_bb_add_object(ibb, buf->handle, intel_buf_bo_size(buf),
+	intel_bb_add_object(ibb, buf->handle, intel_buf_size(buf),
 			    buf->addr.offset, 0, false);
 
 	intel_bb_out(ibb, MI_STORE_DWORD_IMM);
@@ -1166,7 +1166,7 @@ static void delta_check(struct buf_ops *bops)
 	gem_munmap(ptr, ibb->size);
 
 	ptr = gem_mmap__device_coherent(i915, buf->handle, 0,
-					intel_buf_bo_size(buf), PROT_READ);
+					intel_buf_size(buf), PROT_READ);
 	val = ptr[0x2000 / sizeof(uint32_t)];
 	gem_munmap(ptr, ibb->size);
 
@@ -1299,7 +1299,7 @@ static uint32_t count_compressed(int gen, struct intel_buf *buf)
 	int i915 = buf_ops_get_fd(buf->bops);
 	int ccs_size = intel_buf_ccs_width(gen, buf) * intel_buf_ccs_height(gen, buf);
 	uint8_t *ptr = gem_mmap__device_coherent(i915, buf->handle, 0,
-						 intel_buf_bo_size(buf),
+						 intel_buf_size(buf),
 						 PROT_READ);
 	uint32_t compressed = 0;
 	int i;
@@ -1308,7 +1308,7 @@ static uint32_t count_compressed(int gen, struct intel_buf *buf)
 		if (ptr[buf->ccs[0].offset + i])
 			compressed++;
 
-	munmap(ptr, intel_buf_bo_size(buf));
+	munmap(ptr, intel_buf_size(buf));
 
 	return compressed;
 }

@@ -97,7 +97,7 @@ pgt_table_count(int address_bits, struct intel_buf **bufs, int buf_count)
 		/* We require bufs to be sorted. */
 		igt_assert(i == 0 ||
 			   buf->addr.offset >= bufs[i - 1]->addr.offset +
-				intel_buf_bo_size(bufs[i - 1]));
+				intel_buf_size(bufs[i - 1]));
 		start = ALIGN_DOWN(buf->addr.offset, 1UL << address_bits);
 
 		/* Avoid double counting for overlapping aligned bufs. */
