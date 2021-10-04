@@ -112,10 +112,10 @@ static void prepare_scratch(int exporter_fd, struct dumb_bo *scratch,
 		igt_calc_fb_size(exporter_fd, mode->hdisplay, mode->vdisplay, DRM_FORMAT_XRGB8888,
 				 DRM_FORMAT_MOD_NONE, &scratch->size, &scratch->pitch);
 		if (gem_has_lmem(exporter_fd))
-			scratch->handle = gem_create_in_memory_regions(exporter_fd, &scratch->size,
+			scratch->handle = gem_create_in_memory_regions(exporter_fd, scratch->size,
 								       REGION_LMEM(0), REGION_SMEM);
 		else
-			scratch->handle = gem_create_in_memory_regions(exporter_fd, &scratch->size,
+			scratch->handle = gem_create_in_memory_regions(exporter_fd, scratch->size,
 								       REGION_SMEM);
 
 		ptr = gem_mmap__device_coherent(exporter_fd, scratch->handle, 0, scratch->size,

@@ -158,7 +158,7 @@ static void invalid_tests(int fd)
 		igt_require(gem_has_lmem(fd));
 		igt_calc_fb_size(fd, f.width, f.height,
 				DRM_FORMAT_XRGB8888, 0, &size, &stride);
-		handle = gem_create_in_memory_regions(fd, &size, REGION_SMEM);
+		handle = gem_create_in_memory_regions(fd, size, REGION_SMEM);
 		f.handles[0] = handle;
 		do_ioctl_err(fd, DRM_IOCTL_MODE_ADDFB2, &f, EREMOTE);
 	}

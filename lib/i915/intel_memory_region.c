@@ -202,12 +202,12 @@ int __gem_create_in_memory_region_list(int fd, uint32_t *handle, uint64_t *size,
  * @mem_regions: memory regions array (priority list)
  * @num_regions: @mem_regions length
  */
-uint32_t gem_create_in_memory_region_list(int fd, uint64_t *size,
+uint32_t gem_create_in_memory_region_list(int fd, uint64_t size,
 					  struct drm_i915_gem_memory_class_instance *mem_regions,
 					  int num_regions)
 {
 	uint32_t handle;
-	int ret = __gem_create_in_memory_region_list(fd, &handle, size,
+	int ret = __gem_create_in_memory_region_list(fd, &handle, &size,
 						     mem_regions, num_regions);
 	igt_assert_eq(ret, 0);
 	return handle;

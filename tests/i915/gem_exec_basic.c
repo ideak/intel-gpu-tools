@@ -28,12 +28,12 @@
 
 IGT_TEST_DESCRIPTION("Basic sanity check of execbuf-ioctl rings.");
 
-static uint32_t batch_create(int fd, uint64_t batch_size, uint32_t region)
+static uint32_t batch_create(int fd, uint32_t batch_size, uint32_t region)
 {
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	uint32_t handle;
 
-	handle = gem_create_in_memory_regions(fd, &batch_size, region);
+	handle = gem_create_in_memory_regions(fd, batch_size, region);
 	gem_write(fd, handle, 0, &bbe, sizeof(bbe));
 
 	return handle;
@@ -44,7 +44,7 @@ igt_main
 	const struct intel_execution_engine2 *e;
 	struct drm_i915_query_memory_regions *query_info;
 	struct igt_collection *regions, *set;
-	uint64_t batch_size;
+	uint32_t batch_size;
 	const intel_ctx_t *ctx;
 	int fd = -1;
 

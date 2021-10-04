@@ -69,13 +69,12 @@ create_buf(data_t *data, int width, int height, uint8_t color, uint32_t region)
 	struct intel_buf *buf;
 	uint32_t handle;
 	uint8_t *ptr;
-	uint64_t size = SIZE;
 	int i;
 
 	buf = calloc(1, sizeof(*buf));
 	igt_assert(buf);
 
-	handle = gem_create_in_memory_regions(data->drm_fd, &size, region);
+	handle = gem_create_in_memory_regions(data->drm_fd, SIZE, region);
 
 	/*
 	 * Legacy code uses 32 bpp after buffer creation.

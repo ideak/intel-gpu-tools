@@ -813,6 +813,9 @@ static void __intel_buf_init(struct buf_ops *bops,
 		size = bo_size;
 	}
 
+	/* Store real bo size to avoid mistakes in calculating it again */
+	buf->size = size;
+
 	if (handle)
 		buf->handle = handle;
 	else {
@@ -821,9 +824,6 @@ static void __intel_buf_init(struct buf_ops *bops,
 		else
 			buf->handle = gem_create(bops->fd, size);
 	}
-
-	/* Store real bo size to avoid mistakes in calculating it again */
-	buf->size = size;
 
 	set_hw_tiled(bops, buf);
 }
