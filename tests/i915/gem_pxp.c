@@ -829,6 +829,27 @@ static void test_pxp_stale_buf_execution(int i915)
 	free_exec_assets(i915, &data);
 }
 
+static void test_pxp_stale_buf_optout_execution(int i915)
+{
+	int ret;
+	struct simple_exec_assets data = {0};
+
+	/*
+	 * Use a normal context for testing opt-out behavior
+	 * when executing with a pxp buffer across a teardown event.
+	 */
+	prepare_exec_assets(i915, &data, false, true);
+	ret = gem_execbuf_flush_store_dw(i915, data.ibb, data.ctx, data.fencebuf);
+	igt_assert(ret == 0);
+
+	trigger_pxp_debugfs_forced_teardown(i915);
+
+	ret = gem_execbuf_flush_store_dw(i915, data.ibb, data.ctx, data.fencebuf);
+	igt_assert_f((ret == 0), "Opt-out-execution with stale pxp buffer didn't succeed\n");
+
+	free_exec_assets(i915, &data);
+}
+
 igt_main
 {
 	int i915 = -1;
@@ -922,6 +943,8 @@ igt_main
 			test_pxp_stale_ctx_execution(i915);
 		igt_subtest("verify-pxp-stale-buf-execution")
 			test_pxp_stale_buf_execution(i915);
+		igt_subtest("verify-pxp-stale-buf-optout-execution")
+			test_pxp_stale_buf_optout_execution(i915);
 	}
 
 	igt_fixture {
