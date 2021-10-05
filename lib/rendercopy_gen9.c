@@ -183,6 +183,8 @@ gen8_bind_buf(struct intel_bb *ibb, const struct intel_buf *buf, int is_dst) {
 		ss->ss0.tiled_mode = 3;
 
 	ss->ss1.memory_object_control = intel_get_uc_mocs(i915);
+	if (intel_buf_pxp(buf))
+		ss->ss1.memory_object_control |= 1;
 
 	if (buf->tiling == I915_TILING_Yf)
 		ss->ss5.trmode = 1;
@@ -904,6 +906,53 @@ static void gen8_emit_primitive(struct intel_bb *ibb, uint32_t offset)
 	intel_bb_out(ibb, 0);	/* index buffer offset, ignored */
 }
 
+#define GFX_OP_PIPE_CONTROL    ((3 << 29) | (3 << 27) | (2 << 24))
+#define PIPE_CONTROL_CS_STALL	            (1 << 20)
+#define PIPE_CONTROL_RENDER_TARGET_FLUSH    (1 << 12)
+#define PIPE_CONTROL_FLUSH_ENABLE           (1 << 7)
+#define PIPE_CONTROL_DATA_CACHE_INVALIDATE  (1 << 5)
+#define PIPE_CONTROL_PROTECTEDPATH_DISABLE  (1 << 27)
+#define PIPE_CONTROL_PROTECTEDPATH_ENABLE   (1 << 22)
+#define PIPE_CONTROL_POST_SYNC_OP           (1 << 14)
+#define PIPE_CONTROL_POST_SYNC_OP_STORE_DW_IDX (1 << 21)
+#define PS_OP_TAG_START                     0x1234fed0
+#define PS_OP_TAG_END                       0x5678cbaf
+static void gen12_emit_pxp_state(struct intel_bb *ibb, bool enable,
+		 uint32_t pxp_write_op_offset)
+{
+	uint32_t pipe_ctl_flags;
+	uint32_t set_app_id, ps_op_id;
+
+	if (enable) {
+		pipe_ctl_flags = PIPE_CONTROL_FLUSH_ENABLE;
+		intel_bb_out(ibb, GFX_OP_PIPE_CONTROL);
+		intel_bb_out(ibb, pipe_ctl_flags);
+
+		set_app_id =  MI_SET_APPID |
+			      APPTYPE(intel_bb_pxp_apptype(ibb)) |
+			      APPID(intel_bb_pxp_appid(ibb));
+		intel_bb_out(ibb, set_app_id);
+
+		pipe_ctl_flags = PIPE_CONTROL_PROTECTEDPATH_ENABLE;
+		ps_op_id = PS_OP_TAG_START;
+	} else {
+		pipe_ctl_flags = PIPE_CONTROL_PROTECTEDPATH_DISABLE;
+		ps_op_id = PS_OP_TAG_END;
+	}
+
+	pipe_ctl_flags |= (PIPE_CONTROL_CS_STALL |
+			   PIPE_CONTROL_RENDER_TARGET_FLUSH |
+			   PIPE_CONTROL_DATA_CACHE_INVALIDATE |
+			   PIPE_CONTROL_POST_SYNC_OP);
+	intel_bb_out(ibb, GFX_OP_PIPE_CONTROL | 4);
+	intel_bb_out(ibb, pipe_ctl_flags);
+	intel_bb_emit_reloc(ibb, ibb->handle, 0, I915_GEM_DOMAIN_COMMAND,
+			    (enable ? pxp_write_op_offset : (pxp_write_op_offset+8)),
+			    ibb->batch_offset);
+	intel_bb_out(ibb, ps_op_id);
+	intel_bb_out(ibb, ps_op_id);
+}
+
 /* The general rule is if it's named gen6 it is directly copied from
  * gen6_render_copyfunc.
  *
@@ -953,6 +1002,7 @@ void _gen9_render_op(struct intel_bb *ibb,
 	uint32_t vertex_buffer;
 	uint32_t aux_pgtable_state;
 	bool fast_clear = !src;
+	uint32_t pxp_scratch_offset;
 
 	if (!fast_clear)
 		igt_assert(src->bpp == dst->bpp);
@@ -981,7 +1031,11 @@ void _gen9_render_op(struct intel_bb *ibb,
 	aux_pgtable_state = gen12_create_aux_pgtable_state(ibb, aux_pgtable_buf);
 
 	/* TODO: there is other state which isn't setup */
+	pxp_scratch_offset = intel_bb_offset(ibb);
 	intel_bb_ptr_set(ibb, 0);
+
+	if (intel_bb_pxp_enabled(ibb))
+		gen12_emit_pxp_state(ibb, true, pxp_scratch_offset);
 
 	/* Start emitting the commands. The order roughly follows the mesa blorp
 	 * order */
@@ -1053,6 +1107,9 @@ void _gen9_render_op(struct intel_bb *ibb,
 
 	gen8_emit_vf_topology(ibb);
 	gen8_emit_primitive(ibb, vertex_buffer);
+
+	if (intel_bb_pxp_enabled(ibb))
+		gen12_emit_pxp_state(ibb, false, pxp_scratch_offset);
 
 	intel_bb_emit_bbe(ibb);
 	intel_bb_exec(ibb, intel_bb_offset(ibb),
