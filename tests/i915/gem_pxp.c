@@ -6,6 +6,7 @@
 #include "igt.h"
 #include "i915/gem.h"
 #include "i915/gem_create.h"
+#include <fcntl.h>
 
 IGT_TEST_DESCRIPTION("Test PXP that manages protected content through arbitrated HW-PXP-session");
 /* Note: PXP = "Protected Xe Path" */
@@ -14,6 +15,14 @@ IGT_TEST_DESCRIPTION("Test PXP that manages protected content through arbitrated
 struct powermgt_data {
 	int debugfsdir;
 	bool has_runtime_pm;
+};
+
+struct simple_exec_assets {
+	uint32_t ctx;
+	uint32_t fencebo;
+	struct intel_buf *fencebuf;
+	struct buf_ops *bops;
+	struct intel_bb *ibb;
 };
 
 static int create_bo_ext(int i915, uint32_t size, bool protected_is_true, uint32_t *bo_out)
@@ -647,6 +656,146 @@ static void test_pxp_pwrcycle_teardown_keychange(int i915, struct powermgt_data 
 	igt_assert_eq(matched_after_keychange, 0);
 }
 
+#define GFX_OP_PIPE_CONTROL    ((3 << 29) | (3 << 27) | (2 << 24))
+#define PIPE_CONTROL_CS_STALL	            (1 << 20)
+#define PIPE_CONTROL_RENDER_TARGET_FLUSH    (1 << 12)
+#define PIPE_CONTROL_FLUSH_ENABLE           (1 << 7)
+#define PIPE_CONTROL_DATA_CACHE_INVALIDATE  (1 << 5)
+#define PIPE_CONTROL_PROTECTEDPATH_DISABLE  (1 << 27)
+#define PIPE_CONTROL_PROTECTEDPATH_ENABLE   (1 << 22)
+#define PIPE_CONTROL_POST_SYNC_OP           (1 << 14)
+#define PIPE_CONTROL_POST_SYNC_OP_STORE_DW_IDX (1 << 21)
+#define PS_OP_TAG_BEFORE                    0x1234fed0
+#define PS_OP_TAG_AFTER                     0x5678cbaf
+
+static void emit_pipectrl(struct intel_bb *ibb, struct intel_buf *fenceb, bool before)
+{
+	uint32_t pipe_ctl_flags = 0;
+	uint32_t ps_op_id;
+
+	intel_bb_out(ibb, GFX_OP_PIPE_CONTROL);
+	intel_bb_out(ibb, pipe_ctl_flags);
+
+	if (before)
+		ps_op_id = PS_OP_TAG_BEFORE;
+	else
+		ps_op_id = PS_OP_TAG_AFTER;
+
+	pipe_ctl_flags = (PIPE_CONTROL_FLUSH_ENABLE |
+			  PIPE_CONTROL_CS_STALL |
+			  PIPE_CONTROL_POST_SYNC_OP);
+	intel_bb_out(ibb, GFX_OP_PIPE_CONTROL | 4);
+	intel_bb_out(ibb, pipe_ctl_flags);
+	intel_bb_emit_reloc(ibb, fenceb->handle, 0, I915_GEM_DOMAIN_COMMAND, (before?0:8),
+			    fenceb->addr.offset);
+	intel_bb_out(ibb, ps_op_id);
+	intel_bb_out(ibb, ps_op_id);
+	intel_bb_out(ibb, MI_NOOP);
+	intel_bb_out(ibb, MI_NOOP);
+}
+
+static void assert_pipectl_storedw_done(int i915, uint32_t bo)
+{
+	uint32_t *ptr;
+	uint32_t success_mask = 0x0;
+
+	ptr = gem_mmap__device_coherent(i915, bo, 0, 4096, PROT_READ);
+
+	if (ptr[0] == PS_OP_TAG_BEFORE && ptr[1] == PS_OP_TAG_BEFORE)
+		success_mask |= 0x1;
+
+	igt_assert_eq(success_mask, 0x1);
+	igt_assert(gem_munmap(ptr, 4096) == 0);
+}
+
+static int gem_execbuf_flush_store_dw(int i915, struct intel_bb *ibb, uint32_t ctx,
+				      struct intel_buf *fence)
+{
+	int ret;
+
+	intel_bb_ptr_set(ibb, 0);
+	intel_bb_add_intel_buf(ibb, fence, true);
+	emit_pipectrl(ibb, fence, true);
+	intel_bb_emit_bbe(ibb);
+	ret = __intel_bb_exec(ibb, intel_bb_offset(ibb),
+				  I915_EXEC_RENDER | I915_EXEC_NO_RELOC, false);
+	if (ret == 0) {
+		gem_sync(ibb->i915, fence->handle);
+		assert_pipectl_storedw_done(i915, fence->handle);
+	}
+	return ret;
+}
+
+static void prepare_exec_assets(int i915, struct simple_exec_assets *data, bool ctx_pxp,
+				bool buf_pxp)
+{
+	int ret;
+
+	if (ctx_pxp)
+		ret = create_ctx_with_params(i915, true, true, true, false, &(data->ctx));
+	else
+		ret = create_ctx_with_params(i915, false, false, false, false, &(data->ctx));
+	igt_assert_eq(ret, 0);
+	igt_assert_eq(get_ctx_protected_param(i915, data->ctx), ctx_pxp);
+	data->ibb = intel_bb_create_with_context(i915, data->ctx, 4096);
+	igt_assert(data->ibb);
+
+	data->fencebo = alloc_and_fill_dest_buff(i915, buf_pxp, 4096, 0);
+
+	data->bops = buf_ops_create(i915);
+	igt_assert(data->bops);
+
+	data->fencebuf = intel_buf_create_using_handle(data->bops, data->fencebo, 256, 4,
+						       32, 0, I915_TILING_NONE, 0);
+	intel_bb_add_intel_buf(data->ibb, data->fencebuf, true);
+}
+
+static void free_exec_assets(int i915, struct simple_exec_assets *data)
+{
+	intel_bb_destroy(data->ibb);
+	gem_close(i915, data->fencebo);
+	intel_buf_destroy(data->fencebuf);
+	gem_context_destroy(i915, data->ctx);
+	buf_ops_destroy(data->bops);
+}
+
+static void trigger_pxp_debugfs_forced_teardown(int i915)
+{
+	int fd, ret;
+	char str[32];
+
+	fd = igt_debugfs_open(i915, "gt/pxp/terminate_state", O_RDWR);
+	igt_assert_f(fd >= 0, "Can't open pxp termination debugfs\n");
+	ret = snprintf(str, sizeof(str), "0x1");
+	igt_assert(ret > 2 && ret < sizeof(str));
+	ret = write(fd, str, ret);
+	igt_assert_f(ret > 0, "Can't write pxp termination debugfs\n");
+
+	close(fd);
+}
+
+static void test_pxp_stale_ctx_execution(int i915)
+{
+	int ret;
+	struct simple_exec_assets data = {0};
+
+	/*
+	 * Use normal buffers for testing for invalidation
+	 * of protected contexts to ensure kernel is catching
+	 * the invalidated context (not buffer)
+	 */
+	prepare_exec_assets(i915, &data, true, false);
+	ret = gem_execbuf_flush_store_dw(i915, data.ibb, data.ctx, data.fencebuf);
+	igt_assert(ret == 0);
+
+	trigger_pxp_debugfs_forced_teardown(i915);
+
+	ret = gem_execbuf_flush_store_dw(i915, data.ibb, data.ctx, data.fencebuf);
+	igt_assert_f((ret == -EIO), "Executing stale pxp context didn't fail with -EIO\n");
+
+	free_exec_assets(i915, &data);
+}
+
 igt_main
 {
 	int i915 = -1;
@@ -736,6 +885,8 @@ igt_main
 		igt_describe("Verify suspend-resume teardown management:");
 		igt_subtest("verify-pxp-key-change-after-suspend-resume")
 			test_pxp_pwrcycle_teardown_keychange(i915, &pm);
+		igt_subtest("verify-pxp-stale-ctx-execution")
+			test_pxp_stale_ctx_execution(i915);
 	}
 
 	igt_fixture {

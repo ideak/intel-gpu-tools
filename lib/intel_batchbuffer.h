@@ -668,6 +668,9 @@ uint64_t intel_bb_offset_reloc_to_object(struct intel_bb *ibb,
 					 uint32_t offset,
 					 uint64_t presumed_offset);
 
+int __intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,
+			uint64_t flags, bool sync);
+
 void intel_bb_dump_cache(struct intel_bb *ibb);
 
 void intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,

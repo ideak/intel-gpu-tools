@@ -2526,7 +2526,7 @@ static void update_offsets(struct intel_bb *ibb,
  * Note: In this step execobj for bb is allocated and inserted to the objects
  * array.
 */
-static int __intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,
+int __intel_bb_exec(struct intel_bb *ibb, uint32_t end_offset,
 			   uint64_t flags, bool sync)
 {
 	struct drm_i915_gem_execbuffer2 execbuf;
