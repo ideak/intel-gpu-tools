@@ -850,6 +850,69 @@ static void test_pxp_stale_buf_optout_execution(int i915)
 	free_exec_assets(i915, &data);
 }
 
+static void test_pxp_pwrcycle_staleasset_execution(int i915, struct powermgt_data *pm)
+{
+	int ret;
+	struct simple_exec_assets data[3] = {{0}, {0}, {0}};
+	uint32_t ctx2;
+	struct intel_bb *ibb2;
+
+	/*
+	 * For asset data[0]: Use normal buffers for testing for invalidation
+	 * of protected contexts to ensure kernel is catching
+	 * the invalidated context (not buffer)
+	 */
+	prepare_exec_assets(i915, &data[0], true, false);
+	ret = gem_execbuf_flush_store_dw(i915, data[0].ibb, data[0].ctx, data[0].fencebuf);
+	igt_assert(ret == 0);
+
+	/*
+	 * For asset data[1]: Use pxp buffers with pxp context for testing for invalidation
+	 * of protected buffers.
+	 */
+	prepare_exec_assets(i915, &data[1], true, true);
+	ret = gem_execbuf_flush_store_dw(i915, data[1].ibb, data[1].ctx, data[1].fencebuf);
+	igt_assert(ret == 0);
+
+	/*
+	 * For asset data[2]: Use a normal context for testing opt-out behavior
+	 * when executing with a pxp buffer across a teardown event.
+	 */
+	prepare_exec_assets(i915, &data[2], false, true);
+	ret = gem_execbuf_flush_store_dw(i915, data[2].ibb, data[2].ctx, data[2].fencebuf);
+	igt_assert(ret == 0);
+
+	/* Do an S3 suspend resume cycle which also causes the pxp teardown event */
+	trigger_powermgt_suspend_cycle(i915, pm);
+
+	ret = gem_execbuf_flush_store_dw(i915, data[0].ibb, data[0].ctx, data[0].fencebuf);
+	igt_assert_f((ret == -EIO), "Executing stale pxp context didn't fail with -EIO\n");
+
+	/*
+	 * For asset data[1]: after teardown, alloc new assets for context but
+	 * reuse the bo to ensure the kernel is catching the
+	 * invalidated bo (not context)
+	 */
+	ret = create_ctx_with_params(i915, true, true, true, false, &ctx2);
+	igt_assert_eq(ret, 0);
+	igt_assert_eq(get_ctx_protected_param(i915, ctx2), 1);
+	ibb2 = intel_bb_create_with_context(i915, ctx2, 4096);
+	igt_assert(ibb2);
+	intel_bb_remove_intel_buf(data[1].ibb, data[1].fencebuf);
+	intel_bb_add_intel_buf(ibb2, data[1].fencebuf, true);
+	ret = gem_execbuf_flush_store_dw(i915, ibb2, ctx2, data[1].fencebuf);
+	igt_assert_f((ret == -ENOEXEC), "Executing stale pxp buffer didn't fail with -ENOEXEC\n");
+
+	ret = gem_execbuf_flush_store_dw(i915, data[2].ibb, data[2].ctx, data[2].fencebuf);
+	igt_assert_f((ret == 0), "Opt-out-execution with stale pxp buffer didn't succeed\n");
+
+	free_exec_assets(i915, &data[0]);
+	intel_bb_destroy(ibb2);
+	gem_context_destroy(i915, ctx2);
+	free_exec_assets(i915, &data[1]);
+	free_exec_assets(i915, &data[2]);
+}
+
 igt_main
 {
 	int i915 = -1;
@@ -945,6 +1008,8 @@ igt_main
 			test_pxp_stale_buf_execution(i915);
 		igt_subtest("verify-pxp-stale-buf-optout-execution")
 			test_pxp_stale_buf_optout_execution(i915);
+		igt_subtest("verify-pxp-execution-after-suspend-resume")
+			test_pxp_pwrcycle_staleasset_execution(i915, &pm);
 	}
 
 	igt_fixture {
