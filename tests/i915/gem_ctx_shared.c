@@ -624,6 +624,9 @@ static void unplug_show_queue(int i915, struct igt_cork *c, uint64_t ahnd,
 	igt_cork_unplug(c); /* batches will now be queued on the engine */
 	igt_debugfs_dump(i915, "i915_engine_info");
 
+	/* give time to the kernel to complete the queueing */
+	usleep(25000);
+
 	for (int n = 0; n < ARRAY_SIZE(spin); n++) {
 		ahnd = spin[n]->ahnd;
 		igt_spin_free(i915, spin[n]);
@@ -832,10 +835,10 @@ static void promotion(int i915, const intel_ctx_cfg_t *cfg, unsigned ring)
 	gem_context_set_priority(i915, ctx[LO]->id, MIN_PRIO);
 
 	ctx[HI] = intel_ctx_create(i915, &q_cfg);
-	gem_context_set_priority(i915, ctx[HI]->id, 0);
+	gem_context_set_priority(i915, ctx[HI]->id, MAX_PRIO);
 
 	ctx[NOISE] = intel_ctx_create(i915, &q_cfg);
-	gem_context_set_priority(i915, ctx[NOISE]->id, MIN_PRIO/2);
+	gem_context_set_priority(i915, ctx[NOISE]->id, 0);
 
 	result = gem_create(i915, 4096);
 	result_offset = get_offset(ahnd, result, 4096, 0);
