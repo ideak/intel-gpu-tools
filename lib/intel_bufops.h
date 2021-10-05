@@ -52,6 +52,9 @@ struct intel_buf {
 	uint32_t *ptr;
 	bool cpu_write;
 
+	/* Content Protection*/
+	bool is_protected;
+
 	/* For debugging purposes */
 	char name[INTEL_BUF_NAME_MAXSIZE + 1];
 };
@@ -162,6 +165,18 @@ struct intel_buf *intel_buf_create_using_handle_and_size(struct buf_ops *bops,
 							 uint64_t size,
 							 int stride);
 void intel_buf_destroy(struct intel_buf *buf);
+
+static inline void intel_buf_set_pxp(struct intel_buf *buf, bool new_pxp_state)
+{
+	igt_assert(buf);
+	buf->is_protected = new_pxp_state;
+}
+
+static inline bool intel_buf_pxp(const struct intel_buf *buf)
+{
+	igt_assert(buf);
+	return buf->is_protected;
+}
 
 void *intel_buf_cpu_map(struct intel_buf *buf, bool write);
 void *intel_buf_device_map(struct intel_buf *buf, bool write);

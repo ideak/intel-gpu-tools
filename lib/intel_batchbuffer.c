@@ -2347,6 +2347,27 @@ uint64_t intel_bb_offset_reloc_to_object(struct intel_bb *ibb,
 				  delta, offset, presumed_offset);
 }
 
+/*
+ * @intel_bb_set_pxp:
+ * @ibb: pointer to intel_bb
+ * @new_state: enable or disable pxp session
+ * @apptype: pxp session input identifies what type of session to enable
+ * @appid: pxp session input provides which appid to use
+ *
+ * This function merely stores the pxp state and session information to
+ * be retrieved and programmed later by supporting libraries such as
+ * gen12_render_copy that must program the HW within the same dispatch
+ */
+void intel_bb_set_pxp(struct intel_bb *ibb, bool new_state,
+		      uint32_t apptype, uint32_t appid)
+{
+	igt_assert(ibb);
+
+	ibb->pxp.enabled = new_state;
+	ibb->pxp.apptype = new_state ? apptype : 0;
+	ibb->pxp.appid   = new_state ? appid : 0;
+}
+
 static void intel_bb_dump_execbuf(struct intel_bb *ibb,
 				  struct drm_i915_gem_execbuffer2 *execbuf)
 {

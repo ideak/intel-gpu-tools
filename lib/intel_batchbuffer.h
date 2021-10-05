@@ -446,6 +446,11 @@ typedef void (*igt_media_spinfunc_t)(int i915,
 
 igt_media_spinfunc_t igt_get_media_spinfunc(int devid);
 
+struct igt_pxp {
+	bool     enabled;
+	uint32_t apptype;
+	uint32_t appid;
+};
 
 /*
  * Batchbuffer without libdrm dependency
@@ -472,6 +477,7 @@ struct intel_bb {
 	bool supports_48b_address;
 	bool uses_full_ppgtt;
 
+	struct igt_pxp pxp;
 	uint32_t ctx;
 	uint32_t vm_id;
 
@@ -581,6 +587,27 @@ static inline void intel_bb_out(struct intel_bb *ibb, uint32_t dword)
 	ibb->ptr++;
 
 	igt_assert(intel_bb_offset(ibb) <= ibb->size);
+}
+
+void intel_bb_set_pxp(struct intel_bb *ibb, bool new_state,
+		      uint32_t apptype, uint32_t appid);
+
+static inline bool intel_bb_pxp_enabled(struct intel_bb *ibb)
+{
+	igt_assert(ibb);
+	return ibb->pxp.enabled;
+}
+
+static inline uint32_t intel_bb_pxp_apptype(struct intel_bb *ibb)
+{
+	igt_assert(ibb);
+	return ibb->pxp.apptype;
+}
+
+static inline uint32_t intel_bb_pxp_appid(struct intel_bb *ibb)
+{
+	igt_assert(ibb);
+	return ibb->pxp.appid;
 }
 
 struct drm_i915_gem_exec_object2 *
@@ -697,3 +724,4 @@ typedef void (*igt_huc_copyfunc_t)(int fd, uint64_t ahnd,
 
 igt_huc_copyfunc_t	igt_get_huc_copyfunc(int devid);
 #endif
+
