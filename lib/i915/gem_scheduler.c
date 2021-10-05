@@ -28,6 +28,7 @@
 #include "igt_core.h"
 #include "ioctl_wrappers.h"
 
+#include "i915/i915_drm_local.h"
 #include "i915/gem_scheduler.h"
 #include "i915/gem_submission.h"
 
@@ -88,6 +89,19 @@ bool gem_scheduler_has_ctx_priority(int fd)
 {
 	return gem_scheduler_capability(fd) &
 		I915_SCHEDULER_CAP_PRIORITY;
+}
+
+/**
+ * gem_scheduler_has_static_priority:
+ * @fd: open i915 drm file descriptor
+ *
+ * Feature test macro to query whether the driver supports priority assigned
+ * from user space are statically mapping into 3 buckets.
+ */
+bool gem_scheduler_has_static_priority(int fd)
+{
+	return gem_scheduler_capability(fd) &
+		I915_SCHEDULER_CAP_STATIC_PRIORITY_MAP;
 }
 
 /**

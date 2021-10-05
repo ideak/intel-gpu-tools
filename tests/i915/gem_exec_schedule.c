@@ -248,6 +248,9 @@ static void unplug_show_queue(int fd, struct igt_cork *c,
 	igt_cork_unplug(c); /* batches will now be queued on the engine */
 	igt_debugfs_dump(fd, "i915_engine_info");
 
+	/* give time to the kernel to complete the queueing */
+	usleep(25000);
+
 	for (int n = 0; n < max; n++) {
 		uint64_t ahnd = spin[n]->ahnd;
 		igt_spin_free(fd, spin[n]);
@@ -1469,10 +1472,10 @@ static void promotion(int fd, const intel_ctx_cfg_t *cfg, unsigned ring)
 	gem_context_set_priority(fd, ctx[LO]->id, MIN_PRIO);
 
 	ctx[HI] = intel_ctx_create(fd, cfg);
-	gem_context_set_priority(fd, ctx[HI]->id, 0);
+	gem_context_set_priority(fd, ctx[HI]->id, MAX_PRIO);
 
 	ctx[NOISE] = intel_ctx_create(fd, cfg);
-	gem_context_set_priority(fd, ctx[NOISE]->id, MIN_PRIO/2);
+	gem_context_set_priority(fd, ctx[NOISE]->id, 0);
 
 	result = gem_create(fd, 4096);
 	result_offset = get_offset(ahnd, result, 4096, 0);
@@ -3246,19 +3249,25 @@ igt_main
 			test_each_engine_store("preempt-other-chain", fd, ctx, e)
 				preempt_other(fd, &ctx->cfg, e->flags, CHAIN);
 
-			test_each_engine_store("preempt-queue", fd, ctx, e)
-				preempt_queue(fd, &ctx->cfg, e->flags, 0);
-
-			test_each_engine_store("preempt-queue-chain", fd, ctx, e)
-				preempt_queue(fd, &ctx->cfg, e->flags, CHAIN);
-			test_each_engine_store("preempt-queue-contexts", fd, ctx, e)
-				preempt_queue(fd, &ctx->cfg, e->flags, CONTEXTS);
-
-			test_each_engine_store("preempt-queue-contexts-chain", fd, ctx, e)
-				preempt_queue(fd, &ctx->cfg, e->flags, CONTEXTS | CHAIN);
-
 			test_each_engine_store("preempt-engines", fd, ctx, e)
 				preempt_engines(fd, e, 0);
+
+			igt_subtest_group {
+				igt_fixture {
+					igt_require(!gem_scheduler_has_static_priority(fd));
+				}
+
+				test_each_engine_store("preempt-queue", fd, ctx, e)
+					preempt_queue(fd, &ctx->cfg, e->flags, 0);
+
+				test_each_engine_store("preempt-queue-chain", fd, ctx, e)
+					preempt_queue(fd, &ctx->cfg, e->flags, CHAIN);
+				test_each_engine_store("preempt-queue-contexts", fd, ctx, e)
+					preempt_queue(fd, &ctx->cfg, e->flags, CONTEXTS);
+
+				test_each_engine_store("preempt-queue-contexts-chain", fd, ctx, e)
+					preempt_queue(fd, &ctx->cfg, e->flags, CONTEXTS | CHAIN);
+			}
 
 			igt_subtest_group {
 				igt_hang_t hang;
@@ -3300,11 +3309,17 @@ igt_main
 		test_each_engine_store("wide", fd, ctx, e)
 			wide(fd, &ctx->cfg, e->flags);
 
-		test_each_engine_store("reorder-wide", fd, ctx, e)
-			reorder_wide(fd, &ctx->cfg, e->flags);
-
 		test_each_engine_store("smoketest", fd, ctx, e)
 			smoketest(fd, &ctx->cfg, e->flags, 5);
+
+		igt_subtest_group {
+			igt_fixture {
+				igt_require(!gem_scheduler_has_static_priority(fd));
+			}
+
+			test_each_engine_store("reorder-wide", fd, ctx, e)
+				reorder_wide(fd, &ctx->cfg, e->flags);
+		}
 	}
 
 	igt_subtest_group {

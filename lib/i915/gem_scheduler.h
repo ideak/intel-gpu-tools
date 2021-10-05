@@ -29,6 +29,7 @@
 unsigned gem_scheduler_capability(int fd);
 bool gem_scheduler_enabled(int fd);
 bool gem_scheduler_has_ctx_priority(int fd);
+bool gem_scheduler_has_static_priority(int fd);
 bool gem_scheduler_has_preemption(int fd);
 bool gem_scheduler_has_semaphores(int fd);
 bool gem_scheduler_has_engine_busy_stats(int fd);

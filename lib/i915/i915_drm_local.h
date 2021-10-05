@@ -34,6 +34,16 @@ struct drm_i915_gem_create_ext_protected_content {
 	__u32 flags;
 };
 
+/*
+ * Indicates the 2k user priority levels are statically mapped into 3 buckets as
+ * follows:
+ *
+ * -1k to -1	Low priority
+ * 0		Normal priority
+ * 1 to 1k	Highest priority
+ */
+#define   I915_SCHEDULER_CAP_STATIC_PRIORITY_MAP	(1ul << 5)
+
 #if defined(__cplusplus)
 }
 #endif
