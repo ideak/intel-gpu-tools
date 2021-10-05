@@ -29,6 +29,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "igt.h"
 #include "igt_params.h"
 #include "drmtest.h"
 #include "i915/gem.h"
@@ -41,7 +42,7 @@
 #include "sw_sync.h"
 
 #define ATTR "preempt_timeout_ms"
-#define RESET_TIMEOUT 50 /* milliseconds, at least one jiffie for kworker */
+#define RESET_TIMEOUT 1000 /* milliseconds, at long enough for an error capture */
 
 static bool __enable_hangcheck(int dir, bool state)
 {
@@ -253,6 +254,14 @@ static void test_off(int i915, int engine)
 
 	gem_quiescent_gpu(i915);
 	igt_require(enable_hangcheck(i915, false));
+
+	/*
+	 * Not a supported behavior for GuC enabled platforms, assume GuC
+	 * submission on gen12+. This isn't strickly true, e.g. TGL does not use
+	 * GuC submission, but we are not really losing coverage as this test
+	 * isn't not a UMD use case.
+	 */
+	igt_require(intel_gen(intel_get_drm_devid(i915)) < 12);
 
 	igt_assert(igt_sysfs_scanf(engine, "class", "%u", &class) == 1);
 	igt_assert(igt_sysfs_scanf(engine, "instance", "%u", &inst) == 1);
