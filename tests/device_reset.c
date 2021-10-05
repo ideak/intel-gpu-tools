@@ -201,7 +201,7 @@ static void driver_unbind(struct device_fds *dev)
 			igt_lsof("/dev/snd");
 			igt_skip("Audio is in use, skipping\n");
 		} else {
-			igt_warn("Preventively unloaded snd_hda_intel\n");
+			igt_info("Preventively unloaded snd_hda_intel\n");
 		}
 	}
 
