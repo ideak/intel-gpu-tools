@@ -40,6 +40,8 @@
 
 #include <i915/gem_submission.h>
 
+#include "igt_core.h"
+
 /* signal interrupt helpers */
 #ifdef __linux__
 # ifndef HAVE_GETTID
@@ -212,26 +214,42 @@ void intel_require_files(uint64_t count);
 #define CHECK_RAM 0x1
 #define CHECK_SWAP 0x2
 
-#define min(a, b) ({			\
-	typeof(a) _a = (a);		\
-	typeof(b) _b = (b);		\
-	_a < _b ? _a : _b;		\
-})
-#define max(a, b) ({			\
-	typeof(a) _a = (a);		\
-	typeof(b) _b = (b);		\
-	_a > _b ? _a : _b;		\
+#define __typecheck(x, y) \
+        (!!(sizeof((typeof(x) *)1 == (typeof(y) *)1)))
+
+#define __cmp(x, y, op) ((x) op (y) ? (x) : (y))
+
+#define __cmp_once(x, y, unique_x, unique_y, op) ({     \
+	typeof(x) unique_x = (x);               \
+	typeof(y) unique_y = (y);               \
+	__cmp(unique_x, unique_y, op);		\
 })
 
-#define clamp(x, min, max) ({		\
-	typeof(min) _min = (min);	\
-	typeof(max) _max = (max);	\
-	typeof(x) _x = (x);		\
-	_x < _min ? _min : _x > _max ? _max : _x;	\
-})
+#define __is_constexpr(x) \
+	(sizeof(int) == sizeof(*(8 ? ((void *)((long)(x) * 0l)) : (int *)8)))
+
+#define __no_side_effects(x, y) \
+	(__is_constexpr(x) && __is_constexpr(y))
+
+#define __safe_cmp(x, y) \
+	(__typecheck(x, y) && __no_side_effects(x, y))
+
+#define __careful_cmp(x, y, op, prefix) \
+	__builtin_choose_expr(__safe_cmp(x, y), \
+			      __cmp(x, y, op), \
+			      __cmp_once(x, y, igt_unique(igt_tokencat(prefix, __x)), igt_unique(igt_tokencat(prefix, __y)), op))
+
+#define min(x, y)	__careful_cmp(x, y, <, min)
+#define max(x, y)	__careful_cmp(x, y, >, max)
+
+#define clamp(val, lo, hi) min(max(val, lo), hi)
+
+#define min_t(t, x, y)	__careful_cmp((typeof(t))x, (typeof(t))y, <, min_t)
+#define max_t(t, x, y)	__careful_cmp((typeof(t))x, (typeof(t))y, >, max_t)
 
 #define igt_swap(a, b) do {	\
 	typeof(a) _tmp = (a);	\
+	_Static_assert(__typecheck(a, b), "type mismatch for swap"); \
 	(a) = (b);		\
 	(b) = _tmp;		\
 } while (0)

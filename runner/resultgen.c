@@ -481,12 +481,15 @@ static int find_subtest_idx_limited(struct matches matches,
 	if (line_len < 0)
 		return -1;
 
-	for (k = first; k < last; k++)
+	for (k = first; k < last; k++) {
+		ptrdiff_t rem = bufend - matches.items[k].where;
+
 		if (matches.items[k].what == linekey &&
 		    !memcmp(matches.items[k].where,
 			    full_line,
-			    min(line_len, bufend - matches.items[k].where)))
+			    min_t(ptrdiff_t, line_len, rem)))
 			break;
+	}
 
 	free(full_line);
 

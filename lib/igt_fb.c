@@ -733,7 +733,7 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 		 * tiled. But then that failure is expected.
 		 */
 
-		stride = max(min_stride, 512);
+		stride = max(min_stride, 512u);
 		stride = roundup_power_of_two(stride);
 
 		return stride;
@@ -747,7 +747,7 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 		/*
 		 * For amdgpu device with tiling mode
 		 */
-		unsigned int tile_width, tile_height;
+		uint32_t tile_width, tile_height;
 
 		igt_amd_fb_calculate_tile_dimension(fb->plane_bpp[plane],
 				     &tile_width, &tile_height);
@@ -812,9 +812,9 @@ static uint64_t calc_plane_size(struct igt_fb *fb, int plane)
 	if (fb->modifier != DRM_FORMAT_MOD_NONE &&
 	    is_i915_device(fb->fd) &&
 	    intel_display_ver(intel_get_drm_devid(fb->fd)) <= 3) {
-		uint64_t min_size = (uint64_t) fb->strides[plane] *
+		uint64_t size = (uint64_t) fb->strides[plane] *
 			fb->plane_height[plane];
-		uint64_t size;
+		uint64_t min_size = 1024 * 1024;
 
 		/* Round the tiling up to the next power-of-two and the region
 		 * up to the next pot fence size so that this works on all
@@ -824,10 +824,7 @@ static uint64_t calc_plane_size(struct igt_fb *fb, int plane)
 		 * tiled. But then that failure is expected.
 		 */
 
-		size = max(min_size, 1024*1024);
-		size = roundup_power_of_two(size);
-
-		return size;
+		return roundup_power_of_two(max(size, min_size));
 	} else if (fb->modifier != DRM_FORMAT_MOD_NONE && is_amdgpu_device(fb->fd)) {
 		/*
 		 * For amdgpu device with tiling mode

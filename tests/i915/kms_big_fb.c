@@ -400,9 +400,9 @@ static bool test_plane(data_t *data)
 
 static bool test_pipe(data_t *data)
 {
+	uint16_t width, height;
 	drmModeModeInfo *mode;
 	igt_plane_t *primary;
-	int width, height;
 	bool ret = false;
 
 	if (data->format == DRM_FORMAT_C8 &&

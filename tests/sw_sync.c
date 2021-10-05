@@ -837,8 +837,9 @@ igt_main
 	igt_fixture {
 		igt_require_sw_sync();
 		multi_consumer_threads =
-			min(multi_consumer_threads,
-			    sysconf(_SC_NPROCESSORS_ONLN));
+			min_t(multi_consumer_threads,
+			      multi_consumer_threads,
+			      sysconf(_SC_NPROCESSORS_ONLN));
 	}
 
 	igt_subtest("alloc_timeline")

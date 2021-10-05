@@ -214,6 +214,11 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 		igt_pipe_crc_start(data->pipe_crc);
 }
 
+#define TEST_WIDTH(km) \
+	 min_t((km)->hdisplay, (km)->hdisplay, TEST_MAX_WIDTH)
+#define TEST_HEIGHT(km) \
+	 min_t((km)->vdisplay, (km)->vdisplay, TEST_MAX_HEIGHT)
+
 static void prepare_fbs(data_t *data, igt_output_t *output,
 			igt_plane_t *plane, enum rectangle_type rect, uint32_t format)
 {
@@ -234,8 +239,8 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 			w = mode->hdisplay;
 			h = mode->vdisplay;
 		} else {
-			w = min(TEST_MAX_WIDTH, mode->hdisplay);
-			h = min(TEST_MAX_HEIGHT, mode->vdisplay);
+			w = TEST_WIDTH(mode);
+			h = TEST_HEIGHT(mode);
 		}
 
 		min_w = 256;
@@ -614,7 +619,7 @@ static void pointlocation(data_t *data, planeinfos *p, drmModeModeInfo *mode,
 			  int c)
 {
 	if (data->planepos[c].origo & p_right) {
-		p[c].x1 = (int32_t)(data->planepos[c].x * min(TEST_MAX_WIDTH, mode->hdisplay)
+		p[c].x1 = (int32_t)(data->planepos[c].x * TEST_WIDTH(mode)
 				+ mode->hdisplay);
 		p[c].x1 &= ~3;
 		/*
@@ -625,17 +630,17 @@ static void pointlocation(data_t *data, planeinfos *p, drmModeModeInfo *mode,
 		 */
 		p[c].x1 -= mode->hdisplay & 2;
 	} else {
-		p[c].x1 = (int32_t)(data->planepos[c].x * min(TEST_MAX_WIDTH, mode->hdisplay));
+		p[c].x1 = (int32_t)(data->planepos[c].x * TEST_WIDTH(mode));
 		p[c].x1 &= ~3;
 	}
 
 	if (data->planepos[c].origo & p_bottom) {
-		p[c].y1 = (int32_t)(data->planepos[c].y * min(TEST_MAX_HEIGHT, mode->vdisplay)
+		p[c].y1 = (int32_t)(data->planepos[c].y * TEST_HEIGHT(mode)
 				+ mode->vdisplay);
 		p[c].y1 &= ~3;
 		p[c].y1 -= mode->vdisplay & 2;
 	} else {
-		p[c].y1 = (int32_t)(data->planepos[c].y * min(TEST_MAX_HEIGHT, mode->vdisplay));
+		p[c].y1 = (int32_t)(data->planepos[c].y * TEST_HEIGHT(mode));
 		p[c].y1 &= ~3;
 	}
 }
@@ -698,8 +703,8 @@ static void test_multi_plane_rotation(data_t *data, enum pipe pipe)
 		igt_display_require_output(display);
 		igt_display_commit2(display, COMMIT_ATOMIC);
 
-		used_w = min(TEST_MAX_WIDTH, mode->hdisplay);
-		used_h = min(TEST_MAX_HEIGHT, mode->vdisplay);
+		used_w = TEST_WIDTH(mode);
+		used_h = TEST_HEIGHT(mode);
 
 		p[0].plane = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 		p[1].plane = igt_output_get_plane_type(output, DRM_PLANE_TYPE_OVERLAY);

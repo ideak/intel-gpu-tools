@@ -2399,7 +2399,7 @@ static void test_display_planes_random(data_t *data,
 		igt_output_count_plane_type(output, DRM_PLANE_TYPE_OVERLAY);
 
 	/* Limit the number of planes to a reasonable scene. */
-	overlay_planes_max = min(overlay_planes_max, 4);
+	overlay_planes_max = min(overlay_planes_max, 4u);
 
 	overlay_planes_count = (rand() % overlay_planes_max) + 1;
 	igt_debug("Using %d overlay planes\n", overlay_planes_count);

@@ -489,7 +489,7 @@ static void test_inflight(int fd, unsigned int wait)
 
 	max = gem_measure_ring_inflight(fd, -1, 0);
 	igt_require(max > 1);
-	max = min(max - 1, ARRAY_SIZE(fence));
+	max = min_t(max, max - 1, ARRAY_SIZE(fence));
 	igt_debug("Using %d inflight batches\n", max);
 
 	for_each_ring(e, parent_fd) {
@@ -558,7 +558,7 @@ static void test_inflight_suspend(int fd)
 
 	max = gem_measure_ring_inflight(fd, -1, 0);
 	igt_require(max > 1);
-	max = min(max - 1, ARRAY_SIZE(fence));
+	max = min_t(max, max - 1, ARRAY_SIZE(fence));
 	igt_debug("Using %d inflight batches\n", max);
 
 	fd = reopen_device(fd);

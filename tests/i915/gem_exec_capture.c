@@ -566,7 +566,7 @@ static void prioinv(int fd, int dir, const intel_ctx_t *ctx,
 		  gtt, ram);
 
 	count = min(gtt, ram) / 4;
-	count = min(count, 256); /* Keep the duration within reason */
+	count = min(count, 256ul); /* Keep the duration within reason */
 	igt_require(count > 1);
 
 	intel_require_memory(count, size, CHECK_RAM);

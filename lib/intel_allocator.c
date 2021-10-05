@@ -1088,7 +1088,7 @@ uint64_t __intel_allocator_alloc(uint64_t allocator_handle, uint32_t handle,
 	struct alloc_resp resp;
 
 	igt_assert((alignment & (alignment-1)) == 0);
-	req.alloc.alignment = max(alignment, 1 << 12);
+	req.alloc.alignment = max_t(uint64_t, alignment, 1 << 12);
 
 	igt_assert(handle_request(&req, &resp) == 0);
 	igt_assert(resp.response_type == RESP_ALLOC);

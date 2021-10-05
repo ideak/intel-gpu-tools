@@ -534,10 +534,11 @@ static void dump_child_devices(struct context *context, const uint8_t *devices,
 	 * initialized to zero.
 	 */
 	child = calloc(1, sizeof(*child));
+	igt_assert(child);
 
 	for (i = 0; i < child_dev_num; i++) {
 		memcpy(child, devices + i * child_dev_size,
-		       min(sizeof(*child), child_dev_size));
+		       min_t(child_dev_size, sizeof(*child), child_dev_size));
 
 		dump_child_device(context, child);
 	}

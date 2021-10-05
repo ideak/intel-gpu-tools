@@ -195,8 +195,8 @@ test_output(data_t *data)
 		return 0;
 
 	igt_create_fb(data->drm_fd,
-		      max(mode.hdisplay, 64),
-		      max(mode.vdisplay, 64),
+		      max_t(uint16_t, mode.hdisplay, 64),
+		      max_t(uint16_t, mode.vdisplay, 64),
 		      DRM_FORMAT_XRGB8888,
 		      DRM_FORMAT_MOD_NONE,
 		      &fb);

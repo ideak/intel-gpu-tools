@@ -166,7 +166,7 @@ naughty_child(int i915, int link, uint32_t shared, unsigned int flags)
 	if (!gem_uses_full_ppgtt(i915))
 		gtt_size /= 2; /* We have to *share* our GTT! */
 
-	ram_size = min(intel_get_total_ram_mb(), 4096);
+	ram_size = min_t(uint64_t, intel_get_total_ram_mb(), 4096);
 	ram_size *= 1024 * 1024;
 
 	count = min(gtt_size, ram_size) / 16384;
@@ -376,7 +376,7 @@ setup_many(int i915, unsigned long *out)
 	if (!gem_uses_full_ppgtt(i915))
 		gtt_size /= 2; /* We have to *share* our GTT! */
 
-	ram_size = min(intel_get_total_ram_mb(), 4096);
+	ram_size = min_t(uint64_t, intel_get_total_ram_mb(), 4096);
 	ram_size *= 1024 * 1024;
 
 	count = min(gtt_size, ram_size) / 16384;

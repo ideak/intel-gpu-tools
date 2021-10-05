@@ -146,19 +146,16 @@ out:
  *
  * Returns: Number of found lmem regions.
  */
-uint8_t gem_get_lmem_region_count(int fd)
+unsigned int gem_get_lmem_region_count(int fd)
 {
 	struct drm_i915_query_memory_regions *query_info;
-	uint8_t num_regions;
-	uint8_t lmem_regions = 0;
+	unsigned int lmem_regions = 0;
 
 	query_info = gem_get_query_memory_regions(fd);
 	if (!query_info)
 		goto out;
 
-	num_regions = query_info->num_regions;
-
-	for (int i = 0; i < num_regions; i++) {
+	for (unsigned int i = 0; i < query_info->num_regions; i++) {
 		if (query_info->regions[i].region.memory_class == I915_MEMORY_CLASS_DEVICE)
 			lmem_regions += 1;
 	}

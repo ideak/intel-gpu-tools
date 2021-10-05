@@ -605,7 +605,7 @@ static void fair_child(int i915, const intel_ctx_t *ctx,
 		map = gem_mmap__device_coherent(i915, obj[0].handle,
 						0, 4096, PROT_WRITE);
 		igt_assert(map[0]);
-		for (n = 1; n < min(count, 512); n++) {
+		for (n = 1; n < min(count, 512ul); n++) {
 			igt_assert(map[n]);
 			map[n - 1] = map[n] - map[n - 1];
 		}

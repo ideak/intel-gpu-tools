@@ -789,7 +789,7 @@ static void run_modeset_tests(data_t *data, int howmany, bool nonblocking, bool 
 	unsigned iter_max;
 	igt_pipe_crc_t *pipe_crcs[IGT_MAX_PIPES] = { 0 };
 	igt_output_t *output;
-	unsigned width = 0, height = 0;
+	uint16_t width = 0, height = 0;
 
 	for (i = 0; i < data->display.n_outputs; i++)
 		igt_output_set_pipe(&data->display.outputs[i], PIPE_NONE);

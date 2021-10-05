@@ -1413,7 +1413,7 @@ static int target_num_interrupts(int i915)
 {
 	const intel_ctx_cfg_t cfg = intel_ctx_cfg_all_physical(i915);
 
-	return min(gem_submission_measure(i915, &cfg, I915_EXEC_DEFAULT), 30);
+	return min(gem_submission_measure(i915, &cfg, I915_EXEC_DEFAULT), 30u);
 }
 
 static void

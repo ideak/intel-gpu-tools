@@ -1693,7 +1693,7 @@ static void test_forking_evictions(int fd, int size, int count,
 	 * processes meaning swapping will be triggered system
 	 * wide even if one process on it's own can't do it.
 	 */
-	num_threads = min(sysconf(_SC_NPROCESSORS_ONLN) * 4, 12);
+	num_threads = min_t(int, sysconf(_SC_NPROCESSORS_ONLN) * 4, 12);
 	trash_count /= num_threads;
 	if (count > trash_count)
 		count = trash_count;

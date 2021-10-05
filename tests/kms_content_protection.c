@@ -703,9 +703,9 @@ static void test_content_protection_cleanup(void)
 
 static void create_fbs(void)
 {
-	igt_output_t *output;
-	int width = 0, height = 0;
+	uint16_t width = 0, height = 0;
 	drmModeModeInfo *mode;
+	igt_output_t *output;
 
 	for_each_connected_output(&data.display, output) {
 		mode = igt_output_get_mode(output);

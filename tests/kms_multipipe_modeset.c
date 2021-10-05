@@ -40,10 +40,11 @@ static void run_test(data_t *data, int valid_outputs)
 	igt_pipe_crc_t *pipe_crcs[IGT_MAX_PIPES] = { 0 };
 	igt_crc_t ref_crcs[IGT_MAX_PIPES], new_crcs[IGT_MAX_PIPES];
 	igt_display_t *display = &data->display;
-	int width = 0, height = 0, i = 0;
+	uint16_t width = 0, height = 0;
 	igt_pipe_t *pipe;
 	igt_plane_t *plane;
 	drmModeModeInfo *mode;
+	int i = 0;
 
 	for_each_connected_output(display, output) {
 		mode = igt_output_get_mode(output);

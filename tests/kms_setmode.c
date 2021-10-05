@@ -421,15 +421,8 @@ static int test_stealing(int fd, struct crtc_config *crtc, uint32_t *ids)
 	return ret;
 }
 
-static double frame_time(const drmModeModeInfo *kmode)
-{
-	return 1000.0 * kmode->htotal * kmode->vtotal / kmode->clock;
-}
-
-static double line_time(const drmModeModeInfo *kmode)
-{
-	return 1000.0 * kmode->htotal / kmode->clock;
-}
+#define frame_time(km) (1000.0 * (km)->htotal * (km)->vtotal / (km)->clock)
+#define line_time(km) (1000.0 * (km)->htotal / (km)->clock)
 
 static void check_timings(int crtc_idx, const drmModeModeInfo *kmode)
 {

@@ -1082,8 +1082,8 @@ static void test_display_protected_crc(int i915, igt_display_t *display)
 	for_each_connected_output(display, output) {
 		mode = igt_output_get_mode(output);
 
-		width = max(width, mode->hdisplay);
-		height = max(height, mode->vdisplay);
+		width = max_t(int, width, mode->hdisplay);
+		height = max_t(int, height, mode->vdisplay);
 	}
 
 	igt_create_color_fb(i915, width, height, DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_NONE,

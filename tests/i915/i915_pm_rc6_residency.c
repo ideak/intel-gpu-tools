@@ -345,7 +345,7 @@ static void bg_load(int i915, unsigned int flags, unsigned long *ctl)
 		ctl[1]++;
 
 		/* aim for ~1% busy */
-		usleep(min(elapsed / 10, 50 * 1000));
+		usleep(min_t(elapsed, elapsed / 10, 50 * 1000));
 	} while (!READ_ONCE(*ctl));
 }
 

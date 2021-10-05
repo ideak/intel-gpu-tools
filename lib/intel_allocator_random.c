@@ -180,7 +180,7 @@ intel_allocator_random_create(int fd, uint64_t start, uint64_t end)
 	igt_assert(ial->priv);
 	ialr->prng = (uint32_t) to_user_pointer(ial);
 
-	start = max(start, BIAS);
+	start = max_t(uint64_t, start, BIAS);
 	igt_assert(start < end);
 	ialr->start = start;
 	ialr->end = end;

@@ -904,7 +904,7 @@ static int compare_bufs(struct intel_buf *buf1, struct intel_buf *buf2,
 	return ret;
 }
 
-#define LINELEN 76
+#define LINELEN 76ul
 static int dump_base64(const char *name, struct intel_buf *buf)
 {
 	void *ptr;
