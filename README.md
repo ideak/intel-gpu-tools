@@ -149,7 +149,13 @@ overall structure or indexes you need to reflect the change in
 
 Imported DRM uapi headers from airlied's drm-next branch.
 
-These should be updated all together by executing `make headers_install` from
-that branch of the kernel and then copying the resulting
-`./usr/include/drm/*.h` in and committing with a note of which exact commit
-from airlied's branch was used to generate them.
+These should be updated all together by:
+
+    # From the kernel dir with a drm/drm-next commit checked out:
+    $ make INSTALL_HDR_PATH=<dest-dir> headers_install
+    $ rm -f <igt-dir>/include/drm-uapi/*
+    $ cp <dest-dir>/include/linux/sync_file.h <igt-dir>/include/drm-uapi/
+    $ cp <dest-dir>/include/drm/* <igt-dir>/include/drm-uapi/
+
+Then, commit with a note of which exact commit from airlied's branch
+was used to generate them.
