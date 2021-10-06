@@ -20,6 +20,19 @@ extern "C" {
  * clean these up when kernel uapi headers are sync'd.
  */
 
+/* Needed for PXP */
+#define I915_GEM_CREATE_EXT_PROTECTED_CONTENT  1
+#define I915_CONTEXT_PARAM_PROTECTED_CONTENT   0xd
+#define I915_PROTECTED_CONTENT_DEFAULT_SESSION 0xf
+
+/* Needed for PXP */
+struct drm_i915_gem_create_ext_protected_content {
+	/** @base: Extension link. See struct i915_user_extension. */
+	struct i915_user_extension base;
+	/** @flags: reserved for future usage, currently MBZ */
+	__u32 flags;
+};
+
 #if defined(__cplusplus)
 }
 #endif
