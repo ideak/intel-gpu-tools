@@ -154,8 +154,18 @@ These should be updated all together by:
     # From the kernel dir with a drm/drm-next commit checked out:
     $ make INSTALL_HDR_PATH=<dest-dir> headers_install
     $ rm -f <igt-dir>/include/drm-uapi/*
-    $ cp <dest-dir>/include/linux/sync_file.h <igt-dir>/include/drm-uapi/
     $ cp <dest-dir>/include/drm/* <igt-dir>/include/drm-uapi/
+
+Then, commit with a note of which exact commit from airlied's branch
+was used to generate them.
+
+### `include/linux-uapi/sync_file.h`
+
+Imported non-DRM uapi headers from airlied's drm-next branch.
+
+    # From the kernel dir with a drm/drm-next commit checked out:
+    $ make INSTALL_HDR_PATH=<destdir> headers_install
+    $ cp <destdir>/include/linux/sync_file.h ~/igt/include/linux-uapi/
 
 Then, commit with a note of which exact commit from airlied's branch
 was used to generate them.
