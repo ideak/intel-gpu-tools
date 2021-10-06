@@ -251,7 +251,9 @@ static void poll_sequential(int fd, const intel_ctx_t *ctx,
 	memset(obj, 0, sizeof(obj));
 	obj[0].handle = gem_create(fd, 4096);
 	obj[0].flags = EXEC_OBJECT_WRITE;
-	cached = __gem_set_caching(fd, obj[0].handle, 1) == 0;
+	cached = true;
+	if(!gem_has_lmem(fd))
+		cached = __gem_set_caching(fd, obj[0].handle, 1) == 0;
 	obj[1].handle = gem_create(fd, 4096);
 	obj[1].relocs_ptr = to_user_pointer(reloc);
 	obj[1].relocation_count = ARRAY_SIZE(reloc);
