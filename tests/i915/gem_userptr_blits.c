@@ -2151,16 +2151,13 @@ static int userfaultfd(int flags)
 	return syscall(SYS_userfaultfd, flags);
 }
 
-#define LOCAL_I915_PARAM_HAS_USERPTR_PROBE 56
-#define LOCAL_I915_USERPTR_PROBE 0x2
-
 static bool has_userptr_probe(int fd)
 {
 	struct drm_i915_getparam gp;
 	int value = 0;
 
 	memset(&gp, 0, sizeof(gp));
-	gp.param = LOCAL_I915_PARAM_HAS_USERPTR_PROBE;
+	gp.param = I915_PARAM_HAS_USERPTR_PROBE;
 	gp.value = &value;
 
 	ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp, sizeof(gp));
@@ -2222,7 +2219,7 @@ static void test_probe(int fd)
 		}
 
 		igt_assert_eq(__gem_userptr(fd, ptr + PAGE_SIZE, 3*PAGE_SIZE,
-					    0, LOCAL_I915_USERPTR_PROBE, &handle),
+					    0, I915_USERPTR_PROBE, &handle),
 			      expected);
 
 		munmap(ptr, N_PAGES * PAGE_SIZE);
