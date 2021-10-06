@@ -622,23 +622,6 @@ static void test_render_pxp_protsrc_to_protdest(int i915)
 	buf_ops_destroy(bops);
 }
 
-static int export_handle(int fd, uint32_t handle, int *outfd)
-{
-	struct drm_prime_handle args;
-	int ret;
-
-	args.handle = handle;
-	args.flags = DRM_CLOEXEC;
-	args.fd = -1;
-
-	ret = drmIoctl(fd, DRM_IOCTL_PRIME_HANDLE_TO_FD, &args);
-	if (ret)
-		ret = errno;
-	*outfd = args.fd;
-
-	return ret;
-}
-
 static void test_pxp_dmabuffshare_refcnt(void)
 {
 	uint32_t ctx[2], sbo[2], dbo[2];
@@ -659,8 +642,7 @@ static void test_pxp_dmabuffshare_refcnt(void)
 			dbo[0] = alloc_and_fill_dest_buff(fd[0], true, TSTSURF_SIZE,
 							  TSTSURF_INITCOLOR1);
 		} else {
-			ret = export_handle(fd[0], dbo[0], &dmabuf_fd);
-			igt_assert(ret == 0);
+			dmabuf_fd = prime_handle_to_fd(fd[0], dbo[0]);
 			dbo[1] = prime_fd_to_handle(fd[1], dmabuf_fd);
 			igt_assert(dbo[1]);
 		}
