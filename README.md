@@ -159,6 +159,20 @@ These should be updated all together by:
 Then, commit with a note of which exact commit from airlied's branch
 was used to generate them.
 
+### `include/drm-uapi/i915_drm.h`
+
+Imported i915_drm.h uapi headers from airlied's drm-next branch.
+
+In some cases updating a single uapi file is needed as our history
+shows. So in this case, it should be done by:
+
+    # From the kernel dir with a drm/drm-next commit checked out:
+    $ make INSTALL_HDR_PATH=<dest-dir> headers_install
+    $ cp <dest-dir>/include/drm/i915_drm.h <igt-dir>/include/drm-uapi/
+
+Then, commit with a note of which exact commit from airlied's branch
+was used to generate it.
+
 ### `include/linux-uapi/sync_file.h`
 
 Imported non-DRM uapi headers from airlied's drm-next branch.
