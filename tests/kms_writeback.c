@@ -227,14 +227,17 @@ static void writeback_fb_id(igt_output_t *output, igt_fb_t *valid_fb, igt_fb_t *
 
 static void fill_fb(igt_fb_t *fb, uint32_t pixel)
 {
-	void *ptr;
+	uint32_t *ptr;
+	int64_t pixel_count, i;
 
 	igt_assert(fb->drm_format == DRM_FORMAT_XRGB8888);
 
 	ptr = igt_fb_map_buffer(fb->fd, fb);
 	igt_assert(ptr);
 
-	memset(ptr, pixel, fb->strides[0] * fb->height);
+	pixel_count = fb->strides[0] * fb->height / sizeof(uint32_t);
+	for (i = 0; i < pixel_count; i++)
+		ptr[i] = pixel;
 
 	igt_fb_unmap_buffer(fb, ptr);
 }
