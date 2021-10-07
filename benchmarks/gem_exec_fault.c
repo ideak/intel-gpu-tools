@@ -49,6 +49,7 @@
 #include "ioctl_wrappers.h"
 
 #define ENGINE_FLAGS  (I915_EXEC_RING_MASK | I915_EXEC_BSD_MASK)
+#define DEFAULT_TIMEOUT 2.f
 
 static double elapsed(const struct timespec *start,
 		      const struct timespec *end)
@@ -64,7 +65,8 @@ static uint32_t batch(int fd, uint64_t size)
 	return handle;
 }
 
-static int loop(uint64_t size, unsigned ring, int reps, int ncpus, unsigned flags)
+static int loop(uint64_t size, unsigned ring, int reps, int ncpus,
+		unsigned flags, float timeout)
 {
 	struct drm_i915_gem_execbuffer2 execbuf;
 	struct drm_i915_gem_exec_object2 obj;
@@ -128,10 +130,14 @@ static int loop(uint64_t size, unsigned ring, int reps, int ncpus, unsigned flag
 					/* fault out */
 					obj.alignment = 1ull << 63;
 					__gem_execbuf(fd, &execbuf);
-				}
 
-				clock_gettime(CLOCK_MONOTONIC, &end);
-			} while (elapsed(&start, &end) < 2.);
+					clock_gettime(CLOCK_MONOTONIC, &end);
+					if (elapsed(&start, &end) >= timeout) {
+						timeout = -1.0;
+						break;
+					}
+				}
+			} while (timeout > 0);
 
 			gem_sync(fd, obj.handle);
 			clock_gettime(CLOCK_MONOTONIC, &end);
@@ -156,8 +162,9 @@ int main(int argc, char **argv)
 	int reps = 1;
 	int ncpus = 1;
 	int c;
+	float timeout = DEFAULT_TIMEOUT;
 
-	while ((c = getopt (argc, argv, "e:r:s:f")) != -1) {
+	while ((c = getopt (argc, argv, "e:r:s:ft:")) != -1) {
 		switch (c) {
 		case 'e':
 			if (strcmp(optarg, "rcs") == 0)
@@ -190,10 +197,15 @@ int main(int argc, char **argv)
 				size = 4096;
 			break;
 
+		case 't':
+			timeout = atof(optarg);
+			igt_assert_f(timeout > 0, "Timeout must be > 0\n");
+			break;
+
 		default:
 			break;
 		}
 	}
 
-	return loop(size, ring, reps, ncpus, flags);
+	return loop(size, ring, reps, ncpus, flags, timeout);
 }
