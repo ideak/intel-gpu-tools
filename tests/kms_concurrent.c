@@ -166,11 +166,11 @@ prepare_planes(data_t *data, enum pipe pipe, int max_planes,
 		} else if (plane->type == DRM_PLANE_TYPE_CURSOR) {
 			size[i] = SIZE_CURSOR;
 			format = DRM_FORMAT_ARGB8888;
-			modifier = DRM_FORMAT_MOD_NONE;
+			modifier = DRM_FORMAT_MOD_LINEAR;
 		} else {
 			size[i] = SIZE_PLANE;
 			format = DRM_FORMAT_XRGB8888;
-			modifier = DRM_FORMAT_MOD_NONE;
+			modifier = DRM_FORMAT_MOD_LINEAR;
 		}
 
 		x[i] = rand() % (mode->hdisplay - size[i]);

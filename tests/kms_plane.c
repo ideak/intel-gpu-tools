@@ -106,7 +106,7 @@ create_fb_for_mode(data_t *data, drmModeModeInfo *mode,
 	fb_id = igt_create_fb(data->drm_fd,
 			      mode->hdisplay, mode->vdisplay,
 			      DRM_FORMAT_XRGB8888,
-			      DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_MOD_LINEAR,
 			      fb);
 	igt_assert_fd(fb_id);
 
@@ -152,7 +152,7 @@ test_grab_crc(data_t *data, igt_output_t *output, enum pipe pipe,
 		igt_assert_fd(igt_create_color_fb(data->drm_fd,
 						  mode->hdisplay, mode->vdisplay,
 						  DRM_FORMAT_XRGB8888,
-						  DRM_FORMAT_MOD_NONE,
+						  DRM_FORMAT_MOD_LINEAR,
 						  fb_color->red, fb_color->green, fb_color->blue,
 						  &fb));
 	}
@@ -224,7 +224,7 @@ test_plane_position_with_output(data_t *data,
 	igt_create_color_fb(data->drm_fd,
 			    64, 64, /* width, height */
 			    DRM_FORMAT_XRGB8888,
-			    DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_MOD_LINEAR,
 			    0.0, 1.0, 0.0,
 			    &sprite_fb);
 	igt_plane_set_fb(sprite, &sprite_fb);
@@ -306,7 +306,7 @@ create_fb_for_mode_panning(data_t *data, drmModeModeInfo *mode,
 	fb_id = igt_create_fb(data->drm_fd,
 			      mode->hdisplay * 2, mode->vdisplay * 2,
 			      DRM_FORMAT_XRGB8888,
-			      DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_MOD_LINEAR,
 			      fb);
 	igt_assert(fb_id);
 
@@ -868,7 +868,7 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 		width = mode->hdisplay;
 		height = mode->vdisplay;
 		ref.format = DRM_FORMAT_XRGB8888;
-		ref.modifier = DRM_FORMAT_MOD_NONE;
+		ref.modifier = DRM_FORMAT_MOD_LINEAR;
 	} else {
 		if (!plane->drm_plane) {
 			igt_debug("Only legacy cursor ioctl supported, skipping cursor plane\n");
@@ -877,7 +877,7 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 		do_or_die(drmGetCap(data->drm_fd, DRM_CAP_CURSOR_WIDTH, &width));
 		do_or_die(drmGetCap(data->drm_fd, DRM_CAP_CURSOR_HEIGHT, &height));
 		ref.format = DRM_FORMAT_ARGB8888;
-		ref.modifier = DRM_FORMAT_MOD_NONE;
+		ref.modifier = DRM_FORMAT_MOD_LINEAR;
 	}
 
 	igt_debug("Testing connector %s on %s plane %s.%u\n",
@@ -1044,7 +1044,7 @@ test_pixel_formats(data_t *data, enum pipe pipe)
 	mode = igt_output_get_mode(output);
 
 	igt_create_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
-		      DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_NONE, &primary_fb);
+		      DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, &primary_fb);
 
 	igt_output_set_pipe(output, pipe);
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);

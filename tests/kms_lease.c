@@ -107,7 +107,7 @@ static int prepare_crtc(lease_t *lease, uint32_t connector_id, uint32_t crtc_id)
 	mode = igt_output_get_mode(output);
 	igt_create_color_fb(lease->fd, mode->hdisplay, mode->vdisplay,
 			    DRM_FORMAT_XRGB8888,
-			    DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_MOD_LINEAR,
 			    0.0, 0.0, 0.0,
 			    &lease->primary_fb);
 

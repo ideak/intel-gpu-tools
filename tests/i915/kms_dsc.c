@@ -240,7 +240,7 @@ static void run_test(data_t *data, enum dsc_test_type test_type)
 	igt_create_pattern_fb(data->drm_fd, mode->hdisplay,
 			      mode->vdisplay,
 			      DRM_FORMAT_XRGB8888,
-			      DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_MOD_LINEAR,
 			      &data->fb_test_pattern);
 
 	for_each_pipe(&data->display, pipe) {

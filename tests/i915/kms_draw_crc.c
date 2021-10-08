@@ -50,7 +50,7 @@ static const uint32_t formats[N_FORMATS] = {
 
 #define N_TILING_METHODS 3
 static const uint64_t tilings[N_TILING_METHODS] = {
-	DRM_FORMAT_MOD_NONE,
+	DRM_FORMAT_MOD_LINEAR,
 	I915_FORMAT_MOD_X_TILED,
 	I915_FORMAT_MOD_Y_TILED,
 };
@@ -191,7 +191,7 @@ static void draw_method_subtest(enum igt_draw_method method,
 		get_method_crc(gem_has_mappable_ggtt(drm_fd) ? IGT_DRAW_MMAP_GTT :
 							       IGT_DRAW_MMAP_WC,
 			       formats[format_index],
-			       DRM_FORMAT_MOD_NONE,
+			       DRM_FORMAT_MOD_LINEAR,
 			       &base_crcs[format_index].crc);
 		base_crcs[format_index].set = true;
 	}
@@ -226,7 +226,7 @@ static void fill_fb_subtest(void)
 	igt_crc_t base_crc, crc;
 
 	igt_create_fb(drm_fd, ms.mode->hdisplay, ms.mode->vdisplay,
-		      DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_NONE, &fb);
+		      DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, &fb);
 
 	igt_draw_rect_fb(drm_fd, bops, 0, &fb,
 			 gem_has_mappable_ggtt(drm_fd) ? IGT_DRAW_MMAP_GTT :
@@ -239,7 +239,7 @@ static void fill_fb_subtest(void)
 
 	igt_pipe_crc_collect_crc(pipe_crc, &base_crc);
 
-	get_fill_crc(DRM_FORMAT_MOD_NONE, &crc);
+	get_fill_crc(DRM_FORMAT_MOD_LINEAR, &crc);
 	igt_assert_crc_equal(&crc, &base_crc);
 
 	get_fill_crc(I915_FORMAT_MOD_X_TILED, &crc);
@@ -309,7 +309,7 @@ static const char *format_str(int format_index)
 static const char *tiling_str(int tiling_index)
 {
 	switch (tilings[tiling_index]) {
-	case DRM_FORMAT_MOD_NONE:
+	case DRM_FORMAT_MOD_LINEAR :
 		return "untiled";
 	case I915_FORMAT_MOD_X_TILED:
 		return "xtiled";

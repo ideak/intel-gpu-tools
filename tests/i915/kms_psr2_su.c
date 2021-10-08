@@ -112,7 +112,7 @@ static void prepare(data_t *data)
 	igt_create_color_fb(data->drm_fd,
 			    data->mode->hdisplay, data->mode->vdisplay,
 			    DRM_FORMAT_XRGB8888,
-			    DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_MOD_LINEAR,
 			    0.0, 1.0, 0.0,
 			    &data->fb[0]);
 
@@ -122,7 +122,7 @@ static void prepare(data_t *data)
 		igt_create_color_fb(data->drm_fd,
 				    data->mode->hdisplay, data->mode->vdisplay,
 				    DRM_FORMAT_XRGB8888,
-				    DRM_FORMAT_MOD_NONE,
+				    DRM_FORMAT_MOD_LINEAR,
 				    0.0, 1.0, 0.0,
 				    &data->fb[1]);
 

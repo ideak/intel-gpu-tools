@@ -164,7 +164,7 @@ static void create_color_fb(data_t *data, igt_fb_t *fb, color_t *fb_color)
 			      data->mode->hdisplay,
 			      data->mode->vdisplay,
 			      DRM_FORMAT_XRGB8888,
-			      DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_MOD_LINEAR,
 			      fb);
 	igt_assert(fb_id);
 	paint_rectangles(data, data->mode, fb_color, fb);

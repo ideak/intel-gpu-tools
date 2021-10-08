@@ -198,7 +198,7 @@ test_output(data_t *data)
 		      max_t(uint16_t, mode.hdisplay, 64),
 		      max_t(uint16_t, mode.vdisplay, 64),
 		      DRM_FORMAT_XRGB8888,
-		      DRM_FORMAT_MOD_NONE,
+		      DRM_FORMAT_MOD_LINEAR,
 		      &fb);
 
 	kmstest_unset_all_crtcs(data->drm_fd, data->res);

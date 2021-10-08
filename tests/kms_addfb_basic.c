@@ -537,7 +537,7 @@ static void addfb25_tests(int fd)
 		f.height = 1024;
 		f.pixel_format = DRM_FORMAT_XRGB8888;
 		f.pitches[0] = 1024*4;
-		f.modifier[0] = DRM_FORMAT_MOD_NONE;
+		f.modifier[0] = DRM_FORMAT_MOD_LINEAR;
 
 		f.handles[0] = gem_bo;
 	}
@@ -571,7 +571,7 @@ static void addfb25_tests(int fd)
 
 		igt_describe("Test that addfb2 call fails correctly for irrelevant x-tiling");
 		igt_subtest("addfb25-x-tiled-mismatch-legacy") {
-			f.modifier[0] = DRM_FORMAT_MOD_NONE;
+			f.modifier[0] = DRM_FORMAT_MOD_LINEAR;
 			igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_ADDFB2, &f) < 0 && errno == EINVAL);
 		}
 
@@ -625,7 +625,7 @@ static void addfb25_ytile(int fd)
 		f.pixel_format = DRM_FORMAT_XRGB8888;
 		f.pitches[0] = 1024*4;
 		f.flags = DRM_MODE_FB_MODIFIERS;
-		f.modifier[0] = DRM_FORMAT_MOD_NONE;
+		f.modifier[0] = DRM_FORMAT_MOD_LINEAR;
 
 		f.handles[0] = gem_bo;
 	}

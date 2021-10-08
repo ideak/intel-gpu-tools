@@ -59,7 +59,7 @@ static void test_pipe_degamma(data_t *data,
 			      mode->hdisplay,
 			      mode->vdisplay,
 			      DRM_FORMAT_XRGB8888,
-			      DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_MOD_LINEAR,
 			      &fb);
 	igt_assert(fb_id);
 
@@ -67,7 +67,7 @@ static void test_pipe_degamma(data_t *data,
 				      mode->hdisplay,
 				      mode->vdisplay,
 				      DRM_FORMAT_XRGB8888,
-				      DRM_FORMAT_MOD_NONE,
+				      DRM_FORMAT_MOD_LINEAR,
 				      &fb_modeset);
 	igt_assert(fb_modeset_id);
 
@@ -147,7 +147,7 @@ static void test_pipe_gamma(data_t *data,
 			      mode->hdisplay,
 			      mode->vdisplay,
 			      DRM_FORMAT_XRGB8888,
-			      DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_MOD_LINEAR,
 			      &fb);
 	igt_assert(fb_id);
 
@@ -155,7 +155,7 @@ static void test_pipe_gamma(data_t *data,
 				      mode->hdisplay,
 				      mode->vdisplay,
 				      DRM_FORMAT_XRGB8888,
-				      DRM_FORMAT_MOD_NONE,
+				      DRM_FORMAT_MOD_LINEAR,
 				      &fb_modeset);
 	igt_assert(fb_modeset_id);
 
@@ -240,7 +240,7 @@ static void test_pipe_legacy_gamma(data_t *data,
 			      mode->hdisplay,
 			      mode->vdisplay,
 			      DRM_FORMAT_XRGB8888,
-			      DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_MOD_LINEAR,
 			      &fb);
 	igt_assert(fb_id);
 
@@ -248,7 +248,7 @@ static void test_pipe_legacy_gamma(data_t *data,
 				      mode->hdisplay,
 				      mode->vdisplay,
 				      DRM_FORMAT_XRGB8888,
-				      DRM_FORMAT_MOD_NONE,
+				      DRM_FORMAT_MOD_LINEAR,
 				      &fb_modeset);
 	igt_assert(fb_modeset_id);
 
@@ -463,7 +463,7 @@ static bool test_pipe_ctm(data_t *data,
 			      mode->hdisplay,
 			      mode->vdisplay,
 			      DRM_FORMAT_XRGB8888,
-			      DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_MOD_LINEAR,
 			      &fb);
 	igt_assert(fb_id);
 
@@ -471,7 +471,7 @@ static bool test_pipe_ctm(data_t *data,
 				      mode->hdisplay,
 				      mode->vdisplay,
 				      DRM_FORMAT_XRGB8888,
-				      DRM_FORMAT_MOD_NONE,
+				      DRM_FORMAT_MOD_LINEAR,
 				      &fb_modeset);
 	igt_assert(fb_modeset_id);
 	igt_plane_set_fb(primary, &fb_modeset);
@@ -583,7 +583,7 @@ static void test_pipe_limited_range_ctm(data_t *data,
 				      mode->hdisplay,
 				      mode->vdisplay,
 				      DRM_FORMAT_XRGB8888,
-				      DRM_FORMAT_MOD_NONE,
+				      DRM_FORMAT_MOD_LINEAR,
 				      &fb);
 		igt_assert(fb_id);
 
@@ -591,7 +591,7 @@ static void test_pipe_limited_range_ctm(data_t *data,
 					      mode->hdisplay,
 					      mode->vdisplay,
 					      DRM_FORMAT_XRGB8888,
-					      DRM_FORMAT_MOD_NONE,
+					      DRM_FORMAT_MOD_LINEAR,
 					      &fb_modeset);
 		igt_assert(fb_modeset_id);
 		igt_plane_set_fb(primary, &fb_modeset);

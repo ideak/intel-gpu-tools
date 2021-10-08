@@ -57,7 +57,7 @@ static void run_test(data_t *data, int valid_outputs)
 	}
 
 	igt_create_pattern_fb(data->drm_fd, width, height, DRM_FORMAT_XRGB8888,
-			      DRM_FORMAT_MOD_NONE, &data->fb);
+			      DRM_FORMAT_MOD_LINEAR, &data->fb);
 
 	/* Collect reference CRC by Committing individually on all outputs*/
 	for_each_connected_output(display, output) {

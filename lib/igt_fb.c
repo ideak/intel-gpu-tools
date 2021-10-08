@@ -427,7 +427,7 @@ void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 	}
 
 	switch (modifier) {
-	case DRM_FORMAT_MOD_NONE:
+	case DRM_FORMAT_MOD_LINEAR :
 		if (is_i915_device(fd))
 			*width_ret = 64;
 		else
@@ -720,7 +720,7 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 	uint32_t min_stride = fb->plane_width[plane] *
 		(fb->plane_bpp[plane] / 8);
 
-	if (fb->modifier != DRM_FORMAT_MOD_NONE &&
+	if (fb->modifier != DRM_FORMAT_MOD_LINEAR &&
 	    is_i915_device(fb->fd) &&
 	    intel_display_ver(intel_get_drm_devid(fb->fd)) <= 3) {
 		uint32_t stride;
@@ -743,7 +743,7 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 		 * so the easiest way is to align the luma stride to 256.
 		 */
 		return ALIGN(min_stride, 256);
-	} else if (fb->modifier != DRM_FORMAT_MOD_NONE && is_amdgpu_device(fb->fd)) {
+	} else if (fb->modifier != DRM_FORMAT_MOD_LINEAR && is_amdgpu_device(fb->fd)) {
 		/*
 		 * For amdgpu device with tiling mode
 		 */
@@ -809,7 +809,7 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 
 static uint64_t calc_plane_size(struct igt_fb *fb, int plane)
 {
-	if (fb->modifier != DRM_FORMAT_MOD_NONE &&
+	if (fb->modifier != DRM_FORMAT_MOD_LINEAR &&
 	    is_i915_device(fb->fd) &&
 	    intel_display_ver(intel_get_drm_devid(fb->fd)) <= 3) {
 		uint64_t size = (uint64_t) fb->strides[plane] *
@@ -825,7 +825,7 @@ static uint64_t calc_plane_size(struct igt_fb *fb, int plane)
 		 */
 
 		return roundup_power_of_two(max(size, min_size));
-	} else if (fb->modifier != DRM_FORMAT_MOD_NONE && is_amdgpu_device(fb->fd)) {
+	} else if (fb->modifier != DRM_FORMAT_MOD_LINEAR && is_amdgpu_device(fb->fd)) {
 		/*
 		 * For amdgpu device with tiling mode
 		 */
@@ -923,7 +923,7 @@ void igt_calc_fb_size(int fd, int width, int height, uint32_t drm_format, uint64
 uint64_t igt_fb_mod_to_tiling(uint64_t modifier)
 {
 	switch (modifier) {
-	case DRM_FORMAT_MOD_NONE:
+	case DRM_FORMAT_MOD_LINEAR :
 		return I915_TILING_NONE;
 	case I915_FORMAT_MOD_X_TILED:
 		return I915_TILING_X;
@@ -955,7 +955,7 @@ uint64_t igt_fb_tiling_to_mod(uint64_t tiling)
 {
 	switch (tiling) {
 	case I915_TILING_NONE:
-		return DRM_FORMAT_MOD_NONE;
+		return DRM_FORMAT_MOD_LINEAR;
 	case I915_TILING_X:
 		return I915_FORMAT_MOD_X_TILED;
 	case I915_TILING_Y:
@@ -2559,7 +2559,7 @@ static void setup_linear_mapping(struct fb_blit_upload *blit)
 	 */
 
 	igt_init_fb(&linear->fb, fb->fd, fb->width, fb->height,
-		    fb->drm_format, DRM_FORMAT_MOD_NONE,
+		    fb->drm_format, DRM_FORMAT_MOD_LINEAR,
 		    fb->color_encoding, fb->color_range);
 
 	create_bo_for_fb(&linear->fb, true);
@@ -2736,7 +2736,7 @@ static void *igt_fb_create_cairo_shadow_buffer(int fd,
 	igt_assert(shadow);
 
 	igt_init_fb(shadow, fd, width, height,
-		    drm_format, DRM_FORMAT_MOD_NONE,
+		    drm_format, DRM_FORMAT_MOD_LINEAR,
 		    IGT_COLOR_YCBCR_BT709, IGT_COLOR_YCBCR_LIMITED_RANGE);
 
 	shadow->strides[0] = ALIGN(width * (shadow->plane_bpp[0] / 8), 16);

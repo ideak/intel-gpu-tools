@@ -52,7 +52,7 @@ igt_main
 	igt_subtest("set-bad-handle") {
 		struct drm_vc4_set_tiling set = {
 			.handle = 0xd0d0d0d0,
-			.modifier = DRM_FORMAT_MOD_NONE,
+			.modifier = DRM_FORMAT_MOD_LINEAR,
 		};
 		do_ioctl_err(fd, DRM_IOCTL_VC4_SET_TILING, &set, ENOENT);
 	}
@@ -72,7 +72,7 @@ igt_main
 		struct drm_vc4_set_tiling set = {
 			.handle = bo,
 			.flags = 0xd0d0d0d0,
-			.modifier = DRM_FORMAT_MOD_NONE,
+			.modifier = DRM_FORMAT_MOD_LINEAR,
 		};
 		do_ioctl_err(fd, DRM_IOCTL_VC4_SET_TILING, &set, EINVAL);
 		gem_close(fd, bo);
@@ -102,7 +102,7 @@ igt_main
 		int bo = igt_vc4_create_bo(fd, 4096);
 
 		/* Default is untiled. */
-		igt_assert(igt_vc4_get_tiling(fd, bo) == DRM_FORMAT_MOD_NONE);
+		igt_assert(igt_vc4_get_tiling(fd, bo) == DRM_FORMAT_MOD_LINEAR);
 
 		/* Set to tiled and check. */
 		igt_vc4_set_tiling(fd, bo, DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED);
@@ -110,8 +110,8 @@ igt_main
 			   DRM_FORMAT_MOD_BROADCOM_VC4_T_TILED);
 
 		/* Set it back and check. */
-		igt_vc4_set_tiling(fd, bo, DRM_FORMAT_MOD_NONE);
-		igt_assert(igt_vc4_get_tiling(fd, bo) == DRM_FORMAT_MOD_NONE);
+		igt_vc4_set_tiling(fd, bo, DRM_FORMAT_MOD_LINEAR);
+		igt_assert(igt_vc4_get_tiling(fd, bo) == DRM_FORMAT_MOD_LINEAR);
 
 		gem_close(fd, bo);
 	}
@@ -128,7 +128,7 @@ igt_main
 		gem_close(fd, bo);
 
 		bo = igt_vc4_create_bo(fd, size);
-		igt_assert(igt_vc4_get_tiling(fd, bo) == DRM_FORMAT_MOD_NONE);
+		igt_assert(igt_vc4_get_tiling(fd, bo) == DRM_FORMAT_MOD_LINEAR);
 		gem_close(fd, bo);
 	}
 
