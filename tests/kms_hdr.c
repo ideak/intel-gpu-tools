@@ -213,15 +213,26 @@ static void test_bpc_switch_on_output(data_t *data, igt_output_t *output,
 
 		draw_hdr_pattern(&afb);
 
-		/* Start in 8bpc. */
+		/* Plane may be required to fit fullscreen. Check it here and allow
+		 * smaller plane size in following tests.
+		 */
 		igt_plane_set_fb(data->primary, &afb);
 		igt_plane_set_size(data->primary, data->w, data->h);
-		igt_output_set_prop_value(data->output, IGT_CONNECTOR_MAX_BPC, 8);
 		ret = igt_display_try_commit_atomic(display, DRM_MODE_ATOMIC_TEST_ONLY, NULL);
 		if (!ret) {
 			data->w = afb.width;
 			data->h = afb.height;
 		}
+
+		/* Start in 8bpc. */
+		igt_output_set_prop_value(data->output, IGT_CONNECTOR_MAX_BPC, 8);
+		igt_display_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
+		/*
+		 * i915 driver doesn't expose max bpc as debugfs entry,
+		 * so limiting assert only for amd driver.
+		 */
+		if (is_amdgpu_device(data->fd))
+			assert_output_bpc(data, 8);
 
 		/*
 		 * amdgpu requires a primary plane when the CRTC is enabled.
@@ -231,13 +242,6 @@ static void test_bpc_switch_on_output(data_t *data, igt_output_t *output,
 		 */
 		if (!is_amdgpu_device(data->fd))
 			igt_plane_set_fb(data->primary, NULL);
-
-		/*
-		 * i915 driver doesn't expose max bpc as debugfs entry,
-		 * so limiting assert only for amd driver.
-		 */
-		if (is_amdgpu_device(data->fd))
-			assert_output_bpc(data, 8);
 
 		/* Switch to 10bpc. */
 		igt_output_set_prop_value(data->output, IGT_CONNECTOR_MAX_BPC, 10);
