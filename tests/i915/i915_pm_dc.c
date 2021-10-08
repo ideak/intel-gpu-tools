@@ -214,14 +214,20 @@ static bool dc_state_wait_entry(int debugfs_fd, int dc_flag, int prev_dc_count)
 			prev_dc_count, 3000, 100);
 }
 
+static const char *dc_state_name(int dc_flag)
+{
+	if (dc_flag & CHECK_DC3CO)
+		return "DC3CO";
+	else if (dc_flag & CHECK_DC5)
+		return "DC5";
+	else
+		return "DC6";
+}
+
 static void check_dc_counter(data_t *data, int dc_flag, uint32_t prev_dc_count)
 {
-	char tmp[64];
-
-	snprintf(tmp, sizeof(tmp), "%s", dc_flag & CHECK_DC3CO ? "DC3CO" :
-		(dc_flag & CHECK_DC5 ? "DC5" : "DC6"));
 	igt_assert_f(dc_state_wait_entry(data->debugfs_fd, dc_flag, prev_dc_count),
-		     "%s state is not achieved\n%s:\n%s\n", tmp, PWR_DOMAIN_INFO,
+		     "%s state is not achieved\n%s:\n%s\n", dc_state_name(dc_flag), PWR_DOMAIN_INFO,
 		     data->debugfs_dump = igt_sysfs_get(data->debugfs_fd, PWR_DOMAIN_INFO));
 }
 
