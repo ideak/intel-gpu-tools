@@ -198,6 +198,7 @@ igt_main
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
 		gem_require_blitter(fd);
+		igt_require(gem_allows_obj_alignment(fd));
 		igt_fork_hang_detector(fd);
 	}
 
