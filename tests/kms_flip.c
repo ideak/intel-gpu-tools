@@ -1275,7 +1275,7 @@ static void __run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
 	bool retried = false;
 	bool state_ok;
 	unsigned elapsed;
-	uint64_t tiling;
+	uint64_t modifier;
 	int i;
 
 	last_connector = o->kconnector[0];
@@ -1283,9 +1283,9 @@ static void __run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
 	if (o->flags & TEST_PAN)
 		o->fb_width *= 2;
 
-	tiling = DRM_FORMAT_MOD_LINEAR;
+	modifier = DRM_FORMAT_MOD_LINEAR;
 	if (o->flags & TEST_FENCE_STRESS)
-		tiling = I915_FORMAT_MOD_X_TILED;
+		modifier = I915_FORMAT_MOD_X_TILED;
 
 	/* 256 MB is usually the maximum mappable aperture,
 	 * (make it 4x times that to ensure failure) */
@@ -1297,10 +1297,10 @@ static void __run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
 
 	o->fb_ids[0] = igt_create_fb(drm_fd, o->fb_width, o->fb_height,
 					 igt_bpp_depth_to_drm_format(o->bpp, o->depth),
-					 tiling, &o->fb_info[0]);
+					 modifier, &o->fb_info[0]);
 	o->fb_ids[1] = igt_create_fb_with_bo_size(drm_fd, o->fb_width, o->fb_height,
 						  igt_bpp_depth_to_drm_format(o->bpp, o->depth),
-						  tiling, IGT_COLOR_YCBCR_BT709,
+						  modifier, IGT_COLOR_YCBCR_BT709,
 						  IGT_COLOR_YCBCR_LIMITED_RANGE,
 						  &o->fb_info[1], bo_size, 0);
 

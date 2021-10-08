@@ -63,7 +63,7 @@ static bool check_writeback_config(igt_display_t *display, igt_output_t *output)
 	igt_fb_t input_fb, output_fb;
 	igt_plane_t *plane;
 	uint32_t writeback_format = DRM_FORMAT_XRGB8888;
-	uint64_t tiling = DRM_FORMAT_MOD_LINEAR;
+	uint64_t modifier = DRM_FORMAT_MOD_LINEAR;
 	int width, height, ret;
 	drmModeModeInfo override_mode = {
 		.clock = 25175,
@@ -86,10 +86,12 @@ static bool check_writeback_config(igt_display_t *display, igt_output_t *output)
 	width = override_mode.hdisplay;
 	height = override_mode.vdisplay;
 
-	ret = igt_create_fb(display->drm_fd, width, height, DRM_FORMAT_XRGB8888, tiling, &input_fb);
+	ret = igt_create_fb(display->drm_fd, width, height,
+			    DRM_FORMAT_XRGB8888, modifier, &input_fb);
 	igt_assert(ret >= 0);
 
-	ret = igt_create_fb(display->drm_fd, width, height, writeback_format, tiling, &output_fb);
+	ret = igt_create_fb(display->drm_fd, width, height,
+			    writeback_format, modifier, &output_fb);
 	igt_assert(ret >= 0);
 
 	plane = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);

@@ -155,7 +155,7 @@ uint8_t bitdepth;
 
 drmModeRes *resources;
 int drm_fd, modes, gen;
-uint64_t tiling = DRM_FORMAT_MOD_LINEAR;
+uint64_t modifier = DRM_FORMAT_MOD_LINEAR;
 uint32_t depth = 24, stride, bpp;
 int specified_mode_num = -1, specified_disp_id = -1;
 int width, height;
@@ -487,7 +487,7 @@ set_default_mode(struct connector *c, bool set_mode)
 
 	fb_id = igt_create_pattern_fb(drm_fd, width, height,
 				      DRM_FORMAT_XRGB8888,
-				      tiling, &fb_info);
+				      modifier, &fb_info);
 
 	kmstest_dump_mode(&c->mode);
 	drmModeSetCrtc(drm_fd, c->crtc, -1, 0, 0, NULL, 0, NULL);

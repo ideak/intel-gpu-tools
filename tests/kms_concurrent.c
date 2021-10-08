@@ -95,7 +95,7 @@ static void
 create_fb_for_mode_position(data_t *data, drmModeModeInfo *mode,
 			    int *rect_x, int *rect_y,
 			    int *rect_w, int *rect_h,
-			    uint64_t tiling, int max_planes,
+			    uint64_t modifier, int max_planes,
 			    igt_output_t *output)
 {
 	unsigned int fb_id;
@@ -106,7 +106,7 @@ create_fb_for_mode_position(data_t *data, drmModeModeInfo *mode,
 
 	fb_id = igt_create_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
 			      DRM_FORMAT_XRGB8888,
-			      tiling,
+			      modifier,
 			      &data->fb[primary->index]);
 	igt_assert(fb_id);
 

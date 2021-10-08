@@ -66,7 +66,7 @@ static void pipe_crc_free(void)
 }
 
 static void
-test_flip_tiling(data_t *data, enum pipe pipe, igt_output_t *output, uint64_t tiling[2])
+test_flip_tiling(data_t *data, enum pipe pipe, igt_output_t *output, uint64_t modifier[2])
 {
 	drmModeModeInfo *mode;
 	igt_plane_t *primary;
@@ -80,19 +80,19 @@ test_flip_tiling(data_t *data, enum pipe pipe, igt_output_t *output, uint64_t ti
 	mode = igt_output_get_mode(output);
 
 	/* Interlaced modes don't support Y/Yf tiling */
-	if (tiling[0] == I915_FORMAT_MOD_Y_TILED ||
-	    tiling[0] == I915_FORMAT_MOD_Yf_TILED ||
-	    tiling[1] == I915_FORMAT_MOD_Y_TILED ||
-	    tiling[1] == I915_FORMAT_MOD_Yf_TILED)
+	if (modifier[0] == I915_FORMAT_MOD_Y_TILED ||
+	    modifier[0] == I915_FORMAT_MOD_Yf_TILED ||
+	    modifier[1] == I915_FORMAT_MOD_Y_TILED ||
+	    modifier[1] == I915_FORMAT_MOD_Yf_TILED)
 		igt_require(!(mode->flags & DRM_MODE_FLAG_INTERLACE));
 
 	primary = igt_output_get_plane(output, 0);
 
 	width = mode->hdisplay;
 
-	if (tiling[0] != tiling[1] &&
-	    (tiling[0] != DRM_FORMAT_MOD_LINEAR ||
-	     tiling[1] != DRM_FORMAT_MOD_LINEAR)) {
+	if (modifier[0] != modifier[1] &&
+	    (modifier[0] != DRM_FORMAT_MOD_LINEAR ||
+	     modifier[1] != DRM_FORMAT_MOD_LINEAR)) {
 		/*
 		 * Since a page flip to a buffer with different stride
 		 * doesn't work, choose width so that the stride of both
@@ -104,13 +104,13 @@ test_flip_tiling(data_t *data, enum pipe pipe, igt_output_t *output, uint64_t ti
 	}
 
 	fb_id = igt_create_pattern_fb(data->drm_fd, width, mode->vdisplay,
-				      data->testformat, tiling[0],
+				      data->testformat, modifier[0],
 				      &data->fb[0]);
 	igt_assert(fb_id);
 
 	/* Second fb has different background so CRC does not match. */
 	fb_id = igt_create_color_pattern_fb(data->drm_fd, width, mode->vdisplay,
-				      data->testformat, tiling[1],
+				      data->testformat, modifier[1],
 				      0.5, 0.5, 0.5, &data->fb[1]);
 	igt_assert(fb_id);
 
@@ -181,56 +181,56 @@ igt_main
 
 	igt_describe("Check pageflip from tiled buffer to linear one works correctly with x tiling");
 	igt_subtest_with_dynamic("flip-changes-tiling") {
-		uint64_t tiling[2] = { I915_FORMAT_MOD_X_TILED,
-				       DRM_FORMAT_MOD_LINEAR };
+		uint64_t modifier[2] = { I915_FORMAT_MOD_X_TILED,
+					 DRM_FORMAT_MOD_LINEAR };
 		enum pipe pipe;
 
-		for (int i = 0; i < ARRAY_SIZE(tiling); i++)
-			igt_require(igt_display_has_format_mod(&data.display, data.testformat, tiling[i]));
+		for (int i = 0; i < ARRAY_SIZE(modifier); i++)
+			igt_require(igt_display_has_format_mod(&data.display, data.testformat, modifier[i]));
 
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
-				test_flip_tiling(&data, pipe, output, tiling);
+				test_flip_tiling(&data, pipe, output, modifier);
 			test_cleanup(&data, pipe, output);
 		}
 	}
 
 	igt_describe("Check pageflip from tiled buffer to linear one works correctly with y tiling");
 	igt_subtest_with_dynamic("flip-changes-tiling-Y") {
-		uint64_t tiling[2] = { I915_FORMAT_MOD_Y_TILED,
-				       DRM_FORMAT_MOD_LINEAR };
+		uint64_t modifier[2] = { I915_FORMAT_MOD_Y_TILED,
+					 DRM_FORMAT_MOD_LINEAR };
 		enum pipe pipe;
 
 		igt_require_fb_modifiers(data.drm_fd);
 
-		for (int i = 0; i < ARRAY_SIZE(tiling); i++)
-			igt_require(igt_display_has_format_mod(&data.display, data.testformat, tiling[i]));
+		for (int i = 0; i < ARRAY_SIZE(modifier); i++)
+			igt_require(igt_display_has_format_mod(&data.display, data.testformat, modifier[i]));
 
 		igt_require(data.gen >= 9);
 
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
-				test_flip_tiling(&data, pipe, output, tiling);
+				test_flip_tiling(&data, pipe, output, modifier);
 			test_cleanup(&data, pipe, output);
 		}
 	}
 
 	igt_describe("Check pageflip from tiled buffer to linear one works correctly with yf tiling");
 	igt_subtest_with_dynamic("flip-changes-tiling-Yf") {
-		uint64_t tiling[2] = { I915_FORMAT_MOD_Yf_TILED,
-				       DRM_FORMAT_MOD_LINEAR };
+		uint64_t modifier[2] = { I915_FORMAT_MOD_Yf_TILED,
+					 DRM_FORMAT_MOD_LINEAR };
 		enum pipe pipe;
 
 		igt_require_fb_modifiers(data.drm_fd);
 
-		for (int i = 0; i < ARRAY_SIZE(tiling); i++)
-			igt_require(igt_display_has_format_mod(&data.display, data.testformat, tiling[i]));
+		for (int i = 0; i < ARRAY_SIZE(modifier); i++)
+			igt_require(igt_display_has_format_mod(&data.display, data.testformat, modifier[i]));
 
 		igt_require(data.gen >= 9);
 
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
-				test_flip_tiling(&data, pipe, output, tiling);
+				test_flip_tiling(&data, pipe, output, modifier);
 			test_cleanup(&data, pipe, output);
 		}
 	}
@@ -245,56 +245,56 @@ igt_main
 
 	igt_describe("Check pageflip from tiled buffer to another tiled one works correctly with x tiling");
 	igt_subtest_with_dynamic("flip-X-tiled") {
-		uint64_t tiling[2] = { I915_FORMAT_MOD_X_TILED,
-				       I915_FORMAT_MOD_X_TILED };
+		uint64_t modifier[2] = { I915_FORMAT_MOD_X_TILED,
+					 I915_FORMAT_MOD_X_TILED };
 		enum pipe pipe;
 
-		for (int i = 0; i < ARRAY_SIZE(tiling); i++)
-			igt_require(igt_display_has_format_mod(&data.display, data.testformat, tiling[i]));
+		for (int i = 0; i < ARRAY_SIZE(modifier); i++)
+			igt_require(igt_display_has_format_mod(&data.display, data.testformat, modifier[i]));
 
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
-				test_flip_tiling(&data, pipe, output, tiling);
+				test_flip_tiling(&data, pipe, output, modifier);
 			test_cleanup(&data, pipe, output);
 		}
 	}
 
 	igt_describe("Check pageflip from tiled buffer to another tiled one works correctly with y tiling");
 	igt_subtest_with_dynamic("flip-Y-tiled") {
-		uint64_t tiling[2] = { I915_FORMAT_MOD_Y_TILED,
-				       I915_FORMAT_MOD_Y_TILED };
+		uint64_t modifier[2] = { I915_FORMAT_MOD_Y_TILED,
+					 I915_FORMAT_MOD_Y_TILED };
 		enum pipe pipe;
 
 		igt_require_fb_modifiers(data.drm_fd);
 
-		for (int i = 0; i < ARRAY_SIZE(tiling); i++)
-			igt_require(igt_display_has_format_mod(&data.display, data.testformat, tiling[i]));
+		for (int i = 0; i < ARRAY_SIZE(modifier); i++)
+			igt_require(igt_display_has_format_mod(&data.display, data.testformat, modifier[i]));
 
 		igt_require(data.gen >= 9);
 
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
-				test_flip_tiling(&data, pipe, output, tiling);
+				test_flip_tiling(&data, pipe, output, modifier);
 			test_cleanup(&data, pipe, output);
 		}
 	}
 
 	igt_describe("Check pageflip from tiled buffer to another tiled one works correctly with yf tiling");
 	igt_subtest_with_dynamic("flip-Yf-tiled") {
-		uint64_t tiling[2] = { I915_FORMAT_MOD_Yf_TILED,
-				       I915_FORMAT_MOD_Yf_TILED };
+		uint64_t modifier[2] = { I915_FORMAT_MOD_Yf_TILED,
+					 I915_FORMAT_MOD_Yf_TILED };
 		enum pipe pipe;
 
 		igt_require_fb_modifiers(data.drm_fd);
 
-		for (int i = 0; i < ARRAY_SIZE(tiling); i++)
-			igt_require(igt_display_has_format_mod(&data.display, data.testformat, tiling[i]));
+		for (int i = 0; i < ARRAY_SIZE(modifier); i++)
+			igt_require(igt_display_has_format_mod(&data.display, data.testformat, modifier[i]));
 
 		igt_require(data.gen >= 9);
 
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
-				test_flip_tiling(&data, pipe, output, tiling);
+				test_flip_tiling(&data, pipe, output, modifier);
 			test_cleanup(&data, pipe, output);
 		}
 	}
@@ -309,56 +309,56 @@ igt_main
 
 	igt_describe("Check pageflip from linear buffer to tiled one works correctly with x tiling");
 	igt_subtest_with_dynamic("flip-to-X-tiled") {
-		uint64_t tiling[2] = { DRM_FORMAT_MOD_LINEAR,
-				       I915_FORMAT_MOD_X_TILED };
+		uint64_t modifier[2] = { DRM_FORMAT_MOD_LINEAR,
+					 I915_FORMAT_MOD_X_TILED };
 		enum pipe pipe;
 
-		for (int i = 0; i < ARRAY_SIZE(tiling); i++)
-			igt_require(igt_display_has_format_mod(&data.display, data.testformat, tiling[i]));
+		for (int i = 0; i < ARRAY_SIZE(modifier); i++)
+			igt_require(igt_display_has_format_mod(&data.display, data.testformat, modifier[i]));
 
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
-				test_flip_tiling(&data, pipe, output, tiling);
+				test_flip_tiling(&data, pipe, output, modifier);
 			test_cleanup(&data, pipe, output);
 		}
 	}
 
 	igt_describe("Check pageflip from linear buffer to tiled one works correctly with y tiling");
 	igt_subtest_with_dynamic("flip-to-Y-tiled") {
-		uint64_t tiling[2] = { DRM_FORMAT_MOD_LINEAR,
-				       I915_FORMAT_MOD_Y_TILED };
+		uint64_t modifier[2] = { DRM_FORMAT_MOD_LINEAR,
+					 I915_FORMAT_MOD_Y_TILED };
 		enum pipe pipe;
 
 		igt_require_fb_modifiers(data.drm_fd);
 
-		for (int i = 0; i < ARRAY_SIZE(tiling); i++)
-			igt_require(igt_display_has_format_mod(&data.display, data.testformat, tiling[i]));
+		for (int i = 0; i < ARRAY_SIZE(modifier); i++)
+			igt_require(igt_display_has_format_mod(&data.display, data.testformat, modifier[i]));
 
 		igt_require(data.gen >= 9);
 
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
-				test_flip_tiling(&data, pipe, output, tiling);
+				test_flip_tiling(&data, pipe, output, modifier);
 			test_cleanup(&data, pipe, output);
 		}
 	}
 
 	igt_describe("Check pageflip from linear buffer to tiled one works correctly with yf tiling");
 	igt_subtest_with_dynamic("flip-to-Yf-tiled") {
-		uint64_t tiling[2] = { DRM_FORMAT_MOD_LINEAR,
-				       I915_FORMAT_MOD_Yf_TILED };
+		uint64_t modifier[2] = { DRM_FORMAT_MOD_LINEAR,
+					 I915_FORMAT_MOD_Yf_TILED };
 		enum pipe pipe;
 
 		igt_require_fb_modifiers(data.drm_fd);
 
-		for (int i = 0; i < ARRAY_SIZE(tiling); i++)
-			igt_require(igt_display_has_format_mod(&data.display, data.testformat, tiling[i]));
+		for (int i = 0; i < ARRAY_SIZE(modifier); i++)
+			igt_require(igt_display_has_format_mod(&data.display, data.testformat, modifier[i]));
 
 		igt_require(data.gen >= 9);
 
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe))
-				test_flip_tiling(&data, pipe, output, tiling);
+				test_flip_tiling(&data, pipe, output, modifier);
 			test_cleanup(&data, pipe, output);
 		}
 	}

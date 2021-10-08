@@ -48,8 +48,8 @@ static const uint32_t formats[N_FORMATS] = {
 	DRM_FORMAT_XRGB2101010,
 };
 
-#define N_TILING_METHODS 3
-static const uint64_t tilings[N_TILING_METHODS] = {
+#define N_MODIFIER_METHODS 3
+static const uint64_t modifiers[N_MODIFIER_METHODS] = {
 	DRM_FORMAT_MOD_LINEAR,
 	I915_FORMAT_MOD_X_TILED,
 	I915_FORMAT_MOD_Y_TILED,
@@ -119,13 +119,13 @@ static uint32_t get_color(uint32_t drm_format, bool r, bool g, bool b)
 }
 
 static void get_method_crc(enum igt_draw_method method, uint32_t drm_format,
-			   uint64_t tiling, igt_crc_t *crc)
+			   uint64_t modifier, igt_crc_t *crc)
 {
 	struct igt_fb fb;
 	int rc;
 
 	igt_create_fb(drm_fd, ms.mode->hdisplay, ms.mode->vdisplay,
-		      drm_format, tiling, &fb);
+		      drm_format, modifier, &fb);
 	igt_draw_rect_fb(drm_fd, bops, 0, &fb, method,
 			 0, 0, fb.width, fb.height,
 			 get_color(drm_format, 0, 0, 1));
@@ -174,7 +174,7 @@ static bool format_is_supported(uint32_t format, uint64_t modifier)
 }
 
 static void draw_method_subtest(enum igt_draw_method method,
-				uint32_t format_index, uint64_t tiling)
+				uint32_t format_index, uint64_t modifier)
 {
 	igt_crc_t crc;
 
@@ -182,7 +182,7 @@ static void draw_method_subtest(enum igt_draw_method method,
 	igt_skip_on(method == IGT_DRAW_MMAP_GTT &&
 		    !gem_has_mappable_ggtt(drm_fd));
 
-	igt_require(format_is_supported(formats[format_index], tiling));
+	igt_require(format_is_supported(formats[format_index], modifier));
 
 	/* Use IGT_DRAW_MMAP_GTT/WC on an untiled buffer as the parameter for
 	 * comparison. Cache the value so we don't recompute it for every single
@@ -196,17 +196,17 @@ static void draw_method_subtest(enum igt_draw_method method,
 		base_crcs[format_index].set = true;
 	}
 
-	get_method_crc(method, formats[format_index], tiling, &crc);
+	get_method_crc(method, formats[format_index], modifier, &crc);
 	igt_assert_crc_equal(&crc, &base_crcs[format_index].crc);
 }
 
-static void get_fill_crc(uint64_t tiling, igt_crc_t *crc)
+static void get_fill_crc(uint64_t modifier, igt_crc_t *crc)
 {
 	struct igt_fb fb;
 	int rc;
 
 	igt_create_fb(drm_fd, ms.mode->hdisplay, ms.mode->vdisplay,
-		      DRM_FORMAT_XRGB8888, tiling, &fb);
+		      DRM_FORMAT_XRGB8888, modifier, &fb);
 
 	igt_draw_fill_fb(drm_fd, &fb, 0xFF);
 
@@ -306,9 +306,9 @@ static const char *format_str(int format_index)
 	}
 }
 
-static const char *tiling_str(int tiling_index)
+static const char *modifier_str(int modifier_index)
 {
-	switch (tilings[tiling_index]) {
+	switch (modifiers[modifier_index]) {
 	case DRM_FORMAT_MOD_LINEAR :
 		return "untiled";
 	case I915_FORMAT_MOD_X_TILED:
@@ -323,22 +323,22 @@ static const char *tiling_str(int tiling_index)
 igt_main
 {
 	enum igt_draw_method method;
-	int format_idx, tiling_idx;
+	int format_idx, modifier_idx;
 
 	igt_fixture
 		setup_environment();
 
 	for (format_idx = 0; format_idx < N_FORMATS; format_idx++) {
 	for (method = 0; method < IGT_DRAW_METHOD_COUNT; method++) {
-	for (tiling_idx = 0; tiling_idx < N_TILING_METHODS; tiling_idx++) {
+	for (modifier_idx = 0; modifier_idx < N_MODIFIER_METHODS; modifier_idx++) {
 		igt_describe("This subtest verfies igt_draw library works "
-			     "with different tilings, DRM_FORMATS, DRAW_METHODS.");
+			     "with different modifiers, DRM_FORMATS, DRAW_METHODS.");
 		igt_subtest_f("draw-method-%s-%s-%s",
 			      format_str(format_idx),
 			      igt_draw_get_method_name(method),
-			      tiling_str(tiling_idx))
+			      modifier_str(modifier_idx))
 			draw_method_subtest(method, format_idx,
-					    tilings[tiling_idx]);
+					    modifiers[modifier_idx]);
 	} } }
 
 	igt_describe("This subtest verifies CRC after filling fb with x-tiling "

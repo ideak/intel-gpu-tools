@@ -1714,7 +1714,7 @@ static void test_one_plane(bool dpms, uint32_t plane_id,
 	uint32_t crtc_id;
 	struct igt_fb plane_fb1, plane_fb2;
 	int32_t crtc_x = 0, crtc_y = 0;
-	uint64_t tiling;
+	uint64_t modifier;
 
 	disable_all_screens_and_wait(&ms_data);
 
@@ -1725,28 +1725,28 @@ static void test_one_plane(bool dpms, uint32_t plane_id,
 		plane_format = DRM_FORMAT_XRGB8888;
 		plane_w = 64;
 		plane_h = 64;
-		tiling = I915_FORMAT_MOD_X_TILED;
+		modifier = I915_FORMAT_MOD_X_TILED;
 		break;
 	case PLANE_PRIMARY:
 		plane_format = DRM_FORMAT_XRGB8888;
 		plane_w = default_mode_params->mode->hdisplay;
 		plane_h = default_mode_params->mode->vdisplay;
-		tiling = I915_FORMAT_MOD_X_TILED;
+		modifier = I915_FORMAT_MOD_X_TILED;
 		break;
 	case PLANE_CURSOR:
 		plane_format = DRM_FORMAT_ARGB8888;
 		plane_w = 64;
 		plane_h = 64;
-		tiling = DRM_FORMAT_MOD_LINEAR;
+		modifier = DRM_FORMAT_MOD_LINEAR;
 		break;
 	default:
 		igt_assert(0);
 		break;
 	}
 
-	igt_create_fb(drm_fd, plane_w, plane_h, plane_format, tiling,
+	igt_create_fb(drm_fd, plane_w, plane_h, plane_format, modifier,
 		      &plane_fb1);
-	igt_create_fb(drm_fd, plane_w, plane_h, plane_format, tiling,
+	igt_create_fb(drm_fd, plane_w, plane_h, plane_format, modifier,
 		      &plane_fb2);
 	fill_igt_fb(&plane_fb1, 0xFF00FFFF);
 	fill_igt_fb(&plane_fb2, 0xFF00FF00);

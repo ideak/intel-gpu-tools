@@ -81,7 +81,7 @@ drmModeRes *resources;
 int drm_fd, modes;
 int test_all_modes = 0, test_preferred_mode = 0, force_mode = 0, test_plane,
     test_stereo_modes, test_aspect_ratio;
-uint64_t tiling = DRM_FORMAT_MOD_LINEAR;
+uint64_t modifier = DRM_FORMAT_MOD_LINEAR;
 int sleep_between_modes = 0;
 int do_dpms = 0; /* This aliases to DPMS_ON */
 uint32_t depth = 24, stride, bpp;
@@ -370,7 +370,7 @@ set_mode(struct connector *c)
 
 		fb_id = igt_create_pattern_fb(drm_fd, width, height,
 					      igt_bpp_depth_to_drm_format(bpp, depth),
-					      tiling, &fb_info[current_fb]);
+					      modifier, &fb_info[current_fb]);
 		paint_output_info(c, &fb_info[current_fb]);
 		paint_color_key(&fb_info[current_fb]);
 
@@ -416,7 +416,7 @@ static void do_set_stereo_mode(struct connector *c)
 
 	fb_id = igt_create_stereo_fb(drm_fd, &c->mode,
 				     igt_bpp_depth_to_drm_format(bpp, depth),
-				     tiling);
+				     modifier);
 
 	igt_warn_on_f(drmModeSetCrtc(drm_fd, c->crtc, fb_id, 0, 0, &c->id, 1, &c->mode),
 		      "failed to set mode (%dx%d@%dHz): %s\n", width, height, c->mode.vrefresh, strerror(errno));
@@ -671,14 +671,14 @@ static int opt_handler(int opt, int opt_index, void *data)
 		test_preferred_mode = 1;
 		break;
 	case 't':
-		tiling = I915_FORMAT_MOD_X_TILED;
+		modifier = I915_FORMAT_MOD_X_TILED;
 		break;
 	case 'y':
 	case OPT_YB:
-		tiling = I915_FORMAT_MOD_Y_TILED;
+		modifier = I915_FORMAT_MOD_Y_TILED;
 		break;
 	case OPT_YF:
-		tiling = I915_FORMAT_MOD_Yf_TILED;
+		modifier = I915_FORMAT_MOD_Yf_TILED;
 		break;
 	case 'r':
 		qr_code = 1;

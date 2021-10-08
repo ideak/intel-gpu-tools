@@ -73,7 +73,7 @@ typedef struct {
 	int pos_x;
 	int pos_y;
 	uint32_t override_fmt;
-	uint64_t override_tiling;
+	uint64_t override_modifier;
 	int devid;
 
 	struct p_struct *multiplaneoldview;
@@ -225,7 +225,7 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 	drmModeModeInfo *mode;
 	igt_display_t *display = &data->display;
 	unsigned int w, h, ref_w, ref_h, min_w, min_h;
-	uint64_t tiling = data->override_tiling ?: DRM_FORMAT_MOD_LINEAR;
+	uint64_t modifier = data->override_modifier ?: DRM_FORMAT_MOD_LINEAR;
 	uint32_t pixel_format = data->override_fmt ?: DRM_FORMAT_XRGB8888;
 	const float flip_opacity = 0.75;
 
@@ -276,23 +276,23 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 	 * frame can fit in
 	 */
 	if (igt_rotation_90_or_270(data->rotation)) {
-		tiling = data->override_tiling ?: I915_FORMAT_MOD_Y_TILED;
+		modifier = data->override_modifier ?: I915_FORMAT_MOD_Y_TILED;
 
 		igt_swap(w, h);
 	}
 
 	/*
-	 * Just try here if requested tiling format is generally available,
+	 * Just try here if requested modifier format is generally available,
 	 * if one format fail it will skip entire subtest.
 	 */
-	igt_require(igt_display_has_format_mod(display, pixel_format, tiling));
+	igt_require(igt_display_has_format_mod(display, pixel_format, modifier));
 
 	if (!data->crc_rect[data->output_crc_in_use][rect].valid) {
 		/*
 		* Create a reference software rotated flip framebuffer.
 		*/
-		igt_create_fb(data->gfx_fd, ref_w, ref_h, pixel_format, tiling,
-			&data->fb_flip);
+		igt_create_fb(data->gfx_fd, ref_w, ref_h,
+			      pixel_format, modifier, &data->fb_flip);
 		paint_squares(data, data->rotation, &data->fb_flip,
 			flip_opacity);
 		igt_plane_set_fb(plane, &data->fb_flip);
@@ -315,7 +315,7 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 		* Create a reference CRC for a software-rotated fb.
 		*/
 		igt_create_fb(data->gfx_fd, ref_w, ref_h, pixel_format,
-			data->override_tiling ?: DRM_FORMAT_MOD_LINEAR, &data->fb_reference);
+			data->override_modifier ?: DRM_FORMAT_MOD_LINEAR, &data->fb_reference);
 		paint_squares(data, data->rotation, &data->fb_reference, 1.0);
 
 		igt_plane_set_fb(plane, &data->fb_reference);
@@ -338,7 +338,7 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 	/*
 	  * Prepare the non-rotated flip fb.
 	  */
-	igt_create_fb(data->gfx_fd, w, h, pixel_format, tiling,
+	igt_create_fb(data->gfx_fd, w, h, pixel_format, modifier,
 		      &data->fb_flip);
 	paint_squares(data, IGT_ROTATION_0, &data->fb_flip,
 		      flip_opacity);
@@ -346,7 +346,7 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 	/*
 	 * Prepare the plane with an non-rotated fb let the hw rotate it.
 	 */
-	igt_create_fb(data->gfx_fd, w, h, pixel_format, tiling, &data->fb);
+	igt_create_fb(data->gfx_fd, w, h, pixel_format, modifier, &data->fb);
 	paint_squares(data, IGT_ROTATION_0, &data->fb, 1.0);
 	igt_plane_set_fb(plane, &data->fb);
 
@@ -562,7 +562,7 @@ static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_form
 
 typedef struct {
 	int32_t x1, y1;
-	uint64_t width, height, tiling, format;
+	uint64_t width, height, modifier, format;
 	igt_plane_t *plane;
 	igt_rotation_t rotation_sw, rotation_hw;
 } planeinfos;
@@ -587,7 +587,7 @@ static bool setup_multiplane(data_t *data, planeinfos *planeinfo,
 
 		if (!igt_plane_has_format_mod(planeinfo[c].plane,
 					      planeinfo[c].format,
-					      planeinfo[c].tiling))
+					      planeinfo[c].modifier))
 			return false;
 
 		/*
@@ -596,7 +596,7 @@ static bool setup_multiplane(data_t *data, planeinfos *planeinfo,
 		 */
 		if (planes[c]->fb_id == 0) {
 			igt_create_fb(data->gfx_fd, w, h, planeinfo[c].format,
-				      planeinfo[c].tiling, planes[c]);
+				      planeinfo[c].modifier, planes[c]);
 
 			paint_squares(data, planeinfo[c].rotation_sw,
 				      planes[c], 1.0f);
@@ -670,7 +670,7 @@ static void test_multi_plane_rotation(data_t *data, enum pipe pipe)
 
 	/*
 	 * These are those modes which are tested. For testing feel interesting
-	 * case with tiling are 2 bpp, 4 bpp and NV12.
+	 * case with modifier are 2 bpp, 4 bpp and NV12.
 	 */
 	static const uint32_t formatlist[] = {DRM_FORMAT_RGB565,
 		DRM_FORMAT_XRGB8888, DRM_FORMAT_NV12};
@@ -679,7 +679,7 @@ static void test_multi_plane_rotation(data_t *data, enum pipe pipe)
 		igt_rotation_t rotation;
 		float_t width;
 		float_t height;
-		uint64_t tiling;
+		uint64_t modifier;
 		struct igt_fb fbs[ARRAY_SIZE(formatlist)][2];
 	} planeconfigs[] = {
 	{IGT_ROTATION_0, .2f, .4f, DRM_FORMAT_MOD_LINEAR },
@@ -716,7 +716,7 @@ static void test_multi_plane_rotation(data_t *data, enum pipe pipe)
 		for (i = 0; i < ARRAY_SIZE(planeconfigs); i++) {
 			p[0].width = (uint64_t)(planeconfigs[i].width * used_w);
 			p[0].height = (uint64_t)(planeconfigs[i].height * used_h);
-			p[0].tiling = planeconfigs[i].tiling;
+			p[0].modifier = planeconfigs[i].modifier;
 			pointlocation(data, (planeinfos *)&p, mode, 0);
 
 			for (k = 0; k < ARRAY_SIZE(formatlist); k++) {
@@ -725,7 +725,7 @@ static void test_multi_plane_rotation(data_t *data, enum pipe pipe)
 				for (j = 0; j < ARRAY_SIZE(planeconfigs); j++) {
 					p[1].width = (uint64_t)(planeconfigs[j].width * used_w);
 					p[1].height = (uint64_t)(planeconfigs[j].height * used_h);
-					p[1].tiling = planeconfigs[j].tiling;
+					p[1].modifier = planeconfigs[j].modifier;
 					pointlocation(data, (planeinfos *)&p,
 						      mode, 1);
 
@@ -889,7 +889,7 @@ static void test_plane_rotation_exhaust_fences(data_t *data,
 					       igt_plane_t *plane)
 {
 	igt_display_t *display = &data->display;
-	uint64_t tiling = I915_FORMAT_MOD_Y_TILED;
+	uint64_t modifier = I915_FORMAT_MOD_Y_TILED;
 	uint32_t format = DRM_FORMAT_XRGB8888;
 	int fd = data->gfx_fd;
 	drmModeModeInfo *mode;
@@ -909,7 +909,7 @@ static void test_plane_rotation_exhaust_fences(data_t *data,
 	w = mode->hdisplay;
 	h = mode->vdisplay;
 
-	igt_calc_fb_size(fd, w, h, format, tiling, &size, &stride);
+	igt_calc_fb_size(fd, w, h, format, modifier, &size, &stride);
 
 	/*
 	 * Make sure there is atleast 90% of the available GTT space left
@@ -920,7 +920,7 @@ static void test_plane_rotation_exhaust_fences(data_t *data,
 	igt_require(total_fbs_size < total_aperture_size * 0.9);
 
 	for (i = 0; i < MAX_FENCES + 1; i++) {
-		igt_create_fb(fd, w, h, format, tiling, &fb[i]);
+		igt_create_fb(fd, w, h, format, modifier, &fb[i]);
 
 		igt_plane_set_fb(plane, &fb[i]);
 		igt_plane_set_rotation(plane, IGT_ROTATION_0);
@@ -965,9 +965,9 @@ static const char *rot_test_str(igt_rotation_t rot)
 	}
 }
 
-static const char *tiling_test_str(uint64_t tiling)
+static const char *modifier_test_str(uint64_t modifier)
 {
-	switch (tiling) {
+	switch (modifier) {
 	case I915_FORMAT_MOD_X_TILED:
 		return "x-tiled";
 	case I915_FORMAT_MOD_Y_TILED:
@@ -1019,7 +1019,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 	};
 
 	struct reflect_x {
-		uint64_t tiling;
+		uint64_t modifier;
 		igt_rotation_t rot;
 	} *reflect_x, reflect_x_subtests[] = {
 		{ I915_FORMAT_MOD_X_TILED, IGT_ROTATION_0 },
@@ -1060,11 +1060,11 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 			if (is_amdgpu_device(data.gfx_fd)) {
 				data.override_fmt = DRM_FORMAT_XRGB8888;
 				if (igt_rotation_90_or_270(subtest->rot))
-					data.override_tiling = AMD_FMT_MOD |
+					data.override_modifier = AMD_FMT_MOD |
 						AMD_FMT_MOD_SET(TILE, AMD_FMT_MOD_TILE_GFX9_64K_S) |
 						AMD_FMT_MOD_SET(TILE_VERSION, AMD_FMT_MOD_TILE_VER_GFX9);
 				else
-					data.override_tiling = DRM_FORMAT_MOD_LINEAR;
+					data.override_modifier = DRM_FORMAT_MOD_LINEAR;
 			}
 			data.rotation = subtest->rot;
 			test_plane_rotation(&data, subtest->plane, false);
@@ -1096,18 +1096,18 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 	igt_describe("Checking unsupported tiling for gen9+ with 90 degree of rotation");
 	igt_subtest_f("bad-tiling") {
 		data.rotation = IGT_ROTATION_90;
-		data.override_tiling = I915_FORMAT_MOD_X_TILED;
+		data.override_modifier = I915_FORMAT_MOD_X_TILED;
 		test_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY, true);
 	}
-	data.override_tiling = 0;
+	data.override_modifier = 0;
 
 	igt_describe("Tiling and Rotation test for gen 10+ for primary plane");
-	for (reflect_x = reflect_x_subtests; reflect_x->tiling; reflect_x++) {
+	for (reflect_x = reflect_x_subtests; reflect_x->modifier; reflect_x++) {
 		igt_subtest_f("primary-%s-reflect-x-%s",
-			      tiling_test_str(reflect_x->tiling),
+			      modifier_test_str(reflect_x->modifier),
 			      rot_test_str(reflect_x->rot)) {
 			data.rotation = (IGT_REFLECT_X | reflect_x->rot);
-			data.override_tiling = reflect_x->tiling;
+			data.override_modifier = reflect_x->modifier;
 			test_plane_rotation(&data, DRM_PLANE_TYPE_PRIMARY, false);
 		}
 	}

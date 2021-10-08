@@ -81,7 +81,7 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 			igt_plane_t *plane, drmModeModeInfo *mode)
 {
 	igt_display_t *display = &data->display;
-	uint64_t tiling = is_i915_device(data->drm_fd) ?
+	uint64_t modifier = is_i915_device(data->drm_fd) ?
 		I915_FORMAT_MOD_X_TILED : DRM_FORMAT_MOD_LINEAR;
 
 	cleanup_crtc(data);
@@ -89,12 +89,12 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 	igt_output_set_pipe(output, pipe);
 
 	igt_skip_on(!igt_display_has_format_mod(display, DRM_FORMAT_XRGB8888,
-						tiling));
+						modifier));
 
 	/* allocate fb for plane 1 */
 	igt_create_pattern_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
 			      DRM_FORMAT_XRGB8888,
-			      tiling,
+			      modifier,
 			      &data->fb[0]);
 
 	igt_plane_set_fb(plane, &data->fb[0]);
@@ -120,7 +120,7 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 
 static void check_scaling_pipe_plane_rot(data_t *d, igt_plane_t *plane,
 					 uint32_t pixel_format,
-					 uint64_t tiling, enum pipe pipe,
+					 uint64_t modifier, enum pipe pipe,
 					 igt_output_t *output,
 					 igt_rotation_t rot)
 {
@@ -136,7 +136,7 @@ static void check_scaling_pipe_plane_rot(data_t *d, igt_plane_t *plane,
 	/* create buffer in the range of  min and max source side limit.*/
 	width = height = 20;
 	igt_create_color_fb(display->drm_fd, width, height,
-		       pixel_format, tiling, 0.0, 1.0, 0.0, &d->fb[0]);
+		       pixel_format, modifier, 0.0, 1.0, 0.0, &d->fb[0]);
 	igt_plane_set_fb(plane, &d->fb[0]);
 
 	/* Check min to full resolution upscaling */
@@ -158,7 +158,7 @@ static const igt_rotation_t rotations[] = {
 	IGT_ROTATION_270,
 };
 
-static bool can_rotate(data_t *d, unsigned format, uint64_t tiling,
+static bool can_rotate(data_t *d, unsigned format, uint64_t modifier,
 		       igt_rotation_t rot)
 {
 
@@ -247,7 +247,7 @@ static void test_scaler_with_rotation_pipe(data_t *d, enum pipe pipe,
 {
 	igt_display_t *display = &d->display;
 	igt_plane_t *plane;
-	uint64_t tiling = is_i915_device(d->drm_fd) ?
+	uint64_t modifier = is_i915_device(d->drm_fd) ?
 		I915_FORMAT_MOD_Y_TILED : DRM_FORMAT_MOD_LINEAR;
 
 	igt_require(get_num_scalers(d, pipe) > 0);
@@ -267,12 +267,12 @@ static void test_scaler_with_rotation_pipe(data_t *d, enum pipe pipe,
 				unsigned format = plane->drm_plane->formats[j];
 
 				if (test_format(d, &tested_formats, format) &&
-				    igt_plane_has_format_mod(plane, format, tiling) &&
+				    igt_plane_has_format_mod(plane, format, modifier) &&
 				    igt_plane_has_rotation(plane, rot) &&
-				    can_rotate(d, format, tiling, rot) &&
+				    can_rotate(d, format, modifier, rot) &&
 				    can_scale(d, format))
 					check_scaling_pipe_plane_rot(d, plane, format,
-								     tiling, pipe,
+								     modifier, pipe,
 								     output, rot);
 			}
 
@@ -281,7 +281,7 @@ static void test_scaler_with_rotation_pipe(data_t *d, enum pipe pipe,
 	}
 }
 
-static const uint64_t tilings[] = {
+static const uint64_t modifiers[] = {
 	DRM_FORMAT_MOD_LINEAR,
 	I915_FORMAT_MOD_X_TILED,
 	I915_FORMAT_MOD_Y_TILED,
@@ -301,8 +301,8 @@ static void test_scaler_with_pixel_format_pipe(data_t *d, enum pipe pipe, igt_ou
 		if (plane->type == DRM_PLANE_TYPE_CURSOR)
 			continue;
 
-		for (int i = 0; i < ARRAY_SIZE(tilings); i++) {
-			uint64_t tiling = tilings[i];
+		for (int i = 0; i < ARRAY_SIZE(modifiers); i++) {
+			uint64_t modifier = modifiers[i];
 			struct igt_vec tested_formats;
 
 			igt_vec_init(&tested_formats, sizeof(uint32_t));
@@ -311,10 +311,10 @@ static void test_scaler_with_pixel_format_pipe(data_t *d, enum pipe pipe, igt_ou
 				uint32_t format = plane->drm_plane->formats[j];
 
 				if (test_format(d, &tested_formats, format) &&
-				    igt_plane_has_format_mod(plane, format, tiling) &&
+				    igt_plane_has_format_mod(plane, format, modifier) &&
 				    can_scale(d, format))
 					check_scaling_pipe_plane_rot(d, plane,
-								     format, tiling,
+								     format, modifier,
 								     pipe, output, IGT_ROTATION_0);
 			}
 
@@ -365,13 +365,13 @@ test_plane_scaling_on_pipe(data_t *d, enum pipe pipe, igt_output_t *output)
 	igt_pipe_t *pipe_obj = &display->pipes[pipe];
 	drmModeModeInfo *mode;
 	int primary_plane_scaling = 0; /* For now */
-	uint64_t tiling = is_i915_device(display->drm_fd) ?
+	uint64_t modifier = is_i915_device(display->drm_fd) ?
 		I915_FORMAT_MOD_X_TILED : DRM_FORMAT_MOD_LINEAR;
 
 	igt_require(get_num_scalers(d, pipe) > 0);
 
 	igt_skip_on(!igt_display_has_format_mod(display, DRM_FORMAT_XRGB8888,
-						tiling));
+						modifier));
 
 	mode = igt_output_get_mode(output);
 
@@ -381,13 +381,13 @@ test_plane_scaling_on_pipe(data_t *d, enum pipe pipe, igt_output_t *output)
 
 	igt_create_color_pattern_fb(display->drm_fd, 600, 600,
 				    DRM_FORMAT_XRGB8888,
-				    tiling,
+				    modifier,
 				    .5, .5, .5, &d->fb[1]);
 
 	igt_create_pattern_fb(d->drm_fd,
 			      mode->hdisplay, mode->vdisplay,
 			      DRM_FORMAT_XRGB8888,
-			      tiling,
+			      modifier,
 			      &d->fb[2]);
 
 	if (primary_plane_scaling) {
@@ -613,7 +613,7 @@ static void test_scaler_with_multi_pipe_plane(data_t *d)
 	igt_output_t *output1, *output2;
 	drmModeModeInfo *mode1, *mode2;
 	enum pipe pipe1, pipe2;
-	uint64_t tiling = is_i915_device(display->drm_fd) ?
+	uint64_t modifier = is_i915_device(display->drm_fd) ?
 		I915_FORMAT_MOD_Y_TILED : DRM_FORMAT_MOD_LINEAR;
 
 	cleanup_crtc(d);
@@ -632,23 +632,23 @@ static void test_scaler_with_multi_pipe_plane(data_t *d)
 	d->plane4 = get_num_scalers(d, pipe2) >= 2 ? igt_output_get_plane(output2, 1) : NULL;
 
 	igt_skip_on(!igt_display_has_format_mod(display, DRM_FORMAT_XRGB8888,
-						tiling));
+						modifier));
 
 	igt_create_pattern_fb(d->drm_fd, 600, 600,
 			      DRM_FORMAT_XRGB8888,
-			      tiling, &d->fb[0]);
+			      modifier, &d->fb[0]);
 
 	igt_create_pattern_fb(d->drm_fd, 500, 500,
 			      DRM_FORMAT_XRGB8888,
-			      tiling, &d->fb[1]);
+			      modifier, &d->fb[1]);
 
 	igt_create_pattern_fb(d->drm_fd, 700, 700,
 			      DRM_FORMAT_XRGB8888,
-			      tiling, &d->fb[2]);
+			      modifier, &d->fb[2]);
 
 	igt_create_pattern_fb(d->drm_fd, 400, 400,
 			      DRM_FORMAT_XRGB8888,
-			      tiling, &d->fb[3]);
+			      modifier, &d->fb[3]);
 
 	igt_plane_set_fb(d->plane1, &d->fb[0]);
 	if (d->plane2)
