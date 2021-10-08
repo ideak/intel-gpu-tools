@@ -43,7 +43,9 @@
 #include "drm.h"
 #include "drmtest.h"
 #include "i915/gem_create.h"
+#include "i915/gem_submission.h"
 #include "igt_stats.h"
+#include "intel_allocator.h"
 #include "intel_io.h"
 #include "intel_reg.h"
 #include "ioctl_wrappers.h"
@@ -74,10 +76,27 @@ static int loop(uint64_t size, unsigned ring, int reps, int ncpus,
 	unsigned nengine;
 	double *shared;
 	int fd;
+	bool has_ppgtt;
 
 	shared = mmap(0, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 
 	fd = drm_open_driver(DRIVER_INTEL);
+
+	/*
+	 * For older gens .alignment = 1ull << 63 lead do bind/unbind,
+	 * what doesn't work for newer gens with ppgtt.
+	 * For ppgtt case we use reloc allocator which would just assigns
+	 * new offset for each batch. This way we enforce bind/unbind vma
+	 * for each execbuf.
+	 */
+	has_ppgtt = gem_uses_full_ppgtt(fd);
+	if (has_ppgtt) {
+		igt_info("Using softpin mode\n");
+		intel_allocator_multiprocess_start();
+	} else {
+		igt_assert(gem_allows_obj_alignment(fd));
+		igt_info("Using alignment mode\n");
+	}
 
 	memset(&obj, 0, sizeof(obj));
 	obj.handle = batch(fd, 4096);
@@ -92,6 +111,7 @@ static int loop(uint64_t size, unsigned ring, int reps, int ncpus,
 		if (__gem_execbuf(fd, &execbuf))
 			return 77;
 	}
+
 	/* let the small object leak; ideally blocking the low address */
 
 	nengine = 0;
@@ -106,7 +126,7 @@ static int loop(uint64_t size, unsigned ring, int reps, int ncpus,
 		engines[nengine++] = ring;
 
 	if (size > 1ul << 31)
-		obj.flags |= 1 << 3;
+		obj.flags |= EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 
 	while (reps--) {
 		memset(shared, 0, 4096);
@@ -114,9 +134,13 @@ static int loop(uint64_t size, unsigned ring, int reps, int ncpus,
 		igt_fork(child, ncpus) {
 			struct timespec start, end;
 			unsigned count = 0;
+			uint64_t ahnd = 0;
 
 			obj.handle = batch(fd, size);
 			obj.offset = -1;
+
+			if (has_ppgtt)
+				ahnd = intel_allocator_open(fd, 0, INTEL_ALLOCATOR_RELOC);
 
 			clock_gettime(CLOCK_MONOTONIC, &start);
 			do {
@@ -127,9 +151,14 @@ static int loop(uint64_t size, unsigned ring, int reps, int ncpus,
 					obj.alignment = 0;
 					gem_execbuf(fd, &execbuf);
 
-					/* fault out */
-					obj.alignment = 1ull << 63;
-					__gem_execbuf(fd, &execbuf);
+					if (ahnd) {
+						obj.offset = get_offset(ahnd, obj.handle, size, 0);
+						obj.flags |= EXEC_OBJECT_PINNED | EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+					} else {
+						/* fault out */
+						obj.alignment = 1ull << 63;
+						__gem_execbuf(fd, &execbuf);
+					}
 
 					clock_gettime(CLOCK_MONOTONIC, &end);
 					if (elapsed(&start, &end) >= timeout) {
@@ -144,6 +173,8 @@ static int loop(uint64_t size, unsigned ring, int reps, int ncpus,
 			shared[child] = 1e6*elapsed(&start, &end) / count / 2;
 
 			gem_close(fd, obj.handle);
+			if (ahnd)
+				intel_allocator_close(ahnd);
 		}
 		igt_waitchildren();
 
@@ -151,6 +182,10 @@ static int loop(uint64_t size, unsigned ring, int reps, int ncpus,
 			shared[ncpus] += shared[child];
 		printf("%7.3f\n", shared[ncpus] / ncpus);
 	}
+
+	if (has_ppgtt)
+		intel_allocator_multiprocess_stop();
+
 	return 0;
 }
 
