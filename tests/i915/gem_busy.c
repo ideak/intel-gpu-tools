@@ -479,7 +479,7 @@ igt_main
 		igt_subtest_group {
 			igt_fixture {
 				igt_require(has_extended_busy_ioctl(fd));
-				gem_require_mmap_wc(fd);
+				gem_require_mmap_device_coherent(fd);
 			}
 
 			test_each_engine_store("extended", fd, ctx, e) {
@@ -529,7 +529,7 @@ igt_main
 		igt_subtest_group {
 			igt_fixture {
 				igt_require(has_extended_busy_ioctl(fd));
-				gem_require_mmap_wc(fd);
+				gem_require_mmap_device_coherent(fd);
 			}
 
 			test_each_engine_store("hang-extended", fd, ctx, e) {

@@ -1071,7 +1071,7 @@ static void semaphore_resolve(int i915, const intel_ctx_cfg_t *cfg,
 	inner = intel_ctx_create(i915, cfg);
 
 	semaphore = gem_create(i915, 4096);
-	sema = gem_mmap__wc(i915, semaphore, 0, 4096, PROT_WRITE);
+	sema = gem_mmap__device_coherent(i915, semaphore, 0, 4096, PROT_WRITE);
 
 	for_each_ctx_cfg_engine(i915, cfg, e) {
 		struct drm_i915_gem_exec_object2 obj[3];
@@ -3094,7 +3094,7 @@ igt_main
 		gem_scheduler_print_capability(fd);
 
 		igt_require_gem(fd);
-		gem_require_mmap_wc(fd);
+		gem_require_mmap_device_coherent(fd);
 		gem_require_contexts(fd);
 		ctx = intel_ctx_create_all_physical(fd);
 

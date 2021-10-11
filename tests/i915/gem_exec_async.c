@@ -186,7 +186,7 @@ igt_main
 	igt_fixture {
 		fd = drm_open_driver_master(DRIVER_INTEL);
 		igt_require_gem(fd);
-		gem_require_mmap_wc(fd);
+		gem_require_mmap_device_coherent(fd);
 		igt_require(has_async_execbuf(fd));
 
 		ctx = intel_ctx_create_all_physical(fd);

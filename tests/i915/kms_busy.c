@@ -341,7 +341,7 @@ igt_main_args("e", NULL, help_str, opt_handler, NULL)
 		enum pipe pipe;
 
 		igt_require_gem(fd);
-		gem_require_mmap_wc(fd);
+		gem_require_mmap_device_coherent(fd);
 		igt_require(gem_has_ring(fd, I915_EXEC_DEFAULT));
 
 		kmstest_set_vt_graphics_mode();
