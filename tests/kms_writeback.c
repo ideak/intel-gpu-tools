@@ -386,7 +386,7 @@ igt_main
 	igt_describe("Check the writeback format");
 	igt_subtest("writeback-pixel-formats") {
 		drmModePropertyBlobRes *formats_blob = get_writeback_formats_blob(output);
-		const char *valid_chars = "0123456 ABCGNRUVXY";
+		const char *valid_chars = "01234568 ABCGNRUVXY";
 		unsigned int i;
 		char *c;
 
