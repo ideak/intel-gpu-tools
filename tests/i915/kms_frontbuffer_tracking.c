@@ -313,7 +313,7 @@ static drmModeModeInfo *get_connector_smallest_mode(igt_output_t *output)
 	int i;
 
 	if (c->connector_type == DRM_MODE_CONNECTOR_eDP)
-		return igt_std_1024_mode_get(60);
+		return igt_std_1024_mode_get(igt_output_preferred_vrefresh(output));
 
 	for (i = 0; i < c->count_modes; i++) {
 		const drmModeModeInfo *mode = &c->modes[i];
@@ -336,7 +336,7 @@ static drmModeModeInfo *connector_get_mode(igt_output_t *output)
 	  * bugged. */
 	if (IS_HASWELL(intel_get_drm_devid(drm.fd)) &&
 	    output->config.connector->connector_type == DRM_MODE_CONNECTOR_eDP)
-		return igt_std_1024_mode_get(60);
+		return igt_std_1024_mode_get(igt_output_preferred_vrefresh(output));
 
 	if (opt.small_modes)
 		return get_connector_smallest_mode(output);
