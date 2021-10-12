@@ -240,7 +240,7 @@ get_lowres_mode(data_t *data, const drmModeModeInfo *mode_default,
 			return igt_memdup(mode, sizeof(*mode));
 	}
 
-	return igt_std_1024_mode_get(60);
+	return igt_std_1024_mode_get(igt_output_preferred_vrefresh(output));
 }
 
 static void
