@@ -306,51 +306,49 @@ struct {
 	.stop = true,
 };
 
-static const drmModeModeInfo *get_connector_smallest_mode(igt_output_t *output)
+static drmModeModeInfo *get_connector_smallest_mode(igt_output_t *output)
 {
 	drmModeConnector *c = output->config.connector;
 	const drmModeModeInfo *smallest = NULL;
 	int i;
 
+	if (c->connector_type == DRM_MODE_CONNECTOR_eDP)
+		return igt_std_1024_mode_get();
+
 	for (i = 0; i < c->count_modes; i++) {
-		drmModeModeInfo *mode = &c->modes[i];
+		const drmModeModeInfo *mode = &c->modes[i];
 
-		if (!smallest)
-			smallest = mode;
-
-		if (mode->hdisplay * mode->vdisplay <
+		if (!smallest ||
+		    mode->hdisplay * mode->vdisplay <
 		    smallest->hdisplay * smallest->vdisplay)
 			smallest = mode;
 	}
 
-	if (c->connector_type == DRM_MODE_CONNECTOR_eDP)
-		smallest = igt_std_1024_mode_get();
-
-	return smallest;
+	if (smallest)
+		return igt_memdup(smallest, sizeof(*smallest));
+	else
+		return igt_std_1024_mode_get();
 }
 
-static const drmModeModeInfo *connector_get_mode(igt_output_t *output)
+static drmModeModeInfo *connector_get_mode(igt_output_t *output)
 {
-	const drmModeModeInfo *mode = NULL;
-
-	if (opt.small_modes)
-		mode = get_connector_smallest_mode(output);
-	else
-		mode = &output->config.default_mode;
-
-	 /* On HSW the CRC WA is so awful that it makes you think everything is
+	/* On HSW the CRC WA is so awful that it makes you think everything is
 	  * bugged. */
 	if (IS_HASWELL(intel_get_drm_devid(drm.fd)) &&
 	    output->config.connector->connector_type == DRM_MODE_CONNECTOR_eDP)
-		mode = igt_std_1024_mode_get();
+		return igt_std_1024_mode_get();
 
-	return mode;
+	if (opt.small_modes)
+		return get_connector_smallest_mode(output);
+	else
+		return igt_memdup(&output->config.default_mode,
+				  sizeof(output->config.default_mode));
 }
 
 static void init_mode_params(struct modeset_params *params,
 			     igt_output_t *output, enum pipe pipe)
 {
-	const drmModeModeInfo *mode;
+	drmModeModeInfo *mode;
 
 	igt_output_override_mode(output, NULL);
 	mode = connector_get_mode(output);
@@ -380,6 +378,8 @@ static void init_mode_params(struct modeset_params *params,
 	params->sprite.y = 0;
 	params->sprite.w = 64;
 	params->sprite.h = 64;
+
+	free(mode);
 }
 
 static bool find_connector(bool edp_only, bool pipe_a,

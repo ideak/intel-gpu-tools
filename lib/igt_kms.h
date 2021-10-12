@@ -470,7 +470,7 @@ igt_plane_t *igt_output_get_plane_type_index(igt_output_t *output,
 igt_output_t *igt_output_from_connector(igt_display_t *display,
     drmModeConnector *connector);
 void igt_output_refresh(igt_output_t *output);
-const drmModeModeInfo *igt_std_1024_mode_get(void);
+drmModeModeInfo *igt_std_1024_mode_get(void);
 void igt_output_set_writeback_fb(igt_output_t *output, struct igt_fb *fb);
 void igt_modeset_disable_all_outputs(igt_display_t *display);
 

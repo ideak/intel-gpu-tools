@@ -2478,7 +2478,7 @@ igt_output_t *igt_output_from_connector(igt_display_t *display,
 	return found;
 }
 
-const drmModeModeInfo *igt_std_1024_mode_get(void)
+drmModeModeInfo *igt_std_1024_mode_get(void)
 {
 	static const drmModeModeInfo std_1024_mode = {
 		.clock = 65000,
@@ -2498,7 +2498,7 @@ const drmModeModeInfo *igt_std_1024_mode_get(void)
 		.name = "Custom 1024x768",
 	};
 
-	return &std_1024_mode;
+	return igt_memdup(&std_1024_mode, sizeof(std_1024_mode));
 }
 
 /*

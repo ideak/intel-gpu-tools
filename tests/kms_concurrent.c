@@ -223,44 +223,38 @@ test_plane_position_with_output(data_t *data, enum pipe pipe, int max_planes,
 	}
 }
 
-static const drmModeModeInfo *
+static drmModeModeInfo *
 get_lowres_mode(data_t *data, const drmModeModeInfo *mode_default,
 		igt_output_t *output)
 {
-	const drmModeModeInfo *mode = igt_std_1024_mode_get();
 	drmModeConnector *connector = output->config.connector;
 	int limit = mode_default->vdisplay - SIZE_PLANE;
-	bool found;
 
 	if (!connector)
-		return mode;
+		return igt_std_1024_mode_get();
 
-	found = false;
 	for (int i = 0; i < connector->count_modes; i++) {
-		mode = &connector->modes[i];
+		const drmModeModeInfo *mode = &connector->modes[i];
 
-		if (mode->vdisplay < limit) {
-			found = true;
-			break;
-		}
+		if (mode->vdisplay < limit)
+			return igt_memdup(mode, sizeof(*mode));
 	}
 
-	if (!found)
-		mode = igt_std_1024_mode_get();
-
-	return mode;
+	return igt_std_1024_mode_get();
 }
 
 static void
 test_resolution_with_output(data_t *data, enum pipe pipe, int max_planes, igt_output_t *output)
 {
-	const drmModeModeInfo *mode_hi, *mode_lo;
 	int iterations = opt.iterations < 1 ? max_planes : opt.iterations;
 	bool loop_forever = opt.iterations == LOOP_FOREVER ? true : false;
 	int i;
 
 	i = 0;
 	while (i < iterations || loop_forever) {
+		const drmModeModeInfo *mode_hi;
+		drmModeModeInfo *mode_lo;
+
 		igt_output_set_pipe(output, pipe);
 
 		mode_hi = igt_output_get_mode(output);
@@ -268,6 +262,7 @@ test_resolution_with_output(data_t *data, enum pipe pipe, int max_planes, igt_ou
 
 		/* switch to lower resolution */
 		igt_output_override_mode(output, mode_lo);
+		free(mode_lo);
 		if (is_amdgpu_device(data->drm_fd))
 			igt_output_set_pipe(output, PIPE_NONE);
 		igt_display_commit2(&data->display, COMMIT_ATOMIC);
