@@ -2478,10 +2478,10 @@ igt_output_t *igt_output_from_connector(igt_display_t *display,
 	return found;
 }
 
-drmModeModeInfo *igt_std_1024_mode_get(void)
+drmModeModeInfo *igt_std_1024_mode_get(int vrefresh)
 {
-	static const drmModeModeInfo std_1024_mode = {
-		.clock = 65000,
+	const drmModeModeInfo std_1024_mode = {
+		.clock = 65000 * vrefresh / 60,
 		.hdisplay = 1024,
 		.hsync_start = 1048,
 		.hsync_end = 1184,
@@ -2492,7 +2492,7 @@ drmModeModeInfo *igt_std_1024_mode_get(void)
 		.vsync_end = 777,
 		.vtotal = 806,
 		.vscan = 0,
-		.vrefresh = 60,
+		.vrefresh = vrefresh,
 		.flags = 0xA,
 		.type = 0x40,
 		.name = "Custom 1024x768",

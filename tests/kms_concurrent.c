@@ -231,7 +231,7 @@ get_lowres_mode(data_t *data, const drmModeModeInfo *mode_default,
 	int limit = mode_default->vdisplay - SIZE_PLANE;
 
 	if (!connector)
-		return igt_std_1024_mode_get();
+		return igt_std_1024_mode_get(60);
 
 	for (int i = 0; i < connector->count_modes; i++) {
 		const drmModeModeInfo *mode = &connector->modes[i];
@@ -240,7 +240,7 @@ get_lowres_mode(data_t *data, const drmModeModeInfo *mode_default,
 			return igt_memdup(mode, sizeof(*mode));
 	}
 
-	return igt_std_1024_mode_get();
+	return igt_std_1024_mode_get(60);
 }
 
 static void
