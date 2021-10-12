@@ -324,4 +324,6 @@ void igt_lsof(const char *dpath);
 
 uint64_t vfs_file_max(void);
 
+void *igt_memdup(const void *ptr, size_t len);
+
 #endif /* IGT_AUX_H */

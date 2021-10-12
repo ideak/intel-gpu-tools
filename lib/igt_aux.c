@@ -1527,3 +1527,14 @@ uint64_t vfs_file_max(void)
 	}
 	return max;
 }
+
+void *igt_memdup(const void *ptr, size_t len)
+{
+	void *dup;
+
+	dup = malloc(len);
+	if (dup)
+		memcpy(dup, ptr, len);
+
+	return dup;
+}
