@@ -410,7 +410,7 @@ static bool dc9_wait_entry(uint32_t debugfs_fd, int dc_target, int prev_dc, int 
 	 * since we do not have DC9 counter,
 	 * so we rely on dc5/dc6 counter reset to check if display engine was in DC9.
 	 */
-	return igt_wait(read_dc_counter(debugfs_fd, dc_target) >
+	return igt_wait(read_dc_counter(debugfs_fd, dc_target) <
 			prev_dc, seconds, 100);
 }
 
@@ -444,9 +444,10 @@ static void test_dc9_dpms(data_t *data)
 
 	require_dc_counter(data->debugfs_fd, CHECK_DC5);
 	dc_target = support_dc6(data->debugfs_fd) ? CHECK_DC6 : CHECK_DC5;
-	setup_dc9_dpms(data, dc_target);
 	prev_dc = read_dc_counter(data->debugfs_fd, dc_target);
+	setup_dc9_dpms(data, dc_target);
 	dpms_off(data);
+	sleep(1); /* wait for counters reset*/
 	check_dc9(data, dc_target, prev_dc);
 	dpms_on(data);
 }
