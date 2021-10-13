@@ -72,7 +72,7 @@ test_flip_tiling(data_t *data, enum pipe pipe, igt_output_t *output, uint64_t mo
 	igt_plane_t *primary;
 	igt_pipe_crc_t *pipe_crc;
 	igt_crc_t reference_crc, crc;
-	int fb_id, ret, width;
+	int fb_id, ret;
 
 	pipe_crc = pipe_crc_new(data, pipe);
 	igt_output_set_pipe(output, pipe);
@@ -88,30 +88,17 @@ test_flip_tiling(data_t *data, enum pipe pipe, igt_output_t *output, uint64_t mo
 
 	primary = igt_output_get_plane(output, 0);
 
-	width = mode->hdisplay;
-
-	if (modifier[0] != modifier[1] &&
-	    (modifier[0] != DRM_FORMAT_MOD_LINEAR ||
-	     modifier[1] != DRM_FORMAT_MOD_LINEAR)) {
-		/*
-		 * Since a page flip to a buffer with different stride
-		 * doesn't work, choose width so that the stride of both
-		 * buffers is the same.
-		 */
-		width = 512;
-		while (width < mode->hdisplay)
-			width *= 2;
-	}
-
-	fb_id = igt_create_pattern_fb(data->drm_fd, width, mode->vdisplay,
+	fb_id = igt_create_pattern_fb(data->drm_fd,
+				      mode->hdisplay, mode->vdisplay,
 				      data->testformat, modifier[0],
 				      &data->fb[0]);
 	igt_assert(fb_id);
 
 	/* Second fb has different background so CRC does not match. */
-	fb_id = igt_create_color_pattern_fb(data->drm_fd, width, mode->vdisplay,
-				      data->testformat, modifier[1],
-				      0.5, 0.5, 0.5, &data->fb[1]);
+	fb_id = igt_create_color_pattern_fb(data->drm_fd,
+					    mode->hdisplay, mode->vdisplay,
+					    data->testformat, modifier[1],
+					    0.5, 0.5, 0.5, &data->fb[1]);
 	igt_assert(fb_id);
 
 	/* Set the crtc and generate a reference CRC. */
