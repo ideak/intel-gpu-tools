@@ -52,6 +52,9 @@ struct buf_ops;
 #define IGT_FORMAT_ARGS(f) ((f) >> 0) & 0xff, ((f) >> 8) & 0xff, \
 		((f) >> 16) & 0xff, ((f) >> 24) & 0xff, (f)
 
+#define IGT_MODIFIER_FMT "%s(0x%" PRIx64 ")"
+#define IGT_MODIFIER_ARGS(m) igt_fb_modifier_name(m), (m)
+
 /**
  * igt_fb_t:
  * @fb_id: KMS ID of the framebuffer
@@ -217,6 +220,7 @@ int igt_fill_cts_framebuffer(uint32_t *pixmap, uint32_t video_width,
 		uint32_t video_height, uint32_t bitdepth, int alpha);
 
 int igt_fb_get_fnv1a_crc(struct igt_fb *fb, igt_crc_t *crc);
+const char *igt_fb_modifier_name(uint64_t modifier);
 
 #endif /* __IGT_FB_H__ */
 

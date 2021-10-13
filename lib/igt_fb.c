@@ -4328,3 +4328,29 @@ void igt_format_array_fill(uint32_t **formats_array, unsigned int *count,
 		(*formats_array)[index++] = format->drm_id;
 	}
 }
+
+const char *igt_fb_modifier_name(uint64_t modifier)
+{
+	switch (modifier) {
+	case DRM_FORMAT_MOD_LINEAR:
+		return "linear";
+	case I915_FORMAT_MOD_X_TILED:
+		return "X";
+	case I915_FORMAT_MOD_Y_TILED:
+		return "Y";
+	case I915_FORMAT_MOD_Yf_TILED:
+		return "Yf";
+	case I915_FORMAT_MOD_Y_TILED_CCS:
+		return "Y-CCS";
+	case I915_FORMAT_MOD_Yf_TILED_CCS:
+		return "Yf-CCS";
+	case I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS:
+		return "Y-RC_CCS";
+	case I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC:
+		return "Y-RC_CCS-CC";
+	case I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS:
+		return "Y-MC_CCS";
+	default:
+		return "?";
+	}
+}
