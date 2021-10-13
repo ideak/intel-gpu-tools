@@ -39,29 +39,24 @@ typedef struct {
 	int gen;
 	uint32_t testformat;
 	struct igt_fb fb[2];
+	igt_pipe_crc_t *pipe_crc;
 } data_t;
 
-static igt_pipe_crc_t *_pipe_crc;
-
-static igt_pipe_crc_t *pipe_crc_new(data_t *data, int pipe)
+static void pipe_crc_free(data_t *data)
 {
-	if (_pipe_crc) {
-		igt_pipe_crc_free(_pipe_crc);
-		_pipe_crc = NULL;
-	}
+	if (!data->pipe_crc)
+		return;
 
-	_pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
-	igt_assert(_pipe_crc);
-
-	return _pipe_crc;
+	igt_pipe_crc_free(data->pipe_crc);
+	data->pipe_crc = NULL;
 }
 
-static void pipe_crc_free(void)
+static void pipe_crc_new(data_t *data, int pipe)
 {
-	if (_pipe_crc) {
-		igt_pipe_crc_free(_pipe_crc);
-		_pipe_crc = NULL;
-	}
+	pipe_crc_free(data);
+
+	data->pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
+	igt_assert(data->pipe_crc);
 }
 
 static int try_commit(igt_display_t *display)
@@ -75,11 +70,10 @@ test_flip_tiling(data_t *data, enum pipe pipe, igt_output_t *output, uint64_t mo
 {
 	drmModeModeInfo *mode;
 	igt_plane_t *primary;
-	igt_pipe_crc_t *pipe_crc;
 	igt_crc_t reference_crc, crc;
 	int fb_id, ret;
 
-	pipe_crc = pipe_crc_new(data, pipe);
+	pipe_crc_new(data, pipe);
 	igt_output_set_pipe(output, pipe);
 
 	mode = igt_output_get_mode(output);
@@ -104,7 +98,7 @@ test_flip_tiling(data_t *data, enum pipe pipe, igt_output_t *output, uint64_t mo
 	igt_require_f(try_commit(&data->display) == 0,
 		      "commit failed with " IGT_MODIFIER_FMT "\n",
 		      IGT_MODIFIER_ARGS(modifier[1]));
-	igt_pipe_crc_collect_crc(pipe_crc, &reference_crc);
+	igt_pipe_crc_collect_crc(data->pipe_crc, &reference_crc);
 
 	/* Commit the first fb. */
 	igt_plane_set_fb(primary, &data->fb[0]);
@@ -124,7 +118,7 @@ test_flip_tiling(data_t *data, enum pipe pipe, igt_output_t *output, uint64_t mo
 	kmstest_wait_for_pageflip(data->drm_fd);
 
 	/* Get a crc and compare with the reference. */
-	igt_pipe_crc_collect_crc(pipe_crc, &crc);
+	igt_pipe_crc_collect_crc(data->pipe_crc, &crc);
 	igt_assert_crc_equal(&reference_crc, &crc);
 }
 
@@ -135,7 +129,7 @@ static void test_cleanup(data_t *data, enum pipe pipe, igt_output_t *output)
 
 	/* Clean up. */
 	igt_plane_set_fb(primary, NULL);
-	pipe_crc_free();
+	pipe_crc_free(data);
 	igt_output_set_pipe(output, PIPE_ANY);
 	igt_display_commit(&data->display);
 
