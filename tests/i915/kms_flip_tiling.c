@@ -47,16 +47,19 @@ static void pipe_crc_free(data_t *data)
 	if (!data->pipe_crc)
 		return;
 
+	igt_pipe_crc_stop(data->pipe_crc);
 	igt_pipe_crc_free(data->pipe_crc);
 	data->pipe_crc = NULL;
 }
 
 static void pipe_crc_new(data_t *data, int pipe)
 {
-	pipe_crc_free(data);
+	if (data->pipe_crc)
+		return;
 
 	data->pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
 	igt_assert(data->pipe_crc);
+	igt_pipe_crc_start(data->pipe_crc);
 }
 
 static int try_commit(igt_display_t *display)
@@ -68,13 +71,11 @@ static int try_commit(igt_display_t *display)
 static void
 test_flip_tiling(data_t *data, enum pipe pipe, igt_output_t *output, uint64_t modifier[2])
 {
+	struct igt_fb old_fb[2] = { data->fb[0], data->fb[1] };
 	drmModeModeInfo *mode;
 	igt_plane_t *primary;
 	igt_crc_t reference_crc, crc;
 	int fb_id, ret;
-
-	pipe_crc_new(data, pipe);
-	igt_output_set_pipe(output, pipe);
 
 	mode = igt_output_get_mode(output);
 
@@ -98,7 +99,8 @@ test_flip_tiling(data_t *data, enum pipe pipe, igt_output_t *output, uint64_t mo
 	igt_require_f(try_commit(&data->display) == 0,
 		      "commit failed with " IGT_MODIFIER_FMT "\n",
 		      IGT_MODIFIER_ARGS(modifier[1]));
-	igt_pipe_crc_collect_crc(data->pipe_crc, &reference_crc);
+	pipe_crc_new(data, pipe);
+	igt_pipe_crc_get_current(data->drm_fd, data->pipe_crc, &reference_crc);
 
 	/* Commit the first fb. */
 	igt_plane_set_fb(primary, &data->fb[0]);
@@ -118,8 +120,11 @@ test_flip_tiling(data_t *data, enum pipe pipe, igt_output_t *output, uint64_t mo
 	kmstest_wait_for_pageflip(data->drm_fd);
 
 	/* Get a crc and compare with the reference. */
-	igt_pipe_crc_collect_crc(data->pipe_crc, &crc);
+	igt_pipe_crc_get_current(data->drm_fd, data->pipe_crc, &crc);
 	igt_assert_crc_equal(&reference_crc, &crc);
+
+	igt_remove_fb(data->drm_fd, &old_fb[0]);
+	igt_remove_fb(data->drm_fd, &old_fb[1]);
 }
 
 static void test_cleanup(data_t *data, enum pipe pipe, igt_output_t *output)
@@ -131,7 +136,6 @@ static void test_cleanup(data_t *data, enum pipe pipe, igt_output_t *output)
 	igt_plane_set_fb(primary, NULL);
 	pipe_crc_free(data);
 	igt_output_set_pipe(output, PIPE_ANY);
-	igt_display_commit(&data->display);
 
 	igt_remove_fb(data->drm_fd, &data->fb[0]);
 	igt_remove_fb(data->drm_fd, &data->fb[1]);
@@ -161,6 +165,7 @@ igt_main
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
 			igt_plane_t *plane;
 
+			pipe_crc_free(&data);
 			igt_output_set_pipe(output, pipe);
 
 			plane = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
@@ -184,9 +189,9 @@ igt_main
 						      igt_fb_modifier_name(modifier[0]),
 						      igt_fb_modifier_name(modifier[1]))
 						test_flip_tiling(&data, pipe, output, modifier);
-					test_cleanup(&data, pipe, output);
 				}
 			}
+			test_cleanup(&data, pipe, output);
 		}
 	}
 
