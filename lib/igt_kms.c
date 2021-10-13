@@ -4036,6 +4036,24 @@ void igt_output_override_mode(igt_output_t *output, const drmModeModeInfo *mode)
 }
 
 /*
+ * igt_output_preferred_vrefresh:
+ * @output: Output whose preferred vrefresh is queried
+ *
+ * Return the vertical refresh rate of @output's preferred
+ * mode. If the output reports no modes return 60Hz as
+ * a fallback.
+ */
+int igt_output_preferred_vrefresh(igt_output_t *output)
+{
+	drmModeConnector *connector = output->config.connector;
+
+	if (connector->count_modes)
+		return connector->modes[0].vrefresh;
+	else
+		return 60;
+}
+
+/*
  * igt_output_set_pipe:
  * @output: Target output for which the pipe is being set to
  * @pipe: Display pipe to set to
