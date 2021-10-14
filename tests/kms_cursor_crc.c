@@ -72,6 +72,7 @@ typedef struct {
 	cairo_surface_t *surface;
 	uint32_t devid;
 	bool hwimageistestimage;
+	double alpha;
 } data_t;
 
 #define TEST_DPMS (1<<0)
@@ -89,7 +90,7 @@ typedef struct {
 	int height;
 } cursorarea;
 
-static void draw_cursor(cairo_t *cr, cursorarea *cursor)
+static void draw_cursor(cairo_t *cr, cursorarea *cursor, double alpha)
 {
 	int wl, wr, ht, hb;
 
@@ -104,13 +105,13 @@ static void draw_cursor(cairo_t *cr, cursorarea *cursor)
 	    (cursor->y < SHRT_MIN) || (cursor->y > SHRT_MAX))
 		return;
 
-	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+	cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
 	cairo_set_antialias(cr, CAIRO_ANTIALIAS_NONE);
 	/* 4 color rectangles in the corners, RGBY */
-	igt_paint_color(cr, cursor->x, cursor->y, wl, ht, RED);
-	igt_paint_color(cr, cursor->x + wl, cursor->y, wr, ht, GREEN);
-	igt_paint_color(cr, cursor->x, cursor->y + ht, wl, hb, BLUE);
-	igt_paint_color(cr, cursor->x + wl, cursor->y + ht, wr, hb, WHITE);
+	igt_paint_color_alpha(cr, cursor->x, cursor->y, wl, ht, RED, alpha);
+	igt_paint_color_alpha(cr, cursor->x + wl, cursor->y, wr, ht, GREEN, alpha);
+	igt_paint_color_alpha(cr, cursor->x, cursor->y + ht, wl, hb, BLUE, alpha);
+	igt_paint_color_alpha(cr, cursor->x + wl, cursor->y + ht, wr, hb, WHITE, alpha);
 }
 
 static void cursor_enable(data_t *data)
@@ -173,7 +174,7 @@ static void restore_image(data_t *data, uint32_t buffer, cursorarea *cursor)
 	cairo_fill(cr);
 
 	if (cursor)
-		draw_cursor(cr, cursor);
+		draw_cursor(cr, cursor, data->alpha);
 
 	igt_put_cairo_ctx(cr);
 }
@@ -549,7 +550,7 @@ static void create_cursor_fb(data_t *data, int cur_w, int cur_h)
 	cr = igt_get_cairo_ctx(data->drm_fd, &data->fb);
 	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
 	igt_paint_color_alpha(cr, 0, 0, cur_w, cur_h, 0.0, 0.0, 0.0, 0.0);
-	draw_cursor(cr, &((cursorarea){0, 0, cur_w, cur_h}));
+	draw_cursor(cr, &((cursorarea){0, 0, cur_w, cur_h}), data->alpha);
 	igt_put_cairo_ctx(cr);
 }
 
@@ -828,6 +829,7 @@ static void run_tests_on_pipe(data_t *data, enum pipe pipe)
 		data->output = igt_get_single_output_for_pipe(&data->display, pipe);
 		igt_require(data->output);
 		data->hwimageistestimage = false;
+		data->alpha = 1.0;
 	}
 
 	igt_describe("Create a maximum size cursor, then change the size in "
