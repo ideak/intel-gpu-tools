@@ -527,6 +527,32 @@ static void prepare_crtc(data_t *data, igt_output_t *output,
 	igt_pipe_crc_start(data->pipe_crc);
 }
 
+static void create_cursor_fb(data_t *data, int cur_w, int cur_h)
+{
+	cairo_t *cr;
+	uint32_t fb_id;
+
+	/*
+	 * Make the FB slightly taller and leave the extra
+	 * line opaque white, so that we can see that the
+	 * hardware won't scan beyond what it should (esp.
+	 * with non-square cursors).
+	 */
+	fb_id = igt_create_color_fb(data->drm_fd, cur_w, cur_h + 1,
+				    DRM_FORMAT_ARGB8888,
+				    DRM_FORMAT_MOD_LINEAR,
+				    1.0, 1.0, 1.0,
+				    &data->fb);
+
+	igt_assert(fb_id);
+
+	cr = igt_get_cairo_ctx(data->drm_fd, &data->fb);
+	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+	igt_paint_color_alpha(cr, 0, 0, cur_w, cur_h, 0.0, 0.0, 0.0, 0.0);
+	draw_cursor(cr, &((cursorarea){0, 0, cur_w, cur_h}));
+	igt_put_cairo_ctx(cr);
+}
+
 static void test_cursor_alpha(data_t *data, double a)
 {
 	igt_display_t *display = &data->display;
@@ -584,30 +610,6 @@ static void test_cursor_transparent(data_t *data)
 static void test_cursor_opaque(data_t *data)
 {
 	test_cursor_alpha(data, 1.0);
-}
-
-static void create_cursor_fb(data_t *data, int cur_w, int cur_h)
-{
-	cairo_t *cr;
-	uint32_t fb_id;
-
-	/*
-	 * Make the FB slightly taller and leave the extra
-	 * line opaque white, so that we can see that the
-	 * hardware won't scan beyond what it should (esp.
-	 * with non-square cursors).
-	 */
-	fb_id = igt_create_color_fb(data->drm_fd, cur_w, cur_h + 1,
-				    DRM_FORMAT_ARGB8888,
-				    DRM_FORMAT_MOD_LINEAR,
-				    1.0, 1.0, 1.0,
-				    &data->fb);
-
-	igt_assert(fb_id);
-
-	cr = igt_get_cairo_ctx(data->drm_fd, &data->fb);
-	draw_cursor(cr, &((cursorarea){0, 0, cur_w, cur_h}));
-	igt_put_cairo_ctx(cr);
 }
 
 static void require_cursor_size(data_t *data, int w, int h)
