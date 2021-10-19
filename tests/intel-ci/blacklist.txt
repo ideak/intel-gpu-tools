@@ -123,3 +123,6 @@ igt@core_hotunplug@.*(hot|plug).*
 
 # hangs several gens of hosts, and has no immediate fix
 igt@device_reset@reset-bound
+
+# not working for i915
+igt@kms_bw@.*
