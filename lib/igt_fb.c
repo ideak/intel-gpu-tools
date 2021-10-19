@@ -1092,7 +1092,7 @@ static int create_bo_for_fb(struct igt_fb *fb, bool prefer_sysmem)
 		if (is_i915_device(fd)) {
 			int err;
 
-			fb->gem_handle = gem_create(fd, fb->size);
+			fb->gem_handle = gem_buffer_create_fb_obj(fd, fb->size);
 			err = __gem_set_tiling(fd, fb->gem_handle,
 					       igt_fb_mod_to_tiling(fb->modifier),
 					       fb->strides[0]);
