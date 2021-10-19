@@ -341,8 +341,8 @@ static void draw_rect_mmap_cpu(int fd, struct buf_data *buf, struct rect *rect,
 	if (tiling != I915_TILING_NONE)
 		igt_require(intel_display_ver(intel_get_drm_devid(fd)) >= 5);
 
-	ptr = gem_mmap__cpu(fd, buf->handle, 0, PAGE_ALIGN(buf->size),
-			    PROT_READ | PROT_WRITE);
+	ptr = gem_mmap__cpu_coherent(fd, buf->handle, 0, PAGE_ALIGN(buf->size),
+				     PROT_READ | PROT_WRITE);
 
 	switch (tiling) {
 	case I915_TILING_NONE:
@@ -391,8 +391,17 @@ static void draw_rect_mmap_wc(int fd, struct buf_data *buf, struct rect *rect,
 	if (tiling != I915_TILING_NONE)
 		igt_require(intel_display_ver(intel_get_drm_devid(fd)) >= 5);
 
-	ptr = gem_mmap__wc(fd, buf->handle, 0, PAGE_ALIGN(buf->size),
-			   PROT_READ | PROT_WRITE);
+	if (gem_has_lmem(fd))
+		ptr = gem_mmap_offset__fixed(fd, buf->handle, 0,
+					     PAGE_ALIGN(buf->size),
+					     PROT_READ | PROT_WRITE);
+	else if (gem_has_legacy_mmap(fd))
+		ptr = gem_mmap__wc(fd, buf->handle, 0, PAGE_ALIGN(buf->size),
+				   PROT_READ | PROT_WRITE);
+	else
+		ptr = gem_mmap_offset__wc(fd, buf->handle, 0,
+					  PAGE_ALIGN(buf->size),
+					  PROT_READ | PROT_WRITE);
 
 	switch (tiling) {
 	case I915_TILING_NONE:
