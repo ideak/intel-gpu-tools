@@ -127,7 +127,7 @@ static void prepare_test(data_t *data, igt_output_t *output, enum pipe pipe)
 		igt_pipe_get_plane_type(data->pipe, DRM_PLANE_TYPE_PRIMARY);
 
 	data->pipe_crc = igt_pipe_crc_new(data->fd, data->pipe_id,
-					  INTEL_PIPE_CRC_SOURCE_AUTO);
+					  IGT_PIPE_CRC_SOURCE_AUTO);
 
 	igt_output_set_pipe(data->output, data->pipe_id);
 	igt_output_set_prop_value(data->output, IGT_CONNECTOR_MAX_BPC, 10);

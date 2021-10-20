@@ -776,7 +776,7 @@ static void prepare_test(struct data *data)
 			igt_info("Using mode: \n");
 			kmstest_dump_mode(data->highest_mode[i]);
 			data->pipe_crc[i] = igt_pipe_crc_new(data->drm_fd, i,
-							     INTEL_PIPE_CRC_SOURCE_AUTO);
+							     IGT_PIPE_CRC_SOURCE_AUTO);
 		} else
 			data->pipe_crc[i] = NULL;
 

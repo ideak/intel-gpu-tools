@@ -119,7 +119,7 @@ static bool fbc_check_cursor_blinking(struct drm_info *drm)
 	bool ret;
 	int i;
 
-	pipe_crc = igt_pipe_crc_new(drm->fd, PIPE_A, INTEL_PIPE_CRC_SOURCE_AUTO);
+	pipe_crc = igt_pipe_crc_new(drm->fd, PIPE_A, IGT_PIPE_CRC_SOURCE_AUTO);
 
 	igt_pipe_crc_start(pipe_crc);
 	igt_pipe_crc_drain(pipe_crc);

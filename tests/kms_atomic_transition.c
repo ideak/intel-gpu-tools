@@ -832,7 +832,8 @@ retry:
 		j += 1;
 
 		if (is_i915_device(data->drm_fd))
-			data->pipe_crcs[i] = igt_pipe_crc_new(data->drm_fd, i, INTEL_PIPE_CRC_SOURCE_AUTO);
+			data->pipe_crcs[i] = igt_pipe_crc_new(data->drm_fd, i,
+							      IGT_PIPE_CRC_SOURCE_AUTO);
 
 		for_each_valid_output_on_pipe(&data->display, i, output) {
 			if (output->pending_pipe != PIPE_NONE)

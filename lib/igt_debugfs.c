@@ -761,7 +761,7 @@ pipe_crc_new(int fd, enum pipe pipe, const char *source, int flags)
  *
  * Returns: A pipe CRC object for the given @pipe and @source. The library
  * assumes that the source is always available since recent kernels support at
- * least INTEL_PIPE_CRC_SOURCE_AUTO everywhere.
+ * least IGT_PIPE_CRC_SOURCE_AUTO everywhere.
  */
 igt_pipe_crc_t *
 igt_pipe_crc_new(int fd, enum pipe pipe, const char *source)
@@ -779,7 +779,7 @@ igt_pipe_crc_new(int fd, enum pipe pipe, const char *source)
  *
  * Returns: A pipe CRC object for the given @pipe and @source. The library
  * assumes that the source is always available since recent kernels support at
- * least INTEL_PIPE_CRC_SOURCE_AUTO everywhere.
+ * least IGT_PIPE_CRC_SOURCE_AUTO everywhere.
  */
 igt_pipe_crc_t *
 igt_pipe_crc_new_nonblock(int fd, enum pipe pipe, const char *source)

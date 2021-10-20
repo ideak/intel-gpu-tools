@@ -255,7 +255,7 @@ static void prepare_crtc(data_t *data)
 
 	/* create the pipe_crc object for this pipe */
 	data->pipe_crc = igt_pipe_crc_new_nonblock(data->drm_fd, data->pipe,
-						   INTEL_PIPE_CRC_SOURCE_AUTO);
+						   IGT_PIPE_CRC_SOURCE_AUTO);
 
 	/* get reference crc w/o cursor */
 	igt_pipe_crc_start(data->pipe_crc);

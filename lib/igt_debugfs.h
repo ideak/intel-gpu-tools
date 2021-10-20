@@ -97,7 +97,7 @@ typedef struct {
 	uint32_t crc[DRM_MAX_CRC_NR];
 } igt_crc_t;
 
-#define INTEL_PIPE_CRC_SOURCE_AUTO "auto"
+#define IGT_PIPE_CRC_SOURCE_AUTO "auto"
 #define AMDGPU_PIPE_CRC_SOURCE_DPRX "dprx"
 
 bool igt_find_crc_mismatch(const igt_crc_t *a, const igt_crc_t *b, int *index);

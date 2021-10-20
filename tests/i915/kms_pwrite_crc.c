@@ -129,7 +129,7 @@ static void prepare_crtc(data_t *data)
 		igt_pipe_crc_free(data->pipe_crc);
 
 	data->pipe_crc = igt_pipe_crc_new(data->drm_fd, data->pipe,
-					  INTEL_PIPE_CRC_SOURCE_AUTO);
+					  IGT_PIPE_CRC_SOURCE_AUTO);
 
 	/* get reference crc for the white fb */
 	igt_pipe_crc_collect_crc(data->pipe_crc, &data->ref_crc);

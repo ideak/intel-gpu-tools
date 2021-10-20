@@ -68,7 +68,8 @@ struct {
  */
 static void test_init(data_t *data, enum pipe pipe, int n_planes)
 {
-	data->pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
+	data->pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe,
+					  IGT_PIPE_CRC_SOURCE_AUTO);
 
 	data->plane = calloc(n_planes, sizeof(*data->plane));
 	igt_assert_f(data->plane != NULL, "Failed to allocate memory for planes\n");

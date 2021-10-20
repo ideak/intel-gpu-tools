@@ -418,7 +418,7 @@ plane_immutable_zpos(igt_display_t *display, igt_pipe_t *pipe,
 
 	/* create the pipe_crc object for this pipe */
 	pipe_crc = igt_pipe_crc_new(pipe->display->drm_fd, pipe->pipe,
-				    INTEL_PIPE_CRC_SOURCE_AUTO);
+				    IGT_PIPE_CRC_SOURCE_AUTO);
 
 	/* get reference crc */
 	igt_pipe_crc_start(pipe_crc);

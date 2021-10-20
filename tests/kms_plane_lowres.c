@@ -278,7 +278,7 @@ static void run_test(data_t *data, uint64_t modifier)
 			igt_output_set_pipe(data->output, data->pipe);
 
 			data->pipe_crc = igt_pipe_crc_new(data->drm_fd, data->pipe,
-							  INTEL_PIPE_CRC_SOURCE_AUTO);
+							  IGT_PIPE_CRC_SOURCE_AUTO);
 
 			igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(pipe), data->output->name)
 				test_planes_on_pipe(data, modifier);

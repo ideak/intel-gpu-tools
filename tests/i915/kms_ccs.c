@@ -555,7 +555,8 @@ static int test_ccs(data_t *data)
 	enum test_fb_flags fb_flags = 0;
 
 	if (data->flags & TEST_CRC) {
-		data->pipe_crc = igt_pipe_crc_new(data->drm_fd, data->pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
+		data->pipe_crc = igt_pipe_crc_new(data->drm_fd, data->pipe,
+						  IGT_PIPE_CRC_SOURCE_AUTO);
 
 		if (try_config(data, fb_flags | FB_COMPRESSED, &ref_crc) &&
 		    try_config(data, fb_flags, &crc)) {

@@ -225,7 +225,8 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 	 */
 	if (!is_amdgpu_device(data->gfx_fd))
 		igt_display_commit2(display, COMMIT_ATOMIC);
-	data->pipe_crc = igt_pipe_crc_new(data->gfx_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
+	data->pipe_crc = igt_pipe_crc_new(data->gfx_fd, pipe,
+				          IGT_PIPE_CRC_SOURCE_AUTO);
 
 	if (!is_amdgpu_device(data->gfx_fd) && start_crc)
 		igt_pipe_crc_start(data->pipe_crc);
@@ -815,7 +816,7 @@ static void test_multi_plane_rotation(data_t *data, enum pipe pipe)
 		p[1].plane = igt_output_get_plane_type(output, DRM_PLANE_TYPE_OVERLAY);
 
 		data->pipe_crc = igt_pipe_crc_new(data->gfx_fd, pipe,
-						  INTEL_PIPE_CRC_SOURCE_AUTO);
+						  IGT_PIPE_CRC_SOURCE_AUTO);
 		igt_pipe_crc_start(data->pipe_crc);
 
 		for (i = 0; i < ARRAY_SIZE(planeconfigs); i++) {

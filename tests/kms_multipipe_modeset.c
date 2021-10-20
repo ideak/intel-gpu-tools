@@ -67,7 +67,7 @@ static void run_test(data_t *data, int valid_outputs)
 		mode = NULL;
 
 		pipe_crcs[i] = igt_pipe_crc_new(display->drm_fd, i,
-						INTEL_PIPE_CRC_SOURCE_AUTO);
+						IGT_PIPE_CRC_SOURCE_AUTO);
 
 		igt_output_set_pipe(output, i);
 		mode = igt_output_get_mode(output);

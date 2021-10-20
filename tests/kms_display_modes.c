@@ -60,8 +60,8 @@ static void run_extendedmode_basic(data_t *data, int pipe1, int pipe2)
 	mode[0] = igt_output_get_mode(extended_output[0]);
 	mode[1] = igt_output_get_mode(extended_output[1]);
 
-	pipe_crc[0] = igt_pipe_crc_new(data->drm_fd, pipe1, INTEL_PIPE_CRC_SOURCE_AUTO);
-	pipe_crc[1] = igt_pipe_crc_new(data->drm_fd, pipe2, INTEL_PIPE_CRC_SOURCE_AUTO);
+	pipe_crc[0] = igt_pipe_crc_new(data->drm_fd, pipe1, IGT_PIPE_CRC_SOURCE_AUTO);
+	pipe_crc[1] = igt_pipe_crc_new(data->drm_fd, pipe2, IGT_PIPE_CRC_SOURCE_AUTO);
 
 	igt_create_color_fb(data->drm_fd, mode[0]->hdisplay, mode[0]->vdisplay,
 			     DRM_FORMAT_XRGB8888, 0, 1, 0, 0, &fbs[0]);

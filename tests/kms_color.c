@@ -693,7 +693,7 @@ static void test_setup(data_t *data, enum pipe p)
 	data->primary = igt_pipe_get_plane_type(pipe, DRM_PLANE_TYPE_PRIMARY);
 	data->pipe_crc = igt_pipe_crc_new(data->drm_fd,
 					  data->primary->pipe->pipe,
-					  INTEL_PIPE_CRC_SOURCE_AUTO);
+					  IGT_PIPE_CRC_SOURCE_AUTO);
 
 	igt_display_require_output_on_pipe(&data->display, p);
 	data->output = igt_get_single_output_for_pipe(&data->display, p);

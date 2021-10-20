@@ -107,7 +107,8 @@ static void test_read_crc(data_t *data, enum pipe pipe,
 		if (flags & TEST_NONBLOCK) {
 			igt_pipe_crc_t *pipe_crc;
 
-			pipe_crc = igt_pipe_crc_new_nonblock(data->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
+			pipe_crc = igt_pipe_crc_new_nonblock(data->drm_fd, pipe,
+							     IGT_PIPE_CRC_SOURCE_AUTO);
 			igt_wait_for_vblank(data->drm_fd, display->pipes[pipe].crtc_offset);
 			igt_pipe_crc_start(pipe_crc);
 
@@ -122,7 +123,8 @@ static void test_read_crc(data_t *data, enum pipe pipe,
 		} else {
 			igt_pipe_crc_t *pipe_crc;
 
-			pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe, INTEL_PIPE_CRC_SOURCE_AUTO);
+			pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe,
+						    IGT_PIPE_CRC_SOURCE_AUTO);
 			igt_pipe_crc_start(pipe_crc);
 
 			n_crcs = igt_pipe_crc_get_crcs(pipe_crc, N_CRCS, &crcs);
@@ -206,7 +208,7 @@ static void test_compare_crc(data_t *data, enum pipe pipe, igt_output_t *output)
 	igt_display_commit(display);
 
 	pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe,
-				    INTEL_PIPE_CRC_SOURCE_AUTO);
+				    IGT_PIPE_CRC_SOURCE_AUTO);
 	igt_pipe_crc_collect_crc(pipe_crc, &ref_crc);
 
 	/* Flip FB1 with the Primary plane & compare the CRC with ref CRC. */

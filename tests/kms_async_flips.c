@@ -504,7 +504,7 @@ static void test_crc(data_t *data)
 
 	data->pipe_crc = igt_pipe_crc_new(data->drm_fd,
 					  kmstest_get_pipe_from_crtc_id(data->drm_fd, data->crtc_id),
-					  INTEL_PIPE_CRC_SOURCE_AUTO);
+					  IGT_PIPE_CRC_SOURCE_AUTO);
 
 	igt_pipe_crc_start(data->pipe_crc);
 	igt_pipe_crc_get_single(data->pipe_crc, &data->ref_crc);
