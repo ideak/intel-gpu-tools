@@ -237,7 +237,8 @@ static void test_disable_crc_after_crtc(data_t *data, enum pipe pipe,
 	igt_crc_t crc[2];
 	igt_plane_t *primary;
 
-	pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe, "auto");
+	pipe_crc = igt_pipe_crc_new(data->drm_fd, pipe,
+				    IGT_PIPE_CRC_SOURCE_AUTO);
 
 	igt_display_reset(display);
 	igt_output_set_pipe(output, pipe);

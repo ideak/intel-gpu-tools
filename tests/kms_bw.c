@@ -82,7 +82,8 @@ static void test_init(data_t *data)
 		data->primary[i] = igt_pipe_get_plane_type(
 			data->pipe[i], DRM_PLANE_TYPE_PRIMARY);
 		data->pipe_crc[i] =
-			igt_pipe_crc_new(data->fd, data->pipe_id[i], "auto");
+			igt_pipe_crc_new(data->fd, data->pipe_id[i],
+					 IGT_PIPE_CRC_SOURCE_AUTO);
 	}
 
 	for (i = 0; i < display->n_outputs && i < max_pipes; i++) {

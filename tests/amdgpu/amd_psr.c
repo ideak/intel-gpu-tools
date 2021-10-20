@@ -190,7 +190,8 @@ static void test_init(data_t *data)
 	data->overlay =
 		igt_pipe_get_plane_type(data->pipe, DRM_PLANE_TYPE_OVERLAY);
 
-	data->pipe_crc = igt_pipe_crc_new(data->fd, data->pipe_id, "auto");
+	data->pipe_crc = igt_pipe_crc_new(data->fd, data->pipe_id,
+					  IGT_PIPE_CRC_SOURCE_AUTO);
 
 	igt_output_set_pipe(data->output, data->pipe_id);
 
