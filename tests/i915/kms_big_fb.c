@@ -810,6 +810,7 @@ igt_main
 
 		igt_require_pipe_crc(data.drm_fd);
 		igt_display_require(&data.display, data.drm_fd);
+		igt_display_require_output(&data.display);
 
 		res = drmModeGetResources(data.drm_fd);
 		igt_assert(res);
