@@ -875,17 +875,34 @@ static void test_process_mixed(int pfd, const intel_ctx_cfg_t *cfg,
 	gem_quiescent_gpu(pfd);
 }
 
+#define SATURATED_NOPREMPT	(1 << 0)
+
 static void
-test_saturated_hostile(int i915, const intel_ctx_t *base_ctx,
-		       const struct intel_execution_engine2 *engine)
+test_saturated_hostile_all(int i915, const intel_ctx_t *base_ctx,
+			   unsigned int engine_flags, unsigned int test_flags)
 {
 	const struct intel_execution_engine2 *other;
+	unsigned int other_flags = 0;
 	igt_spin_t *spin;
 	const intel_ctx_t *ctx;
 	uint64_t ahnd = get_reloc_ahnd(i915, base_ctx->id);
 	int fence = -1;
 
 	cleanup(i915);
+
+	if (test_flags & SATURATED_NOPREMPT) {
+		/*
+		 * Render and compute engines have a reset dependency. If one is
+		 * reset then all must be reset. Thus, if a hanging batch causes
+		 * a reset, any non-preemptible batches on the other engines
+		 * will be killed. So don't bother testing for the survival of
+		 * non-preemptible batches when compute engines are present.
+		 */
+		for_each_ctx_engine(i915, base_ctx, other)
+			igt_require(other->class != I915_ENGINE_CLASS_COMPUTE);
+
+		other_flags |= IGT_SPIN_NO_PREEMPTION;
+	}
 
 	/*
 	 * Check that if we have to remove a hostile request from a
@@ -900,13 +917,12 @@ test_saturated_hostile(int i915, const intel_ctx_t *base_ctx,
 	 */
 
 	for_each_ctx_engine(i915, base_ctx, other) {
-		if (other->flags == engine->flags)
+		if (other->flags == engine_flags)
 			continue;
 
 		spin = igt_spin_new(i915, .ahnd = ahnd, .ctx = base_ctx,
 				   .engine = other->flags,
-				   .flags = (IGT_SPIN_NO_PREEMPTION |
-					     IGT_SPIN_FENCE_OUT));
+				   .flags = other_flags | IGT_SPIN_FENCE_OUT);
 
 		if (fence < 0) {
 			fence = spin->out_fence;
@@ -927,7 +943,7 @@ test_saturated_hostile(int i915, const intel_ctx_t *base_ctx,
 	ctx = ctx_create_persistence(i915, &base_ctx->cfg, false);
 	ahnd = get_reloc_ahnd(i915, ctx->id);
 	spin = igt_spin_new(i915, .ahnd = ahnd, .ctx = ctx,
-			    .engine = engine->flags,
+			    .engine = engine_flags,
 			    .flags = (IGT_SPIN_NO_PREEMPTION |
 				      IGT_SPIN_POLL_RUN |
 				      IGT_SPIN_FENCE_OUT));
@@ -942,6 +958,24 @@ test_saturated_hostile(int i915, const intel_ctx_t *base_ctx,
 	igt_assert_eq(wait_for_status(fence, reset_timeout_ms), 1);
 	close(fence);
 	put_ahnd(ahnd);
+}
+
+static void
+test_saturated_hostile_nopreempt(int i915, const intel_ctx_cfg_t *cfg,
+				 unsigned int engine_flags)
+{
+	const intel_ctx_t *ctx = intel_ctx_create(i915, cfg);
+	test_saturated_hostile_all(i915, ctx, engine_flags, SATURATED_NOPREMPT);
+	intel_ctx_destroy(i915, ctx);
+}
+
+static void
+test_saturated_hostile(int i915, const intel_ctx_cfg_t *cfg,
+		       unsigned int engine_flags)
+{
+	const intel_ctx_t *ctx = intel_ctx_create(i915, cfg);
+	test_saturated_hostile_all(i915, ctx, engine_flags, 0);
+	intel_ctx_destroy(i915, ctx);
 }
 
 static void test_processes(int i915)
@@ -1310,7 +1344,14 @@ igt_main
 		igt_subtest_with_dynamic_f("saturated-hostile") {
 			for_each_ctx_engine(i915, ctx, e) {
 				igt_dynamic_f("%s", e->name)
-					test_saturated_hostile(i915, ctx, e);
+					do_test(test_saturated_hostile, i915, &ctx->cfg, e->flags, e->name);
+			}
+		}
+
+		igt_subtest_with_dynamic_f("saturated-hostile-nopreempt") {
+			for_each_ctx_engine(i915, ctx, e) {
+				igt_dynamic_f("%s", e->name)
+					do_test(test_saturated_hostile_nopreempt, i915, &ctx->cfg, e->flags, e->name);
 			}
 		}
 
