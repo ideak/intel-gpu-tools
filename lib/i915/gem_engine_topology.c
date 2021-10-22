@@ -130,6 +130,7 @@ static const char *class_names[] = {
 	[I915_ENGINE_CLASS_COPY]	  = "bcs",
 	[I915_ENGINE_CLASS_VIDEO]	  = "vcs",
 	[I915_ENGINE_CLASS_VIDEO_ENHANCE] = "vecs",
+	[I915_ENGINE_CLASS_COMPUTE]       = "ccs",
 };
 
 static void init_engine(struct intel_execution_engine2 *e2,
