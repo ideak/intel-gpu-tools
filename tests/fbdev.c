@@ -39,6 +39,41 @@
 
 #include "igt.h"
 
+#define PANSTEP(panstep_) \
+	((panstep_) ? (panstep_) : 1)
+
+static unsigned int __panoffset(unsigned int offset, unsigned int panstep)
+{
+	return offset - (offset % PANSTEP(panstep));
+}
+
+#define XOFFSET(offset_) \
+	__panoffset(offset_, fix_info.xpanstep)
+
+#define YOFFSET(offset_) \
+	__panoffset(offset_, fix_info.ypanstep)
+
+static void pan_test(int fd, const struct fb_var_screeninfo *var, int expected_ret)
+{
+	struct fb_var_screeninfo pan_var, new_var;
+	int ret;
+
+	memcpy(&pan_var, var, sizeof(pan_var));
+
+	ret = ioctl(fd, FBIOPAN_DISPLAY, &pan_var);
+	igt_assert_f(ret == expected_ret,
+		     "ioctl(FBIOPAN_DISPLAY) returned ret=%d, expected %d\n", ret, expected_ret);
+
+	if (ret)
+		return; /* panning failed; skip additional tests */
+
+	ret = ioctl(fd, FBIOGET_VSCREENINFO, &new_var);
+	igt_assert_f(ret == 0, "ioctl(FBIOGET_VSCREENINFO) failed, ret=%d\n", ret);
+	igt_assert_f(pan_var.xoffset == new_var.xoffset && pan_var.yoffset == new_var.yoffset,
+		     "panning to (%u, %u) moved to (%u, %u)\n",
+		     pan_var.xoffset, pan_var.yoffset, new_var.xoffset, new_var.yoffset);
+}
+
 static void mode_tests(int fd)
 {
 	struct fb_var_screeninfo var_info;
@@ -91,6 +126,79 @@ static void mode_tests(int fd)
 		igt_assert_f(var_info.yres_virtual <= nlines,
 			     "vertical virtual resolution (%u) with line length %u exceeds available video memory\n",
 			     var_info.yres_virtual, fix_info.line_length);
+	}
+
+	igt_describe("Check panning / page flipping");
+	igt_subtest("pan") {
+		struct fb_var_screeninfo pan_var;
+		int expected_ret;
+
+		memset(&pan_var, 0, sizeof(pan_var));
+
+		/*
+		 * Tests that are expected to succeed.
+		 */
+
+		/* jump to opposite end of virtual screen */
+		pan_var.xoffset = XOFFSET(var_info.xres_virtual - var_info.xres - var_info.xoffset);
+		pan_var.yoffset = YOFFSET(var_info.yres_virtual - var_info.yres - var_info.yoffset);
+		pan_test(fd, &pan_var, 0);
+		/* jump to (0, 0) */
+		pan_var.xoffset = XOFFSET(0);
+		pan_var.yoffset = YOFFSET(0);
+		pan_test(fd, &pan_var, 0);
+		/* jump to maximum extend */
+		pan_var.xoffset = XOFFSET(var_info.xres_virtual - var_info.xres);
+		pan_var.yoffset = YOFFSET(var_info.yres_virtual - var_info.yres);
+		pan_test(fd, &pan_var, 0);
+
+		/*
+		 * Tests that are expected to fail.
+		 */
+
+		/* jump beyond maximum horizontal extend */
+		pan_var.xoffset = XOFFSET(var_info.xres_virtual - var_info.xres + PANSTEP(fix_info.xpanstep));
+		pan_var.yoffset = YOFFSET(0);
+		pan_test(fd, &pan_var, -1);
+		/* jump beyond horizontal virtual resolution */
+		pan_var.xoffset = XOFFSET(var_info.xres_virtual);
+		pan_var.yoffset = YOFFSET(0);
+		pan_test(fd, &pan_var, -1);
+
+		/*
+		 * The FB_VMODE_YWRAP flag is configurable as part of ioctl(FBIOPAN_DISPLAY),
+		 * but it's hard to know which drivers support it and which don't. Testing for
+		 * FBINFO_HWACCEL_YWRAP does not produce meaningful results. So we got with the
+		 * device's current setting.
+		 *
+		 * With FB_VMODE_YWRAP set, the display is expected to wrap around when
+		 * reaching the limits of the vertical resolution. Otherwise, this should
+		 * fail.
+		 *
+		 */
+
+		if (var_info.vmode & FB_VMODE_YWRAP) {
+			pan_var.vmode |= FB_VMODE_YWRAP;
+			expected_ret = 0;
+		} else {
+			expected_ret = -1;
+		}
+
+		/* jump beyond maximum vertical extend */
+		pan_var.xoffset = XOFFSET(0);
+		pan_var.yoffset = YOFFSET(var_info.yres_virtual - var_info.yres + PANSTEP(fix_info.ypanstep));
+		pan_test(fd, &pan_var, expected_ret);
+		/* jump beyond vertical virtual resolution */
+		pan_var.xoffset = XOFFSET(0);
+		pan_var.yoffset = YOFFSET(var_info.yres_virtual);
+		pan_test(fd, &pan_var, expected_ret);
+
+		pan_var.vmode &= ~FB_VMODE_YWRAP;
+	}
+
+	igt_fixture {
+		/* restore original panning offsets */
+		ioctl(fd, FBIOPAN_DISPLAY, &var_info);
 	}
 }
 
