@@ -27,6 +27,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
@@ -50,14 +51,46 @@ static void mode_tests(int fd)
 
 	igt_describe("Check if screeninfo is valid");
 	igt_subtest("info") {
-		unsigned long size;
+		unsigned long nbits, nlines;
 
-		size = var_info.yres * fix_info.line_length;
-		igt_assert_f(size <= fix_info.smem_len,
-			     "screen size (%d x %d) of pitch %d does not fit within mappable area of size %u\n",
-			     var_info.xres, var_info.yres,
-			     fix_info.line_length,
-			     fix_info.smem_len);
+		/* video memory configuration */
+		igt_assert_f(fix_info.line_length, "line length not set\n");
+		igt_assert_f(fix_info.smem_len, "size of video memory not set\n");
+		igt_assert_f(fix_info.line_length <= fix_info.smem_len,
+			     "line length (%u) exceeds available video memory (%u)\n",
+			     fix_info.line_length, fix_info.smem_len);
+
+		/* color format */
+		igt_assert_f(var_info.bits_per_pixel, "bits-per-pixel not set\n");
+
+		/* horizontal resolution */
+		igt_assert_f(var_info.xres, "horizontal resolution not set\n");
+		igt_assert_f(var_info.xres_virtual, "horizontal virtual resolution not set\n");
+		igt_assert_f(var_info.xres <= var_info.xres_virtual,
+			     "horizontal virtual resolution (%u) less than horizontal resolution (%u)\n",
+			     var_info.xres_virtual, var_info.xres);
+		igt_assert_f(var_info.xoffset <= (var_info.xres_virtual - var_info.xres),
+			     "screen horizontal offset (%u) overflow\n",
+			     var_info.xoffset);
+		nbits = fix_info.line_length * CHAR_BIT;
+		igt_assert_f((var_info.xres_virtual * var_info.bits_per_pixel) <= nbits,
+			     "vertical virtual resolution (%u) with bpp %u exceeds line length %u\n",
+			     var_info.yres_virtual, var_info.bits_per_pixel, fix_info.line_length);
+
+		/* vertical resolution */
+		igt_assert_f(var_info.yres, "vertical resolution not set\n");
+		igt_assert_f(var_info.yres_virtual, "vertical virtual resolution not set\n");
+		igt_assert_f(var_info.yres <= var_info.yres_virtual,
+			     "vertical virtual resolution (%u) less than vertical resolution (%u)\n",
+			     var_info.yres_virtual, var_info.yres);
+		igt_assert_f((var_info.vmode & FB_VMODE_YWRAP) ||
+			     (var_info.yoffset <= (var_info.yres_virtual - var_info.yres)),
+			     "screen vertical offset (%u) overflow\n",
+			     var_info.yoffset);
+		nlines = fix_info.smem_len / fix_info.line_length;
+		igt_assert_f(var_info.yres_virtual <= nlines,
+			     "vertical virtual resolution (%u) with line length %u exceeds available video memory\n",
+			     var_info.yres_virtual, fix_info.line_length);
 	}
 }
 
