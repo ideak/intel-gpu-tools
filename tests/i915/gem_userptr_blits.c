@@ -2064,7 +2064,9 @@ static void test_set_caching(int i915)
 	for (int idx = 0; idx < ARRAY_SIZE(levels); idx++) {
 		gem_userptr(i915, page, 4096, 0, 0, &handle);
 		ret = __gem_set_caching(i915, handle, levels[idx]);
-		if (levels[idx] == I915_CACHING_NONE) {
+		if (gem_has_lmem(i915))
+			igt_assert_eq(ret, -ENODEV);
+		else if (levels[idx] == I915_CACHING_NONE) {
 			if(ret != 0)
 				igt_assert_eq(ret, -ENXIO);
 			else
@@ -2078,7 +2080,9 @@ static void test_set_caching(int i915)
 	gem_userptr(i915, page, 4096, 0, 0, &handle);
 	for (int idx = 0; idx < ARRAY_SIZE(levels); idx++) {
 		ret = __gem_set_caching(i915, handle, levels[idx]);
-		if (levels[idx] == I915_CACHING_NONE) {
+		if (gem_has_lmem(i915))
+                        igt_assert_eq(ret, -ENODEV);
+		else if (levels[idx] == I915_CACHING_NONE) {
 			if (ret != 0)
 			        igt_assert_eq(ret, -ENXIO);
 		} else {
@@ -2087,7 +2091,9 @@ static void test_set_caching(int i915)
 	}
 	for (int idx = 0; idx < ARRAY_SIZE(levels); idx++) {
 		ret = __gem_set_caching(i915, handle, levels[idx]);
-		if (levels[idx] == I915_CACHING_NONE) {
+		if (gem_has_lmem(i915))
+                        igt_assert_eq(ret, -ENODEV);
+		else if (levels[idx] == I915_CACHING_NONE) {
 			if (ret != 0)
 				igt_assert_eq(ret, -ENXIO);
 		} else {
