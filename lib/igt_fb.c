@@ -392,6 +392,12 @@ bool igt_format_is_yuv_semiplanar(uint32_t format)
 	return igt_format_is_yuv(format) && f->num_planes == 2;
 }
 
+static bool is_yuv_semiplanar_plane(const struct igt_fb *fb, int color_plane)
+{
+	return igt_format_is_yuv_semiplanar(fb->drm_format) &&
+	       color_plane == 1;
+}
+
 /**
  * igt_get_fb_tile_size:
  * @fd: the DRM file descriptor
@@ -843,15 +849,64 @@ static uint64_t calc_plane_size(struct igt_fb *fb, int plane)
 	}
 }
 
+static unsigned int gcd(unsigned int a, unsigned int b)
+{
+	while (b) {
+		unsigned int m = a % b;
+
+		a = b;
+		b = m;
+	}
+
+	return a;
+}
+
+static unsigned int lcm(unsigned int a, unsigned int b)
+{
+	unsigned int g = gcd(a, b);
+
+	if (g == 0 || b == 0)
+		return 0;
+
+	return a / g * b;
+}
+
+static unsigned int get_plane_alignment(struct igt_fb *fb, int color_plane)
+{
+	unsigned int tile_width, tile_height;
+	unsigned int tile_row_size;
+	unsigned int alignment;
+
+	if (!(is_i915_device(fb->fd) &&
+	      is_gen12_ccs_modifier(fb->modifier) &&
+	      is_yuv_semiplanar_plane(fb, color_plane)))
+		return 0;
+
+	igt_get_fb_tile_size(fb->fd, fb->modifier, fb->plane_bpp[color_plane],
+			     &tile_width, &tile_height);
+
+	tile_row_size = fb->strides[color_plane] * tile_height;
+
+	alignment = lcm(tile_row_size, 64 * 1024);
+
+	return alignment;
+}
+
 static uint64_t calc_fb_size(struct igt_fb *fb)
 {
 	uint64_t size = 0;
 	int plane;
 
 	for (plane = 0; plane < fb->num_planes; plane++) {
+		unsigned int align;
+
 		/* respect the stride requested by the caller */
 		if (!fb->strides[plane])
 			fb->strides[plane] = calc_plane_stride(fb, plane);
+
+		align = get_plane_alignment(fb, plane);
+		if (align)
+			size += align - (size % align);
 
 		fb->offsets[plane] = size;
 
