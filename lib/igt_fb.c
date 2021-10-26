@@ -670,7 +670,7 @@ static unsigned fb_plane_height(const struct igt_fb *fb, int plane)
 		if (ccs_to_main_plane(fb, plane))
 			height = DIV_ROUND_UP(height, format->vsub);
 
-		return DIV_ROUND_UP(height, 128) * 4;
+		return DIV_ROUND_UP(height, 32);
 	} else if (is_ccs_plane(fb, plane)) {
 		return DIV_ROUND_UP(fb->height, 512) * 32;
 	}
@@ -837,10 +837,6 @@ static uint64_t calc_plane_size(struct igt_fb *fb, int plane)
 
 		igt_get_fb_tile_size(fb->fd, fb->modifier, fb->plane_bpp[plane],
 				     &tile_width, &tile_height);
-
-		/* A main surface using a CCS AUX surface must be 4x4 tiles aligned. */
-		if (is_gen12_ccs_modifier(fb->modifier))
-			tile_height *= 4;
 
 		size = (uint64_t)fb->strides[plane] *
 			ALIGN(fb->plane_height[plane], tile_height);

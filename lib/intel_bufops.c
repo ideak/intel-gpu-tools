@@ -771,7 +771,7 @@ static void __intel_buf_init(struct buf_ops *bops,
 			buf->surface[0].stride = ALIGN(width * (bpp / 8), 128);
 
 		if (bops->intel_gen >= 12)
-			height = ALIGN(height, 4 * 32);
+			height = ALIGN(height, 32);
 
 		buf->surface[0].size = buf->surface[0].stride * height;
 		buf->tiling = tiling;
