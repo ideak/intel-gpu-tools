@@ -827,8 +827,8 @@ static uint64_t calc_plane_size(struct igt_fb *fb, int plane)
 		uint64_t size;
 
 		/* The AUX CCS surface must be page aligned */
-		size = (uint64_t)fb->strides[plane] *
-			ALIGN(fb->plane_height[plane], 64);
+		size = ALIGN((uint64_t)fb->strides[plane] *
+			     fb->plane_height[plane], 4096);
 
 		return size;
 	} else {
