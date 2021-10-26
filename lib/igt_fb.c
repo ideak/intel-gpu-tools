@@ -761,16 +761,8 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 		/*
 		 * The CCS surface stride is
 		 *    ccs_stride = main_surface_stride_in_bytes / 512 * 64.
-		 *
-		 * On ADL_P this stride must be minimum 128 bytes corresponding
-		 * to 8 tiles on the main surface and it must be power-of-two
-		 * sized. The allocated main surface stride doesn't need to be
-		 * POT sized, which is auto-padded by the kernel to the POT size.
 		 */
-		if (IS_ALDERLAKE_P(intel_get_drm_devid(fb->fd)))
-			return roundup_power_of_two(max(min_stride, 128u));
-		else
-			return ALIGN(min_stride, 64);
+		return ALIGN(min_stride, 64);
 	} else if (!fb->modifier && is_nouveau_device(fb->fd)) {
 		int align;
 
@@ -788,20 +780,8 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 		igt_get_fb_tile_size(fb->fd, fb->modifier, fb->plane_bpp[plane],
 				     &tile_width, &tile_height);
 
-		if (is_gen12_ccs_modifier(fb->modifier)) {
-			if (IS_ALDERLAKE_P(intel_get_drm_devid(fb->fd)))
-				/*
-				 * The main surface stride must be aligned to the CCS AUX
-				 * page table block size (covered by one AUX PTE). This
-				 * block size is 64kb -> 16 tiles.
-				 * We can do away padding an 8 tile stride to 16, since in
-				 * this case one AUX PTE entry will cover 2 main surface
-				 * tile rows.
-				 */
-				tile_align = (min_stride <= 8 * tile_width) ? 8 : 16;
-			else
-				tile_align = 4;
-		}
+		if (is_gen12_ccs_modifier(fb->modifier))
+			tile_align = 4;
 
 		return ALIGN(min_stride, tile_width * tile_align);
 	}
