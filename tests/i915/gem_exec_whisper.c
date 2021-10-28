@@ -630,7 +630,7 @@ igt_main
 		if (m->flags & CHAIN)
 			continue;
 
-		igt_subtest_with_dynamic_f("%s", m->name) {
+		igt_subtest_with_dynamic_f("%s-engine", m->name) {
 			for_each_ctx_engine(fd, ctx, e) {
 				if (!gem_class_can_store_dword(fd, e->class))
 					continue;
