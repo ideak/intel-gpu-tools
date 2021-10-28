@@ -92,6 +92,17 @@ check_test ()
 		echo "    test does seem to be using igt_main() (should have subtests) and yet --list-subtests is empty!"
 		fail $test
 	fi
+
+	# check for duplicate subtests
+	echo "  Checking subtest uniqueness..."
+	if [ $RET -eq 0 ]; then
+	    DUPLICATES="`./$test --list-subtests | sort | uniq -d`"
+	    if [ -n "$DUPLICATES" ]; then
+		echo "    test has duplicate subtest names!"
+		echo $DUPLICATES
+		fail $test
+	    fi
+	fi
 }
 
 TESTLISTFILE="$tests_dir/test-list.txt"
