@@ -1205,7 +1205,7 @@ igt_main
 
 	/* Legacy for selecting rings. */
 	for_each_test(t, individual) {
-		igt_subtest_with_dynamic_f("%s", t->name) {
+		igt_subtest_with_dynamic_f("legacy-%s", t->name) {
 			for (const struct intel_execution_ring *l = intel_execution_rings; l->name; l++) {
 				igt_dynamic_f("%s", l->name) {
 					t->func(fd, intel_ctx_0(fd), eb_ring(l),
