@@ -155,7 +155,7 @@ lib_version = vcs_tag(input : 'version.h.in', output : 'version.h',
 
 lib_intermediates = []
 foreach f: lib_sources
-    name = f.underscorify(f)
+    name = f.underscorify()
     lib = static_library('igt-' + name,
 	[ f, lib_version ],
 	include_directories: inc,
