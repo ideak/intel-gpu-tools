@@ -21,6 +21,7 @@
  * IN THE SOFTWARE.
  */
 
+#include "drmtest.h"
 #include "igt_params.h"
 #include "igt_psr.h"
 #include "igt_sysfs.h"
@@ -263,4 +264,19 @@ void psr_print_debugfs(int debugfs_fd)
 	}
 
 	igt_info("%s", buf);
+}
+
+bool i915_psr2_selective_fetch_check(int drm_fd)
+{
+	int debugfs_fd;
+	bool ret;
+
+	if (!is_i915_device(drm_fd))
+		return false;
+
+	debugfs_fd = igt_debugfs_dir(drm_fd);
+	ret = psr2_selective_fetch_check(debugfs_fd);
+	close(debugfs_fd);
+
+	return ret;
 }

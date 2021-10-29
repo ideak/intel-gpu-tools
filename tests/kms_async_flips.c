@@ -27,6 +27,7 @@
 
 #include "igt.h"
 #include "igt_aux.h"
+#include "igt_psr.h"
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <poll.h>
@@ -298,6 +299,15 @@ static void test_cursor(data_t *data)
 	uint64_t width, height;
 	struct igt_fb cursor_fb;
 	struct drm_mode_cursor cur;
+
+	/*
+	 * Intel's PSR2 selective fetch adds other planes to state when
+	 * necessary, causing the async flip to fail because async flip is not
+	 * supported in cursor plane.
+	 */
+	igt_skip_on_f(i915_psr2_selective_fetch_check(data->drm_fd),
+		      "PSR2 sel fetch causes cursor to be added to primary plane " \
+		      "pages flips and async flip is not supported in cursor\n");
 
 	do_or_die(drmGetCap(data->drm_fd, DRM_CAP_CURSOR_WIDTH, &width));
 	do_or_die(drmGetCap(data->drm_fd, DRM_CAP_CURSOR_WIDTH, &height));
