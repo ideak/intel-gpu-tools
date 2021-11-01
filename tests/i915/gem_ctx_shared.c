@@ -277,6 +277,7 @@ static void exec_shared_gtt(int i915, const intel_ctx_cfg_t *cfg,
 	scratch = gem_create(i915, 16384);
 	gem_write(i915, scratch, 0, &bbe, sizeof(bbe));
 	obj.handle = scratch;
+	execbuf.rsvd1 = ctx[0]->id;
 	gem_execbuf(i915, &execbuf);
 	obj.flags |= EXEC_OBJECT_PINNED; /* reuse this address */
 	execbuf.rsvd1 = ctx[1]->id; /* and bind the second context image */
