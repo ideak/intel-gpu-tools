@@ -72,8 +72,11 @@ static void trigger_reset(int fd)
 	igt_kmsg(KMSG_DEBUG "Forcing GPU reset\n");
 	igt_force_gpu_reset(fd);
 
-	/* The forced reset should be immediate */
-	igt_assert_lte(igt_seconds_elapsed(&ts), 2);
+	/* The forced reset should be immediate for non GUC platforms.
+	 * GUC log capture can take some time so skip check here.
+	 */
+	if (!gem_using_guc_submission(fd))
+		igt_assert_lte(igt_seconds_elapsed(&ts), 2);
 
 	/* And just check the gpu is indeed running again */
 	igt_kmsg(KMSG_DEBUG "Checking that the GPU recovered\n");
