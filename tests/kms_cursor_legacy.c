@@ -522,9 +522,15 @@ static void basic_flip_cursor(igt_display_t *display,
 	struct igt_fb fb_info, cursor_fb, cursor_fb2, argb_fb;
 	unsigned vblank_start;
 	enum pipe pipe = find_connected_pipe(display, false);
-	uint64_t ahnd = (flags & BASIC_BUSY) ? get_reloc_ahnd(display->drm_fd, 0) : 0;
+	uint64_t ahnd = 0;
 	igt_spin_t *spin;
 	int i, miss1 = 0, miss2 = 0, delta;
+
+	if (flags & BASIC_BUSY)
+	{
+		igt_require_intel(display->drm_fd);
+		ahnd = get_reloc_ahnd(display->drm_fd, 0);
+	}
 
 	if (mode >= flip_test_atomic)
 		igt_require(display->is_atomic);
@@ -1327,6 +1333,7 @@ static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
 	igt_pipe_t *pipe_connected = &display->pipes[pipe];
 	igt_plane_t *plane_primary = igt_pipe_get_plane_type(pipe_connected, DRM_PLANE_TYPE_PRIMARY);
 	igt_crc_t crcs[2], test_crc;
+	igt_require_intel(display->drm_fd);
 	uint64_t ahnd = get_reloc_ahnd(display->drm_fd, 0);
 
 	if (atomic)
