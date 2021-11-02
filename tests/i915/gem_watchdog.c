@@ -222,7 +222,7 @@ static void virtual(int i915, const intel_ctx_cfg_t *base_cfg)
 	const intel_ctx_t *ctx[num_engines];
 	uint64_t ahnd;
 
-	igt_require(gem_has_execlists(i915));
+	igt_require(gem_has_execlists(i915) || gem_has_guc_submission(i915));
 
 	igt_debug("%u virtual engines\n", num_engines);
 	igt_require(num_engines);

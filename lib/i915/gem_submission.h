@@ -28,8 +28,10 @@
 
 #include "intel_ctx.h"
 
-#define GEM_SUBMISSION_EXECLISTS	(1 << 1)
-#define GEM_SUBMISSION_GUC		(1 << 2)
+#define GEM_SUBMISSION_RINGBUF		1
+#define GEM_SUBMISSION_EXECLISTS	2
+#define GEM_SUBMISSION_GUC		3
+
 unsigned gem_submission_method(int fd);
 void gem_submission_print_method(int fd);
 bool gem_has_execlists(int fd);

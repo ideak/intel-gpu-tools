@@ -63,8 +63,7 @@
 unsigned gem_submission_method(int fd)
 {
 	const int gen = intel_gen(intel_get_drm_devid(fd));
-	unsigned flags = 0;
-
+	unsigned method = GEM_SUBMISSION_RINGBUF;
 	int dir;
 
 	dir = igt_params_open(fd);
@@ -72,16 +71,13 @@ unsigned gem_submission_method(int fd)
 		return 0;
 
 	if (igt_sysfs_get_u32(dir, "enable_guc") & 1) {
-		flags |= GEM_SUBMISSION_GUC | GEM_SUBMISSION_EXECLISTS;
-		goto out;
+		method = GEM_SUBMISSION_GUC;
+	} else if (gen >= 8) {
+		method = GEM_SUBMISSION_EXECLISTS;
 	}
 
-	if (gen >= 8)
-		flags |= GEM_SUBMISSION_EXECLISTS;
-
-out:
 	close(dir);
-	return flags;
+	return method;
 }
 
 /**
@@ -92,19 +88,19 @@ out:
  */
 void gem_submission_print_method(int fd)
 {
-	const unsigned flags = gem_submission_method(fd);
+	const unsigned method = gem_submission_method(fd);
 	const struct intel_device_info *info;
 
 	info = intel_get_device_info(intel_get_drm_devid(fd));
 	if (info)
 		igt_info("Running on %s\n", info->codename);
 
-	if (flags & GEM_SUBMISSION_GUC) {
+	if (method == GEM_SUBMISSION_GUC) {
 		igt_info("Using GuC submission\n");
 		return;
 	}
 
-	if (flags & GEM_SUBMISSION_EXECLISTS) {
+	if (method == GEM_SUBMISSION_EXECLISTS) {
 		igt_info("Using Execlists submission\n");
 		return;
 	}
@@ -121,7 +117,7 @@ void gem_submission_print_method(int fd)
  */
 bool gem_has_execlists(int fd)
 {
-	return gem_submission_method(fd) & GEM_SUBMISSION_EXECLISTS;
+	return gem_submission_method(fd) == GEM_SUBMISSION_EXECLISTS;
 }
 
 /**
@@ -133,7 +129,7 @@ bool gem_has_execlists(int fd)
  */
 bool gem_has_guc_submission(int fd)
 {
-	return gem_submission_method(fd) & GEM_SUBMISSION_GUC;
+	return gem_submission_method(fd) == GEM_SUBMISSION_GUC;
 }
 
 static bool is_wedged(int i915)
