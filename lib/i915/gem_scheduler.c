@@ -145,7 +145,7 @@ bool gem_scheduler_has_timeslicing(int fd)
 		 I915_SCHEDULER_CAP_SEMAPHORES)) ==
 		(I915_SCHEDULER_CAP_PREEMPTION |
 		I915_SCHEDULER_CAP_SEMAPHORES))
-		|| gem_has_guc_submission(fd));
+		|| gem_using_guc_submission(fd));
 }
 
 /**

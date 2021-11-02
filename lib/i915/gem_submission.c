@@ -115,7 +115,7 @@ void gem_submission_print_method(int fd)
  * Feature test macro to query whether the driver is using execlists as a
  * hardware submission method.
  */
-bool gem_has_execlists(int fd)
+bool gem_using_execlists(int fd)
 {
 	return gem_submission_method(fd) == GEM_SUBMISSION_EXECLISTS;
 }
@@ -127,7 +127,7 @@ bool gem_has_execlists(int fd)
  * Feature test macro to query whether the driver is using the GuC as a
  * hardware submission method.
  */
-bool gem_has_guc_submission(int fd)
+bool gem_using_guc_submission(int fd)
 {
 	return gem_submission_method(fd) == GEM_SUBMISSION_GUC;
 }
