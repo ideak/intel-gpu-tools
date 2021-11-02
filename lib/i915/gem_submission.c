@@ -52,21 +52,7 @@
  * currently used hardware submission method. Different generations of hardware
  * support different submission backends, currently we're distinguishing 3
  * different methods: legacy ringbuffer submission, execlists, GuC submission.
- * For legacy ringbuffer submission, there's also a variation where we're using
- * semaphores for synchronization between engines.
  */
-
-static bool has_semaphores(int fd, int dir)
-{
-	int val = 0;
-	struct drm_i915_getparam gp = {
-		gp.param = I915_PARAM_HAS_SEMAPHORES,
-		gp.value = &val,
-	};
-	if (ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp) < 0)
-		val = igt_sysfs_get_boolean(dir, "semaphores");
-	return val;
-}
 
 /**
  * gem_submission_method:
@@ -90,13 +76,8 @@ unsigned gem_submission_method(int fd)
 		goto out;
 	}
 
-	if (gen >= 8) {
+	if (gen >= 8)
 		flags |= GEM_SUBMISSION_EXECLISTS;
-		goto out;
-	}
-
-	if (has_semaphores(fd, dir))
-		flags |= GEM_SUBMISSION_SEMAPHORES;
 
 out:
 	close(dir);
@@ -128,20 +109,7 @@ void gem_submission_print_method(int fd)
 		return;
 	}
 
-	igt_info("Using Legacy submission%s\n",
-		 flags & GEM_SUBMISSION_SEMAPHORES ? ", with semaphores" : "");
-}
-
-/**
- * gem_has_semaphores:
- * @fd: open i915 drm file descriptor
- *
- * Feature test macro to query whether the driver is using semaphores for
- * synchronization between engines.
- */
-bool gem_has_semaphores(int fd)
-{
-	return gem_submission_method(fd) & GEM_SUBMISSION_SEMAPHORES;
+	igt_info("Using Legacy submission\n");
 }
 
 /**

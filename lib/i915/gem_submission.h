@@ -28,12 +28,10 @@
 
 #include "intel_ctx.h"
 
-#define GEM_SUBMISSION_SEMAPHORES	(1 << 0)
 #define GEM_SUBMISSION_EXECLISTS	(1 << 1)
 #define GEM_SUBMISSION_GUC		(1 << 2)
 unsigned gem_submission_method(int fd);
 void gem_submission_print_method(int fd);
-bool gem_has_semaphores(int fd);
 bool gem_has_execlists(int fd);
 bool gem_has_guc_submission(int fd);
 bool gem_engine_has_mutable_submission(int fd, unsigned int engine);
