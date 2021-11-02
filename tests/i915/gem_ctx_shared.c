@@ -159,7 +159,7 @@ static void disjoint_timelines(int i915, const intel_ctx_cfg_t *cfg)
 	uint32_t plug;
 	uint64_t ahnd;
 
-	igt_require(gem_using_execlists(i915) || gem_using_guc_submission(i915));
+	igt_require(gem_uses_ppgtt(i915) && gem_scheduler_enabled(i915));
 
 	/*
 	 * Each context, although they share a vm, are expected to be
