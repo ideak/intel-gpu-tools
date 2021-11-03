@@ -51,6 +51,7 @@ igt_hang_t igt_hang_ctx_with_ahnd(int fd, uint64_t ahnd, uint32_t ctx, int ring,
 
 #define HANG_ALLOW_BAN 1
 #define HANG_ALLOW_CAPTURE 2
+#define HANG_WANT_ENGINE_RESET 4
 
 igt_hang_t igt_hang_ring(int fd, int ring);
 igt_hang_t igt_hang_ring_with_ahnd(int fd, int ring, uint64_t ahnd);

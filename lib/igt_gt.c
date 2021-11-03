@@ -56,23 +56,28 @@
  * engines.
  */
 
+static int reset_query_once = -1;
+
 static bool has_gpu_reset(int fd)
 {
-	static int once = -1;
-	if (once < 0) {
-		struct drm_i915_getparam gp;
-		int val = 0;
+	if (reset_query_once < 0) {
+		reset_query_once = gem_gpu_reset_type(fd);
 
-		memset(&gp, 0, sizeof(gp));
-		gp.param = 35; /* HAS_GPU_RESET */
-		gp.value = &val;
-
-		if (ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp))
-			once = intel_gen(intel_get_drm_devid(fd)) >= 5;
-		else
-			once = val > 0;
+		/* Very old kernels did not support the query */
+		if (reset_query_once == -1)
+			reset_query_once =
+			      (intel_gen(intel_get_drm_devid(fd)) >= 5) ? 1 : 0;
 	}
-	return once;
+
+	return reset_query_once > 0;
+}
+
+static bool has_engine_reset(int fd)
+{
+	if (reset_query_once < 0)
+		has_gpu_reset(fd);
+
+	return reset_query_once > 1;
 }
 
 static void eat_error_state(int dev)
@@ -176,7 +181,11 @@ igt_hang_t igt_allow_hang(int fd, unsigned ctx, unsigned flags)
 		igt_skip("hang injection disabled by user [IGT_HANG=0]\n");
 	gem_context_require_bannable(fd);
 
-	allow_reset = 1;
+	if (flags & HANG_WANT_ENGINE_RESET)
+		allow_reset = 2;
+	else
+		allow_reset = 1;
+
 	if ((flags & HANG_ALLOW_CAPTURE) == 0) {
 		param.param = I915_CONTEXT_PARAM_NO_ERROR_CAPTURE;
 		param.value = 1;
@@ -187,10 +196,15 @@ igt_hang_t igt_allow_hang(int fd, unsigned ctx, unsigned flags)
 		__gem_context_set_param(fd, &param);
 		allow_reset = INT_MAX; /* any reset method */
 	}
+
 	igt_require(igt_params_set(fd, "reset", "%d", allow_reset));
+	reset_query_once = -1;  /* Re-query after changing param */
 
 	if (!igt_check_boolean_env_var("IGT_HANG_WITHOUT_RESET", false))
 		igt_require(has_gpu_reset(fd));
+
+	if (flags & HANG_WANT_ENGINE_RESET)
+		igt_require(has_engine_reset(fd));
 
 	ban = context_get_ban(fd, ctx);
 	if ((flags & HANG_ALLOW_BAN) == 0)
