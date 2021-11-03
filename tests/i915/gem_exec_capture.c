@@ -524,7 +524,6 @@ static void many(int fd, int dir, uint64_t size, unsigned int flags)
 	}
 	igt_info("Captured %lu %"PRId64"-blobs out of a total of %lu\n",
 		 blobs, size >> 12, count);
-	igt_assert(count);
 
 	free(error);
 	free(offsets);
