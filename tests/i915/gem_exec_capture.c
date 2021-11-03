@@ -23,6 +23,7 @@
 
 #include <sys/poll.h>
 #include <zlib.h>
+#include <sched.h>
 
 #include "i915/gem.h"
 #include "i915/gem_create.h"
@@ -30,6 +31,8 @@
 #include "igt_device.h"
 #include "igt_rand.h"
 #include "igt_sysfs.h"
+
+#define MAX_RESET_TIME	600
 
 IGT_TEST_DESCRIPTION("Check that we capture the user specified objects on a hang");
 
@@ -213,7 +216,29 @@ static void configure_hangs(int fd, const struct intel_execution_engine2 *e, int
 	gem_engine_property_printf(fd, e->name, "heartbeat_interval_ms", "%d", 500);
 
 	/* Allow engine based resets and disable banning */
-	igt_allow_hang(fd, ctxt_id, HANG_ALLOW_CAPTURE);
+	igt_allow_hang(fd, ctxt_id, HANG_ALLOW_CAPTURE | HANG_WANT_ENGINE_RESET);
+}
+
+static bool fence_busy(int fence)
+{
+	return poll(&(struct pollfd){fence, POLLIN}, 1, 0) == 0;
+}
+
+static void wait_to_die(int fence_out)
+{
+	struct timeval before, after, delta;
+
+	/* Wait for a reset to occur */
+	gettimeofday(&before, NULL);
+	while (fence_busy(fence_out)) {
+		gettimeofday(&after, NULL);
+		timersub(&after, &before, &delta);
+		igt_assert(delta.tv_sec < MAX_RESET_TIME);
+		sched_yield();
+	}
+	gettimeofday(&after, NULL);
+	timersub(&after, &before, &delta);
+	igt_info("Target died after %ld.%06lds\n", delta.tv_sec, delta.tv_usec);
 }
 
 static void __capture1(int fd, int dir, uint64_t ahnd, const intel_ctx_t *ctx,
@@ -230,7 +255,7 @@ static void __capture1(int fd, int dir, uint64_t ahnd, const intel_ctx_t *ctx,
 	struct drm_i915_gem_execbuffer2 execbuf;
 	uint32_t *batch, *seqno;
 	struct offset offset;
-	int i;
+	int i, fence_out;
 
 	configure_hangs(fd, e, ctx->id);
 
@@ -315,18 +340,25 @@ static void __capture1(int fd, int dir, uint64_t ahnd, const intel_ctx_t *ctx,
 	execbuf.flags = e->flags;
 	if (gen > 3 && gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
+	execbuf.flags |= I915_EXEC_FENCE_OUT;
 	execbuf.rsvd1 = ctx->id;
+	execbuf.rsvd2 = ~0UL;
 
 	igt_assert(!READ_ONCE(*seqno));
-	gem_execbuf(fd, &execbuf);
+	gem_execbuf_wr(fd, &execbuf);
+
+	fence_out = execbuf.rsvd2 >> 32;
+	igt_assert(fence_out >= 0);
 
 	/* Wait for the request to start */
 	while (READ_ONCE(*seqno) != 0xc0ffee)
 		igt_assert(gem_bo_busy(fd, obj[SCRATCH].handle));
 	munmap(seqno, 4096);
 
+	/* Wait for a reset to occur */
+	wait_to_die(fence_out);
+
 	/* Check that only the buffer we marked is reported in the error */
-	igt_force_gpu_reset(fd);
 	memset(&offset, 0, sizeof(offset));
 	offset.addr = obj[CAPTURE].offset;
 	igt_assert_eq(check_error_state(dir, &offset, 1, target_size, false), 1);
@@ -373,7 +405,8 @@ static int cmp(const void *A, const void *B)
 static struct offset *
 __captureN(int fd, int dir, uint64_t ahnd, const intel_ctx_t *ctx,
 	   const struct intel_execution_engine2 *e,
-	   unsigned int size, int count, unsigned int flags)
+	   unsigned int size, int count,
+	   unsigned int flags, int *_fence_out)
 #define INCREMENTAL 0x1
 #define ASYNC 0x2
 {
@@ -383,7 +416,7 @@ __captureN(int fd, int dir, uint64_t ahnd, const intel_ctx_t *ctx,
 	struct drm_i915_gem_execbuffer2 execbuf;
 	uint32_t *batch, *seqno;
 	struct offset *offsets;
-	int i;
+	int i, fence_out;
 
 	configure_hangs(fd, e, ctx->id);
 
@@ -491,10 +524,17 @@ __captureN(int fd, int dir, uint64_t ahnd, const intel_ctx_t *ctx,
 	execbuf.flags = e->flags;
 	if (gen > 3 && gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
+	execbuf.flags |= I915_EXEC_FENCE_OUT;
 	execbuf.rsvd1 = ctx->id;
+	execbuf.rsvd2 = ~0UL;
 
 	igt_assert(!READ_ONCE(*seqno));
-	gem_execbuf(fd, &execbuf);
+	gem_execbuf_wr(fd, &execbuf);
+
+	fence_out = execbuf.rsvd2 >> 32;
+	igt_assert(fence_out >= 0);
+	if (_fence_out)
+		*_fence_out = fence_out;
 
 	/* Wait for the request to start */
 	while (READ_ONCE(*seqno) != 0xc0ffee)
@@ -502,7 +542,7 @@ __captureN(int fd, int dir, uint64_t ahnd, const intel_ctx_t *ctx,
 	munmap(seqno, 4096);
 
 	if (!(flags & ASYNC)) {
-		igt_force_gpu_reset(fd);
+		wait_to_die(fence_out);
 		gem_sync(fd, obj[count + 1].handle);
 	}
 
@@ -554,7 +594,7 @@ static void many(int fd, int dir, uint64_t size, unsigned int flags)
 	intel_require_memory(count, size, CHECK_RAM);
 	ahnd = get_reloc_ahnd(fd, ctx->id);
 
-	offsets = __captureN(fd, dir, ahnd, ctx, e, size, count, flags);
+	offsets = __captureN(fd, dir, ahnd, ctx, e, size, count, flags, NULL);
 
 	blobs = check_error_state(dir, offsets, count, size, !!(flags & INCREMENTAL));
 	igt_info("Captured %lu %"PRId64"-blobs out of a total of %lu\n",
@@ -607,6 +647,7 @@ static void prioinv(int fd, int dir, const intel_ctx_t *ctx,
 	igt_assert(pipe(link) == 0);
 	igt_fork(child, 1) {
 		const intel_ctx_t *ctx2;
+		int fence_out;
 		fd = gem_reopen_driver(fd);
 		igt_debug("Submitting large capture [%ld x %dMiB objects]\n",
 			  count, (int)(size >> 20));
@@ -618,11 +659,11 @@ static void prioinv(int fd, int dir, const intel_ctx_t *ctx,
 		/* Reopen the allocator in the new process. */
 		ahnd = get_reloc_ahnd(fd, ctx2->id);
 
-		free(__captureN(fd, dir, ahnd, ctx2, e, size, count, ASYNC));
+		free(__captureN(fd, dir, ahnd, ctx2, e, size, count, ASYNC, &fence_out));
 		put_ahnd(ahnd);
 
 		write(link[1], &fd, sizeof(fd)); /* wake the parent up */
-		igt_force_gpu_reset(fd);
+		wait_to_die(fence_out);
 		write(link[1], &fd, sizeof(fd)); /* wake the parent up */
 	}
 	read(link[0], &dummy, sizeof(dummy));
@@ -713,7 +754,7 @@ igt_main
 		gem_require_mmap_wc(fd);
 		igt_require(has_capture(fd));
 		ctx = intel_ctx_create_all_physical(fd);
-		igt_allow_hang(fd, ctx->id, HANG_ALLOW_CAPTURE);
+		igt_allow_hang(fd, ctx->id, HANG_ALLOW_CAPTURE | HANG_WANT_ENGINE_RESET);
 
 		dir = igt_sysfs_open(fd);
 		igt_require(igt_sysfs_set(dir, "error", "Begone!"));
