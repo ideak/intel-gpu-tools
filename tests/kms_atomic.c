@@ -502,13 +502,6 @@ static void plane_overlay(igt_pipe_t *pipe, igt_output_t *output, igt_plane_t *p
 	uint32_t w = mode->hdisplay / 2;
 	uint32_t h = mode->vdisplay / 2;
 
-	/* On AMD, with hardware cursor, overlay plane must fully cover
-	 * the primary plane (underlay). AMD does not support this test
-	 * scenario
-	 */
-	igt_require_f(!is_amdgpu_device(output->display->drm_fd),
-		      "Overlay must fully cover the primary plane on AMD\n");
-
 	igt_require(format != 0);
 
 	igt_create_pattern_fb(pipe->display->drm_fd, w, h,
