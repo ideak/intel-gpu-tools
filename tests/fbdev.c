@@ -139,15 +139,15 @@ static void mode_tests(int fd)
 		 * Tests that are expected to succeed.
 		 */
 
-		/* jump to opposite end of virtual screen */
+		igt_debug("Jump to opposite end of virtual screen\n");
 		pan_var.xoffset = XOFFSET(var_info.xres_virtual - var_info.xres - var_info.xoffset);
 		pan_var.yoffset = YOFFSET(var_info.yres_virtual - var_info.yres - var_info.yoffset);
 		pan_test(fd, &pan_var, 0);
-		/* jump to (0, 0) */
+		igt_debug("Jump to (0, 0)\n");
 		pan_var.xoffset = XOFFSET(0);
 		pan_var.yoffset = YOFFSET(0);
 		pan_test(fd, &pan_var, 0);
-		/* jump to maximum extend */
+		igt_debug("Jump to maximum extend\n");
 		pan_var.xoffset = XOFFSET(var_info.xres_virtual - var_info.xres);
 		pan_var.yoffset = YOFFSET(var_info.yres_virtual - var_info.yres);
 		pan_test(fd, &pan_var, 0);
@@ -156,11 +156,11 @@ static void mode_tests(int fd)
 		 * Tests that are expected to fail.
 		 */
 
-		/* jump beyond maximum horizontal extend */
+		igt_debug("Jump beyond maximum horizontal extend\n");
 		pan_var.xoffset = XOFFSET(var_info.xres_virtual - var_info.xres + PANSTEP(fix_info.xpanstep));
 		pan_var.yoffset = YOFFSET(0);
 		pan_test(fd, &pan_var, -1);
-		/* jump beyond horizontal virtual resolution */
+		igt_debug("Jump beyond horizontal virtual resolution\n");
 		pan_var.xoffset = XOFFSET(var_info.xres_virtual);
 		pan_var.yoffset = YOFFSET(0);
 		pan_test(fd, &pan_var, -1);
@@ -184,11 +184,11 @@ static void mode_tests(int fd)
 			expected_ret = -1;
 		}
 
-		/* jump beyond maximum vertical extend */
+		igt_debug("Jump beyond maximum vertical extend\n");
 		pan_var.xoffset = XOFFSET(0);
 		pan_var.yoffset = YOFFSET(var_info.yres_virtual - var_info.yres + PANSTEP(fix_info.ypanstep));
 		pan_test(fd, &pan_var, expected_ret);
-		/* jump beyond vertical virtual resolution */
+		igt_debug("Jump beyond vertical virtual resolution\n");
 		pan_var.xoffset = XOFFSET(0);
 		pan_var.yoffset = YOFFSET(var_info.yres_virtual);
 		pan_test(fd, &pan_var, expected_ret);
