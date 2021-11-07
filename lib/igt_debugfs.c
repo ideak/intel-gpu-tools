@@ -352,6 +352,23 @@ void __igt_debugfs_read(int fd, const char *filename, char *buf, int size)
 }
 
 /**
+ * __igt_debugfs_write:
+ * @fd: the drm device file fd
+ * @filename: file name
+ * @buf: buffer to be written to the debugfs file
+ * @size: size of the buffer
+ *
+ * This function opens the debugfs file, writes it, then closes the file.
+ */
+void __igt_debugfs_write(int fd, const char *filename, const char *buf, int size)
+{
+	int dir = igt_debugfs_dir(fd);
+
+	igt_sysfs_write(dir, filename, buf, size);
+	close(dir);
+}
+
+/**
  * igt_debugfs_search:
  * @filename: file name
  * @substring: string to search for in @filename
