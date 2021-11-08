@@ -301,8 +301,6 @@ igt_main
 		set_device_filter(dev_path);
 
 		igt_skip_on(!is_sysfs_reset_supported(dev.fds.dev));
-
-		igt_set_timeout(60, "device reset tests timed out after 60s");
 	}
 
 	igt_describe("Unbinds driver from device, initiates reset"
@@ -319,7 +317,6 @@ igt_main
 	}
 
 	igt_fixture {
-		igt_reset_timeout();
 		cleanup_device_fds(&dev);
 	}
 }
