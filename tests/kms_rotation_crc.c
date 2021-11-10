@@ -300,15 +300,15 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 			igt_plane_set_position(plane, data->pos_x, data->pos_y);
 		igt_display_commit2(display, COMMIT_ATOMIC);
 
-		if (is_i915_device(data->gfx_fd)) {
+		if (is_amdgpu_device(data->gfx_fd)) {
+			igt_pipe_crc_collect_crc(
+				data->pipe_crc,
+				&data->crc_rect[data->output_crc_in_use][rect].flip_crc);
+		} else {
 			igt_pipe_crc_get_current(
 				display->drm_fd, data->pipe_crc,
 				&data->crc_rect[data->output_crc_in_use][rect].flip_crc);
 			igt_remove_fb(data->gfx_fd, &data->fb_flip);
-		} else if (is_amdgpu_device(data->gfx_fd)) {
-			igt_pipe_crc_collect_crc(
-				data->pipe_crc,
-				&data->crc_rect[data->output_crc_in_use][rect].flip_crc);
 		}
 
 		/*
@@ -323,13 +323,15 @@ static void prepare_fbs(data_t *data, igt_output_t *output,
 			igt_plane_set_position(plane, data->pos_x, data->pos_y);
 		igt_display_commit2(display, COMMIT_ATOMIC);
 
-		if (is_i915_device(data->gfx_fd)) {
-			igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc,
-					&data->crc_rect[data->output_crc_in_use][rect].ref_crc);
-		} else if (is_amdgpu_device(data->gfx_fd)) {
-			igt_pipe_crc_collect_crc(data->pipe_crc,
-					&data->crc_rect[data->output_crc_in_use][rect].ref_crc);
+		if (is_amdgpu_device(data->gfx_fd)) {
+			igt_pipe_crc_collect_crc(
+				data->pipe_crc,
+				&data->crc_rect[data->output_crc_in_use][rect].ref_crc);
 			igt_remove_fb(data->gfx_fd, &data->fb_flip);
+		} else {
+			igt_pipe_crc_get_current(
+				display->drm_fd, data->pipe_crc,
+				&data->crc_rect[data->output_crc_in_use][rect].ref_crc);
 		}
 		data->crc_rect[data->output_crc_in_use][rect].valid = true;
 	}
@@ -388,12 +390,15 @@ static void test_single_case(data_t *data, enum pipe pipe,
 	igt_assert_eq(ret, 0);
 
 	/* Check CRC */
-	if (is_i915_device(data->gfx_fd))
-		igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc, &crc_output);
-	else if (is_amdgpu_device(data->gfx_fd))
+	if (is_amdgpu_device(data->gfx_fd)) {
 		igt_pipe_crc_collect_crc(data->pipe_crc, &crc_output);
-	igt_assert_crc_equal(&data->crc_rect[data->output_crc_in_use][rect].ref_crc,
-			     &crc_output);
+	} else {
+		igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc,
+								 &crc_output);
+	}
+	igt_assert_crc_equal(
+		&data->crc_rect[data->output_crc_in_use][rect].ref_crc,
+		&crc_output);
 
 	/*
 	 * If flips are requested flip to a different fb and
@@ -415,10 +420,13 @@ static void test_single_case(data_t *data, enum pipe pipe,
 			igt_assert_eq(ret, 0);
 		}
 		kmstest_wait_for_pageflip(data->gfx_fd);
-		if (is_i915_device(data->gfx_fd))
-			igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc, &crc_output);
-		else if (is_amdgpu_device(data->gfx_fd))
+
+		if (is_amdgpu_device(data->gfx_fd)) {
 			igt_pipe_crc_collect_crc(data->pipe_crc, &crc_output);
+		} else {
+			igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc,
+									 &crc_output);
+		}
 		igt_assert_crc_equal(&data->crc_rect[data->output_crc_in_use][rect].flip_crc,
 				     &crc_output);
 	}
@@ -524,7 +532,9 @@ static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_form
 			/* Only support partial covering primary plane on gen9+ */
 			if (is_amdgpu_device(data->gfx_fd) ||
 				(plane_type == DRM_PLANE_TYPE_PRIMARY &&
-			    intel_display_ver(intel_get_drm_devid(data->gfx_fd)) < 9)) {
+				 is_i915_device(data->gfx_fd) &&
+				 intel_display_ver(
+					 intel_get_drm_devid(data->gfx_fd)) < 9)) {
 				if (i != rectangle)
 					continue;
 				else
@@ -1038,7 +1048,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 	int gen = 0;
 
 	igt_fixture {
-		data.gfx_fd = drm_open_driver_master(DRIVER_INTEL | DRIVER_AMDGPU);
+		data.gfx_fd = drm_open_driver_master(DRIVER_ANY);
 		if (is_i915_device(data.gfx_fd)) {
 			data.devid = intel_get_drm_devid(data.gfx_fd);
 			gen = intel_display_ver(data.devid);

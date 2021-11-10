@@ -647,7 +647,7 @@ igt_main
 	data_t data = {};
 
 	igt_fixture {
-		data.fd = drm_open_driver_master(DRIVER_AMDGPU | DRIVER_INTEL);
+		data.fd = drm_open_driver_master(DRIVER_ANY);
 
 		kmstest_set_vt_graphics_mode();
 
