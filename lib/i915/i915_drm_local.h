@@ -21,29 +21,6 @@ extern "C" {
  */
 #define I915_ENGINE_CLASS_COMPUTE 4
 
-/* Needed for PXP */
-#define I915_GEM_CREATE_EXT_PROTECTED_CONTENT  1
-#define I915_CONTEXT_PARAM_PROTECTED_CONTENT   0xd
-#define I915_PROTECTED_CONTENT_DEFAULT_SESSION 0xf
-
-/* Needed for PXP */
-struct drm_i915_gem_create_ext_protected_content {
-	/** @base: Extension link. See struct i915_user_extension. */
-	struct i915_user_extension base;
-	/** @flags: reserved for future usage, currently MBZ */
-	__u32 flags;
-};
-
-/*
- * Indicates the 2k user priority levels are statically mapped into 3 buckets as
- * follows:
- *
- * -1k to -1	Low priority
- * 0		Normal priority
- * 1 to 1k	Highest priority
- */
-#define   I915_SCHEDULER_CAP_STATIC_PRIORITY_MAP	(1ul << 5)
-
 #if defined(__cplusplus)
 }
 #endif
