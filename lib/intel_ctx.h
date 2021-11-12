@@ -46,7 +46,9 @@ typedef struct intel_ctx_cfg {
 	uint32_t vm;
 	bool nopersist;
 	bool load_balance;
+	bool parallel;
 	unsigned int num_engines;
+	unsigned int width;
 	struct i915_engine_class_instance engines[GEM_MAX_ENGINES];
 } intel_ctx_cfg_t;
 

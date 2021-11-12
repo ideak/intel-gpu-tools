@@ -2642,6 +2642,11 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #define STATE3D_COLOR_FACTOR	((0x3<<29)|(0x1d<<24)|(0x01<<16))
 
+/* Atomics */
+#define MI_ATOMIC			((0x2f << 23) | 2)
+#define   MI_ATOMIC_INLINE_DATA         (1 << 18)
+#define   MI_ATOMIC_ADD                 (0x7 << 8)
+
 /* Batch */
 #define MI_BATCH_BUFFER		((0x30 << 23) | 1)
 #define MI_BATCH_BUFFER_START	(0x31 << 23)
