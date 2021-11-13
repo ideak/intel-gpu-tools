@@ -308,6 +308,27 @@ int igt_debugfs_open(int device, const char *filename, int mode)
 }
 
 /**
+ * igt_debugfs_exists:
+ * @device: the drm device file fd
+ * @filename: file name
+ * @mode: mode bits as used by open()
+ *
+ * Test that the specified debugfs file exists and can be opened with the
+ * requested mode.
+ */
+bool igt_debugfs_exists(int device, const char *filename, int mode)
+{
+	int fd = igt_debugfs_open(device, filename, mode);
+
+	if (fd >= 0) {
+		close(fd);
+		return true;
+	}
+
+	return false;
+}
+
+/**
  * igt_debugfs_simple_read:
  * @filename: file name
  * @buf: buffer where the contents will be stored, allocated by the caller
