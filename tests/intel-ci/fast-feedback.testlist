@@ -34,6 +34,10 @@ igt@gem_flink_basic@double-flink
 igt@gem_flink_basic@flink-lifetime
 igt@gem_huc_copy@huc-copy
 igt@gem_linear_blits@basic
+igt@gem_lmem_swapping@basic
+igt@gem_lmem_swapping@parallel-random-engines
+igt@gem_lmem_swapping@random-engines
+igt@gem_lmem_swapping@verify-random
 igt@gem_mmap@basic
 igt@gem_mmap_gtt@basic
 igt@gem_render_linear_blits@basic
