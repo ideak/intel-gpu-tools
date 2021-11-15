@@ -156,6 +156,7 @@ i915_progs = [
 	'gem_gtt_speed',
 	'gem_huc_copy',
 	'gem_linear_blits',
+	'gem_lmem_swapping',
 	'gem_lut_handle',
 	'gem_madvise',
 	'gem_media_fill',
