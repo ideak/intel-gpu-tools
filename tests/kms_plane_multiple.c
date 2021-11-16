@@ -109,9 +109,12 @@ get_reference_crc(data_t *data, igt_output_t *output, enum pipe pipe,
 
 	mode = igt_output_get_mode(output);
 
+	igt_skip_on(!igt_plane_has_format_mod(data->plane[primary->index],
+		    DRM_FORMAT_XRGB8888, modifier));
+
 	igt_create_color_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
 			    DRM_FORMAT_XRGB8888,
-			    DRM_FORMAT_MOD_LINEAR,
+			    modifier,
 			    color->red, color->green, color->blue,
 			    &data->fb[primary->index]);
 
