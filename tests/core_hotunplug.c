@@ -174,11 +174,11 @@ static void driver_unbind(struct hotunplug *priv, const char *prefix,
 	igt_set_timeout(timeout, "Driver unbind timeout!");
 	igt_assert_f(igt_sysfs_set(priv->fd.sysfs_drv, "unbind",
 				   priv->dev_bus_addr),
-		     "Driver unbind failure!\n");
+		     "Driver unbind failure (%s)!\n", priv->dev_bus_addr);
 	igt_reset_timeout();
 
 	igt_assert_f(faccessat(priv->fd.sysfs_drv, priv->dev_bus_addr, F_OK, 0),
-		     "Unbound device still present\n");
+		     "Unbound device still present (%s)\n", priv->dev_bus_addr);
 }
 
 /* Re-bind the driver to the device */
@@ -190,12 +190,12 @@ static void driver_bind(struct hotunplug *priv, int timeout)
 	igt_set_timeout(timeout, "Driver re-bind timeout!");
 	igt_assert_f(igt_sysfs_set(priv->fd.sysfs_drv, "bind",
 				   priv->dev_bus_addr),
-		     "Driver re-bind failure\n!");
+		     "Driver re-bind failure (%s)!\n", priv->dev_bus_addr);
 	igt_reset_timeout();
 
 	igt_fail_on_f(faccessat(priv->fd.sysfs_drv, priv->dev_bus_addr,
 				F_OK, 0),
-		      "Rebound device not present!\n");
+		      "Rebound device not present (%s)!\n", priv->dev_bus_addr);
 
 	if (priv->snd_unload)
 		igt_kmod_load("snd_hda_intel", NULL);
@@ -223,7 +223,7 @@ static void device_unplug(struct hotunplug *priv, const char *prefix,
 	igt_assert_eq(priv->fd.sysfs_dev, -1);
 
 	igt_assert_f(faccessat(priv->fd.sysfs_bus, priv->dev_bus_addr, F_OK, 0),
-		     "Unplugged device still present\n");
+		     "Unplugged device still present (%s)\n", priv->dev_bus_addr);
 }
 
 /* Re-discover the device by rescanning its bus */
@@ -239,7 +239,7 @@ static void bus_rescan(struct hotunplug *priv, int timeout)
 
 	igt_fail_on_f(faccessat(priv->fd.sysfs_bus, priv->dev_bus_addr,
 				F_OK, 0),
-		      "Fakely unplugged device not rediscovered!\n");
+		      "Fakely unplugged device not rediscovered (%s)!\n", priv->dev_bus_addr);
 }
 
 static void cleanup(struct hotunplug *priv)
