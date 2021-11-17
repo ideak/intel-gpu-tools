@@ -428,7 +428,7 @@ __captureN(int fd, int dir, uint64_t ahnd, const intel_ctx_t *ctx,
 
 	obj[0].handle = gem_create(fd, 4096);
 	obj[0].offset = get_offset(ahnd, obj[0].handle, 4096, 0);
-	obj[0].flags = EXEC_OBJECT_WRITE | ahnd ? EXEC_OBJECT_PINNED : 0;
+	obj[0].flags = EXEC_OBJECT_WRITE | (ahnd ? EXEC_OBJECT_PINNED : 0);
 
 	for (i = 0; i < count; i++) {
 		obj[i + 1].handle = gem_create(fd, size);
