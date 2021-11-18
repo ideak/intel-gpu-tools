@@ -38,6 +38,7 @@ struct device {
 	int gen;
 	int pciid;
 	int llc;
+	uint64_t ahnd; /* ahnd != 0 if no-relocs */
 };
 
 struct buffer {
@@ -119,8 +120,10 @@ static struct buffer *buffer_create(const struct device *device,
 	buffer->size = ALIGN(buffer->stride * height, 4096);
 	buffer->handle = gem_create(device->fd, buffer->size);
 	buffer->caching = device->llc;
-
-	buffer->gtt_offset = buffer->handle * buffer->size;
+	if (device->ahnd)
+		buffer->gtt_offset = get_offset(device->ahnd, buffer->handle, buffer->size, 0);
+	else
+		buffer->gtt_offset = buffer->handle * buffer->size;
 
 	for (int y = 0; y < height; y++) {
 		uint32_t *row = buffer->model + y * width;
@@ -160,20 +163,34 @@ static void buffer_set_tiling(const struct device *device,
 	execbuf.buffer_count = ARRAY_SIZE(obj);
 	if (device->gen >= 6)
 		execbuf.flags = I915_EXEC_BLT;
+	if (device->ahnd)
+		execbuf.flags |= I915_EXEC_NO_RELOC;
 
 	memset(obj, 0, sizeof(obj));
 	obj[0].handle = gem_create(device->fd, size);
 	if (__gem_set_tiling(device->fd, obj[0].handle, tiling, stride) == 0)
 		obj[0].flags = EXEC_OBJECT_NEEDS_FENCE;
+	if (device->ahnd) {
+		obj[0].flags |= EXEC_OBJECT_PINNED | EXEC_OBJECT_WRITE;
+		obj[0].offset = get_offset(device->ahnd, obj[0].handle, size, 0);
+	}
 
 	obj[1].handle = buffer->handle;
 	obj[1].offset = buffer->gtt_offset;
 	if (buffer->fenced)
 		obj[1].flags = EXEC_OBJECT_NEEDS_FENCE;
+	if (device->ahnd)
+		obj[1].flags |= EXEC_OBJECT_PINNED;
 
 	obj[2].handle = gem_create(device->fd, 4096);
-	obj[2].relocs_ptr = to_user_pointer(memset(reloc, 0, sizeof(reloc)));
-	obj[2].relocation_count = 2;
+	if (device->ahnd) {
+		obj[2].offset = get_offset(device->ahnd, obj[2].handle, 4096, 0);
+		obj[2].flags |= EXEC_OBJECT_PINNED;
+	} else {
+		obj[2].relocs_ptr = to_user_pointer(memset(reloc, 0, sizeof(reloc)));
+		obj[2].relocation_count = 2;
+	}
+
 	batch = gem_mmap__cpu(device->fd, obj[2].handle, 0, 4096, PROT_WRITE);
 
 	i = 0;
@@ -247,8 +264,11 @@ static void buffer_set_tiling(const struct device *device,
 	gem_execbuf(device->fd, &execbuf);
 
 	gem_close(device->fd, obj[2].handle);
+	put_offset(device->ahnd, obj[2].offset);
+
 	gem_close(device->fd, obj[1].handle);
 
+	put_offset(device->ahnd, buffer->gtt_offset);
 	buffer->gtt_offset = obj[0].offset;
 	buffer->handle = obj[0].handle;
 
@@ -292,19 +312,34 @@ static bool blit_to_linear(const struct device *device,
 	execbuf.buffer_count = ARRAY_SIZE(obj);
 	if (device->gen >= 6)
 		execbuf.flags = I915_EXEC_BLT;
+	if (device->ahnd)
+		execbuf.flags |= I915_EXEC_NO_RELOC;
 
 	memset(obj, 0, sizeof(obj));
 	if (__gem_userptr(device->fd, linear, buffer->size, 0, 0, &obj[0].handle))
 		return false;
 
+	if (device->ahnd) {
+		obj[0].flags |= EXEC_OBJECT_PINNED | EXEC_OBJECT_WRITE;
+		obj[0].offset = get_offset(device->ahnd, obj[0].handle, buffer->size, 0);
+	}
+
 	obj[1].handle = buffer->handle;
 	obj[1].offset = buffer->gtt_offset;
 	obj[1].flags = EXEC_OBJECT_NEEDS_FENCE;
+	if (device->ahnd)
+		obj[1].flags |= EXEC_OBJECT_PINNED;
 
 	memset(reloc, 0, sizeof(reloc));
 	obj[2].handle = gem_create(device->fd, 4096);
-	obj[2].relocs_ptr = to_user_pointer(reloc);
-	obj[2].relocation_count = ARRAY_SIZE(reloc);
+	if (device->ahnd) {
+		obj[2].flags |= EXEC_OBJECT_PINNED;
+		obj[2].offset = get_offset(device->ahnd, obj[2].handle, 4096, 0);
+	} else {
+		obj[2].relocs_ptr = to_user_pointer(reloc);
+		obj[2].relocation_count = ARRAY_SIZE(reloc);
+	}
+
 	batch = gem_mmap__cpu(device->fd, obj[2].handle, 0, 4096, PROT_WRITE);
 
 	if (buffer->tiling >= I915_TILING_Y) {
@@ -368,9 +403,11 @@ static bool blit_to_linear(const struct device *device,
 
 	gem_execbuf(device->fd, &execbuf);
 	gem_close(device->fd, obj[2].handle);
+	put_offset(device->ahnd, obj[2].offset);
 
 	gem_sync(device->fd, obj[0].handle);
 	gem_close(device->fd, obj[0].handle);
+	put_offset(device->ahnd, obj[0].offset);
 
 	return true;
 }
@@ -399,7 +436,8 @@ static void *download(const struct device *device,
 		break;
 
 	case WC:
-		if (!gem_mmap__has_wc(device->fd) || buffer->tiling)
+		if (!(gem_mmap__has_wc(device->fd) || gem_mmap__has_device_coherent(device->fd))
+		    || buffer->tiling)
 			mode = GTT;
 		break;
 
@@ -425,9 +463,12 @@ static void *download(const struct device *device,
 		break;
 
 	case WC:
-		src = gem_mmap__wc(device->fd, buffer->handle,
-				   0, buffer->size,
-				   PROT_READ);
+		src = __gem_mmap__wc(device->fd, buffer->handle,
+				     0, buffer->size,
+				     PROT_READ);
+		if (!src)
+			src = gem_mmap__device_coherent(device->fd, buffer->handle, 0,
+							buffer->size, PROT_READ);
 
 		gem_set_domain(device->fd, buffer->handle,
 			       I915_GEM_DOMAIN_WC, 0);
@@ -490,6 +531,7 @@ static void buffer_free(const struct device *device, struct buffer *buffer)
 {
 	igt_assert(buffer_check(device, buffer, GTT));
 	gem_close(device->fd, buffer->handle);
+	put_offset(device->ahnd, buffer->gtt_offset);
 	free(buffer);
 }
 
@@ -604,22 +646,33 @@ blit(const struct device *device,
 	execbuf.buffer_count = ARRAY_SIZE(obj);
 	if (device->gen >= 6)
 		execbuf.flags = I915_EXEC_BLT;
+	if (device->ahnd)
+		execbuf.flags |= I915_EXEC_NO_RELOC;
 
 	memset(obj, 0, sizeof(obj));
 	obj[0].handle = dst->handle;
 	obj[0].offset = dst->gtt_offset;
 	if (dst->tiling)
 		obj[0].flags = EXEC_OBJECT_NEEDS_FENCE;
+	if (device->ahnd)
+		obj[0].flags |= EXEC_OBJECT_PINNED | EXEC_OBJECT_WRITE;
 
 	obj[1].handle = src->handle;
 	obj[1].offset = src->gtt_offset;
 	if (src->tiling)
 		obj[1].flags = EXEC_OBJECT_NEEDS_FENCE;
+	if (device->ahnd)
+		obj[1].flags |= EXEC_OBJECT_PINNED;
 
 	memset(reloc, 0, sizeof(reloc));
 	obj[2].handle = gem_create(device->fd, 4096);
-	obj[2].relocs_ptr = to_user_pointer(reloc);
-	obj[2].relocation_count = ARRAY_SIZE(reloc);
+	if (device->ahnd) {
+		obj[2].offset = get_offset(device->ahnd, obj[2].handle, 4096, 0);
+		obj[2].flags |= EXEC_OBJECT_PINNED;
+	} else {
+		obj[2].relocs_ptr = to_user_pointer(reloc);
+		obj[2].relocation_count = ARRAY_SIZE(reloc);
+	}
 	batch = gem_mmap__cpu(device->fd, obj[2].handle, 0, 4096, PROT_WRITE);
 
 	if ((src->tiling | dst->tiling) >= I915_TILING_Y) {
@@ -691,6 +744,7 @@ blit(const struct device *device,
 
 	gem_execbuf(device->fd, &execbuf);
 	gem_close(device->fd, obj[2].handle);
+	put_offset(device->ahnd, obj[2].offset);
 
 	dst->gtt_offset = obj[0].offset;
 	src->gtt_offset = obj[1].offset;
@@ -733,6 +787,7 @@ igt_main
 		device.pciid = intel_get_drm_devid(device.fd);
 		device.gen = intel_gen(device.pciid);
 		device.llc = gem_has_llc(device.fd);
+		device.ahnd = get_reloc_ahnd(device.fd, 0);
 	}
 
 	igt_subtest("basic") {
@@ -793,5 +848,9 @@ igt_main
 				}
 			}
 		}
+	}
+
+	igt_fixture {
+		put_ahnd(device.ahnd);
 	}
 }
