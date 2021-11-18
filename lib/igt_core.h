@@ -1164,13 +1164,13 @@ void igt_install_exit_handler(igt_exit_handler_t fn);
 bool igt_run_in_simulation(void);
 /**
  * SLOW_QUICK:
- * @slow: value in simulation mode
- * @quick: value in normal mode
+ * @sim: value in simulation mode
+ * @hw: value in normal mode
  *
  * Simple macro to select between two values (e.g. number of test rounds or test
  * buffer size) depending upon whether i-g-t is run in simulation mode or not.
  */
-#define SLOW_QUICK(slow,quick) (igt_run_in_simulation() ? (quick) : (slow))
+#define SLOW_QUICK(hw, sim) (igt_run_in_simulation() ? (sim) : (hw))
 
 void igt_skip_on_simulation(void);
 
