@@ -376,6 +376,12 @@ static struct engines *discover_engines(char *device)
 			break;
 		}
 
+		/* Double check config is an engine config. */
+		if (engine->busy.config >= __I915_PMU_OTHER(0)) {
+			free((void *)engine->name);
+			continue;
+		}
+
 		engine->class = (engine->busy.config &
 				 (__I915_PMU_OTHER(0) - 1)) >>
 				I915_PMU_CLASS_SHIFT;
