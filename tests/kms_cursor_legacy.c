@@ -27,6 +27,7 @@
 
 #include "i915/gem.h"
 #include "igt.h"
+#include "igt_psr.h"
 #include "igt_rand.h"
 #include "igt_stats.h"
 
@@ -1421,6 +1422,7 @@ igt_main
 {
 	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
 	igt_display_t display = { .drm_fd = -1 };
+	bool intel_psr2_restore = false;
 	int i;
 
 	igt_fixture {
@@ -1428,6 +1430,12 @@ igt_main
 		kmstest_set_vt_graphics_mode();
 
 		igt_display_require(&display, display.drm_fd);
+		/*
+		 * Not possible to evade vblank after a primary or sprite plane
+		 * page flip with cursor legacy APIS when Intel's PSR2 selective
+		 * fetch is enabled, so switching PSR1 for this whole test.
+		 */
+		intel_psr2_restore = i915_psr2_sel_fetch_to_psr1(display.drm_fd);
 	}
 
 	/*Test description for pipe-* and all-pipe-* tests*/
@@ -1609,6 +1617,8 @@ igt_main
 		}
 
 	igt_fixture {
+		if (intel_psr2_restore)
+			i915_psr2_sel_fetch_restore(display.drm_fd);
 		igt_display_fini(&display);
 	}
 }

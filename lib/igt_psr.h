@@ -49,4 +49,7 @@ void psr_print_debugfs(int debugfs_fd);
 
 bool i915_psr2_selective_fetch_check(int drm_fd);
 
+bool i915_psr2_sel_fetch_to_psr1(int drm_fd);
+void i915_psr2_sel_fetch_restore(int drm_fd);
+
 #endif

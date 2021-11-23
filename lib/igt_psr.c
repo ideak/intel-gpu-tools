@@ -280,3 +280,47 @@ bool i915_psr2_selective_fetch_check(int drm_fd)
 
 	return ret;
 }
+
+/**
+ * i915_psr2_sel_fetch_to_psr1
+ *
+ * Check if PSR2 selective fetch is enabled, if yes switch to PSR1 and returns
+ * true otherwise returns false.
+ * This function should be called from tests that are not compatible with PSR2
+ * selective fetch.
+ *
+ * Returns:
+ * True if PSR mode changed to PSR1, false otherwise.
+ */
+bool i915_psr2_sel_fetch_to_psr1(int drm_fd)
+{
+	int debugfs_fd;
+	bool ret = false;
+
+	if (!is_i915_device(drm_fd))
+		return ret;
+
+	debugfs_fd = igt_debugfs_dir(drm_fd);
+	if (psr2_selective_fetch_check(debugfs_fd)) {
+		psr_set(drm_fd, debugfs_fd, PSR_MODE_1);
+		ret = true;
+	}
+
+	close(debugfs_fd);
+	return ret;
+}
+
+/**
+ * i915_psr2_sel_fetch_restore
+ *
+ * Restore PSR2 selective fetch after tests were executed, this function should
+ * only be called if i915_psr2_sel_fetch_to_psr1() returned true.
+ */
+void i915_psr2_sel_fetch_restore(int drm_fd)
+{
+	int debugfs_fd;
+
+	debugfs_fd = igt_debugfs_dir(drm_fd);
+	psr_set(drm_fd, debugfs_fd, PSR_MODE_2_SEL_FETCH);
+	close(debugfs_fd);
+}
