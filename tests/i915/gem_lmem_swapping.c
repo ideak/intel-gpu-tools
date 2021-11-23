@@ -521,6 +521,7 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 
 		i915 = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(i915);
+		igt_require(gem_has_lmem(i915));
 
 		regions = gem_get_query_memory_regions(i915);
 		igt_require(regions);
