@@ -469,6 +469,7 @@ static void object_reloc(struct buf_ops *bops, enum obj_cache_ops cache_op)
 	uint64_t flags = 0;
 	uint64_t shift = cache_op == PURGE_CACHE ? 0x2000 : 0x0;
 	bool purge_cache = cache_op == PURGE_CACHE ? true : false;
+	uint64_t alignment = gem_allows_obj_alignment(i915) ? 0x2000 : 0x0;
 
 	ibb = intel_bb_create_with_relocs(i915, PAGE_SIZE);
 	if (debug_bb)
@@ -490,7 +491,7 @@ static void object_reloc(struct buf_ops *bops, enum obj_cache_ops cache_op)
 	igt_assert(poff_h2 == INTEL_BUF_INVALID_ADDRESS);
 
 	intel_bb_add_object(ibb, h1, PAGE_SIZE, poff_h1, 0, true);
-	intel_bb_add_object(ibb, h2, PAGE_SIZE, poff_h2, 0x2000, true);
+	intel_bb_add_object(ibb, h2, PAGE_SIZE, poff_h2, alignment, true);
 
 	/*
 	 * Objects were added to bb, we expect initial addresses are zeroed
@@ -516,7 +517,7 @@ static void object_reloc(struct buf_ops *bops, enum obj_cache_ops cache_op)
 
 	if (purge_cache) {
 		intel_bb_add_object(ibb, h1, PAGE_SIZE, poff2_h1, 0, true);
-		intel_bb_add_object(ibb, h2, PAGE_SIZE, poff2_h2 + shift, 0x2000, true);
+		intel_bb_add_object(ibb, h2, PAGE_SIZE, poff2_h2 + shift, alignment, true);
 	}
 
 	poff_bb = intel_bb_get_object_offset(ibb, ibb->handle);
