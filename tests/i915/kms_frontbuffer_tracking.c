@@ -724,7 +724,7 @@ static void __debugfs_read(const char *param, char *buf, int len)
 {
 	len = igt_debugfs_simple_read(drm.debugfs, param, buf, len);
 	if (len < 0)
-		igt_assert_eq(len, -ENODEV);
+		igt_assert(len == -ENOENT || len == -ENODEV);
 }
 
 static int __debugfs_write(const char *param, char *buf, int len)
