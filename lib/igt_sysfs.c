@@ -42,6 +42,7 @@
 #include "igt_core.h"
 #include "igt_sysfs.h"
 #include "igt_device.h"
+#include "igt_io.h"
 
 /**
  * SECTION:igt_sysfs
@@ -52,42 +53,6 @@
  * This library provides helpers to access sysfs features. Right now it only
  * provides basic support for like igt_sysfs_open().
  */
-
-static ssize_t readN(int fd, char *buf, size_t len)
-{
-	ssize_t ret;
-	size_t total = 0;
-
-	do {
-		ret = read(fd, buf + total, len - total);
-		if (ret < 0)
-			ret = -errno;
-		if (ret == -EINTR || ret == -EAGAIN)
-			continue;
-		if (ret <= 0)
-			break;
-		total += ret;
-	} while (total != len);
-	return total ?: ret;
-}
-
-static ssize_t writeN(int fd, const char *buf, size_t len)
-{
-	ssize_t ret;
-	size_t total = 0;
-
-	do {
-		ret = write(fd, buf + total, len - total);
-		if (ret < 0)
-			ret = -errno;
-		if (ret == -EINTR || ret == -EAGAIN)
-			continue;
-		if (ret <= 0)
-			break;
-		total += ret;
-	} while (total != len);
-	return total ?: ret;
-}
 
 /**
  * igt_sysfs_path:
@@ -159,7 +124,7 @@ int igt_sysfs_write(int dir, const char *attr, const void *data, int len)
 	if (igt_debug_on(fd < 0))
 		return -errno;
 
-	len = writeN(fd, data, len);
+	len = igt_writen(fd, data, len);
 	close(fd);
 
 	return len;
@@ -185,7 +150,7 @@ int igt_sysfs_read(int dir, const char *attr, void *data, int len)
 	if (igt_debug_on(fd < 0))
 		return -errno;
 
-	len = readN(fd, data, len);
+	len = igt_readn(fd, data, len);
 	close(fd);
 
 	return len;
@@ -237,7 +202,7 @@ char *igt_sysfs_get(int dir, const char *attr)
 	if (igt_debug_on(!buf))
 		goto out;
 
-	while ((ret = readN(fd, buf + offset, rem)) == rem) {
+	while ((ret = igt_readn(fd, buf + offset, rem)) == rem) {
 		char *newbuf;
 
 		newbuf = realloc(buf, 2*len);
@@ -330,7 +295,7 @@ int igt_sysfs_vprintf(int dir, const char *attr, const char *fmt, va_list ap)
 		}
 	}
 
-	ret = writeN(fd, buf, ret);
+	ret = igt_writen(fd, buf, ret);
 
 	close(fd);
 	if (buf != stack)
