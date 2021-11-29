@@ -46,7 +46,7 @@
  * Read from fd into provided buffer until the buffer is full or EOF
  *
  * Returns:
- * -errorno on failure or bytes read on success
+ * -errno on failure or bytes read on success
  */
 ssize_t igt_readn(int fd, char *buf, size_t len)
 {
@@ -75,7 +75,7 @@ ssize_t igt_readn(int fd, char *buf, size_t len)
  * This writes @len bytes from @data to the sysfs file.
  *
  * Returns:
- * -errorno on failure or bytes read on success
+ * -errno on failure or bytes written on success
  */
 ssize_t igt_writen(int fd, const char *buf, size_t len)
 {

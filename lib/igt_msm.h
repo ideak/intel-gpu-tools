@@ -100,6 +100,7 @@ enum adreno_pm4_type3_packets {
 	CP_WAIT_MEM_GTE = 20,
 	CP_WAIT_REG_MEM = 60,
 	CP_MEM_WRITE = 61,
+	CP_MEM_TO_MEM = 115,
 };
 
 static inline unsigned
