@@ -33,7 +33,8 @@
 
 IGT_TEST_DESCRIPTION("Test PSR2 selective update");
 
-#define SQUARE_SIZE 100
+#define SQUARE_SIZE   100
+#define SQUARE_OFFSET 100
 /* each selective update block is 4 lines tall */
 #define EXPECTED_NUM_SU_BLOCKS ((SQUARE_SIZE / 4) + (SQUARE_SIZE % 4 ? 1 : 0))
 
@@ -128,7 +129,7 @@ static void prepare(data_t *data)
 
 		cr = igt_get_cairo_ctx(data->drm_fd, &data->fb[1]);
 		/* paint a white square */
-		igt_paint_color_alpha(cr, 0, 0, SQUARE_SIZE, SQUARE_SIZE,
+		igt_paint_color_alpha(cr, SQUARE_OFFSET, SQUARE_OFFSET, SQUARE_SIZE, SQUARE_SIZE,
 				      1.0, 1.0, 1.0, 1.0);
 		igt_put_cairo_ctx(cr);
 	} else if (data->op == FRONTBUFFER) {
@@ -152,8 +153,8 @@ static bool update_screen_and_test(data_t *data)
 		struct drm_mode_rect clip;
 		igt_plane_t *primary;
 
-		clip.x1 = clip.y1 = 0;
-		clip.x2 = clip.y2 = SQUARE_SIZE;
+		clip.x1 = clip.y1 = SQUARE_OFFSET;
+		clip.x2 = clip.y2 = SQUARE_OFFSET + SQUARE_SIZE;
 
 		primary = igt_output_get_plane_type(data->output,
 						    DRM_PLANE_TYPE_PRIMARY);
@@ -167,16 +168,18 @@ static bool update_screen_and_test(data_t *data)
 	case FRONTBUFFER: {
 		drmModeClip clip;
 
-		clip.x1 = clip.y1 = 0;
-		clip.x2 = clip.y2 = SQUARE_SIZE;
+		clip.x1 = clip.y1 = SQUARE_OFFSET;
+		clip.x2 = clip.y2 = SQUARE_OFFSET + SQUARE_SIZE;
 
 		if (data->screen_changes & 1) {
 			/* go back to all green frame with a square */
-			igt_paint_color_alpha(data->cr, 0, 0, SQUARE_SIZE,
+			igt_paint_color_alpha(data->cr, SQUARE_OFFSET,
+					      SQUARE_OFFSET, SQUARE_SIZE,
 					      SQUARE_SIZE, 1.0, 1.0, 1.0, 1.0);
 		} else {
 			/* go back to all green frame */
-			igt_paint_color_alpha(data->cr, 0, 0, SQUARE_SIZE,
+			igt_paint_color_alpha(data->cr, SQUARE_OFFSET,
+					      SQUARE_OFFSET, SQUARE_SIZE,
 					      SQUARE_SIZE, 0, 1.0, 0, 1.0);
 		}
 
