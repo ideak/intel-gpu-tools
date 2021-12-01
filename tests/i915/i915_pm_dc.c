@@ -434,22 +434,22 @@ static void setup_dc9_dpms(data_t *data, int dc_target)
 	dpms_off(data);
 	igt_skip_on_f(!(igt_wait(read_dc_counter(data->debugfs_fd, dc_target) >
 				prev_dc, 3000, 100)), "Unable to enters shallow DC states\n");
+	prev_dc = read_dc_counter(data->debugfs_fd, dc_target);
 	dpms_on(data);
 	cleanup_dc_dpms(data);
-}
-
-static void test_dc9_dpms(data_t *data)
-{
-	int prev_dc, dc_target;
-
-	require_dc_counter(data->debugfs_fd, CHECK_DC5);
-	dc_target = support_dc6(data->debugfs_fd) ? CHECK_DC6 : CHECK_DC5;
-	prev_dc = read_dc_counter(data->debugfs_fd, dc_target);
-	setup_dc9_dpms(data, dc_target);
 	dpms_off(data);
 	sleep(1); /* wait for counters reset*/
 	check_dc9(data, dc_target, prev_dc);
 	dpms_on(data);
+}
+
+static void test_dc9_dpms(data_t *data)
+{
+	int dc_target;
+
+	require_dc_counter(data->debugfs_fd, CHECK_DC5);
+	dc_target = support_dc6(data->debugfs_fd) ? CHECK_DC6 : CHECK_DC5;
+	setup_dc9_dpms(data, dc_target);
 }
 
 static void kms_poll_state_restore(int sig)
