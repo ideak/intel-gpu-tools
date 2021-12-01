@@ -51,6 +51,23 @@ enum operations {
 	LAST
 };
 
+static const uint32_t formats_page_flip[] = {
+	DRM_FORMAT_XRGB8888,
+	DRM_FORMAT_NV12,
+	DRM_FORMAT_P010,
+	DRM_FORMAT_INVALID,
+};
+
+static const uint32_t formats_frontbuffer[] = {
+	DRM_FORMAT_XRGB8888,
+	DRM_FORMAT_INVALID,
+};
+
+static const uint32_t *formats[] = {
+				    [PAGE_FLIP] = formats_page_flip,
+				    [FRONTBUFFER] = formats_frontbuffer,
+};
+
 static const char *op_str(enum operations op)
 {
 	static const char * const name[] = {
@@ -69,6 +86,7 @@ typedef struct {
 	igt_output_t *output;
 	struct igt_fb fb[2];
 	enum operations op;
+	uint32_t format;
 	cairo_t *cr;
 	int change_screen_timerfd;
 	uint32_t screen_changes;
@@ -112,7 +130,7 @@ static void prepare(data_t *data)
 	/* all green frame */
 	igt_create_color_fb(data->drm_fd,
 			    data->mode->hdisplay, data->mode->vdisplay,
-			    DRM_FORMAT_XRGB8888,
+			    data->format,
 			    DRM_FORMAT_MOD_LINEAR,
 			    0.0, 1.0, 0.0,
 			    &data->fb[0]);
@@ -122,7 +140,7 @@ static void prepare(data_t *data)
 
 		igt_create_color_fb(data->drm_fd,
 				    data->mode->hdisplay, data->mode->vdisplay,
-				    DRM_FORMAT_XRGB8888,
+				    data->format,
 				    DRM_FORMAT_MOD_LINEAR,
 				    0.0, 1.0, 0.0,
 				    &data->fb[1]);
@@ -264,6 +282,7 @@ igt_main
 					 data.debugfs_fd, PSR_MODE_2),
 			      "Error enabling PSR2\n");
 		data.op = FRONTBUFFER;
+		data.format = DRM_FORMAT_XRGB8888;
 		prepare(&data);
 		r = psr_wait_entry(data.debugfs_fd, PSR_MODE_2);
 		cleanup(&data);
@@ -284,31 +303,34 @@ igt_main
 	}
 
 	for (data.op = PAGE_FLIP; data.op < LAST; data.op++) {
-		igt_describe("Test that selective update works when screen changes");
-		igt_subtest_f("%s", op_str(data.op)) {
+		const uint32_t *format = formats[data.op];
 
-			if (data.op == FRONTBUFFER &&
-			    intel_display_ver(intel_get_drm_devid(data.drm_fd)) >= 12) {
-				/*
-				 * FIXME: Display 12+ platforms now have PSR2
-				 * selective fetch enabled by default but we
-				 * still can't properly handle frontbuffer
-				 * rendering, so right it does full frame
-				 * fetches at every frontbuffer rendering.
-				 * So it is expected that this test will fail
-				 * in display 12+ platform fow now.
-				 */
-				igt_skip("PSR2 selective fetch is doing full frame fetches for frontbuffer rendering\n");
+		while (*format != DRM_FORMAT_INVALID) {
+			data.format = *format++;
+			igt_describe("Test that selective update works when screen changes");
+			igt_subtest_f("%s-%s", op_str(data.op), igt_format_str(data.format)) {
+				if (data.op == FRONTBUFFER &&
+				    intel_display_ver(intel_get_drm_devid(data.drm_fd)) >= 12) {
+					/*
+					 * FIXME: Display 12+ platforms now have PSR2
+					 * selective fetch enabled by default but we
+					 * still can't properly handle frontbuffer
+					 * rendering, so right it does full frame
+					 * fetches at every frontbuffer rendering.
+					 * So it is expected that this test will fail
+					 * in display 12+ platform for now.
+					 */
+					igt_skip("PSR2 selective fetch is doing full frame fetches for frontbuffer rendering\n");
+				}
+				prepare(&data);
+				run(&data);
+				cleanup(&data);
 			}
-
-			prepare(&data);
-			run(&data);
-			cleanup(&data);
 		}
-	}
 
-	igt_fixture {
-		close(data.debugfs_fd);
-		display_fini(&data);
+		igt_fixture {
+			close(data.debugfs_fd);
+			display_fini(&data);
+		}
 	}
 }
