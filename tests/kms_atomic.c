@@ -62,6 +62,17 @@ enum kms_atomic_check_relax {
 	PLANE_RELAX_FB = (1 << 1)
 };
 
+static inline int damage_rect_width(struct drm_mode_rect *r)
+{
+	return r->x2 - r->x1;
+}
+
+static inline int damage_rect_height(struct drm_mode_rect *r)
+{
+	return r->y2 - r->y1;
+}
+
+
 static bool plane_filter(enum igt_atomic_plane_properties prop)
 {
 	if ((1 << prop) & IGT_PLANE_COORD_CHANGED_MASK)
@@ -1053,6 +1064,205 @@ static void atomic_invalid_params(igt_pipe_t *pipe,
 	do_ioctl_err(display->drm_fd, DRM_IOCTL_MODE_ATOMIC, &ioc, EFAULT);
 }
 
+static void atomic_plane_damage(igt_pipe_t *pipe, igt_plane_t *plane, struct igt_fb *fb)
+{
+	struct drm_mode_rect damage[2];
+	struct igt_fb fb_1, fb_2;
+	cairo_t *cr_1, *cr_2;
+
+	/* Color fb with white rect at center */
+	igt_create_color_fb(pipe->display->drm_fd, fb->width, fb->height,
+			    fb->drm_format, I915_TILING_NONE, 0.2, 0.2, 0.2,
+			    &fb_1);
+	cr_1 = igt_get_cairo_ctx(pipe->display->drm_fd, &fb_1);
+	igt_paint_color(cr_1, fb->width/4, fb->height/4, fb->width/2,
+			fb->height/2, 1.0, 1.0, 1.0);
+	igt_put_cairo_ctx(cr_1);
+
+	/*
+	 * Flip the primary plane to new color fb using atomic API and check the
+	 * state.
+	 */
+	igt_plane_set_fb(plane, &fb_1);
+	crtc_commit(pipe, plane, COMMIT_ATOMIC, ATOMIC_RELAX_NONE);
+
+	/*
+	 * Change the color of top left clip from center and issue plane update
+	 * with damage and verify the state.
+	 */
+	damage[0].x1 = 0;
+	damage[0].y1 = 0;
+	damage[0].x2 = fb->width/2;
+	damage[0].y2 = fb->height/2;
+
+	cr_1 = igt_get_cairo_ctx(pipe->display->drm_fd, &fb_1);
+	igt_paint_color(cr_1, damage[0].x1, damage[0].y1,
+			damage_rect_width(&damage[0]),
+			damage_rect_height(&damage[0]), 1.0, 0, 0);
+	igt_put_cairo_ctx(cr_1);
+
+	igt_plane_set_fb(plane, &fb_1);
+	igt_plane_replace_prop_blob(plane, IGT_PLANE_FB_DAMAGE_CLIPS, damage,
+				    sizeof(*damage));
+	crtc_commit(pipe, plane, COMMIT_ATOMIC, ATOMIC_RELAX_NONE);
+
+	/*
+	 * Change the color of top left and bottom right clip from center and
+	 * issue plane update with damage and verify the state.
+	 */
+	igt_create_color_fb(pipe->display->drm_fd, fb->width, fb->height,
+			    fb->drm_format, I915_TILING_NONE, 0.2, 0.2, 0.2,
+			    &fb_2);
+
+	damage[0].x1 = fb->width/2;
+	damage[0].y1 = 0;
+	damage[0].x2 = fb->width;
+	damage[0].y2 = fb->height/2;
+
+	cr_2 = igt_get_cairo_ctx(pipe->display->drm_fd, &fb_2);
+	cr_1 = igt_get_cairo_ctx(pipe->display->drm_fd, &fb_1);
+	cairo_set_source_surface(cr_2, fb_1.cairo_surface, 0, 0);
+	cairo_paint(cr_2);
+	igt_paint_color(cr_2, damage[0].x1, damage[0].y1,
+			damage_rect_width(&damage[0]),
+			damage_rect_height(&damage[0]), 0, 1.0, 0);
+	igt_put_cairo_ctx(cr_1);
+	igt_put_cairo_ctx(cr_2);
+	igt_plane_set_fb(plane, &fb_2);
+	igt_plane_replace_prop_blob(plane, IGT_PLANE_FB_DAMAGE_CLIPS, damage,
+				    sizeof(*damage));
+	crtc_commit(pipe, plane, COMMIT_ATOMIC, ATOMIC_RELAX_NONE);
+
+	/*
+	 * Issue plane update with damage with a clip outside of plane src.
+	 * NOTE: This will result in no update on plane as damage is outside, so
+	 * will see no change on the screen.
+	 */
+	/* Reszie fb_1 to be bigger than plane */
+	igt_remove_fb(pipe->display->drm_fd, &fb_1);
+	igt_create_color_fb(pipe->display->drm_fd, fb->width * 2, fb->height,
+			    fb->drm_format, I915_TILING_NONE, 0.2, 0.2, 0.2,
+			    &fb_1);
+
+	damage[0].x1 = fb->width;
+	damage[0].y1 = 0;
+	damage[0].x2 = fb->width + fb->width/2;
+	damage[0].y2 = fb->height/2;
+
+	cr_1 = igt_get_cairo_ctx(pipe->display->drm_fd, &fb_1);
+	cr_2 = igt_get_cairo_ctx(pipe->display->drm_fd, &fb_2);
+	cairo_set_source_surface(cr_1, fb_2.cairo_surface, 0, 0);
+	cairo_paint(cr_1);
+	igt_paint_color(cr_1, damage[0].x1, damage[0].y1,
+			damage_rect_width(&damage[0]),
+			damage_rect_height(&damage[0]), 0, 1.0, 0);
+	igt_put_cairo_ctx(cr_2);
+	igt_put_cairo_ctx(cr_1);
+	igt_plane_set_fb(plane, &fb_1);
+	igt_plane_set_size(plane, fb->width, fb->height);
+	igt_fb_set_position(&fb_1, plane, 0, 0);
+	igt_fb_set_size(&fb_1, plane, fb->width, fb->height);
+	igt_plane_replace_prop_blob(plane, IGT_PLANE_FB_DAMAGE_CLIPS, damage,
+				    sizeof(*damage));
+	crtc_commit(pipe, plane, COMMIT_ATOMIC, ATOMIC_RELAX_NONE);
+
+	/*
+	 * Issue a plane update with damage with a clip that overlap with plane
+	 * src (Top right from center extending outside src in below case).
+	 * NOTE: Here drm core should take care of intersecting the clip to
+	 * plane src.
+	 */
+	damage[0].x1 = fb->width/2;
+	damage[0].y1 = 0;
+	damage[0].x2 = fb->width/2 + fb->width;
+	damage[0].y2 = fb->height/2;
+
+	cr_1 = igt_get_cairo_ctx(pipe->display->drm_fd, &fb_1);
+	igt_paint_color(cr_1, damage[0].x1, damage[0].y1,
+			damage_rect_width(&damage[0]),
+			damage_rect_height(&damage[0]), 1.0, 1.0, 0);
+	igt_put_cairo_ctx(cr_1);
+	igt_plane_set_fb(plane, &fb_1);
+	igt_plane_set_size(plane, fb->width, fb->height);
+	igt_fb_set_position(&fb_1, plane, 0, 0);
+	igt_fb_set_size(&fb_1, plane, fb->width, fb->height);
+	igt_plane_replace_prop_blob(plane, IGT_PLANE_FB_DAMAGE_CLIPS, damage,
+				    sizeof(*damage));
+	crtc_commit(pipe, plane, COMMIT_ATOMIC, ATOMIC_RELAX_NONE);
+
+	/*
+	 * Issue a plane update with damage with two clips one inside plane src
+	 * and one outside
+	 * NOTE: This will result in plane update with clip inside plane src.
+	 */
+	damage[0].x1 = 0;
+	damage[0].y1 = fb->height/2;
+	damage[0].x2 = fb->width/2;
+	damage[0].y2 = fb->height;
+
+	damage[1].x1 = fb->width + fb->width/2;
+	damage[1].y1 = fb->height/2;
+	damage[1].x2 = fb->width * 2;
+	damage[1].y2 = fb->height;
+
+	cr_1 = igt_get_cairo_ctx(pipe->display->drm_fd, &fb_1);
+	igt_paint_color(cr_1, damage[0].x1, damage[0].y1,
+			damage_rect_width(&damage[0]),
+			damage_rect_height(&damage[0]), 0, 1.0, 1.0);
+	igt_paint_color(cr_1, damage[1].x1, damage[1].y1,
+			damage_rect_width(&damage[1]),
+			damage_rect_height(&damage[1]), 0, 1.0, 0);
+	igt_put_cairo_ctx(cr_1);
+	igt_plane_set_fb(plane, &fb_1);
+	igt_plane_set_size(plane, fb->width, fb->height);
+	igt_fb_set_position(&fb_1, plane, 0, 0);
+	igt_fb_set_size(&fb_1, plane, fb->width, fb->height);
+	igt_plane_replace_prop_blob(plane, IGT_PLANE_FB_DAMAGE_CLIPS, damage,
+				    sizeof(*damage) * 2);
+	crtc_commit(pipe, plane, COMMIT_ATOMIC, ATOMIC_RELAX_NONE);
+
+	/*
+	 * Issue a plane update with overlapping damage clips. White rect in
+	 * center overlap partially with top left red rect.
+	 * NOTE: Drm core does not error for overlapping damage clips so if any
+	 * driver does not support overlapping should have their own
+	 * validations.
+	 */
+	damage[0].x1 = 0;
+	damage[0].y1 = 0;
+	damage[0].x2 = fb->width/2;
+	damage[0].y2 = fb->height/2;
+
+	damage[1].x1 = fb->width/4;
+	damage[1].y1 = fb->height/4;
+	damage[1].x2 = fb->width/4 + fb->width/2;
+	damage[1].y2 = fb->height/4 + fb->height/2;
+
+	cr_1 = igt_get_cairo_ctx(pipe->display->drm_fd, &fb_1);
+	igt_paint_color(cr_1, damage[0].x1, damage[0].y1,
+			damage_rect_width(&damage[0]),
+			damage_rect_height(&damage[0]), 1.0, 0, 0);
+	igt_paint_color(cr_1, damage[1].x1, damage[1].y1,
+			damage_rect_width(&damage[1]),
+			damage_rect_height(&damage[1]), 1.0, 1.0, 1.0);
+	igt_put_cairo_ctx(cr_1);
+	igt_plane_set_fb(plane, &fb_1);
+	igt_plane_set_size(plane, fb->width, fb->height);
+	igt_fb_set_position(&fb_1, plane, 0, 0);
+	igt_fb_set_size(&fb_1, plane, fb->width, fb->height);
+	igt_plane_replace_prop_blob(plane, IGT_PLANE_FB_DAMAGE_CLIPS, damage,
+				    sizeof(*damage) * 2);
+	crtc_commit(pipe, plane, COMMIT_ATOMIC, ATOMIC_RELAX_NONE);
+
+	/* Restore the primary plane */
+	igt_plane_set_fb(plane, fb);
+	plane_commit(plane, COMMIT_ATOMIC, ATOMIC_RELAX_NONE);
+
+	/* Remove the fb created for this test */
+	igt_remove_fb(pipe->display->drm_fd, &fb_1);
+	igt_remove_fb(pipe->display->drm_fd, &fb_2);
+}
+
 static void atomic_setup(igt_display_t *display, enum pipe pipe, igt_output_t *output, igt_plane_t *primary, struct igt_fb *fb)
 {
 	igt_output_set_pipe(output, pipe);
@@ -1210,6 +1420,15 @@ igt_main
 		atomic_setup(&display, pipe, output, primary, &fb);
 
 		atomic_invalid_params(pipe_obj, primary, output, &fb);
+	}
+
+	igt_describe("Simple test cases to use FB_DAMAGE_CLIPS plane property");
+	igt_subtest("atomic_plane_damage") {
+		igt_require(igt_plane_has_prop(primary, IGT_PLANE_FB_DAMAGE_CLIPS));
+
+		atomic_setup(&display, pipe, output, primary, &fb);
+
+		atomic_plane_damage(pipe_obj, primary, &fb);
 	}
 
 	igt_fixture {
