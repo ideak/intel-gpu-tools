@@ -73,7 +73,7 @@ int force_dsc_restore_fd = -1;
 
 static inline void manual(const char *expected)
 {
-	igt_debug_manual_check("all", expected);
+	igt_debug_interactive_mode_check("all", expected);
 }
 
 static void force_dsc_enable(data_t *data)

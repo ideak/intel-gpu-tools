@@ -972,7 +972,7 @@ void igt_drop_root(void)
  * Waits for a key press when run interactively and when the corresponding debug
  * var is set in the --interactive-debug=$var variable. Multiple keys
  * can be specified as a comma-separated list or alternatively "all" if a wait
- * should happen for all cases.
+ * should happen for all cases. Calling this function with "all" will assert.
  *
  * When not connected to a terminal interactive_debug is ignored
  * and execution immediately continues.
@@ -993,6 +993,9 @@ void igt_debug_wait_for_keypress(const char *var)
 	if (!igt_interactive_debug)
 		return;
 
+	if (strstr(var, "all"))
+		igt_assert_f(false, "Bug in test: Do not call igt_debug_wait_for_keypress with \"all\"\n");
+
 	if (!strstr(igt_interactive_debug, var) &&
 	    !strstr(igt_interactive_debug, "all"))
 		return;
@@ -1008,7 +1011,7 @@ void igt_debug_wait_for_keypress(const char *var)
 }
 
 /**
- * igt_debug_manual_check:
+ * igt_debug_interactive_mode_check:
  * @var: var lookup to to enable this wait
  * @expected: message to be printed as expected behaviour before wait for keys Y/n
  *
@@ -1028,7 +1031,7 @@ void igt_debug_wait_for_keypress(const char *var)
  *
  * Force test fail when N/n is pressed.
  */
-void igt_debug_manual_check(const char *var, const char *expected)
+void igt_debug_interactive_mode_check(const char *var, const char *expected)
 {
 	struct termios oldt, newt;
 	char key;

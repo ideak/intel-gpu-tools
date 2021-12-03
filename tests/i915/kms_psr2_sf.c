@@ -342,7 +342,7 @@ static void prepare(data_t *data)
 
 static inline void manual(const char *expected)
 {
-	igt_debug_manual_check("all", expected);
+	igt_debug_interactive_mode_check("all", expected);
 }
 
 static void plane_update_expected_output(int plane_type, int box_count,

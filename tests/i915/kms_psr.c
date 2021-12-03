@@ -246,7 +246,7 @@ static bool psr_enable_if_enabled(data_t *data)
 
 static inline void manual(const char *expected)
 {
-	igt_debug_manual_check("all", expected);
+	igt_debug_interactive_mode_check("all", expected);
 }
 
 static bool drrs_disabled(data_t *data)

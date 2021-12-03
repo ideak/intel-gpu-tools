@@ -195,7 +195,7 @@ int igt_get_autoresume_delay(enum igt_suspend_state state);
 void igt_drop_root(void);
 
 void igt_debug_wait_for_keypress(const char *var);
-void igt_debug_manual_check(const char *var, const char *expected);
+void igt_debug_interactive_mode_check(const char *var, const char *expected);
 
 /* sysinfo cross-arch wrappers from intel_os.c */
 
