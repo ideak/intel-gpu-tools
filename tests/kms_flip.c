@@ -129,6 +129,15 @@ struct event_state {
 	int seq_step;
 };
 
+static bool should_skip_ts_checks(void) {
+	/* Mediatek devices have a HW issue with sending their vblank IRQ at the same time interval
+	 * everytime. The drift can be below or above the expected frame time, causing the
+	 * timestamp to drift with a relatively larger standard deviation over a large sample.
+	 * As it's a known issue, skip any Timestamp or Sequence checks for MTK drivers.
+	 */
+	return is_mtk_device(drm_fd);
+}
+
 static bool vblank_dependence(int flags)
 {
 	int vblank_flags = TEST_VBLANK | TEST_VBLANK_BLOCK |
@@ -761,16 +770,19 @@ static bool run_test_step(struct test_output *o, unsigned int *events)
 		start = gettime_us();
 		igt_assert(__wait_for_vblank(TEST_VBLANK_BLOCK, o->pipe, 2, 0, &reply) == 0);
 		end = gettime_us();
-		/*
-		 * we waited for two vblanks, so verify that
-		 * we were blocked for ~1-2 frames. And due
-		 * to scheduling latencies we give it an extra
-		 * half a frame or so.
-		 */
-		igt_assert_f(end - start > 0.9 * actual_frame_time(o) &&
-			     end - start < 2.6 * actual_frame_time(o),
-			     "wait for two vblanks took %lu usec (frame time %f usec)\n",
-			     end - start, mode_frame_time(o));
+
+		if (!should_skip_ts_checks()) {
+			/*
+			 * we waited for two vblanks, so verify that
+			 * we were blocked for ~1-2 frames. And due
+			 * to scheduling latencies we give it an extra
+			 * half a frame or so.
+			 */
+			igt_assert_f(end - start > 0.9 * actual_frame_time(o) &&
+							 end - start < 2.6 * actual_frame_time(o),
+						 "wait for two vblanks took %lu usec (frame time %f usec)\n",
+						 end - start, mode_frame_time(o));
+		}
 		join_vblank_wait_thread();
 	}
 
@@ -1228,8 +1240,10 @@ static bool calibrate_ts(struct test_output *o, int crtc_idx)
 
 	igt_info("Expected frametime: %.0fus; measured %.1fus +- %.3fus accuracy %.2f%%\n",
 		 expected, mean, stddev, 100 * 3 * stddev / mean);
-	/* 99.7% samples within 0.5% of the mean */
-	igt_assert(3 * stddev / mean < 0.005);
+	if (!should_skip_ts_checks())
+		/* 99.7% samples within 0.5% of the mean */
+		igt_assert(3 * stddev / mean < 0.005);
+
 	/* 84% samples within 0.5% of the expected value.
 	 * See comments in check_timings() in kms_setmode.c
 	 */
@@ -1722,6 +1736,12 @@ igt_main_args("e", NULL, help_str, opt_handler, NULL)
 
 		if (is_i915_device(drm_fd)) {
 			bops = buf_ops_create(drm_fd);
+		}
+
+		if (should_skip_ts_checks()) {
+			igt_info("Skipping timestamp checks\n");
+			for (i = 0; i < sizeof(tests) / sizeof(tests[0]); i++)
+				tests[i].flags &= ~(TEST_CHECK_TS | TEST_VBLANK_EXPIRED_SEQ);
 		}
 	}
 
