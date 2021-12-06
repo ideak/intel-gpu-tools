@@ -232,7 +232,7 @@ static void test_mpo_4k(data_t *data)
 	igt_remove_fb(data->fd, &r_fb);
 }
 
-static void test_mpo_swizzle_toggle(data_t *data)
+static void test_mpo_swizzle_toggle_multihead(data_t *data)
 {
 	struct amdgpu_bo_metadata meta = {};
 	igt_display_t *display = &data->display;
@@ -306,6 +306,72 @@ static void test_mpo_swizzle_toggle(data_t *data)
 	igt_remove_fb(data->fd, &fb_1920_xr24_tiled);
 }
 
+static void test_mpo_swizzle_toggle(data_t *data)
+{
+	struct amdgpu_bo_metadata meta = {};
+	igt_display_t *display = &data->display;
+	igt_fb_t fb_1280_ar24_tiled, fb_1920_xb24_tiled, fb_1920_xb24_linear,
+		 fb_1920_xr24_tiled;
+	int w, h;
+
+	w = 2400;
+	h = 1350;
+
+	igt_create_pattern_fb(data->fd, 1280, 1024, DRM_FORMAT_ARGB8888, 0,
+			      &fb_1280_ar24_tiled);
+	igt_create_pattern_fb(data->fd, 1920, 1080, DRM_FORMAT_XBGR8888, 0,
+			      &fb_1920_xb24_tiled);
+	igt_create_pattern_fb(data->fd, 1920, 1080, DRM_FORMAT_XBGR8888, 0,
+			      &fb_1920_xb24_linear);
+	igt_create_pattern_fb(data->fd, 1920, 1080, DRM_FORMAT_XRGB8888, 0,
+			      &fb_1920_xr24_tiled);
+
+	meta.tiling_info = AMDGPU_TILING_SET(SWIZZLE_MODE, 0x19);
+	set_metadata(data, &fb_1280_ar24_tiled, &meta);
+
+	meta.tiling_info = AMDGPU_TILING_SET(SWIZZLE_MODE, 0x19);
+	set_metadata(data, &fb_1920_xb24_tiled, &meta);
+
+	meta.tiling_info = AMDGPU_TILING_SET(SWIZZLE_MODE, 0x19);
+	set_metadata(data, &fb_1920_xr24_tiled, &meta);
+
+	test_init(data);
+
+	/* Initial modeset */
+	igt_output_set_pipe(data->output[0], data->pipe_id[0]);
+	force_output_mode(data, data->output[0], &test_mode_1);
+
+	igt_plane_set_fb(data->primary[0], &fb_1920_xb24_linear);
+	igt_plane_set_size(data->primary[0], w, h);
+
+	igt_display_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, 0);
+
+	/* Enable overlay plane. */
+	igt_plane_set_fb(data->overlay[0], &fb_1280_ar24_tiled);
+	igt_plane_set_fb(data->primary[0], &fb_1920_xb24_linear);
+	igt_plane_set_size(data->primary[0], w, h);
+	igt_display_commit_atomic(display, 0, 0);
+
+	/* Switch to tiled. */
+	igt_plane_set_fb(data->overlay[0], &fb_1280_ar24_tiled);
+	igt_plane_set_fb(data->primary[0], &fb_1920_xb24_tiled);
+	igt_plane_set_size(data->primary[0], w, h);
+	igt_display_commit_atomic(display, 0, 0);
+
+	/* Switch to linear. */
+	igt_plane_set_fb(data->overlay[0], &fb_1280_ar24_tiled);
+	igt_plane_set_fb(data->primary[0], &fb_1920_xb24_linear);
+	igt_plane_set_size(data->primary[0], w, h);
+	igt_display_commit_atomic(display, 0, 0);
+
+	test_fini(data);
+	igt_remove_fb(data->fd, &fb_1280_ar24_tiled);
+	igt_remove_fb(data->fd, &fb_1920_xb24_tiled);
+	igt_remove_fb(data->fd, &fb_1920_xb24_linear);
+	igt_remove_fb(data->fd, &fb_1920_xr24_tiled);
+}
+
+
 igt_main
 {
 	data_t data;
@@ -327,6 +393,8 @@ igt_main
 
 	igt_subtest("test-mpo-4k") test_mpo_4k(&data);
 	igt_subtest("mpo-swizzle-toggle") test_mpo_swizzle_toggle(&data);
+	igt_subtest("mpo-swizzle-toggle-multihead")
+		test_mpo_swizzle_toggle_multihead(&data);
 
 	igt_fixture
 	{
