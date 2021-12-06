@@ -740,12 +740,16 @@ igt_main
 	igt_subtest("mpo-swizzle-toggle") test_mpo_swizzle_toggle(&data);
 	igt_subtest("mpo-swizzle-toggle-multihead")
 		test_mpo_swizzle_toggle_multihead(&data);
-	igt_subtest("mpo-pan-rgb") test_display_mpo(&data, MPO_SINGLE_PAN, DRM_FORMAT_XRGB8888, DISPLAYS_TO_TEST);
-	igt_subtest("mpo-pan-nv12") test_display_mpo(&data, MPO_SINGLE_PAN, DRM_FORMAT_NV12, DISPLAYS_TO_TEST);
+	igt_subtest("mpo-pan-rgb") test_display_mpo(&data, MPO_SINGLE_PAN, DRM_FORMAT_XRGB8888, 1);
+	igt_subtest("mpo-pan-rgb-multihead") test_display_mpo(&data, MPO_SINGLE_PAN, DRM_FORMAT_XRGB8888, DISPLAYS_TO_TEST);
+	igt_subtest("mpo-pan-nv12") test_display_mpo(&data, MPO_SINGLE_PAN, DRM_FORMAT_NV12, 1);
+	igt_subtest("mpo-pan-nv12-multihead") test_display_mpo(&data, MPO_SINGLE_PAN, DRM_FORMAT_NV12, DISPLAYS_TO_TEST);
 	igt_subtest("mpo-pan-multi-rgb") test_display_mpo(&data, MPO_MULTI_PAN, DRM_FORMAT_XRGB8888, DISPLAYS_TO_TEST);
 	igt_subtest("mpo-pan-multi-nv12") test_display_mpo(&data, MPO_MULTI_PAN, DRM_FORMAT_NV12, DISPLAYS_TO_TEST);
-	igt_subtest("mpo-scale-rgb") test_display_mpo(&data, MPO_SCALE, DRM_FORMAT_XRGB8888, DISPLAYS_TO_TEST);
-	igt_subtest("mpo-scale-nv12") test_display_mpo(&data, MPO_SCALE, DRM_FORMAT_NV12, DISPLAYS_TO_TEST);
+	igt_subtest("mpo-scale-rgb") test_display_mpo(&data, MPO_SCALE, DRM_FORMAT_XRGB8888, 1);
+	igt_subtest("mpo-scale-rgb-multihead") test_display_mpo(&data, MPO_SCALE, DRM_FORMAT_XRGB8888, DISPLAYS_TO_TEST);
+	igt_subtest("mpo-scale-nv12") test_display_mpo(&data, MPO_SCALE, DRM_FORMAT_NV12, 1);
+	igt_subtest("mpo-scale-nv12-multihead") test_display_mpo(&data, MPO_SCALE, DRM_FORMAT_NV12, DISPLAYS_TO_TEST);
 
 	igt_fixture
 	{
