@@ -18,6 +18,7 @@ if libdrm_amdgpu.found()
 			  'amd_vrr_range',
 			  'amd_mode_switch',
 			  'amd_psr',
+			  'amd_plane',
 			]
 	amdgpu_deps += libdrm_amdgpu
 endif
