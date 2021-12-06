@@ -150,9 +150,9 @@ static void test_init(data_t *data)
 	igt_display_t *display = &data->display;
 	int i, n, max_pipes = display->n_pipes;
 
-	for (i = 0; i < max_pipes; ++i) {
+	for_each_pipe(display, i) {
 		data->pipe_id[i] = PIPE_A + i;
-		data->pipe[i] = &data->display.pipes[data->pipe_id[i]];
+		data->pipe[i] = &display->pipes[data->pipe_id[i]];
 		data->primary[i] = igt_pipe_get_plane_type(
 			data->pipe[i], DRM_PLANE_TYPE_PRIMARY);
 		data->overlay[i] = igt_pipe_get_plane_type_index(
@@ -188,9 +188,9 @@ static void test_init(data_t *data)
 static void test_fini(data_t *data)
 {
 	igt_display_t *display = &data->display;
-	int i, max_pipes = display->n_pipes;
+	int i;
 
-	for (i = 0; i < max_pipes; ++i) {
+	for_each_pipe(display, i) {
 		igt_pipe_crc_free(data->pipe_crc[i]);
 	}
 
