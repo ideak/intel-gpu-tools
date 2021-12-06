@@ -193,8 +193,10 @@ static void test_mpo_4k(data_t *data)
 	test_init(data);
 
 	/* Skip if not 4K resolution. */
-	igt_skip_on(!(data->mode[0].hdisplay == 3840
-		      && data->mode[0].vdisplay == 2160));
+	igt_skip_on(!((data->mode[0].hdisplay == 4096
+		      && data->mode[0].vdisplay == 2160)||
+		      (data->mode[0].hdisplay == 3840
+		      && data->mode[0].vdisplay == 2160)));
 
 	w = data->w[0];
 	h = data->h[0];
@@ -210,6 +212,7 @@ static void test_mpo_4k(data_t *data)
 	draw_color_alpha(&o_fb, cutout_x, cutout_y, cutout_w, cutout_h,
 			 0.00, 0.00, 0.00, 0.00);
 
+	igt_output_set_pipe(data->output[0], data->pipe_id[0]);
 	igt_plane_set_fb(data->primary[0], &r_fb);
 	igt_display_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
 
