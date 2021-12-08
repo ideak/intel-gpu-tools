@@ -1533,6 +1533,8 @@ igt_main
 	/*Test description for cursor-crc tests*/
 	igt_describe("Test will first does a page flip and then cursor update");
 	igt_subtest_group {
+		igt_fixture
+			igt_require_pipe_crc(display.drm_fd);
 
 		igt_subtest("flip-vs-cursor-crc-legacy")
 			flip_vs_cursor_crc(&display, false);
@@ -1544,6 +1546,8 @@ igt_main
 	/*Test description for busy-crc tests*/
 	igt_describe("this test perform a busy bo update followed by a cursor update");
 	igt_subtest_group {
+		igt_fixture
+			igt_require_pipe_crc(display.drm_fd);
 
 		igt_subtest("flip-vs-cursor-busy-crc-legacy")
 			flip_vs_cursor_busy_crc(&display, false);
