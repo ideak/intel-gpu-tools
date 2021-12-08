@@ -62,6 +62,7 @@ igt@sysfs_timeslice_duration@off
 # GEM: Not worth fixing
 ###############################################
 igt@gen7_exec_parse@.*lri.*
+igt@gem_exec_alignment@pi-shared
 ###############################################
 # There are no DRRS capable displays in CI lab
 ###############################################
