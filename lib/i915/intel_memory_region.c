@@ -123,9 +123,17 @@ struct drm_i915_query_memory_regions *gem_get_query_memory_regions(int fd)
 	 * Any DRM_I915_QUERY_MEMORY_REGIONS specific errors are encoded in the
 	 * item.length, even though the ioctl might still return success.
 	 */
+
 	if (item.length < 0) {
-		igt_critical("DRM_I915_QUERY_MEMORY_REGIONS failed with %d\n",
-			     item.length);
+		/*
+		 * If kernel supports query but not memory regions query
+		 * just return predefined system memory region only.
+		 */
+		size_t sys_qi_size = offsetof(typeof(*query_info), regions[1]);
+
+		query_info = calloc(1, sys_qi_size);
+		query_info->num_regions = 1;
+		query_info->regions[0].region.memory_class = I915_MEMORY_CLASS_SYSTEM;
 		goto out;
 	}
 
