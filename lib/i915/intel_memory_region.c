@@ -197,8 +197,23 @@ int __gem_create_in_memory_region_list(int fd, uint32_t *handle, uint64_t *size,
 		.num_regions = num_regions,
 		.regions = to_user_pointer(mem_regions),
 	};
+	int ret;
 
-	return __gem_create_ext(fd, size, handle, &ext_regions.base);
+	ret = __gem_create_ext(fd, size, handle, &ext_regions.base);
+
+	/*
+	 * Provide fallback for stable kernels if region passed in the array
+	 * can be system memory. In this case we get -ENODEV but still
+	 * we're able to allocate gem bo in system memory using legacy call.
+	 */
+	if (ret == -ENODEV)
+		for (int i = 0; i < num_regions; i++)
+			if (mem_regions[i].memory_class == I915_MEMORY_CLASS_SYSTEM) {
+				ret = __gem_create(fd, size, handle);
+				break;
+			}
+
+	return ret;
 }
 
 /* gem_create_in_memory_region_list:
