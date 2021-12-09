@@ -1007,7 +1007,8 @@ static void memset64(uint64_t *s, uint64_t c, size_t n)
 static void clear_yuv_buffer(struct igt_fb *fb)
 {
 	bool full_range = fb->color_range == IGT_COLOR_YCBCR_FULL_RANGE;
-	size_t plane_size[2];
+	int num_planes = lookup_drm_format(fb->drm_format)->num_planes;
+	size_t plane_size[num_planes];
 	void *ptr;
 
 	igt_assert(igt_format_is_yuv(fb->drm_format));
@@ -1015,7 +1016,8 @@ static void clear_yuv_buffer(struct igt_fb *fb)
 	for (int i = 0; i < lookup_drm_format(fb->drm_format)->num_planes; i++) {
 		unsigned int tile_width, tile_height;
 
-		igt_assert_lt(i, ARRAY_SIZE(plane_size));
+		igt_assert_lt(i, num_planes);
+
 		igt_get_fb_tile_size(fb->fd, fb->modifier, fb->plane_bpp[i],
 				     &tile_width, &tile_height);
 		plane_size[i] = fb->strides[i] *
@@ -1081,6 +1083,21 @@ static void clear_yuv_buffer(struct igt_fb *fb)
 		memset64(ptr + fb->offsets[0],
 			 full_range ? 0x800000008000ULL : 0x800010008000ULL,
 			 plane_size[0] / sizeof(uint64_t));
+		break;
+	case DRM_FORMAT_YUV420:
+	case DRM_FORMAT_YUV422:
+	case DRM_FORMAT_YVU420:
+	case DRM_FORMAT_YVU422:
+		igt_assert(ARRAY_SIZE(plane_size) == 3);
+		memset(ptr + fb->offsets[0],
+		       full_range ? 0x00 : 0x10,
+		       plane_size[0]);
+		memset(ptr + fb->offsets[1],
+		       0x80,
+		       plane_size[1]);
+		memset(ptr + fb->offsets[2],
+		       0x80,
+		       plane_size[2]);
 		break;
 	}
 
