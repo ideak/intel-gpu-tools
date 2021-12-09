@@ -3320,6 +3320,7 @@ igt_main
 
 	igt_subtest_group {
 		igt_fixture {
+			igt_require(!gem_using_guc_submission(i915));
 			intel_allocator_multiprocess_start();
 		}
 
