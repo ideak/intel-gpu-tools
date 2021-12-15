@@ -1471,7 +1471,14 @@ void igt_skip(const char *f, ...)
 	}
 
 	if (in_subtest) {
-		/* Doing the same even if inside a dynamic subtest */
+		if (in_dynamic_subtest) {
+			/*
+			 * Don't count skipping dynamic subtests, for
+			 * the purposes of getting the result of the
+			 * containing subtest.
+			 */
+			_igt_dynamic_tests_executed--;
+		}
 		exit_subtest("SKIP");
 	} else if (test_with_subtests) {
 		skip_subtests_henceforth = SKIP;
