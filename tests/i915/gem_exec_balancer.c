@@ -180,6 +180,33 @@ __set_param_fresh_context(int i915, struct drm_i915_gem_context_param param)
 	return err;
 }
 
+static bool has_bonding(int i915)
+{
+	I915_DEFINE_CONTEXT_ENGINES_BOND(bonds[16], 1);
+	I915_DEFINE_CONTEXT_PARAM_ENGINES(engines, 1);
+	struct drm_i915_gem_context_param p = {
+		.param = I915_CONTEXT_PARAM_ENGINES,
+		.value = to_user_pointer(&engines),
+		.size = sizeof(engines),
+	};
+	int ret;
+
+	memset(&engines, 0, sizeof(engines));
+	igt_assert_eq(__set_param_fresh_context(i915, p), 0);
+
+	memset(bonds, 0, sizeof(bonds));
+	for (int n = 0; n < ARRAY_SIZE(bonds); n++) {
+		bonds[n].base.name = I915_CONTEXT_ENGINES_EXT_BOND;
+		bonds[n].base.next_extension =
+			n ? to_user_pointer(&bonds[n - 1]) : 0;
+		bonds[n].num_bonds = 1;
+	}
+	engines.extensions = to_user_pointer(&bonds);
+	ret = __set_param_fresh_context(i915, p);
+
+	return ret == -ENODEV ? false : true;
+}
+
 static void invalid_balancer(int i915)
 {
 	I915_DEFINE_CONTEXT_ENGINES_LOAD_BALANCE(balancer, 64);
@@ -191,6 +218,7 @@ static void invalid_balancer(int i915)
 	};
 	uint32_t handle;
 	void *ptr;
+	bool bonding;
 
 	/*
 	 * Assume that I915_CONTEXT_PARAM_ENGINE validates the array
@@ -198,6 +226,7 @@ static void invalid_balancer(int i915)
 	 * extension explodes.
 	 */
 
+	bonding = has_bonding(i915);
 	for (int class = 0; class < 32; class++) {
 		struct i915_engine_class_instance *ci;
 		unsigned int count;
@@ -299,7 +328,7 @@ static void invalid_balancer(int i915)
 
 		munmap(ptr + 4096, 4096);
 
-		if (count >= 2) {
+		if (count >= 2 && bonding) {
 			/* You can't bond to a balanced engine */
 			memset(&bond, 0, sizeof(bond));
 			bond.base.name = I915_CONTEXT_ENGINES_EXT_BOND;
