@@ -396,6 +396,13 @@ static const struct intel_device_info intel_alderlake_s_info = {
 	.codename = "alderlake_s"
 };
 
+static const struct intel_device_info intel_raptorlake_s_info = {
+	.graphics_ver = 12,
+	.display_ver = 12,
+	.is_raptorlake_s = true,
+	.codename = "raptorlake_s"
+};
+
 static const struct intel_device_info intel_alderlake_p_info = {
 	.graphics_ver = 12,
 	.display_ver = 13,
@@ -494,6 +501,7 @@ static const struct pci_id_match intel_device_match[] = {
 	INTEL_DG1_IDS(&intel_dg1_info),
 
 	INTEL_ADLS_IDS(&intel_alderlake_s_info),
+	INTEL_RPLS_IDS(&intel_raptorlake_s_info),
 	INTEL_ADLP_IDS(&intel_alderlake_p_info),
 
 	INTEL_VGA_DEVICE(PCI_MATCH_ANY, &intel_generic_info),
