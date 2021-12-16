@@ -27,8 +27,26 @@
 #include "igt.h"
 #include "igt_fb.h"
 
+/* Read & Write DSC parameters */
+#define DEBUGFS_DSC_CLOCK_EN "dsc_clock_en"
+#define DEBUGFS_DSC_SLICE_WIDTH "dsc_slice_width"
+#define DEBUGFS_DSC_SLICE_HEIGHT "dsc_slice_height"
+#define DEBUGFS_DSC_BITS_PER_PIXEL "dsc_bits_per_pixel"
+/* Read only DSC parameters */
+#define DEBUGFS_DSC_PIC_WIDTH "dsc_pic_width"
+#define DEBUGFS_DSC_PIC_HEIGHT "dsc_pic_height"
+#define DEBUGFS_DSC_CHUNK_SIZE "dsc_chunk_size"
+#define DEBUGFS_DSC_SLICE_BPG "dsc_slice_bpg"
+#define DEBUGFS_DSC_FEC_SUPPORT "dp_dsc_fec_support"
+
 #define DEBUGFS_DP_LINK_SETTINGS "link_settings"
 #define DEBUGFS_HPD_TRIGGER "trigger_hotplug"
+
+enum amd_dsc_clock_force {
+	DSC_AUTOMATIC = 0,
+	DSC_FORCE_ON,
+	DSC_FORCE_OFF,
+};
 
 enum dc_lane_count {
 	LANE_COUNT_UNKNOWN = 0,
@@ -79,6 +97,23 @@ void igt_amd_fb_to_tiled(struct igt_fb *dst, void *dst_buf, struct igt_fb *src,
 void igt_amd_fb_convert_plane_to_tiled(struct igt_fb *dst, void *dst_buf,
 				       struct igt_fb *src, void *src_buf);
 bool igt_amd_is_tiled(uint64_t modifier);
+
+/* IGT DSC helper functions */
+bool is_dp_dsc_supported(int drm_fd, char *connector_name);
+bool is_dp_fec_supported(int drm_fd, char *connector_name);
+void igt_amd_require_dsc(igt_display_t *display, int drm_fd);
+int igt_amd_read_dsc_clock_status(int drm_fd, char *connector_name);
+void igt_amd_write_dsc_clock_en(int drm_fd, char *connector_name, int dsc_force);
+void igt_amd_write_dsc_param_slice_height(int drm_fd, char *connector_name, int slice_height);
+int igt_amd_read_dsc_param_slice_height(int drm_fd, char *connector_name);
+void igt_amd_write_dsc_param_slice_width(int drm_fd, char *connector_name, int slice_width);
+int igt_amd_read_dsc_param_slice_width(int drm_fd, char *connector_name);
+void igt_amd_write_dsc_param_bpp(int drm_fd, char *connector_name, int bpp);
+int igt_amd_read_dsc_param_bpp(int drm_fd, char *connector_name);
+int igt_amd_read_dsc_param_pic_width(int drm_fd, char *connector_name);
+int igt_amd_read_dsc_param_pic_height(int drm_fd, char *connector_name);
+int igt_amd_read_dsc_param_chunk_size(int drm_fd, char *connector_name);
+int igt_amd_read_dsc_param_slice_bpg(int drm_fd, char *connector_name);
 
 /* IGT HPD helper functions */
 void igt_amd_require_hpd(igt_display_t *display, int drm_fd);

@@ -251,11 +251,11 @@ bool igt_amd_is_tiled(uint64_t modifier)
 }
 
 /**
- * igt_amd_output_has_hpd: check if connector has HPD debugfs entry
+ * igt_amd_output_has_dsc: check if connector has dsc debugfs entry
  * @drm_fd: DRM file descriptor
  * @connector_name: The connector's name, on which we're reading the status
  */
-static bool igt_amd_output_has_hpd(int drm_fd, char *connector_name)
+static bool igt_amd_output_has_dsc(int drm_fd, char *connector_name)
 {
 	int fd;
 	int res;
@@ -267,15 +267,465 @@ static bool igt_amd_output_has_hpd(int drm_fd, char *connector_name)
 		return false;
 	}
 
-	res = fstatat(fd, DEBUGFS_HPD_TRIGGER, &stat, 0);
+	res = fstatat(fd, DEBUGFS_DSC_CLOCK_EN , &stat, 0);
 	if (res != 0) {
-		igt_info("%s debugfs not supported\n", DEBUGFS_HPD_TRIGGER);
+		igt_info("%s debugfs not supported\n", DEBUGFS_DSC_CLOCK_EN);
 		close(fd);
 		return false;
 	}
 
 	close(fd);
 	return true;
+}
+
+/**
+ * is_dp_dsc_supported: Checks if connector is DSC capable
+ * @display: A pointer to an #igt_display_t structure
+ * @drm_fd: DRM file descriptor
+ */
+bool is_dp_dsc_supported(int drm_fd, char *connector_name)
+{
+	char buf[512];
+	int fd, ret;
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+
+	if (fd < 0) {
+		igt_info("Couldn't open connector %s debugfs directory\n",
+			 connector_name);
+		return false;
+	}
+
+	ret = igt_debugfs_simple_read(fd, DEBUGFS_DSC_FEC_SUPPORT, buf, sizeof(buf));
+	close(fd);
+
+	igt_assert_f(ret >= 0, "Reading %s for connector %s failed.\n",
+		     DEBUGFS_DSC_FEC_SUPPORT, connector_name);
+
+	return strstr(buf, "DSC_Sink_Support: yes");
+}
+
+/**
+ * is_dp_fec_supported: Checks if connector is FEC capable
+ * @display: A pointer to an #igt_display_t structure
+ * @drm_fd: DRM file descriptor
+ */
+bool is_dp_fec_supported(int drm_fd, char *connector_name)
+{
+	char buf[512];
+	int fd, ret;
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+
+	if (fd < 0) {
+		igt_info("Couldn't open connector %s debugfs directory\n",
+			 connector_name);
+		return false;
+	}
+
+	ret = igt_debugfs_simple_read(fd, DEBUGFS_DSC_FEC_SUPPORT, buf, sizeof(buf));
+	close(fd);
+
+	igt_assert_f(ret >= 0, "Reading %s for connector %s failed.\n",
+		     DEBUGFS_DSC_FEC_SUPPORT, connector_name);
+
+	return strstr(buf, "FEC_Sink_Support: yes");
+}
+
+/**
+ * igt_amd_require_dsc: Checks if connectors have DSC debugfs
+ * @display: A pointer to an #igt_display_t structure
+ * @drm_fd: DRM file descriptor
+ *
+ * Checks if the AMDGPU driver has support of debugfs entries for
+ * DSC. Skip test if DSC is not supported.
+ */
+void igt_amd_require_dsc(igt_display_t *display, int drm_fd)
+{
+	igt_output_t *output;
+
+	for_each_connected_output(display, output) {
+		if (igt_amd_output_has_dsc(drm_fd, output->name))
+			return;
+	}
+
+	igt_skip("No DSC debugfs support.\n");
+}
+
+/**
+ * igt_amd_read_dsc_clock_status: Read the DSC Clock Enable debugfs
+ * @drm_fd: DRM file descriptor
+ * @connector_name: The connector's name, which we use to read status on
+ *
+ */
+int igt_amd_read_dsc_clock_status(int drm_fd, char *connector_name)
+{
+	char buf[4];
+	int fd, ret;
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+	if (fd < 0) {
+		igt_info("Couldn't open connector %s debugfs directory\n",
+			 connector_name);
+		return false;
+	}
+	ret = igt_debugfs_simple_read(fd, DEBUGFS_DSC_CLOCK_EN, buf, sizeof(buf));
+	close(fd);
+
+	igt_assert_f(ret >= 0, "Reading %s for connector %s failed.\n",
+		     DEBUGFS_DSC_CLOCK_EN, connector_name);
+
+	return strtol(buf, NULL, 0);
+}
+
+
+/**
+ * igt_amd_write_dsc_clock_en: Write the DSC Clock Enable debugfs
+ * @drm_fd: DRM file descriptor
+ * @connector_name: The connector's name, which we use to read status on
+ * @dsc_force: DSC force parameter, 0 - DSC automatic, 1 - DSC force on,
+ * 2 - DSC force off
+ *
+ */
+void igt_amd_write_dsc_clock_en(int drm_fd, char *connector_name, int dsc_force)
+{
+	int fd, dsc_fd;
+	char src[4];
+	int wr_len;
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+	igt_assert(fd >= 0);
+	dsc_fd = openat(fd, DEBUGFS_DSC_CLOCK_EN, O_WRONLY);
+	close(fd);
+	igt_assert(dsc_fd >= 0);
+
+	if (dsc_force == DSC_FORCE_ON)
+		snprintf(src, sizeof(src), "%d", 1);
+	else if (dsc_force == DSC_FORCE_OFF)
+		snprintf(src, sizeof(src), "%d", 2);
+	else
+		snprintf(src, sizeof(src), "%d", 0);
+
+	igt_info("DSC Clock force, write %s > dsc_clock_en\n", src);
+
+	wr_len = write(dsc_fd, src, strlen(src));
+	close(dsc_fd);
+	igt_assert_eq(wr_len, strlen(src));
+}
+
+/**
+ * igt_amd_write_dsc_param_slice_height: Write the DSC Slice Height debugfs
+ * @drm_fd: DRM file descriptor
+ * @connector_name: The connector's name, which we use to read status on
+ * @slice_height: DSC slice height parameter, accepts any positive integer,
+ * 		  if parameter is negative - it will not write to debugfs.
+ *
+ */
+void igt_amd_write_dsc_param_slice_height(int drm_fd, char *connector_name, int slice_height)
+{
+	int fd, dsc_fd;
+	char src[32];
+	int wr_len;
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+	igt_assert(fd >= 0);
+	dsc_fd = openat(fd, DEBUGFS_DSC_SLICE_HEIGHT, O_WRONLY);
+	close(fd);
+	igt_assert(dsc_fd >= 0);
+
+	if (slice_height >= 0) {
+		snprintf(src, sizeof(src), "%#x", slice_height);
+	} else {
+		igt_warn("DSC SLICE HEIGHT, slice height parameter is invalid (%d)\n", slice_height);
+		goto exit;
+	}
+
+	igt_info("DSC SLICE HEIGHT, write %s > dsc_slice_height\n", src);
+
+	wr_len = write(dsc_fd, src, strlen(src));
+	igt_assert_eq(wr_len, strlen(src));
+exit:
+	close(dsc_fd);
+}
+
+/**
+ * igt_amd_read_dsc_param_slice_height: Read the DSC Slice Height debugfs
+ * @drm_fd: DRM file descriptor
+ * @connector_name: The connector's name, which we use to read status on
+ *
+ */
+int igt_amd_read_dsc_param_slice_height(int drm_fd, char *connector_name)
+{
+	char buf[32];
+	int fd, ret;
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+	if (fd < 0) {
+		igt_info("Couldn't open connector %s debugfs directory\n",
+			 connector_name);
+		return false;
+	}
+	ret = igt_debugfs_simple_read(fd, DEBUGFS_DSC_SLICE_HEIGHT, buf, sizeof(buf));
+	close(fd);
+
+	igt_assert_f(ret >= 0, "Reading %s for connector %s failed.\n",
+		     DEBUGFS_DSC_SLICE_HEIGHT, connector_name);
+
+	return strtol(buf, NULL, 0);
+}
+
+/**
+ * igt_amd_write_dsc_param_slice_width: Write the DSC Slice Width debugfs
+ * @drm_fd: DRM file descriptor
+ * @connector_name: The connector's name, which we use to read status on
+ * @slice_width: DSC slice width parameter, accepts any positive integer,
+ * 		 if parameter is negative - it will not write to debugfs.
+ *
+ */
+void igt_amd_write_dsc_param_slice_width(int drm_fd, char *connector_name, int slice_width)
+{
+	int fd, dsc_fd;
+	char src[32];
+	int wr_len;
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+	igt_assert(fd >= 0);
+	dsc_fd = openat(fd, DEBUGFS_DSC_SLICE_WIDTH, O_WRONLY);
+	close(fd);
+	igt_assert(dsc_fd >= 0);
+
+	if (slice_width >= 0) {
+		snprintf(src, sizeof(src), "%#x", slice_width);
+	} else {
+		igt_warn("DSC SLICE WIDTH, slice width parameter is invalid (%d)\n", slice_width);
+		goto exit;
+	}
+
+	igt_info("DSC SLICE WIDTH, write %s > dsc_slice_width\n", src);
+
+	wr_len = write(dsc_fd, src, strlen(src));
+	igt_assert_eq(wr_len, strlen(src));
+exit:
+	close(dsc_fd);
+}
+
+/**
+ * igt_amd_read_dsc_param_slice_width: Read the DSC Slice Width debugfs
+ * @drm_fd: DRM file descriptor
+ * @connector_name: The connector's name, which we use to read status on
+ *
+ */
+int igt_amd_read_dsc_param_slice_width(int drm_fd, char *connector_name)
+{
+	char buf[32];
+	int fd, ret;
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+	if (fd < 0) {
+		igt_info("Couldn't open connector %s debugfs directory\n",
+			 connector_name);
+		return false;
+	}
+	ret = igt_debugfs_simple_read(fd, DEBUGFS_DSC_SLICE_WIDTH, buf, sizeof(buf));
+	close(fd);
+
+	igt_assert_f(ret >= 0, "Reading %s for connector %s failed.\n",
+		     DEBUGFS_DSC_SLICE_WIDTH, connector_name);
+
+	return strtol(buf, NULL, 0);
+}
+
+/**
+ * igt_amd_write_dsc_param_bpp: Write the DSC Bits Per Pixel debugfs
+ * @drm_fd: DRM file descriptor
+ * @connector_name: The connector's name, which we use to read status on
+ * @bpp: DSC bits per pixel parameter, accepts any positive integer,
+ * 	 if parameter is negative - it will not write to debugfs.
+ *
+ */
+void igt_amd_write_dsc_param_bpp(int drm_fd, char *connector_name, int bpp)
+{
+	int fd, dsc_fd;
+	char src[32];
+	int wr_len;
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+	igt_assert(fd >= 0);
+	dsc_fd = openat(fd, DEBUGFS_DSC_BITS_PER_PIXEL, O_WRONLY);
+	close(fd);
+	igt_assert(dsc_fd >= 0);
+
+	if (bpp >= 0) {
+		snprintf(src, sizeof(src), "%#x", bpp);
+	} else {
+		igt_warn("DSC BITS PER PIXEL, bits per pixel parameter is invalid (%d)\n", bpp);
+		goto exit;
+	}
+
+	igt_info("DSC BITS PER PIXEL, write %s > dsc_bits_per_pixel\n", src);
+
+	wr_len = write(dsc_fd, src, strlen(src));
+	igt_assert_eq(wr_len, strlen(src));
+exit:
+	close(dsc_fd);
+}
+
+/**
+ * igt_amd_read_dsc_param_bpp: Read the DSC Bits Per Pixel debugfs
+ * @drm_fd: DRM file descriptor
+ * @connector_name: The connector's name, which we use to read status on
+ *
+ */
+int igt_amd_read_dsc_param_bpp(int drm_fd, char *connector_name)
+{
+	char buf[32];
+	int fd, ret;
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+	if (fd < 0) {
+		igt_info("Couldn't open connector %s debugfs directory\n",
+			 connector_name);
+		return false;
+	}
+	ret = igt_debugfs_simple_read(fd, DEBUGFS_DSC_BITS_PER_PIXEL, buf, sizeof(buf));
+	close(fd);
+
+	igt_assert_f(ret >= 0, "Reading %s for connector %s failed.\n",
+		     DEBUGFS_DSC_BITS_PER_PIXEL, connector_name);
+
+	return strtol(buf, NULL, 0);
+}
+
+/**
+ * igt_amd_read_dsc_param_pic_width: Read the DSC Picture Width debugfs
+ * @drm_fd: DRM file descriptor
+ * @connector_name: The connector's name, which we use to read status on
+ *
+ */
+int igt_amd_read_dsc_param_pic_width(int drm_fd, char *connector_name)
+{
+	char buf[4];
+	int fd, ret;
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+	if (fd < 0) {
+		igt_info("Couldn't open connector %s debugfs directory\n",
+			 connector_name);
+		return false;
+	}
+	ret = igt_debugfs_simple_read(fd, DEBUGFS_DSC_PIC_WIDTH, buf, sizeof(buf));
+	close(fd);
+
+	igt_assert_f(ret >= 0, "Reading %s for connector %s failed.\n",
+		     DEBUGFS_DSC_PIC_WIDTH, connector_name);
+
+	return strtol(buf, NULL, 0);
+}
+
+/**
+ * igt_amd_read_dsc_param_pic_height: Read the DSC Picture Height debugfs
+ * @drm_fd: DRM file descriptor
+ * @connector_name: The connector's name, which we use to read status on
+ *
+ */
+int igt_amd_read_dsc_param_pic_height(int drm_fd, char *connector_name)
+{
+	char buf[4];
+	int fd, ret;
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+	if (fd < 0) {
+		igt_info("Couldn't open connector %s debugfs directory\n",
+			 connector_name);
+		return false;
+	}
+	ret = igt_debugfs_simple_read(fd, DEBUGFS_DSC_PIC_HEIGHT, buf, sizeof(buf));
+	close(fd);
+
+	igt_assert_f(ret >= 0, "Reading %s for connector %s failed.\n",
+		     DEBUGFS_DSC_PIC_HEIGHT, connector_name);
+
+	return strtol(buf, NULL, 0);
+}
+
+/**
+ * igt_amd_read_dsc_param_chunk_size: Read the DSC Chunk Size debugfs
+ * @drm_fd: DRM file descriptor
+ * @connector_name: The connector's name, which we use to read status on
+ *
+ */
+int igt_amd_read_dsc_param_chunk_size(int drm_fd, char *connector_name)
+{
+	char buf[4];
+	int fd, ret;
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+	if (fd < 0) {
+		igt_info("Couldn't open connector %s debugfs directory\n",
+			 connector_name);
+		return false;
+	}
+	ret = igt_debugfs_simple_read(fd, DEBUGFS_DSC_CHUNK_SIZE, buf, sizeof(buf));
+	close(fd);
+
+	igt_assert_f(ret >= 0, "Reading %s for connector %s failed.\n",
+		     DEBUGFS_DSC_CHUNK_SIZE, connector_name);
+
+	return strtol(buf, NULL, 0);
+}
+
+/**
+ * igt_amd_read_dsc_param_slice_bpg: Read the DSC Slice BPG Offset debugfs
+ * @drm_fd: DRM file descriptor
+ * @connector_name: The connector's name, which we use to read status on
+ *
+ */
+int igt_amd_read_dsc_param_slice_bpg(int drm_fd, char *connector_name)
+{
+	char buf[4];
+	int fd, ret;
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+	if (fd < 0) {
+		igt_info("Couldn't open connector %s debugfs directory\n",
+			 connector_name);
+		return false;
+	}
+	ret = igt_debugfs_simple_read(fd, DEBUGFS_DSC_SLICE_BPG, buf, sizeof(buf));
+	close(fd);
+
+	igt_assert_f(ret >= 0, "Reading %s for connector %s failed.\n",
+		     DEBUGFS_DSC_SLICE_BPG, connector_name);
+
+	return strtol(buf, NULL, 0);
+}
+
+/**
+ * igt_amd_output_has_hpd: check if connector has HPD debugfs entry
+ * @drm_fd: DRM file descriptor
+ * @connector_name: The connector's name, on which we're reading the status
+ */
+static bool igt_amd_output_has_hpd(int drm_fd, char *connector_name)
+{
+        int fd;
+        int res;
+        struct stat stat;
+
+        fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+        if (fd < 0) {
+                igt_info("output %s: debugfs not found\n", connector_name);
+                return false;
+        }
+
+        res = fstatat(fd, DEBUGFS_HPD_TRIGGER, &stat, 0);
+        if (res != 0) {
+                igt_info("%s debugfs not supported\n", DEBUGFS_HPD_TRIGGER);
+                close(fd);
+                return false;
+        }
+
+        close(fd);
+        return true;
 }
 
 /**
@@ -288,14 +738,14 @@ static bool igt_amd_output_has_hpd(int drm_fd, char *connector_name)
  */
 void igt_amd_require_hpd(igt_display_t *display, int drm_fd)
 {
-	igt_output_t *output;
+        igt_output_t *output;
 
-	for_each_connected_output(display, output) {
-		if (igt_amd_output_has_hpd(drm_fd, output->name))
-			return;
-	}
+        for_each_connected_output(display, output) {
+                if (igt_amd_output_has_hpd(drm_fd, output->name))
+                        return;
+        }
 
-	igt_skip("No HPD debugfs support.\n");
+        igt_skip("No HPD debugfs support.\n");
 }
 
 /**
@@ -307,21 +757,21 @@ void igt_amd_require_hpd(igt_display_t *display, int drm_fd)
  */
 int igt_amd_trigger_hotplug(int drm_fd, char *connector_name)
 {
-	int fd, hpd_fd;
-	int wr_len;
-	const char *enable_hpd = "1";
+        int fd, hpd_fd;
+        int wr_len;
+        const char *enable_hpd = "1";
 
-	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
-	igt_assert(fd >= 0);
-	hpd_fd = openat(fd, DEBUGFS_HPD_TRIGGER, O_WRONLY);
-	close(fd);
-	igt_assert(hpd_fd >= 0);
+        fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+        igt_assert(fd >= 0);
+        hpd_fd = openat(fd, DEBUGFS_HPD_TRIGGER, O_WRONLY);
+        close(fd);
+        igt_assert(hpd_fd >= 0);
 
-	wr_len = write(hpd_fd, enable_hpd, strlen(enable_hpd));
-	close(hpd_fd);
-	igt_assert_eq(wr_len, strlen(enable_hpd));
+        wr_len = write(hpd_fd, enable_hpd, strlen(enable_hpd));
+        close(hpd_fd);
+        igt_assert_eq(wr_len, strlen(enable_hpd));
 
-	return 0;
+        return 0;
 }
 
 /*

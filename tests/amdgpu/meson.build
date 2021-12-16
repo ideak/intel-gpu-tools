@@ -17,6 +17,7 @@ if libdrm_amdgpu.found()
 			  'amd_link_settings',
 			  'amd_vrr_range',
 			  'amd_mode_switch',
+			  'amd_dp_dsc',
 			  'amd_psr',
 			  'amd_plane',
 			]
