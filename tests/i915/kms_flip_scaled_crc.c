@@ -50,7 +50,7 @@ const struct {
 	const double secondmultiplier;
 } flip_scenario_test[] = {
 	{
-		"flip-32bpp-ytile-to-64bpp-ytile",
+		"flip-32bpp-ytile-to-64bpp-ytile-downscaling",
 		"Flip from 32bpp non scaled fb to 64bpp downscaled fb to stress CD clock programming",
 		I915_FORMAT_MOD_Y_TILED, DRM_FORMAT_XRGB8888,
 		I915_FORMAT_MOD_Y_TILED, DRM_FORMAT_XRGB16161616F,
@@ -58,7 +58,7 @@ const struct {
 		2.0,
 	},
 	{
-		"flip-64bpp-ytile-to-32bpp-ytile",
+		"flip-64bpp-ytile-to-32bpp-ytile-downscaling",
 		"Flip from 64bpp non scaled fb to 32bpp downscaled fb to stress CD clock programming",
 		I915_FORMAT_MOD_Y_TILED, DRM_FORMAT_XRGB16161616F,
 		I915_FORMAT_MOD_Y_TILED, DRM_FORMAT_XRGB8888,
@@ -66,7 +66,7 @@ const struct {
 		2.0,
 	},
 	{
-		"flip-64bpp-ytile-to-16bpp-ytile",
+		"flip-64bpp-ytile-to-16bpp-ytile-downscaling",
 		"Flip from 64bpp non scaled fb to 16bpp downscaled fb to stress CD clock programming",
 		I915_FORMAT_MOD_Y_TILED, DRM_FORMAT_XRGB16161616F,
 		I915_FORMAT_MOD_Y_TILED, DRM_FORMAT_RGB565,
@@ -74,7 +74,7 @@ const struct {
 		2.0,
 	},
 	{
-		"flip-32bpp-ytileccs-to-64bpp-ytile",
+		"flip-32bpp-ytileccs-to-64bpp-ytile-downscaling",
 		"Flip from 32bpp non scaled fb to 64bpp downscaled fb to stress CD clock programming",
 		I915_FORMAT_MOD_Y_TILED_CCS, DRM_FORMAT_XRGB8888,
 		I915_FORMAT_MOD_Y_TILED, DRM_FORMAT_XRGB16161616F,
@@ -82,7 +82,7 @@ const struct {
 		2.0,
 	},
 	{
-		"flip-32bpp-ytile-to-32bpp-ytilegen12rcccs",
+		"flip-32bpp-ytile-to-32bpp-ytilegen12rcccs-downscaling",
 		"Flip from 32bpp non scaled fb to 32bpp downscaled fb to stress CD clock programming",
 		I915_FORMAT_MOD_Y_TILED, DRM_FORMAT_XRGB8888,
 		I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS, DRM_FORMAT_XRGB8888,
@@ -90,7 +90,7 @@ const struct {
 		2.0,
 	},
 	{
-		"flip-32bpp-ytile-to-32bpp-ytileccs",
+		"flip-32bpp-ytile-to-32bpp-ytileccs-downscaling",
 		"Flip from 32bpp non scaled fb to 32bpp downscaled fb to stress CD clock programming",
 		I915_FORMAT_MOD_Y_TILED, DRM_FORMAT_XRGB8888,
 		I915_FORMAT_MOD_Y_TILED_CCS, DRM_FORMAT_XRGB8888,
@@ -98,7 +98,7 @@ const struct {
 		2.0,
 	},
 	{
-		"flip-64bpp-ytile-to-32bpp-ytilercccs",
+		"flip-64bpp-ytile-to-32bpp-ytilercccs-downscaling",
 		"Flip from 64bpp non scaled fb to 32bpp downscaled fb to stress CD clock programming",
 		I915_FORMAT_MOD_Y_TILED, DRM_FORMAT_XRGB16161616F,
 		I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS, DRM_FORMAT_XRGB8888,
