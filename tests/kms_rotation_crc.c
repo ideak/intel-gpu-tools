@@ -683,7 +683,7 @@ static void test_multi_plane_rotation(data_t *data, enum pipe pipe)
 	 * case with modifier are 2 bpp, 4 bpp and NV12.
 	 */
 	static const uint32_t formatlist[] = {DRM_FORMAT_RGB565,
-		DRM_FORMAT_XRGB8888, DRM_FORMAT_NV12};
+		DRM_FORMAT_XRGB8888, DRM_FORMAT_NV12, DRM_FORMAT_P010};
 
 	static struct {
 		igt_rotation_t rotation;
@@ -769,14 +769,13 @@ static void test_multi_plane_rotation(data_t *data, enum pipe pipe)
 						 * no need to redo comparison image and
 						 * just use stored crc.
 						 */
-						if (p[0].format != DRM_FORMAT_NV12 &&
-						    p[1].format != DRM_FORMAT_NV12 &&
+						if (!igt_format_is_yuv_semiplanar(p[0].format) && !igt_format_is_yuv_semiplanar(p[1].format) &&
 						    crclog[ctz(planeconfigs[i].rotation) | (ctz(planeconfigs[j].rotation) << 2)].frame != 0) {
 							retcrc_sw = crclog[ctz(planeconfigs[i].rotation) | (ctz(planeconfigs[j].rotation) << 2)];
 							have_crc = true;
-						} else if (p[0].format == DRM_FORMAT_NV12 &&
-							   p[1].format != DRM_FORMAT_NV12 &&
-							   lastroundjformat != DRM_FORMAT_NV12 &&
+						} else if((p[0].format == DRM_FORMAT_NV12 || p[0].format == DRM_FORMAT_P010) &&
+							   p[1].format != DRM_FORMAT_NV12 && p[1].format != DRM_FORMAT_P010 &&
+							   lastroundjformat != DRM_FORMAT_NV12 && lastroundjformat != DRM_FORMAT_P010 &&
 							   planeconfigs[i].rotation == lastroundirotation &&
 							   planeconfigs[j].rotation == lastroundjrotation) {
 							/*
@@ -837,7 +836,7 @@ static void test_multi_plane_rotation(data_t *data, enum pipe pipe)
 										   flipsw,
 										   &retcrc_sw);
 
-							if (p[0].format != DRM_FORMAT_NV12 && p[1].format != DRM_FORMAT_NV12)
+							if (!igt_format_is_yuv_semiplanar(p[0].format) &&!igt_format_is_yuv_semiplanar(p[1].format))
 								crclog[ctz(planeconfigs[i].rotation) | (ctz(planeconfigs[j].rotation) << 2)]
 								= retcrc_sw;
 						}
