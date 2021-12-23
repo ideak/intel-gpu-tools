@@ -754,9 +754,11 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 				expected_colors[1].g =
 				expected_colors[2].b =
 				0.25 + delta * (i - 2);
-			success |= test_pipe_ctm(data, primary,
-						 red_green_blue,
-						 expected_colors, ctm);
+			if (test_pipe_ctm(data, primary, red_green_blue,
+					  expected_colors, ctm)) {
+				success = true;
+				break;
+			}
 		}
 		igt_assert(success);
 	}
@@ -776,9 +778,11 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 				expected_colors[1].g =
 				expected_colors[2].b =
 				0.5 + delta * (i - 2);
-			success |= test_pipe_ctm(data, primary,
-						 red_green_blue,
-						 expected_colors, ctm);
+			if (test_pipe_ctm(data, primary, red_green_blue,
+					  expected_colors, ctm)) {
+				success = true;
+				break;
+			}
 		}
 		igt_assert(success);
 	}
@@ -798,9 +802,11 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 				expected_colors[1].g =
 				expected_colors[2].b =
 				0.75 + delta * (i - 3);
-			success |= test_pipe_ctm(data, primary,
-						 red_green_blue,
-						 expected_colors, ctm);
+			if (test_pipe_ctm(data, primary, red_green_blue,
+						expected_colors, ctm)) {
+				success = true;
+				break;
+			}
 		}
 		igt_assert(success);
 	}
