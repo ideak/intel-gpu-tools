@@ -101,7 +101,7 @@ struct buf_ops {
 	int fd;
 	int gen_start;
 	int gen_end;
-	int intel_gen;
+	unsigned int intel_gen;
 	uint32_t supported_tiles;
 	uint32_t supported_hw_tiles;
 	uint32_t swizzle_x;
@@ -440,8 +440,8 @@ static void __copy_ccs(struct buf_ops *bops, struct intel_buf *buf,
 		       uint32_t *linear, enum ccs_copy_direction dir)
 {
 	uint64_t size, offset, ccs_size;
+	unsigned int gen;
 	void *map;
-	int gen;
 
 	if (!buf->compression || HAS_FLATCCS(intel_get_drm_devid(bops->fd)))
 		return;
@@ -1214,7 +1214,7 @@ static void __intel_buf_write_to_png(struct buf_ops *bops,
 	cairo_status_t ret;
 	void *linear;
 	int format, width, height, stride, offset;
-	int gen = bops->intel_gen;
+	unsigned int gen = bops->intel_gen;
 
 	igt_assert_eq(posix_memalign(&linear, 16, intel_buf_size(buf)), 0);
 
@@ -1265,7 +1265,7 @@ void intel_buf_write_aux_to_png(struct intel_buf *buf, const char *filename)
 	.ys_to_linear       = copy_ys_to_linear, \
 	.tile4_to_linear    = copy_tile4_to_linear
 
-struct buf_ops buf_ops_arr[] = {
+static const struct buf_ops buf_ops_arr[] = {
 	{
 		DEFAULT_BUFOPS(2, 8),
 		.supported_tiles    = TILE_NONE | TILE_X | TILE_Y,
@@ -1277,7 +1277,7 @@ struct buf_ops buf_ops_arr[] = {
 	},
 
 	{
-		DEFAULT_BUFOPS(12, 12),
+		DEFAULT_BUFOPS(12, ~0U),
 		.supported_tiles   = TILE_NONE | TILE_X | TILE_Y | TILE_Yf | TILE_Ys | TILE_4,
 	},
 };
@@ -1394,28 +1394,27 @@ uint64_t intel_buf_bo_size(const struct intel_buf *buf)
 static struct buf_ops *__buf_ops_create(int fd, bool check_idempotency)
 {
 	struct buf_ops *bops = calloc(1, sizeof(*bops));
+	unsigned int generation;
 	uint32_t devid;
-	int generation;
 
 	igt_assert(bops);
 
 	devid = intel_get_drm_devid(fd);
 	generation = intel_gen(devid);
 
-	/* Predefined settings */
+	/* Predefined settings: see intel_device_info? */
 	for (int i = 0; i < ARRAY_SIZE(buf_ops_arr); i++) {
 		if (generation >= buf_ops_arr[i].gen_start &&
 		    generation <= buf_ops_arr[i].gen_end) {
 			memcpy(bops, &buf_ops_arr[i], sizeof(*bops));
-			bops->fd = fd;
-			bops->intel_gen = generation;
-			igt_debug("generation: %d, supported tiles: 0x%02x\n",
-				  generation, bops->supported_tiles);
 			break;
 		}
 	}
 
-	igt_assert(bops->intel_gen);
+	bops->fd = fd;
+	bops->intel_gen = generation;
+	igt_debug("generation: %d, supported tiles: 0x%02x\n",
+		  bops->intel_gen, bops->supported_tiles);
 
 	/*
 	 * Warning!
