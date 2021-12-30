@@ -1187,8 +1187,9 @@ igt_fillfunc_t igt_get_media_fillfunc(int devid)
 igt_vme_func_t igt_get_media_vme_func(int devid)
 {
 	igt_vme_func_t fill = NULL;
+	const struct intel_device_info *devinfo = intel_get_device_info(devid);
 
-	if (IS_GEN11(devid))
+	if (IS_GEN11(devid) && !devinfo->is_elkhartlake && !devinfo->is_jasperlake)
 		fill = gen11_media_vme_func;
 
 	return fill;
