@@ -2185,7 +2185,10 @@ static void test_probe(int fd)
 	 */
 	memset(&mmap_offset, 0, sizeof(mmap_offset));
 	mmap_offset.handle = gem_create(fd, PAGE_SIZE);
-	mmap_offset.flags = I915_MMAP_OFFSET_WB;
+	if (gem_has_lmem(fd))
+		mmap_offset.flags = I915_MMAP_OFFSET_FIXED;
+	else
+		mmap_offset.flags = I915_MMAP_OFFSET_WB;
 	igt_assert_eq(igt_ioctl(fd, DRM_IOCTL_I915_GEM_MMAP_OFFSET, &mmap_offset), 0);
 
 	for (unsigned long pass = 0; pass < 4 * 4 * 4 * 4 * 4; pass++) {
