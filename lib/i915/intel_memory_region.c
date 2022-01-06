@@ -28,11 +28,13 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <pthread.h>
 
 #include "i915/gem_create.h"
 #include "intel_reg.h"
 #include "drmtest.h"
 #include "ioctl_wrappers.h"
+#include "igt_aux.h"
 #include "igt_dummyload.h"
 #include "igt_gt.h"
 #include "igt_params.h"
@@ -40,6 +42,7 @@
 #include "intel_chipset.h"
 #include "igt_collection.h"
 #include "igt_device.h"
+#include "gem_mman.h"
 
 #include "i915/intel_memory_region.h"
 
@@ -479,4 +482,374 @@ uint64_t gpu_meminfo_region_available(const struct drm_i915_query_memory_regions
 			return info->regions[i].unallocated_size;
 
 	return 0;
+}
+
+#define PAGE_SIZE 4096
+
+enum cache_entry_type {
+	MIN_START_OFFSET,
+	MIN_ALIGNMENT,
+	SAFE_START_OFFSET,
+	SAFE_ALIGNMENT,
+};
+
+struct cache_entry {
+	uint16_t devid;
+	enum cache_entry_type type;
+
+	union {
+		/* for MIN_START_OFFSET */
+		struct {
+			uint64_t offset;
+			uint32_t region;
+		} start;
+
+		/* for MIN_ALIGNMENT */
+		struct {
+			uint64_t alignment;
+			uint64_t region1;
+			uint64_t region2;
+		} minalign;
+
+		/* for SAFE_START_OFFSET */
+		uint64_t safe_start_offset;
+
+		/* for SAFE_ALIGNMENT */
+		uint64_t safe_alignment;
+	};
+	struct igt_list_head link;
+};
+
+static IGT_LIST_HEAD(cache);
+static pthread_mutex_t cache_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+static struct cache_entry *find_entry_unlocked(enum cache_entry_type type,
+					       uint16_t devid,
+					       uint32_t region1,
+					       uint32_t region2)
+{
+	struct cache_entry *entry;
+
+	igt_list_for_each_entry(entry, &cache, link) {
+		if (entry->type != type || entry->devid != devid)
+			continue;
+
+		switch (entry->type) {
+		case MIN_START_OFFSET:
+			if (entry->start.region == region1)
+				return entry;
+			continue;
+
+		case MIN_ALIGNMENT:
+			if (entry->minalign.region1 == region1 &&
+			    entry->minalign.region2 == region2)
+				return entry;
+			continue;
+
+		case SAFE_START_OFFSET:
+		case SAFE_ALIGNMENT:
+			return entry;
+		}
+	}
+
+	return NULL;
+}
+
+/**
+ * gem_detect_min_start_offset_for_region:
+ * @i915: drm fd
+ * @region: memory region
+ *
+ * Returns: minimum start offset at which kernel allows placing objects
+ *          for memory region.
+ */
+uint64_t gem_detect_min_start_offset_for_region(int i915, uint32_t region)
+{
+	struct drm_i915_gem_exec_object2 obj;
+	struct drm_i915_gem_execbuffer2 eb;
+	uint64_t start_offset = 0;
+	uint64_t bb_size = PAGE_SIZE;
+	uint32_t *batch;
+	uint16_t devid = intel_get_drm_devid(i915);
+	struct cache_entry *entry, *newentry;
+
+	pthread_mutex_lock(&cache_mutex);
+	entry = find_entry_unlocked(MIN_START_OFFSET, devid, region, 0);
+	if (entry)
+		goto out;
+	pthread_mutex_unlock(&cache_mutex);
+
+	memset(&obj, 0, sizeof(obj));
+	memset(&eb, 0, sizeof(eb));
+
+	eb.buffers_ptr = to_user_pointer(&obj);
+	eb.buffer_count = 1;
+	eb.flags = I915_EXEC_DEFAULT;
+	igt_assert(__gem_create_in_memory_regions(i915, &obj.handle, &bb_size, region) == 0);
+	obj.flags = EXEC_OBJECT_PINNED;
+
+	batch = gem_mmap__device_coherent(i915, obj.handle, 0, bb_size, PROT_WRITE);
+	*batch = MI_BATCH_BUFFER_END;
+	munmap(batch, bb_size);
+
+	while (1) {
+		obj.offset = start_offset;
+
+		if (__gem_execbuf(i915, &eb) == 0)
+			break;
+
+		if (start_offset)
+			start_offset <<= 1;
+		else
+			start_offset = PAGE_SIZE;
+
+		if (start_offset >= 1ull << 32)
+			obj.flags |= EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+
+		igt_assert(start_offset <= 1ull << 48);
+	}
+	gem_close(i915, obj.handle);
+
+	newentry = malloc(sizeof(*newentry));
+	if (!newentry)
+		return start_offset;
+
+	/* Check does other thread did the job before */
+	pthread_mutex_lock(&cache_mutex);
+	entry = find_entry_unlocked(MIN_START_OFFSET, devid, region, 0);
+	if (entry)
+		goto out;
+
+	entry = newentry;
+	entry->devid = devid;
+	entry->type = MIN_START_OFFSET;
+	entry->start.offset = start_offset;
+	entry->start.region = region;
+	igt_list_add(&entry->link, &cache);
+
+out:
+	pthread_mutex_unlock(&cache_mutex);
+
+	return entry->start.offset;
+}
+
+/**
+ * gem_detect_safe_start_offset:
+ * @i915: drm fd
+ *
+ * Returns: finds start offset which can be used as first one regardless
+ *          memory region. Useful if for some reason some regions don't allow
+ *          starting from 0x0 offset.
+ */
+uint64_t gem_detect_safe_start_offset(int i915)
+{
+	struct drm_i915_query_memory_regions *query_info;
+	struct igt_collection *regions, *set;
+	uint32_t region;
+	uint64_t offset = 0;
+	uint16_t devid = intel_get_drm_devid(i915);
+	struct cache_entry *entry, *newentry;
+
+	pthread_mutex_lock(&cache_mutex);
+	entry = find_entry_unlocked(SAFE_START_OFFSET, devid, 0, 0);
+	if (entry)
+		goto out;
+	pthread_mutex_unlock(&cache_mutex);
+
+	query_info = gem_get_query_memory_regions(i915);
+	igt_assert(query_info);
+
+	set = get_memory_region_set(query_info,
+				    I915_SYSTEM_MEMORY,
+				    I915_DEVICE_MEMORY);
+
+	for_each_combination(regions, 1, set) {
+		region = igt_collection_get_value(regions, 0);
+		offset = max(offset,
+			     gem_detect_min_start_offset_for_region(i915, region));
+	}
+	free(query_info);
+	igt_collection_destroy(set);
+
+	newentry = malloc(sizeof(*newentry));
+	if (!newentry)
+		return offset;
+
+	pthread_mutex_lock(&cache_mutex);
+	entry = find_entry_unlocked(SAFE_START_OFFSET, devid, 0, 0);
+	if (entry)
+		goto out;
+
+	entry = newentry;
+	entry->devid = devid;
+	entry->type = SAFE_START_OFFSET;
+	entry->safe_start_offset = offset;
+	igt_list_add(&entry->link, &cache);
+
+out:
+	pthread_mutex_unlock(&cache_mutex);
+
+	return entry->safe_start_offset;
+}
+
+/**
+ * gem_detect_min_alignment_for_regions:
+ * @i915: drm fd
+ * @region1: first region
+ * @region2: second region
+ *
+ * Returns: minimum alignment which must be used when objects from @region1 and
+ * @region2 are going to interact.
+ */
+uint64_t gem_detect_min_alignment_for_regions(int i915,
+					      uint32_t region1,
+					      uint32_t region2)
+{
+	struct drm_i915_gem_exec_object2 obj[2];
+	struct drm_i915_gem_execbuffer2 eb;
+	uint64_t min_alignment = PAGE_SIZE;
+	uint64_t bb_size = PAGE_SIZE, obj_size = PAGE_SIZE;
+	uint32_t *batch;
+	uint16_t devid = intel_get_drm_devid(i915);
+	struct cache_entry *entry, *newentry;
+
+	pthread_mutex_lock(&cache_mutex);
+	entry = find_entry_unlocked(MIN_ALIGNMENT, devid, region1, region2);
+	if (entry)
+		goto out;
+	pthread_mutex_unlock(&cache_mutex);
+
+	memset(obj, 0, sizeof(obj));
+	memset(&eb, 0, sizeof(eb));
+
+	/* Establish bb offset first */
+	eb.buffers_ptr = to_user_pointer(obj);
+	eb.buffer_count = ARRAY_SIZE(obj);
+	eb.flags = I915_EXEC_BATCH_FIRST | I915_EXEC_DEFAULT;
+	igt_assert(__gem_create_in_memory_regions(i915, &obj[0].handle,
+						  &bb_size, region1) == 0);
+
+	batch = gem_mmap__device_coherent(i915, obj[0].handle, 0, bb_size,
+					  PROT_WRITE);
+	*batch = MI_BATCH_BUFFER_END;
+	munmap(batch, bb_size);
+
+	obj[0].flags = EXEC_OBJECT_PINNED;
+	obj[0].offset = gem_detect_min_start_offset_for_region(i915, region1);
+
+	/* Find appropriate alignment of object */
+	igt_assert(__gem_create_in_memory_regions(i915, &obj[1].handle,
+						  &obj_size, region2) == 0);
+	obj[1].handle = gem_create_in_memory_regions(i915, PAGE_SIZE, region2);
+	obj[1].flags = EXEC_OBJECT_PINNED;
+	while (1) {
+		obj[1].offset = ALIGN(obj[0].offset + bb_size, min_alignment);
+		igt_assert(obj[1].offset <= 1ull << 32);
+
+		if (__gem_execbuf(i915, &eb) == 0)
+			break;
+
+		min_alignment <<= 1;
+	}
+
+	gem_close(i915, obj[0].handle);
+	gem_close(i915, obj[1].handle);
+
+	newentry = malloc(sizeof(*newentry));
+	if (!newentry)
+		return min_alignment;
+
+	pthread_mutex_lock(&cache_mutex);
+	entry = find_entry_unlocked(MIN_ALIGNMENT, devid, region1, region2);
+	if (entry)
+		goto out;
+
+	entry = newentry;
+	entry->devid = devid;
+	entry->type = MIN_ALIGNMENT;
+	entry->minalign.alignment = min_alignment;
+	entry->minalign.region1 = region1;
+	entry->minalign.region2 = region2;
+	igt_list_add(&entry->link, &cache);
+
+out:
+	pthread_mutex_unlock(&cache_mutex);
+
+	return entry->minalign.alignment;
+}
+
+/**
+ * gem_detect_safe_alignment:
+ * @i915: drm fd
+ *
+ * Returns: safe alignment for all memory regions on @i915 device.
+ * Safe in this case means max() from all minimum alignments for each
+ * region.
+ */
+uint64_t gem_detect_safe_alignment(int i915)
+{
+	struct drm_i915_query_memory_regions *query_info;
+	struct igt_collection *regions, *set;
+	uint64_t default_alignment = 0;
+	uint32_t region_bb, region_obj;
+	uint16_t devid = intel_get_drm_devid(i915);
+	struct cache_entry *entry, *newentry;
+
+	/* non-discrete uses 4K page size */
+	if (!gem_has_lmem(i915))
+		return PAGE_SIZE;
+
+	pthread_mutex_lock(&cache_mutex);
+	entry = find_entry_unlocked(SAFE_ALIGNMENT, devid, 0, 0);
+	if (entry)
+		goto out;
+	pthread_mutex_unlock(&cache_mutex);
+
+	query_info = gem_get_query_memory_regions(i915);
+	igt_assert(query_info);
+
+	set = get_memory_region_set(query_info,
+				    I915_SYSTEM_MEMORY,
+				    I915_DEVICE_MEMORY);
+
+	for_each_variation_r(regions, 2, set) {
+		uint64_t alignment;
+
+		region_bb = igt_collection_get_value(regions, 0);
+		region_obj = igt_collection_get_value(regions, 1);
+
+		/* We're interested in triangular matrix */
+		if (region_bb > region_obj)
+			continue;
+
+		alignment = gem_detect_min_alignment_for_regions(i915,
+								 region_bb,
+								 region_obj);
+		if (default_alignment < alignment)
+			default_alignment = alignment;
+	}
+
+	free(query_info);
+	igt_collection_destroy(set);
+
+	newentry = malloc(sizeof(*newentry));
+	if (!newentry)
+		return default_alignment;
+
+	/* Try again, check does we have cache updated in the meantime. */
+	pthread_mutex_lock(&cache_mutex);
+	entry = find_entry_unlocked(SAFE_ALIGNMENT, devid,  0, 0);
+	if (entry)
+		goto out;
+
+	entry = newentry;
+	entry->devid = devid;
+	entry->type = SAFE_ALIGNMENT;
+	entry->safe_alignment = default_alignment;
+	igt_list_add(&entry->link, &cache);
+
+out:
+	pthread_mutex_unlock(&cache_mutex);
+
+	return entry->minalign.alignment;
 }

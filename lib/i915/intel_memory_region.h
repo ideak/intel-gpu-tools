@@ -129,4 +129,9 @@ uint64_t gpu_meminfo_region_available(const struct drm_i915_query_memory_regions
 				      uint16_t memory_class,
 				      uint16_t memory_instance);
 
+uint64_t gem_detect_min_start_offset_for_region(int i915, uint32_t region);
+uint64_t gem_detect_safe_start_offset(int i915);
+uint64_t gem_detect_min_alignment_for_regions(int i915, uint32_t region1, uint32_t region2);
+uint64_t gem_detect_safe_alignment(int i915);
+
 #endif /* INTEL_MEMORY_REGION_H */
