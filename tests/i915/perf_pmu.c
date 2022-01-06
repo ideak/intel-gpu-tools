@@ -2319,7 +2319,7 @@ igt_main
 	}
 
 	test_each_engine("busy-hang", fd, ctx, e) {
-		igt_hang_t hang = igt_allow_hang(fd, 0, 0);
+		igt_hang_t hang = igt_allow_hang(fd, ctx->id, 0);
 
 		single(fd, ctx, e, TEST_BUSY | FLAG_HANG);
 
