@@ -45,6 +45,7 @@ igt@gem_render_tiled_blits@basic
 igt@gem_ringfill@basic-all
 igt@gem_softpin@allocator-basic
 igt@gem_softpin@allocator-basic-reserve
+igt@gem_softpin@safe-alignment
 igt@gem_sync@basic-all
 igt@gem_sync@basic-each
 igt@gem_tiled_blits@basic
