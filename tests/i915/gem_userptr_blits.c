@@ -2374,8 +2374,11 @@ igt_main_args("c:", NULL, help_str, opt_handler, NULL)
 		igt_subtest("forbidden-operations")
 			test_forbidden_ops(fd);
 
-		igt_subtest("sd-probe")
+		igt_subtest("sd-probe") {
+			igt_skip_on_f(gem_has_lmem(fd),
+				      "GEM_SET_DOMAIN not supported on discrete platforms\n");
 			test_sd_probe(fd);
+		}
 
 		igt_subtest("set-cache-level")
 			test_set_caching(fd);
