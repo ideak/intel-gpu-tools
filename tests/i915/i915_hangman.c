@@ -31,6 +31,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <fcntl.h>
+#include <signal.h>
 
 #include "i915/gem.h"
 #include "i915/gem_create.h"
@@ -289,6 +290,38 @@ test_engine_hang(const intel_ctx_t *ctx,
 	put_ahnd(ahnd);
 }
 
+static int hang_count;
+
+static void sig_io(int sig)
+{
+	hang_count++;
+}
+
+static void test_hang_detector(const intel_ctx_t *ctx,
+			       const struct intel_execution_engine2 *e)
+{
+	igt_hang_t hang;
+	uint64_t ahnd = get_reloc_ahnd(device, ctx->id);
+
+	hang_count = 0;
+
+	igt_fork_hang_detector(device);
+
+	/* Steal the signal handler */
+	signal(SIGIO, sig_io);
+
+	/* Make a hang... */
+	hang = igt_hang_ctx_with_ahnd(device, ahnd, ctx->id, e->flags, 0);
+
+	igt_post_hang_ring(device, hang);
+	put_ahnd(ahnd);
+
+	igt_stop_hang_detector();
+
+	/* Did it work? */
+	igt_assert(hang_count == 1);
+}
+
 /* This test covers the case where we end up in an uninitialised area of the
  * ppgtt and keep executing through it. This is particularly relevant if 48b
  * ppgtt is enabled because the ppgtt is massively bigger compared to the 32b
@@ -407,6 +440,16 @@ igt_main
 	igt_describe("Check that executing unintialised memory causes a hang");
 	igt_subtest("hangcheck-unterminated")
 		hangcheck_unterminated(ctx);
+
+	igt_describe("Check that hang detector works");
+	igt_subtest_with_dynamic("detector") {
+		const struct intel_execution_engine2 *e;
+
+		for_each_ctx_engine(device, ctx, e) {
+			igt_dynamic_f("%s", e->name)
+				test_hang_detector(ctx, e);
+		}
+	}
 
 	do_tests("GT", "gt", ctx);
 
