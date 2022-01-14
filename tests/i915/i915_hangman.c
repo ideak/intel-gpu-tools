@@ -323,9 +323,66 @@ static void hangcheck_unterminated(const intel_ctx_t *ctx)
 	}
 }
 
-igt_main
+static void do_tests(const char *name, const char *prefix,
+		     const intel_ctx_t *ctx)
 {
 	const struct intel_execution_engine2 *e;
+	char buff[256];
+
+	snprintf(buff, sizeof(buff), "Per engine error capture (%s reset)", name);
+	igt_describe(buff);
+	snprintf(buff, sizeof(buff), "%s-error-state-capture", prefix);
+	igt_subtest_with_dynamic(buff) {
+		for_each_ctx_engine(device, ctx, e) {
+			igt_dynamic_f("%s", e->name)
+				test_error_state_capture(ctx, e);
+		}
+	}
+
+	snprintf(buff, sizeof(buff), "Per engine hang recovery (spin, %s reset)", name);
+	igt_describe(buff);
+	snprintf(buff, sizeof(buff), "%s-engine-hang", prefix);
+	igt_subtest_with_dynamic(buff) {
+                int has_gpu_reset = 0;
+		struct drm_i915_getparam gp = {
+			.param = I915_PARAM_HAS_GPU_RESET,
+			.value = &has_gpu_reset,
+		};
+
+		igt_require(gem_scheduler_has_preemption(device));
+		igt_params_set(device, "reset", "%u", -1);
+                ioctl(device, DRM_IOCTL_I915_GETPARAM, &gp);
+		igt_require(has_gpu_reset > 1);
+
+		for_each_ctx_engine(device, ctx, e) {
+			igt_dynamic_f("%s", e->name)
+				test_engine_hang(ctx, e, 0);
+		}
+	}
+
+	snprintf(buff, sizeof(buff), "Per engine hang recovery (invalid CS, %s reset)", name);
+	igt_describe(buff);
+	snprintf(buff, sizeof(buff), "%s-engine-error", prefix);
+	igt_subtest_with_dynamic(buff) {
+		int has_gpu_reset = 0;
+		struct drm_i915_getparam gp = {
+			.param = I915_PARAM_HAS_GPU_RESET,
+			.value = &has_gpu_reset,
+		};
+
+		igt_params_set(device, "reset", "%u", -1);
+		ioctl(device, DRM_IOCTL_I915_GETPARAM, &gp);
+		igt_require(has_gpu_reset > 1);
+
+		for_each_ctx_engine(device, ctx, e) {
+			igt_dynamic_f("%s", e->name)
+				test_engine_hang(ctx, e, IGT_SPIN_INVALID_CS);
+		}
+	}
+}
+
+igt_main
+{
 	const intel_ctx_t *ctx;
 	igt_hang_t hang = {};
 
@@ -347,54 +404,19 @@ igt_main
 	igt_subtest("error-state-basic")
 		test_error_state_basic();
 
-	igt_describe("Per engine error capture");
-	igt_subtest_with_dynamic("error-state-capture") {
-		for_each_ctx_engine(device, ctx, e) {
-			igt_dynamic_f("%s", e->name)
-				test_error_state_capture(ctx, e);
-		}
-	}
-
-	igt_describe("Per engine hang recovery (spin)");
-	igt_subtest_with_dynamic("engine-hang") {
-                int has_gpu_reset = 0;
-		struct drm_i915_getparam gp = {
-			.param = I915_PARAM_HAS_GPU_RESET,
-			.value = &has_gpu_reset,
-		};
-
-		igt_require(gem_scheduler_has_preemption(device));
-		igt_params_set(device, "reset", "%u", -1);
-                ioctl(device, DRM_IOCTL_I915_GETPARAM, &gp);
-		igt_require(has_gpu_reset > 1);
-
-		for_each_ctx_engine(device, ctx, e) {
-			igt_dynamic_f("%s", e->name)
-				test_engine_hang(ctx, e, 0);
-		}
-	}
-
-	igt_describe("Per engine hang recovery (invalid CS)");
-	igt_subtest_with_dynamic("engine-error") {
-		int has_gpu_reset = 0;
-		struct drm_i915_getparam gp = {
-			.param = I915_PARAM_HAS_GPU_RESET,
-			.value = &has_gpu_reset,
-		};
-
-		igt_params_set(device, "reset", "%u", -1);
-		ioctl(device, DRM_IOCTL_I915_GETPARAM, &gp);
-		igt_require(has_gpu_reset > 1);
-
-		for_each_ctx_engine(device, ctx, e) {
-			igt_dynamic_f("%s", e->name)
-				test_engine_hang(ctx, e, IGT_SPIN_INVALID_CS);
-		}
-	}
-
 	igt_describe("Check that executing unintialised memory causes a hang");
 	igt_subtest("hangcheck-unterminated")
 		hangcheck_unterminated(ctx);
+
+	do_tests("GT", "gt", ctx);
+
+	igt_fixture {
+		igt_disallow_hang(device, hang);
+
+		hang = igt_allow_hang(device, ctx->id, HANG_ALLOW_CAPTURE | HANG_WANT_ENGINE_RESET);
+	}
+
+	do_tests("engine", "engine", ctx);
 
 	igt_fixture {
 		igt_disallow_hang(device, hang);
