@@ -48,7 +48,56 @@
 static int device = -1;
 static int sysfs = -1;
 
+#define OFFSET_ALIVE	10
+
 IGT_TEST_DESCRIPTION("Tests for hang detection and recovery");
+
+static void check_alive(void)
+{
+	const struct intel_execution_engine2 *engine;
+	const intel_ctx_t *ctx;
+	uint32_t scratch, *out;
+	int fd, i = 0;
+	uint64_t ahnd, scratch_addr;
+
+	fd = drm_open_driver(DRIVER_INTEL);
+	igt_require(gem_class_can_store_dword(fd, 0));
+
+	ctx = intel_ctx_create_all_physical(fd);
+	ahnd = get_reloc_ahnd(fd, ctx->id);
+	scratch = gem_create(fd, 4096);
+	scratch_addr = get_offset(ahnd, scratch, 4096, 0);
+	out = gem_mmap__device_coherent(fd, scratch, 0, 4096, PROT_WRITE | PROT_READ);
+	gem_set_domain(fd, scratch,
+			I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+
+	for_each_physical_engine(fd, engine) {
+		igt_assert_eq_u32(out[i + OFFSET_ALIVE], 0);
+		i++;
+	}
+
+	i = 0;
+	for_each_ctx_engine(fd, ctx, engine) {
+		if (!gem_class_can_store_dword(fd, engine->class))
+			continue;
+
+		/* +OFFSET_ALIVE to ensure engine zero doesn't get a false negative */
+		igt_store_word(fd, ahnd, ctx, engine, -1, scratch, scratch_addr,
+			       i + OFFSET_ALIVE, i + OFFSET_ALIVE);
+		i++;
+	}
+
+	gem_set_domain(fd, scratch, I915_GEM_DOMAIN_GTT, 0);
+
+	while (i--)
+		igt_assert_eq_u32(out[i + OFFSET_ALIVE], i + OFFSET_ALIVE);
+
+	munmap(out, 4096);
+	gem_close(fd, scratch);
+	put_ahnd(ahnd);
+	intel_ctx_destroy(fd, ctx);
+	close(fd);
+}
 
 static bool has_error_state(int dir)
 {
@@ -231,6 +280,8 @@ static void test_error_state_capture(const intel_ctx_t *ctx,
 	check_error_state(e->name, offset, batch);
 	munmap(batch, 4096);
 	put_ahnd(ahnd);
+
+	check_alive();
 }
 
 static void
@@ -289,6 +340,8 @@ test_engine_hang(const intel_ctx_t *ctx,
 		put_ahnd(ahndN);
 	}
 	put_ahnd(ahnd);
+
+	check_alive();
 }
 
 static int hang_count;
@@ -321,6 +374,8 @@ static void test_hang_detector(const intel_ctx_t *ctx,
 
 	/* Did it work? */
 	igt_assert(hang_count == 1);
+
+	check_alive();
 }
 
 /* This test covers the case where we end up in an uninitialised area of the
@@ -356,6 +411,8 @@ static void hangcheck_unterminated(const intel_ctx_t *ctx)
 		igt_force_gpu_reset(device);
 		igt_assert_f(0, "unterminated batch did not trigger a hang!\n");
 	}
+
+	check_alive();
 }
 
 static void do_tests(const char *name, const char *prefix,
@@ -433,6 +490,8 @@ igt_main
 		igt_assert(sysfs != -1);
 
 		igt_require(has_error_state(sysfs));
+
+		gem_require_mmap_device_coherent(device);
 	}
 
 	igt_describe("Basic error capture");
