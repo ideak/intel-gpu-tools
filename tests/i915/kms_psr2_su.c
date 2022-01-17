@@ -327,10 +327,9 @@ igt_main
 				cleanup(&data);
 			}
 		}
-
-		igt_fixture {
-			close(data.debugfs_fd);
-			display_fini(&data);
-		}
+	}
+	igt_fixture {
+		close(data.debugfs_fd);
+		display_fini(&data);
 	}
 }
