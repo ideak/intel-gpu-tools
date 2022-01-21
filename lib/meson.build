@@ -23,6 +23,7 @@ lib_sources = [
 	'igt_debugfs.c',
 	'igt_device.c',
 	'igt_device_scan.c',
+	'igt_drm_clients.h',
 	'igt_drm_fdinfo.c',
 	'igt_aux.c',
 	'igt_gt.c',
@@ -255,6 +256,13 @@ lib_igt_device_scan_build = static_library('igt_device_scan',
 
 lib_igt_device_scan = declare_dependency(link_with : lib_igt_device_scan_build,
 				  include_directories : inc)
+
+lib_igt_drm_clients_build = static_library('igt_drm_clients',
+        ['igt_drm_clients.c'],
+        include_directories : inc)
+
+lib_igt_drm_clients = declare_dependency(link_with : lib_igt_drm_clients_build,
+				         include_directories : inc)
 
 lib_igt_drm_fdinfo_build = static_library('igt_drm_fdinfo',
 	['igt_drm_fdinfo.c'],

@@ -47,6 +47,7 @@
 #include <sys/sysmacros.h>
 
 #include "igt_perf.h"
+#include "igt_drm_clients.h"
 #include "igt_drm_fdinfo.h"
 
 #define ARRAY_SIZE(arr) (sizeof(arr)/sizeof(arr[0]))
@@ -81,16 +82,10 @@ struct engine {
 	struct pmu_counter sema;
 };
 
-struct engine_class {
-	unsigned int class;
-	const char *name;
-	unsigned int num_engines;
-};
-
 struct engines {
 	unsigned int num_engines;
 	unsigned int num_classes;
-	struct engine_class *class;
+	struct igt_drm_client_engine_class *class;
 	unsigned int num_counters;
 	DIR *root;
 	int fd;
@@ -679,176 +674,10 @@ static void pmu_sample(struct engines *engines)
 	}
 }
 
-enum client_status {
-	FREE = 0, /* mbz */
-	ALIVE,
-	PROBE
-};
-
-struct clients;
-
-struct client {
-	struct clients *clients;
-
-	enum client_status status;
-	unsigned int id;
-	unsigned int pid;
-	char pid_str[10];
-	char name[24];
-	char print_name[24];
-	unsigned int samples;
-	unsigned long total_runtime;
-	unsigned long last_runtime;
-	unsigned long *val;
-	uint64_t *last;
-};
-
-struct clients {
-	unsigned int num_clients;
-	unsigned int active_clients;
-
-	unsigned int num_classes;
-	struct engine_class *class;
-
-	int max_pid_len;
-	int max_name_len;
-
-	char pci_slot[64];
-
-	struct client *client;
-};
-
-#define for_each_client(clients, c, tmp) \
-	for ((tmp) = (clients)->num_clients, c = (clients)->client; \
-	     (tmp > 0); (tmp)--, (c)++)
-
-static struct clients *init_clients(const char *pci_slot)
-{
-	struct clients *clients;
-
-	clients = malloc(sizeof(*clients));
-	if (!clients)
-		return NULL;
-
-	memset(clients, 0, sizeof(*clients));
-
-	strncpy(clients->pci_slot, pci_slot, sizeof(clients->pci_slot));
-
-	return clients;
-}
-
-static struct client *
-find_client(struct clients *clients, enum client_status status, unsigned int id)
-{
-	unsigned int start, num;
-	struct client *c;
-
-	start = status == FREE ? clients->active_clients : 0; /* Free block at the end. */
-	num = clients->num_clients - start;
-
-	for (c = &clients->client[start]; num; c++, num--) {
-		if (status != c->status)
-			continue;
-
-		if (status == FREE || c->id == id)
-			return c;
-	}
-
-	return NULL;
-}
-
-static void
-update_client(struct client *c, unsigned int pid, char *name,
-	      const struct drm_client_fdinfo *info)
-{
-	unsigned int i;
-	int len;
-
-	if (c->pid != pid) {
-		c->pid = pid;
-		len = snprintf(c->pid_str, sizeof(c->pid_str) - 1, "%u", pid);
-		if (len > c->clients->max_pid_len)
-			c->clients->max_pid_len = len;
-	}
-
-	if (strcmp(c->name, name)) {
-		char *p;
-
-		strncpy(c->name, name, sizeof(c->name) - 1);
-		strncpy(c->print_name, name, sizeof(c->print_name) - 1);
-
-		p = c->print_name;
-		while (*p) {
-			if (!isprint(*p))
-				*p = '*';
-			p++;
-		}
-
-		len = strlen(c->print_name);
-		if (len > c->clients->max_name_len)
-			c->clients->max_name_len = len;
-	}
-
-	c->last_runtime = 0;
-	c->total_runtime = 0;
-
-	for (i = 0; i < c->clients->num_classes; i++) {
-		assert(i < ARRAY_SIZE(info->busy));
-
-		if (info->busy[i] < c->last[i])
-			continue; /* It will catch up soon. */
-
-		c->total_runtime += info->busy[i];
-		c->val[i] = info->busy[i] - c->last[i];
-		c->last_runtime += c->val[i];
-		c->last[i] = info->busy[i];
-	}
-
-	c->samples++;
-	c->status = ALIVE;
-}
-
-static void
-add_client(struct clients *clients, const struct drm_client_fdinfo *info,
-	   unsigned int pid, char *name)
-{
-	struct client *c;
-
-	assert(!find_client(clients, ALIVE, info->id));
-
-	c = find_client(clients, FREE, 0);
-	if (!c) {
-		unsigned int idx = clients->num_clients;
-
-		clients->num_clients += (clients->num_clients + 2) / 2;
-		clients->client = realloc(clients->client,
-					  clients->num_clients * sizeof(*c));
-		assert(clients->client);
-
-		c = &clients->client[idx];
-		memset(c, 0, (clients->num_clients - idx) * sizeof(*c));
-	}
-
-	c->id = info->id;
-	c->clients = clients;
-	c->val = calloc(clients->num_classes, sizeof(c->val));
-	c->last = calloc(clients->num_classes, sizeof(c->last));
-	assert(c->val && c->last);
-
-	update_client(c, pid, name, info);
-}
-
-static void free_client(struct client *c)
-{
-	free(c->val);
-	free(c->last);
-	memset(c, 0, sizeof(*c));
-}
-
 static int client_last_cmp(const void *_a, const void *_b)
 {
-	const struct client *a = _a;
-	const struct client *b = _b;
+	const struct igt_drm_client *a = _a;
+	const struct igt_drm_client *b = _b;
 	long tot_a, tot_b;
 
 	/*
@@ -857,8 +686,8 @@ static int client_last_cmp(const void *_a, const void *_b)
 	 * id.
 	 */
 
-	tot_a = a->status == ALIVE ? a->last_runtime : -1;
-	tot_b = b->status == ALIVE ? b->last_runtime : -1;
+	tot_a = a->status == IGT_DRM_CLIENT_ALIVE ? a->last_runtime : -1;
+	tot_b = b->status == IGT_DRM_CLIENT_ALIVE ? b->last_runtime : -1;
 
 	tot_b -= tot_a;
 	if (tot_b > 0)
@@ -871,12 +700,12 @@ static int client_last_cmp(const void *_a, const void *_b)
 
 static int client_total_cmp(const void *_a, const void *_b)
 {
-	const struct client *a = _a;
-	const struct client *b = _b;
+	const struct igt_drm_client *a = _a;
+	const struct igt_drm_client *b = _b;
 	long tot_a, tot_b;
 
-	tot_a = a->status == ALIVE ? a->total_runtime : -1;
-	tot_b = b->status == ALIVE ? b->total_runtime : -1;
+	tot_a = a->status == IGT_DRM_CLIENT_ALIVE ? a->total_runtime : -1;
+	tot_b = b->status == IGT_DRM_CLIENT_ALIVE ? b->total_runtime : -1;
 
 	tot_b -= tot_a;
 	if (tot_b > 0)
@@ -889,12 +718,12 @@ static int client_total_cmp(const void *_a, const void *_b)
 
 static int client_id_cmp(const void *_a, const void *_b)
 {
-	const struct client *a = _a;
-	const struct client *b = _b;
+	const struct igt_drm_client *a = _a;
+	const struct igt_drm_client *b = _b;
 	int id_a, id_b;
 
-	id_a = a->status == ALIVE ? a->id : -1;
-	id_b = b->status == ALIVE ? b->id : -1;
+	id_a = a->status == IGT_DRM_CLIENT_ALIVE ? a->id : -1;
+	id_b = b->status == IGT_DRM_CLIENT_ALIVE ? b->id : -1;
 
 	id_b -= id_a;
 	if (id_b > 0)
@@ -907,12 +736,12 @@ static int client_id_cmp(const void *_a, const void *_b)
 
 static int client_pid_cmp(const void *_a, const void *_b)
 {
-	const struct client *a = _a;
-	const struct client *b = _b;
+	const struct igt_drm_client *a = _a;
+	const struct igt_drm_client *b = _b;
 	int pid_a, pid_b;
 
-	pid_a = a->status == ALIVE ? a->pid : INT_MAX;
-	pid_b = b->status == ALIVE ? b->pid : INT_MAX;
+	pid_a = a->status == IGT_DRM_CLIENT_ALIVE ? a->pid : INT_MAX;
+	pid_b = b->status == IGT_DRM_CLIENT_ALIVE ? b->pid : INT_MAX;
 
 	pid_b -= pid_a;
 	if (pid_b > 0)
@@ -925,56 +754,19 @@ static int client_pid_cmp(const void *_a, const void *_b)
 
 static int (*client_cmp)(const void *, const void *) = client_last_cmp;
 
-static struct clients *sort_clients(struct clients *clients,
-				    int (*cmp)(const void *, const void *))
-{
-	unsigned int active, free;
-	struct client *c;
-	int tmp;
-
-	if (!clients)
-		return clients;
-
-	qsort(clients->client, clients->num_clients, sizeof(*clients->client),
-	      cmp);
-
-	/* Trim excessive array space. */
-	active = 0;
-	for_each_client(clients, c, tmp) {
-		if (c->status != ALIVE)
-			break; /* Active clients are first in the array. */
-		active++;
-	}
-
-	clients->active_clients = active;
-
-	free = clients->num_clients - active;
-	if (free > clients->num_clients / 2) {
-		active = clients->num_clients - free / 2;
-		if (active != clients->num_clients) {
-			clients->num_clients = active;
-			clients->client = realloc(clients->client,
-						  clients->num_clients *
-						  sizeof(*c));
-		}
-	}
-
-	return clients;
-}
-
 static bool aggregate_pids = true;
 
-static struct clients *display_clients(struct clients *clients)
+static struct igt_drm_clients *display_clients(struct igt_drm_clients *clients)
 {
-	struct client *ac, *c, *cp = NULL;
-	struct clients *aggregated;
+	struct igt_drm_client *ac, *c, *cp = NULL;
+	struct igt_drm_clients *aggregated;
 	int tmp, num = 0;
 
 	if (!aggregate_pids)
 		goto out;
 
 	/* Sort by pid first to make it easy to aggregate while walking. */
-	sort_clients(clients, client_pid_cmp);
+	igt_drm_clients_sort(clients, client_pid_cmp);
 
 	aggregated = calloc(1, sizeof(*clients));
 	assert(aggregated);
@@ -983,23 +775,24 @@ static struct clients *display_clients(struct clients *clients)
 	assert(ac);
 
 	aggregated->num_classes = clients->num_classes;
-	aggregated->class = clients->class;
+	aggregated->engine_class = clients->engine_class;
+	aggregated->private_data = clients->private_data;
 	aggregated->client = ac;
 
-	for_each_client(clients, c, tmp) {
+	igt_for_each_drm_client(clients, c, tmp) {
 		unsigned int i;
 
-		if (c->status == FREE)
+		if (c->status == IGT_DRM_CLIENT_FREE)
 			break;
 
-		assert(c->status == ALIVE);
+		assert(c->status == IGT_DRM_CLIENT_ALIVE);
 
 		if (!cp || c->pid != cp->pid) {
 			ac = &aggregated->client[num++];
 
 			/* New pid. */
 			ac->clients = aggregated;
-			ac->status = ALIVE;
+			ac->status = IGT_DRM_CLIENT_ALIVE;
 			ac->id = -c->pid;
 			ac->pid = c->pid;
 			strcpy(ac->name, c->name);
@@ -1033,235 +826,24 @@ static struct clients *display_clients(struct clients *clients)
 	clients = aggregated;
 
 out:
-	return sort_clients(clients, client_cmp);
+	return igt_drm_clients_sort(clients, client_cmp);
 }
 
-static void free_clients(struct clients *clients)
+static void free_display_clients(struct igt_drm_clients *clients)
 {
-	struct client *c;
+	struct igt_drm_client *c;
 	unsigned int tmp;
 
-	for_each_client(clients, c, tmp) {
+	/*
+	 * Don't call igt_drm_clients_free or igt_drm_client_free since
+	 * "display" clients are not proper clients and have un-initialized
+	 * fields which we don't want the library to try and free.
+	 */
+	igt_for_each_drm_client(clients, c, tmp)
 		free(c->val);
-		free(c->last);
-	}
 
 	free(clients->client);
 	free(clients);
-}
-
-static bool is_drm_fd(int fd_dir, const char *name)
-{
-	struct stat stat;
-	int ret;
-
-	ret = fstatat(fd_dir, name, &stat, 0);
-
-	return ret == 0 &&
-	       (stat.st_mode & S_IFMT) == S_IFCHR &&
-	       major(stat.st_rdev) == 226;
-}
-
-static bool get_task_name(const char *buffer, char *out, unsigned long sz)
-{
-	char *s = index(buffer, '(');
-	char *e = rindex(buffer, ')');
-	unsigned int len;
-
-	if (!s || !e)
-		return false;
-	assert(e >= s);
-
-	len = e - ++s;
-	if(!len || (len + 1) >= sz)
-		return false;
-
-	strncpy(out, s, len);
-	out[len] = 0;
-
-	return true;
-}
-
-static DIR *opendirat(int at, const char *name)
-{
-	DIR *dir;
-	int fd;
-
-	fd = openat(at, name, O_DIRECTORY);
-	if (fd < 0)
-		return NULL;
-
-	dir = fdopendir(fd);
-	if (!dir)
-		close(fd);
-
-	return dir;
-}
-
-static size_t readat2buf(int at, const char *name, char *buf, const size_t sz)
-{
-	ssize_t count;
-	int fd;
-
-	fd = openat(at, name, O_RDONLY);
-	if (fd <= 0)
-		return 0;
-
-	count = read(fd, buf, sz - 1);
-	close(fd);
-
-	if (count > 0) {
-		buf[count] = 0;
-
-		return count;
-	} else {
-		buf[0] = 0;
-
-		return 0;
-	}
-}
-
-static void clients_update_max_lengths(struct clients *clients)
-{
-	struct client *c;
-	int tmp;
-
-	clients->max_name_len = 0;
-	clients->max_pid_len = 0;
-
-	for_each_client(clients, c, tmp) {
-		int len;
-
-		if (c->status != ALIVE)
-			continue; /* Array not yet sorted by the caller. */
-
-		len = strlen(c->print_name);
-		if (len > clients->max_name_len)
-			clients->max_name_len = len;
-
-		len = strlen(c->pid_str);
-		if (len > clients->max_pid_len)
-			clients->max_pid_len = len;
-	}
-}
-
-static struct clients *scan_clients(struct clients *clients, bool display)
-{
-	struct dirent *proc_dent;
-	bool freed = false;
-	struct client *c;
-	DIR *proc_dir;
-	int tmp;
-
-	if (!clients)
-		return clients;
-
-	for_each_client(clients, c, tmp) {
-		assert(c->status != PROBE);
-		if (c->status == ALIVE)
-			c->status = PROBE;
-		else
-			break; /* Free block at the end of array. */
-	}
-
-	proc_dir = opendir("/proc");
-	if (!proc_dir)
-		return clients;
-
-	while ((proc_dent = readdir(proc_dir)) != NULL) {
-		int pid_dir = -1, fd_dir = -1;
-		struct dirent *fdinfo_dent;
-		char client_name[64] = { };
-		unsigned int client_pid;
-		DIR *fdinfo_dir = NULL;
-		char buf[4096];
-		size_t count;
-
-		if (proc_dent->d_type != DT_DIR)
-			continue;
-		if (!isdigit(proc_dent->d_name[0]))
-			continue;
-
-		pid_dir = openat(dirfd(proc_dir), proc_dent->d_name,
-				 O_DIRECTORY | O_RDONLY);
-		if (pid_dir < 0)
-			continue;
-
-		count = readat2buf(pid_dir, "stat", buf, sizeof(buf));
-		if (!count)
-			goto next;
-
-		client_pid = atoi(buf);
-		if (!client_pid)
-			goto next;
-
-		if (!get_task_name(buf, client_name, sizeof(client_name)))
-			goto next;
-
-		fd_dir = openat(pid_dir, "fd", O_DIRECTORY | O_RDONLY);
-		if (fd_dir < 0)
-			goto next;
-
-		fdinfo_dir = opendirat(pid_dir, "fdinfo");
-		if (!fdinfo_dir)
-			goto next;
-
-		while ((fdinfo_dent = readdir(fdinfo_dir)) != NULL) {
-			struct drm_client_fdinfo info = { };
-
-			if (fdinfo_dent->d_type != DT_REG)
-				continue;
-			if (!isdigit(fdinfo_dent->d_name[0]))
-				continue;
-
-			if (!is_drm_fd(fd_dir, fdinfo_dent->d_name))
-				continue;
-
-			if (!__igt_parse_drm_fdinfo(dirfd(fdinfo_dir),
-						    fdinfo_dent->d_name,
-						    &info))
-				continue;
-
-			if (strcmp(info.driver, "i915"))
-				continue;
-			if (strcmp(info.pdev, clients->pci_slot))
-				continue;
-			if (find_client(clients, ALIVE, info.id))
-				continue; /* Skip duplicate fds. */
-
-			c = find_client(clients, PROBE, info.id);
-			if (!c)
-				add_client(clients, &info, client_pid,
-					   client_name);
-			else
-				update_client(c, client_pid, client_name,
-					      &info);
-		}
-
-next:
-		if (fdinfo_dir)
-			closedir(fdinfo_dir);
-		if (fd_dir >= 0)
-			close(fd_dir);
-		if (pid_dir >= 0)
-			close(pid_dir);
-	}
-
-	closedir(proc_dir);
-
-	for_each_client(clients, c, tmp) {
-		if (c->status == PROBE) {
-			free_client(c);
-			freed = true;
-		} else if (c->status == FREE) {
-			break;
-		}
-	}
-
-	if (freed)
-		clients_update_max_lengths(clients);
-
-	return display ? display_clients(clients) : clients;
 }
 
 static const char *bars[] = { " ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█" };
@@ -2037,15 +1619,15 @@ print_engines_footer(struct engines *engines, double t,
 
 static int class_cmp(const void *_a, const void *_b)
 {
-	const struct engine_class *a = _a;
-	const struct engine_class *b = _b;
+	const struct igt_drm_client_engine_class *a = _a;
+	const struct igt_drm_client_engine_class *b = _b;
 
-	return a->class - b->class;
+	return a->engine_class - b->engine_class;
 }
 
 static void init_engine_classes(struct engines *engines)
 {
-	struct engine_class *classes;
+	struct igt_drm_client_engine_class *classes;
 	unsigned int i, num;
 	int max = -1;
 
@@ -2072,7 +1654,7 @@ static void init_engine_classes(struct engines *engines)
 	}
 
 	for (i = 0; i < num; i++) {
-		classes[i].class = i;
+		classes[i].engine_class = i;
 		classes[i].name = class_display_name(i);
 	}
 
@@ -2214,7 +1796,7 @@ print_engines(struct engines *engines, double t, int lines, int w, int h)
 }
 
 static int
-print_clients_header(struct clients *clients, int lines,
+print_clients_header(struct igt_drm_clients *clients, int lines,
 		     int con_w, int con_h, int *class_w)
 {
 	if (output_mode == INTERACTIVE) {
@@ -2237,19 +1819,19 @@ print_clients_header(struct clients *clients, int lines,
 			int width;
 
 			for (i = 0; i < clients->num_classes; i++) {
-				if (clients->class[i].num_engines)
+				if (clients->engine_class[i].num_engines)
 					num_active++;
 			}
 
 			*class_w = width = (con_w - len) / num_active;
 
 			for (i = 0; i < clients->num_classes; i++) {
-				const char *name = clients->class[i].name;
+				const char *name = clients->engine_class[i].name;
 				int name_len = strlen(name);
 				int pad = (width - name_len) / 2;
 				int spaces = width - pad - name_len;
 
-				if (!clients->class[i].num_engines)
+				if (!clients->engine_class[i].num_engines)
 					continue; /* Assert in the ideal world. */
 
 				if (pad < 0 || spaces < 0)
@@ -2276,10 +1858,10 @@ static bool numeric_clients;
 static bool filter_idle;
 
 static int
-print_client(struct client *c, struct engines *engines, double t, int lines,
+print_client(struct igt_drm_client *c, struct engines *engines, double t, int lines,
 	     int con_w, int con_h, unsigned int period_us, int *class_w)
 {
-	struct clients *clients = c->clients;
+	struct igt_drm_clients *clients = c->clients;
 	unsigned int i;
 
 	if (output_mode == INTERACTIVE) {
@@ -2295,7 +1877,7 @@ print_client(struct client *c, struct engines *engines, double t, int lines,
 		for (i = 0; c->samples > 1 && i < clients->num_classes; i++) {
 			double pct, max;
 
-			if (!clients->class[i].num_engines)
+			if (!clients->engine_class[i].num_engines)
 				continue; /* Assert in the ideal world. */
 
 			pct = (double)c->val[i] / period_us / 1e3 * 100;
@@ -2305,7 +1887,7 @@ print_client(struct client *c, struct engines *engines, double t, int lines,
 			 * client data and time we obtained our time-delta from
 			 * PMU.
 			 */
-			max = 100.0 * clients->class[i].num_engines;
+			max = 100.0 * clients->engine_class[i].num_engines;
 			if (pct > max)
 				pct = max;
 
@@ -2332,7 +1914,7 @@ print_client(struct client *c, struct engines *engines, double t, int lines,
 				double pct;
 
 				snprintf(buf, sizeof(buf), "%s",
-					clients->class[i].name);
+					clients->engine_class[i].name);
 				pops->open_struct(buf);
 
 				pct = (double)c->val[i] / period_us / 1e3 * 100;
@@ -2354,7 +1936,7 @@ print_client(struct client *c, struct engines *engines, double t, int lines,
 }
 
 static int
-print_clients_footer(struct clients *clients, double t,
+print_clients_footer(struct igt_drm_clients *clients, double t,
 		     int lines, int con_w, int con_h)
 {
 	if (output_mode == INTERACTIVE) {
@@ -2603,10 +2185,21 @@ static unsigned long elapsed_us(struct timespec *prev, unsigned int period_us)
 	return elapsed;
 }
 
+static bool client_match(const struct igt_drm_clients *clients,
+			 const struct drm_client_fdinfo *info)
+{
+	if (strcmp(info->driver, "i915"))
+		return false;
+	if (strcmp(info->pdev, clients->private_data))
+		return false;
+
+	return true;
+}
+
 int main(int argc, char **argv)
 {
 	unsigned int period_us = DEFAULT_PERIOD_MS * 1000;
-	struct clients *clients = NULL;
+	struct igt_drm_clients *clients = NULL;
 	bool physical_engines = false;
 	int con_w = -1, con_h = -1;
 	char *output_path = NULL;
@@ -2760,16 +2353,17 @@ int main(int argc, char **argv)
 	ret = EXIT_SUCCESS;
 
 	if (has_drm_fdinfo(&card))
-		clients = init_clients(card.pci_slot_name[0] ?
-				       card.pci_slot_name : IGPU_PCI);
+		clients = igt_drm_clients_init(strdup(card.pci_slot_name[0] ?
+						      card.pci_slot_name :
+						      IGPU_PCI));
 	init_engine_classes(engines);
 	if (clients) {
 		clients->num_classes = engines->num_classes;
-		clients->class = engines->class;
+		clients->engine_class = engines->class;
 	}
 
 	pmu_sample(engines);
-	scan_clients(clients, false);
+	igt_drm_clients_scan(clients, client_match);
 	gettime(&ts);
 	codename = igt_device_get_pretty_name(&card, false);
 
@@ -2777,12 +2371,12 @@ int main(int argc, char **argv)
 		printf("[\n");
 
 	while (!stop_top) {
-		struct clients *disp_clients;
+		struct igt_drm_clients *disp_clients;
+		struct igt_drm_client *c;
 		bool consumed = false;
 		unsigned int scan_us;
 		int j, lines = 0;
 		struct winsize ws;
-		struct client *c;
 		double t;
 
 		/* Update terminal size. */
@@ -2801,7 +2395,9 @@ int main(int argc, char **argv)
 		pmu_sample(engines);
 		t = (double)(engines->ts.cur - engines->ts.prev) / 1e9;
 
-		disp_clients = scan_clients(clients, true);
+		disp_clients =
+			display_clients(igt_drm_clients_scan(clients,
+							     client_match));
 		scan_us = elapsed_us(&ts, period_us);
 
 		if (stop_top)
@@ -2830,9 +2426,9 @@ int main(int argc, char **argv)
 							     con_w, con_h,
 							     &class_w);
 
-				for_each_client(disp_clients, c, j) {
-					assert(c->status != PROBE);
-					if (c->status != ALIVE)
+				igt_for_each_drm_client(disp_clients, c, j) {
+					assert(c->status != IGT_DRM_CLIENT_PROBE);
+					if (c->status != IGT_DRM_CLIENT_ALIVE)
 						break; /* Active clients are first in the array. */
 
 					if (lines >= con_h)
@@ -2853,7 +2449,7 @@ int main(int argc, char **argv)
 		}
 
 		if (disp_clients != clients)
-			free_clients(disp_clients);
+			free_display_clients(disp_clients);
 
 		if (stop_top)
 			break;
@@ -2868,7 +2464,7 @@ int main(int argc, char **argv)
 		printf("]\n");
 
 	if (clients)
-		free_clients(clients);
+		igt_drm_clients_free(clients);
 
 	free(codename);
 err_pmu:

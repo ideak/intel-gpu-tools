@@ -1,0 +1,89 @@
+// SPDX-License-Identifier: MIT
+/*
+ * Copyright © 2022 Intel Corporation
+ */
+
+#ifndef IGT_DRM_CLIENTS_H
+#define IGT_DRM_CLIENTS_H
+
+#include <stdint.h>
+
+/**
+ * SECTION:igt_drm_clients
+ * @short_description: Parsing driver exposed fdinfo to track DRM clients
+ * @title: DRM clients parsing library
+ * @include: igt_drm_clients.h
+ *
+ * Some DRM drivers expose GPU usage statistics in DRM file descriptor fdinfo
+ * data as exposed in /proc. (As documented in kernel's
+ * Documentation/gpu/drm-usage-stats.rst.)
+ *
+ * This library enumerates all DRM clients by parsing that data and tracks them
+ * in a list of clients (struct igt_drm_clients) available for inspection
+ * after one or more calls to igt_drm_clients_scan.
+ */
+
+struct drm_client_fdinfo;
+
+enum igt_drm_client_status {
+	IGT_DRM_CLIENT_FREE = 0, /* mbz */
+	IGT_DRM_CLIENT_ALIVE,
+	IGT_DRM_CLIENT_PROBE
+};
+
+struct igt_drm_client_engine_class {
+	unsigned int engine_class;
+	const char *name;
+	unsigned int num_engines;
+};
+
+struct igt_drm_clients;
+
+struct igt_drm_client {
+	struct igt_drm_clients *clients; /* Owning list. */
+
+	enum igt_drm_client_status status;
+	unsigned int id; /* DRM client id from fdinfo. */
+	unsigned int pid; /* PID which has this DRM fd open. */
+	char pid_str[10]; /* Cached PID representation. */
+	char name[24]; /* Process name of the owning PID. */
+	char print_name[24]; /* Name without any non-printable characters. */
+	unsigned int samples; /* Count of times scanning updated this client. */
+	unsigned long total_runtime; /* Aggregate busyness on all engines since client start. */
+	unsigned long last_runtime; /* Aggregate busyness on all engines since previous scan. */
+	unsigned long *val; /* Array of engine busyness data, relative to previous scan. */
+	uint64_t *last; /* Array of engine busyness data as parsed from fdinfo. */
+};
+
+struct igt_drm_clients {
+	unsigned int num_clients;
+	unsigned int active_clients;
+
+	unsigned int num_classes;
+	struct igt_drm_client_engine_class *engine_class;
+
+	int max_pid_len;
+	int max_name_len;
+
+	void *private_data;
+
+	struct igt_drm_client *client; /* Must be last. */
+};
+
+#define igt_for_each_drm_client(clients, c, tmp) \
+	for ((tmp) = (clients)->num_clients, c = (clients)->client; \
+	     (tmp > 0); (tmp)--, (c)++)
+
+struct igt_drm_clients *igt_drm_clients_init(void *private_data);
+void igt_drm_clients_free(struct igt_drm_clients *clients);
+
+struct igt_drm_clients *
+igt_drm_clients_scan(struct igt_drm_clients *clients,
+		     bool (*filter_client)(const struct igt_drm_clients *,
+					   const struct drm_client_fdinfo *));
+
+struct igt_drm_clients *
+igt_drm_clients_sort(struct igt_drm_clients *clients,
+		     int (*cmp)(const void *, const void *));
+
+#endif /* IGT_DRM_CLIENTS_H */
