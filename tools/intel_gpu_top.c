@@ -2136,7 +2136,7 @@ static bool has_drm_fdinfo(const struct igt_device_card *card)
 	if (fd < 0)
 		return false;
 
-	cnt = igt_parse_drm_fdinfo(fd, &info);
+	cnt = igt_parse_drm_fdinfo(fd, &info, NULL, 0);
 
 	close(fd);
 
@@ -2200,6 +2200,13 @@ int main(int argc, char **argv)
 {
 	unsigned int period_us = DEFAULT_PERIOD_MS * 1000;
 	struct igt_drm_clients *clients = NULL;
+	static const char *engine_map[] = {
+		"render",
+		"copy",
+		"video",
+		"video-enhance",
+		"compute",
+	};
 	bool physical_engines = false;
 	int con_w = -1, con_h = -1;
 	char *output_path = NULL;
@@ -2363,7 +2370,8 @@ int main(int argc, char **argv)
 	}
 
 	pmu_sample(engines);
-	igt_drm_clients_scan(clients, client_match);
+	igt_drm_clients_scan(clients, client_match, engine_map,
+			     ARRAY_SIZE(engine_map));
 	gettime(&ts);
 	codename = igt_device_get_pretty_name(&card, false);
 
@@ -2397,7 +2405,9 @@ int main(int argc, char **argv)
 
 		disp_clients =
 			display_clients(igt_drm_clients_scan(clients,
-							     client_match));
+							     client_match,
+							     engine_map,
+							     ARRAY_SIZE(engine_map)));
 		scan_us = elapsed_us(&ts, period_us);
 
 		if (stop_top)
