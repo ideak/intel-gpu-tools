@@ -39,7 +39,9 @@ typedef struct {
 	int gen;
 	uint32_t testformat;
 	struct igt_fb fb[2];
+	struct igt_fb old_fb[2];
 	igt_pipe_crc_t *pipe_crc;
+	bool flipevent_in_queue; // if test fails may need to handle rogue event
 } data_t;
 
 static void pipe_crc_free(data_t *data)
@@ -71,11 +73,12 @@ static int try_commit(igt_display_t *display)
 static void
 test_flip_tiling(data_t *data, enum pipe pipe, igt_output_t *output, uint64_t modifier[2])
 {
-	struct igt_fb old_fb[2] = { data->fb[0], data->fb[1] };
 	drmModeModeInfo *mode;
 	igt_plane_t *primary;
 	igt_crc_t reference_crc, crc;
 	int fb_id, ret;
+
+	memcpy(&data->old_fb, &data->fb, sizeof(data->fb));
 
 	mode = igt_output_get_mode(output);
 
@@ -117,14 +120,16 @@ test_flip_tiling(data_t *data, enum pipe pipe, igt_output_t *output, uint64_t mo
 	 */
 	igt_require(ret == 0);
 
+	data->flipevent_in_queue = true;
 	kmstest_wait_for_pageflip(data->drm_fd);
+	data->flipevent_in_queue = false;
 
 	/* Get a crc and compare with the reference. */
 	igt_pipe_crc_get_current(data->drm_fd, data->pipe_crc, &crc);
 	igt_assert_crc_equal(&reference_crc, &crc);
 
-	igt_remove_fb(data->drm_fd, &old_fb[0]);
-	igt_remove_fb(data->drm_fd, &old_fb[1]);
+	igt_remove_fb(data->drm_fd, &data->old_fb[0]);
+	igt_remove_fb(data->drm_fd, &data->old_fb[1]);
 }
 
 static void test_cleanup(data_t *data, enum pipe pipe, igt_output_t *output)
@@ -141,7 +146,31 @@ static void test_cleanup(data_t *data, enum pipe pipe, igt_output_t *output)
 	igt_remove_fb(data->drm_fd, &data->fb[1]);
 }
 
-static data_t data;
+static void handle_lost_event(data_t *data) {
+	// wait for max 5 seconds in case hit swapping or similar in progress.
+	drmEventContext evctx = { .version = 2 };
+	struct timeval timeout = { .tv_sec = 5};
+	fd_set fds;
+	int ret;
+
+	FD_ZERO(&fds);
+	FD_SET(data->drm_fd, &fds);
+	do {
+		errno = 0;
+		ret = select(data->drm_fd + 1, &fds, NULL, NULL, &timeout);
+	} while (ret < 0 && errno == EINTR);
+
+	// TODO: if still failed may need to reset/restart everything to
+	// avoid consecutive tests failing.
+
+	igt_assert(drmHandleEvent(data->drm_fd, &evctx) == 0);
+
+	data->flipevent_in_queue = false;
+	igt_remove_fb(data->drm_fd, &data->old_fb[0]);
+	igt_remove_fb(data->drm_fd, &data->old_fb[1]);
+}
+
+static data_t data = {};
 igt_output_t *output;
 
 igt_main
@@ -189,6 +218,9 @@ igt_main
 						      igt_fb_modifier_name(modifier[0]),
 						      igt_fb_modifier_name(modifier[1]))
 						test_flip_tiling(&data, pipe, output, modifier);
+
+					if (data.flipevent_in_queue)
+						handle_lost_event(&data);
 				}
 			}
 			test_cleanup(&data, pipe, output);
