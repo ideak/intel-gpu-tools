@@ -387,10 +387,9 @@ static void capture(int fd, int dir, const intel_ctx_t *ctx,
 		    const struct intel_execution_engine2 *e, uint32_t region)
 {
 	uint32_t handle;
-	uint64_t ahnd;
-	int obj_size = 4096;
+	uint64_t ahnd, obj_size = 4096;
 
-	handle = gem_create_in_memory_regions(fd, obj_size, region);
+	igt_assert_eq(__gem_create_in_memory_regions(fd, &handle, &obj_size, region), 0);
 	ahnd = get_reloc_ahnd(fd, ctx->id);
 
 	__capture1(fd, dir, ahnd, ctx, e, handle, obj_size, region);
