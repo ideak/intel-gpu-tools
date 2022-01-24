@@ -200,22 +200,38 @@ void igt_drm_client_free(struct igt_drm_client *c, bool clear)
 		memset(c, 0, sizeof(*c));
 }
 
+struct sort_context
+{
+	int (*user_cmp)(const void *, const void *, void *);
+};
+
+static int sort_cmp(const void *_a, const void *_b, void *_ctx)
+{
+	const struct sort_context *ctx = _ctx;
+	const struct igt_drm_client *a = _a;
+	const struct igt_drm_client *b = _b;
+	int cmp = b->status - a->status;
+
+	if (cmp == 0)
+		return ctx->user_cmp(_a, _b, _ctx);
+	else
+		return cmp;
+}
+
 /**
  * igt_drm_clients_sort:
  * @clients: Previously initialised clients object
  * @cmp: Client comparison callback
  *
  * Sort the clients array according to the passed in comparison callback which
- * is compatible with the qsort(3) semantics.
- *
- * Caller has to ensure the callback is putting all active
- * (IGT_DRM_CLIENT_ALIVE) clients in a single group at the head of the array
- * before any other sorting criteria.
+ * is compatible with the qsort(3) semantics, with the third void * argument
+ * being unused.
  */
 struct igt_drm_clients *
 igt_drm_clients_sort(struct igt_drm_clients *clients,
-		     int (*cmp)(const void *, const void *))
+		     int (*cmp)(const void *, const void *, void *))
 {
+	struct sort_context ctx = { .user_cmp = cmp };
 	unsigned int active, free;
 	struct igt_drm_client *c;
 	int tmp;
@@ -223,8 +239,13 @@ igt_drm_clients_sort(struct igt_drm_clients *clients,
 	if (!clients)
 		return clients;
 
-	qsort(clients->client, clients->num_clients, sizeof(*clients->client),
-	      cmp);
+	/*
+	 * Enforce client->status ordering (active followed by free) by running
+	 * the user provided comparison callback wrapped in the one internal
+	 * to the library.
+	 */
+	qsort_r(clients->client, clients->num_clients, sizeof(*clients->client),
+	      sort_cmp, &ctx);
 
 	/* Trim excessive array space. */
 	active = 0;

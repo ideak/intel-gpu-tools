@@ -86,6 +86,6 @@ igt_drm_clients_scan(struct igt_drm_clients *clients,
 
 struct igt_drm_clients *
 igt_drm_clients_sort(struct igt_drm_clients *clients,
-		     int (*cmp)(const void *, const void *));
+		     int (*cmp)(const void *, const void *, void *));
 
 #endif /* IGT_DRM_CLIENTS_H */
