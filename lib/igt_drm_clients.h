@@ -31,10 +31,12 @@ enum igt_drm_client_status {
 	IGT_DRM_CLIENT_PROBE
 };
 
-struct igt_drm_client_engine_class {
-	unsigned int engine_class;
-	const char *name;
-	unsigned int num_engines;
+struct igt_drm_client_engines {
+	unsigned int num_engines; /* Number of discovered active engines. */
+	unsigned int max_engine_id; /* Largest engine index discovered.
+				       (Can differ from num_engines - 1 when using the engine map facility.) */
+	unsigned int *capacity; /* Array of engine capacities as parsed from fdinfo. */
+	char **names; /* Array of engine names, either auto-detected or from the passed in engine map. */
 };
 
 struct igt_drm_clients;
@@ -43,6 +45,7 @@ struct igt_drm_client {
 	struct igt_drm_clients *clients; /* Owning list. */
 
 	enum igt_drm_client_status status;
+	struct igt_drm_client_engines *engines; /* Engines used by this client, to map with busynees data. */
 	unsigned int id; /* DRM client id from fdinfo. */
 	unsigned int drm_minor; /* DRM minor of this client. */
 	unsigned int pid; /* PID which has this DRM fd open. */
@@ -59,9 +62,6 @@ struct igt_drm_client {
 struct igt_drm_clients {
 	unsigned int num_clients;
 	unsigned int active_clients;
-
-	unsigned int num_classes;
-	struct igt_drm_client_engine_class *engine_class;
 
 	int max_pid_len;
 	int max_name_len;
