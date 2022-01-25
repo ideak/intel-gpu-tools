@@ -207,13 +207,13 @@ igt_main
 	}
 
 	igt_subtest("normal") {
-		int loop = 100;
+		int loop = SLOW_QUICK(100, 3);
 		while (loop--)
 			copy(&data);
 	}
 
 	igt_subtest("interruptible") {
-		int loop = 100;
+		int loop = SLOW_QUICK(100, 3);
 		igt_fork_signal_helper();
 		while (loop--)
 			copy(&data);
@@ -221,13 +221,13 @@ igt_main
 	}
 
 	igt_subtest("flink") {
-		int loop = 100;
+		int loop = SLOW_QUICK(100, 3);
 		while (loop--)
 			copy_flink(&data);
 	}
 
 	igt_subtest("flink-interruptible") {
-		int loop = 100;
+		int loop = SLOW_QUICK(100, 3);
 		igt_fork_signal_helper();
 		while (loop--)
 			copy_flink(&data);
