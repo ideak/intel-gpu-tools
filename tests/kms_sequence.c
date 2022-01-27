@@ -295,4 +295,8 @@ igt_main
 			}
 		}
 	}
+
+	igt_fixture {
+		close(fd);
+	}
 }
