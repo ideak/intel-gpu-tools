@@ -50,6 +50,7 @@ test_progs = [
 	'kms_properties',
 	'kms_rmfb',
 	'kms_rotation_crc',
+	'kms_scaling_modes',
 	'kms_selftest',
 	'kms_sequence',
 	'kms_setmode',
