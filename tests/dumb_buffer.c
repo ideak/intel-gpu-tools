@@ -392,4 +392,8 @@ igt_main
 
 	igt_subtest("create-clear")
 		always_clear(fd, 30);
+
+	igt_fixture {
+		close(fd);
+	}
 }
