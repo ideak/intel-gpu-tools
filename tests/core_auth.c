@@ -25,7 +25,6 @@
  * Testcase: drmGetMagic() and drmAuthMagic()
  */
 
-#include "igt.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -47,6 +46,9 @@
 #ifndef __linux__
 # include <pthread.h>
 #endif
+
+#include "igt.h"
+#include "igt_types.h"
 
 IGT_TEST_DESCRIPTION("Call drmGetMagic() and drmAuthMagic() and see if it behaves.");
 
@@ -192,8 +194,6 @@ static void test_basic_auth(int master)
 
 igt_main
 {
-	int master;
-
 	/* root (which we run igt as) should always be authenticated */
 	igt_describe("Check drm client is always authenticated.");
 	igt_subtest("getclient-simple") {
@@ -220,6 +220,8 @@ igt_main
 
 	/* above tests require that no drm fd is open */
 	igt_subtest_group {
+		igt_fd_t(master);
+
 		igt_fixture
 			master = drm_open_driver_master(DRIVER_ANY);
 	
