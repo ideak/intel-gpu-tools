@@ -1436,5 +1436,6 @@ igt_main
 		igt_remove_fb(display.drm_fd, &fb);
 
 		igt_display_fini(&display);
+		close(display.drm_fd);
 	}
 }
