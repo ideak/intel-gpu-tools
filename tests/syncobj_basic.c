@@ -231,4 +231,8 @@ igt_main
 	igt_subtest("test-valid-cycle")
 		test_valid_cycle(fd);
 
+	igt_fixture {
+		close(fd);
+	}
+
 }
