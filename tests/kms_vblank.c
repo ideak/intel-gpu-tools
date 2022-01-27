@@ -550,4 +550,8 @@ igt_main
 	for_each_pipe_static(data.pipe)
 		igt_subtest_group
 			run_subtests_for_pipe(&data);
+
+	igt_fixture {
+		close(fd);
+	}
 }
