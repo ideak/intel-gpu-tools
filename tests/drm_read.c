@@ -46,6 +46,8 @@
 #include <pthread.h>
 #include "drm.h"
 
+#include "igt_types.h"
+
 IGT_TEST_DESCRIPTION("Call read(drm) and see if it behaves.");
 
 static void sighandler(int sig, siginfo_t * info, void *context)
@@ -253,10 +255,10 @@ static void test_short_buffer_wakeup(int in, enum pipe pipe)
 
 igt_main
 {
-	int fd;
 	igt_display_t display;
 	struct igt_fb fb;
 	enum pipe pipe;
+	igt_fd_t(fd);
 
 	igt_fixture {
 		struct sigaction alarm_action = {};
