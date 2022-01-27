@@ -912,4 +912,8 @@ igt_main
 
 	igt_subtest("wait-all-interrupted")
 		test_wait_interrupted(fd, WAIT_ALL);
+
+	igt_fixture {
+		close(fd);
+	}
 }
