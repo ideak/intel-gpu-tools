@@ -24,6 +24,7 @@
 #include "i915/gem.h"
 #include "i915/gem_create.h"
 #include "igt.h"
+#include "igt_types.h"
 
 static int batch_create(int fd)
 {
@@ -125,7 +126,7 @@ static void test_many_handles(int fd)
 
 igt_main
 {
-	int fd = -1;
+	igt_fd_t(fd);
 
 	igt_fixture {
 		/* Create an flink requires DRM_AUTH */
