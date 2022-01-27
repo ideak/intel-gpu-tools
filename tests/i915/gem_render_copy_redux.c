@@ -233,4 +233,8 @@ igt_main
 			copy_flink(&data);
 		igt_stop_signal_helper();
 	}
+
+	igt_fixture {
+		data_fini(&data);
+	}
 }
