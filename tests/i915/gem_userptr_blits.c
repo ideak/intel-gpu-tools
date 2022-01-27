@@ -62,6 +62,7 @@
 #include "i915/gem_create.h"
 #include "igt.h"
 #include "igt_sysfs.h"
+#include "igt_types.h"
 #include "sw_sync.h"
 
 #include "eviction_common.c"
@@ -2299,7 +2300,7 @@ static void test_userfault(int i915)
 
 uint64_t total_ram;
 uint64_t aperture_size;
-int fd, count;
+int count;
 
 static int opt_handler(int opt, int opt_index, void *data)
 {
@@ -2319,6 +2320,7 @@ const char *help_str = "  -c\tBuffer count\n";
 igt_main_args("c:", NULL, help_str, opt_handler, NULL)
 {
 	int size = sizeof(linear);
+	igt_fd_t(fd);
 
 	igt_fixture {
 		unsigned int mmo_max = 0;
