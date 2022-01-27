@@ -334,6 +334,8 @@ igt_main
 			run_test(&data, subtests[i].modifier);
 	}
 
-	igt_fixture
+	igt_fixture {
 		igt_display_fini(&data.display);
+		close(data.drm_fd);
+	}
 }
