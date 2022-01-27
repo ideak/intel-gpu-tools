@@ -28,6 +28,7 @@
 #include "igt.h"
 #include "igt_device.h"
 #include "igt_sysfs.h"
+#include "igt_types.h"
 #include "sw_sync.h"
 
 #define MAX_ENGINES 64
@@ -341,7 +342,7 @@ static void unpin_rps(int sysfs)
 igt_main
 {
 	const struct intel_execution_engine2 *e;
-	int i915 = -1;
+	igt_fd_t(i915);
 
 	igt_skip_on_simulation();
 
