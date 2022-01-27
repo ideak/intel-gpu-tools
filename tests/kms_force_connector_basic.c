@@ -33,9 +33,9 @@ IGT_TEST_DESCRIPTION("Check the debugfs force connector/edid features work"
 
 static void reset_connectors(void)
 {
-	int drm_fd = 0;
 	drmModeRes *res;
 	drmModeConnector *connector = NULL;
+	int drm_fd;
 
 	drm_fd = drm_open_driver_master(DRIVER_ANY);
 	res = drmModeGetResources(drm_fd);
@@ -54,6 +54,8 @@ static void reset_connectors(void)
 	}
 
 	igt_set_module_param_int(drm_fd, "load_detect_test", 0);
+
+	close(drm_fd);
 }
 
 static int opt_handler(int opt, int opt_index, void *data)
@@ -224,6 +226,9 @@ igt_main_args("", long_opts, help_str, opt_handler, NULL)
 
 			drmModeFreePlane(drm_plane);
 		}
+
+		igt_remove_fb(drm_fd, &xrgb_fb);
+		igt_remove_fb(drm_fd, &argb_fb);
 	}
 
 	igt_describe("Test to check the forced connector state.");
