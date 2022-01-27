@@ -48,6 +48,7 @@
 
 #include "i915/gem.h"
 #include "igt.h"
+#include "igt_types.h"
 
 IGT_TEST_DESCRIPTION("Collection of tests targeting request retirement code"
 		     " paths.");
@@ -103,10 +104,10 @@ test_retire_vma_not_inactive(int fd)
 	put_ahnd(ahnd);
 }
 
-int fd;
-
 igt_main
 {
+	igt_fd_t(fd);
+
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(fd);
