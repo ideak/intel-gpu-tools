@@ -41,6 +41,7 @@
 #include "i915/gem_context.h"
 #include "i915/gem_create.h"
 #include "igt.h"
+#include "igt_types.h"
 #include "sw_sync.h"
 
 #define engine_class(e, n) ((e)->engines[(n)].engine_class)
@@ -593,7 +594,7 @@ static void independent_all(int i915, const intel_ctx_t *ctx)
 igt_main
 {
 	const struct intel_execution_engine2 *e;
-	int i915 = -1;
+	igt_fd_t(i915);
 
 	igt_fixture {
 		i915 = drm_open_driver(DRIVER_INTEL);
