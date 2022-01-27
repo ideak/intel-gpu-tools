@@ -35,6 +35,7 @@
 #include "igt_gt.h"
 #include "igt_perf.h"
 #include "igt_sysfs.h"
+#include "igt_types.h"
 #include "sw_sync.h"
 
 IGT_TEST_DESCRIPTION("Exercise in-kernel load-balancing");
@@ -3302,7 +3303,7 @@ static bool has_parallel_execbuf(int i915)
 
 igt_main
 {
-	int i915 = -1;
+	igt_fd_t(i915);
 
 	igt_fixture {
 		i915 = drm_open_driver(DRIVER_INTEL);
