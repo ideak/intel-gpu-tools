@@ -468,6 +468,8 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 			run_test(&data, subtests[i].modifier);
 	}
 
-	igt_fixture
+	igt_fixture {
 		igt_display_fini(&data.display);
+		close(data.drm_fd);
+	}
 }
