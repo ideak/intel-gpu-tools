@@ -436,5 +436,6 @@ igt_main_args("e", NULL, help_str, opt_handler, NULL)
 
 	igt_fixture {
 		igt_display_fini(&display);
+		close(display.drm_fd);
 	}
 }
