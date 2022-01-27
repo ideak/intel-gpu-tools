@@ -25,7 +25,6 @@
  *
  */
 
-#include "igt.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -34,7 +33,11 @@
 #include <errno.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
+
 #include "drm.h"
+
+#include "igt.h"
+#include "igt_types.h"
 
 IGT_TEST_DESCRIPTION("Tests for flink - a way to export a gem object by name");
 
@@ -152,12 +155,14 @@ test_flink_lifetime(int fd)
 	ret = ioctl(fd2, DRM_IOCTL_GEM_OPEN, &open_struct);
 	igt_assert_eq(ret, 0);
 	igt_assert(open_struct.handle != 0);
-}
 
-int fd;
+	close(fd2);
+}
 
 igt_main
 {
+	igt_fd_t(fd);
+
 	igt_fixture
 		fd = drm_open_driver(DRIVER_INTEL);
 
