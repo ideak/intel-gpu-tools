@@ -1536,4 +1536,8 @@ igt_main
 	igt_describe(test_32bits_limit_desc);
 	igt_subtest("32bits-limit")
 		test_32bits_limit(fd);
+
+	igt_fixture {
+		close(fd);
+	}
 }
