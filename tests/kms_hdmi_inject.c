@@ -219,5 +219,6 @@ igt_main
 
 	igt_fixture {
 		drmModeFreeConnector(connector);
+		close(drm_fd);
 	}
 }
