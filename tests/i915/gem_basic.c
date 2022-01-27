@@ -25,7 +25,6 @@
  *
  */
 
-#include "igt.h"
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -37,7 +36,10 @@
 #include <sys/ioctl.h>
 
 #include "drm.h"
+
 #include "i915/gem_create.h"
+#include "igt.h"
+#include "igt_types.h"
 
 IGT_TEST_DESCRIPTION("Tests basic gem_create and gem_close IOCTLs");
 
@@ -78,10 +80,10 @@ test_create_fd_close(int fd)
 	close(fd);
 }
 
-int fd;
-
 igt_main
 {
+	igt_fd_t(fd);
+
 	igt_fixture
 		fd = drm_open_driver(DRIVER_INTEL);
 
