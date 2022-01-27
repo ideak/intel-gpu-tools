@@ -982,5 +982,6 @@ igt_main
 	igt_fixture {
 		igt_display_fini(&data.display);
 		buf_ops_destroy(data.bops);
+		close(data.drm_fd);
 	}
 }
