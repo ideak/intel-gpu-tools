@@ -296,4 +296,9 @@ igt_main {
 		pthread_join(test_thread_id3, NULL);
 		pthread_join(test_thread_id4, NULL);
 	}
+
+	igt_fixture {
+		close(fd);
+		close(fd1);
+	}
 }
