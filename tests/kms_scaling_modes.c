@@ -132,6 +132,8 @@ igt_main
 	igt_subtest_with_dynamic("scaling-mode-none")
 		test_scaling_mode(&data, DRM_MODE_SCALE_NONE);
 
-	igt_fixture
+	igt_fixture {
 		igt_display_fini(&data.display);
+		close(data.drm_fd);
+	}
 }
