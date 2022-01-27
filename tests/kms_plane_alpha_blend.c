@@ -648,5 +648,6 @@ igt_main
 				    COMMIT_ATOMIC : COMMIT_LEGACY);
 
 		igt_display_fini(&data.display);
+		close(data.gfx_fd);
 	}
 }
