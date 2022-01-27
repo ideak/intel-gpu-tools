@@ -64,4 +64,6 @@ igt_simple_main
 	int intel = drm_open_driver(DRIVER_INTEL);
 
 	igt_assert(has_known_intel_chipset(intel));
+
+	close(intel);
 }
