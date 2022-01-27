@@ -111,4 +111,5 @@ igt_simple_main
 	kmstest_force_edid(drm_fd, connector, NULL);
 
 	drmModeFreeConnector(connector);
+	close(drm_fd);
 }
