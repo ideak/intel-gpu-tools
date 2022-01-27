@@ -280,6 +280,8 @@ igt_main
 	igt_subtest_with_dynamic("atomic-fastset")
 		test_panel_fitting(&data, TEST_ATOMIC);
 
-	igt_fixture
+	igt_fixture {
 		igt_display_fini(&data.display);
+		close(data.drm_fd);
+	}
 }
