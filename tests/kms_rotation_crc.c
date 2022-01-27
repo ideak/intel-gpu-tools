@@ -1248,5 +1248,6 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 
 	igt_fixture {
 		igt_display_fini(&data.display);
+		close(data.gfx_fd);
 	}
 }
