@@ -1877,4 +1877,7 @@ igt_main_args("e", NULL, help_str, opt_handler, NULL)
 			run_pair(tests[i].duration, tests[i].flags);
 	}
 	igt_stop_signal_helper();
+
+	igt_fixture
+		close(drm_fd);
 }
