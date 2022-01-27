@@ -42,6 +42,7 @@
 #include "i915/gem_engine_topology.h"
 #include "i915/gem_vm.h"
 #include "igt.h"
+#include "igt_types.h"
 #include "igt_rand.h"
 #include "igt_vgem.h"
 #include "sw_sync.h"
@@ -987,7 +988,7 @@ igt_main
 {
 	const struct intel_execution_engine2 *e;
 	intel_ctx_cfg_t cfg;
-	int i915 = -1;
+	igt_fd_t(i915);
 
 	igt_fixture {
 		i915 = drm_open_driver(DRIVER_INTEL);
