@@ -592,5 +592,6 @@ igt_main_args("", long_options, help_str, opt_handler, &data)
 		close(data.debugfs_fd);
 		buf_ops_destroy(data.bops);
 		display_fini(&data);
+		close(data.drm_fd);
 	}
 }
