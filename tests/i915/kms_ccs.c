@@ -699,6 +699,8 @@ igt_main_args("cs:", NULL, help_str, opt_handler, &data)
 		}
 	}
 
-	igt_fixture
+	igt_fixture {
 		igt_display_fini(&data.display);
+		close(data.drm_fd);
+	}
 }
