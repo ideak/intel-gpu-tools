@@ -31,6 +31,7 @@
 #include "i915/gem_create.h"
 #include "igt.h"
 #include "igt_device.h"
+#include "igt_types.h"
 
 #define PAGE_SIZE 4096
 #define PAGE_ALIGN(x) ALIGN(x, PAGE_SIZE)
@@ -238,7 +239,6 @@ static void check_workarounds(int fd, enum operation op, unsigned int flags)
 igt_main
 {
 	struct intel_mmio_data mmio_data;
-	int device = -1;
 	const struct {
 		const char *name;
 		enum operation op;
@@ -258,6 +258,7 @@ igt_main
 		{ "-fd", FD },
 		{ }
 	}, *m;
+	igt_fd_t(device);
 
 	igt_fixture {
 		FILE *file;
