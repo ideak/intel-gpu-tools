@@ -306,5 +306,6 @@ igt_main
 	igt_fixture {
 		igt_display_fini(&data.display);
 		igt_reset_connectors();
+		close(data.drm_fd);
 	}
 }
