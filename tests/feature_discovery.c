@@ -29,15 +29,16 @@
 #include "igt_kms.h"
 #include "igt_psr.h"
 #include "igt_sysfs.h"
+#include "igt_types.h"
 
-static int fd;
-static int debugfs_fd;
 static igt_display_t display;
 
 IGT_TEST_DESCRIPTION("A metatest that checks for \"features\" presence. "
 		     "The subtests here should only skip or pass, "
 		     "anything else means we have a serious problem.");
 igt_main {
+	igt_fd_t(debugfs_fd);
+	igt_fd_t(fd);
 
 	igt_fixture {
 		fd = drm_open_driver_master(DRIVER_ANY);
