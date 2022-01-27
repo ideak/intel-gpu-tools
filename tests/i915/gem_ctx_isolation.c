@@ -25,6 +25,7 @@
 #include "i915/gem_create.h"
 #include "igt.h"
 #include "igt_dummyload.h"
+#include "igt_types.h"
 
 #define MAX_REG 0x200000
 #define NUM_REGS (MAX_REG / sizeof(uint32_t))
@@ -979,7 +980,7 @@ igt_main
 	unsigned int has_context_isolation = 0;
 	const struct intel_execution_engine2 *e;
 	intel_ctx_cfg_t cfg;
-	int i915 = -1;
+	igt_fd_t(i915);
 
 	igt_fixture {
 		int gen;
