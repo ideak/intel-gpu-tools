@@ -1761,6 +1761,15 @@ int main(int argc, char **argv)
 	if (ret) {
 		fprintf(stderr,
 			"Failed to initialize PMU! (%s)\n", strerror(errno));
+		if (errno == EACCES && geteuid())
+			fprintf(stderr,
+"\n"
+"When running as a normal user CAP_PERFMON is required to access performance\n"
+"monitoring. See \"man 7 capabilities\", \"man 8 setcap\", or contact your\n"
+"distribution vendor for assistance.\n"
+"\n"
+"More information can be found at 'Perf events and tool security' document:\n"
+"https://www.kernel.org/doc/html/latest/admin-guide/perf-security.html\n");
 		ret = EXIT_FAILURE;
 		goto err;
 	}
