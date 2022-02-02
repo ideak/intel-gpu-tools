@@ -59,6 +59,7 @@
 
 #include "drmtest.h"
 #include "intel_allocator.h"
+#include "intel_batchbuffer.h"
 #include "intel_chipset.h"
 #include "intel_io.h"
 #include "igt_debugfs.h"
@@ -1426,6 +1427,7 @@ __noreturn static void exit_subtest(const char *result)
 	 * remnants from previous allocator run (if any).
 	 */
 	intel_allocator_init();
+	intel_bb_reinit_allocator();
 
 	if (!in_dynamic_subtest)
 		_igt_dynamic_tests_executed = -1;

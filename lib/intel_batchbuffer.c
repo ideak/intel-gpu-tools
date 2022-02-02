@@ -80,6 +80,10 @@
  * library as a dependency.
  */
 
+static bool intel_bb_do_tracking;
+static IGT_LIST_HEAD(intel_bb_list);
+static pthread_mutex_t intel_bb_list_lock = PTHREAD_MUTEX_INITIALIZER;
+
 /**
  * intel_batchbuffer_align:
  * @batch: batchbuffer object
@@ -1359,6 +1363,9 @@ __intel_bb_create(int i915, uint32_t ctx, uint32_t size, bool do_relocs,
 								  strategy);
 	ibb->allocator_type = allocator_type;
 	ibb->allocator_strategy = strategy;
+	ibb->allocator_start = start;
+	ibb->allocator_end = end;
+
 	ibb->i915 = i915;
 	ibb->enforce_relocs = do_relocs;
 	ibb->handle = gem_create(i915, size);
@@ -1383,6 +1390,12 @@ __intel_bb_create(int i915, uint32_t ctx, uint32_t size, bool do_relocs,
 	IGT_INIT_LIST_HEAD(&ibb->intel_bufs);
 
 	ibb->refcount = 1;
+
+	if (intel_bb_do_tracking && ibb->allocator_type != INTEL_ALLOCATOR_NONE) {
+		pthread_mutex_lock(&intel_bb_list_lock);
+		igt_list_add(&ibb->link, &intel_bb_list);
+		pthread_mutex_unlock(&intel_bb_list_lock);
+	}
 
 	return ibb;
 }
@@ -1600,6 +1613,12 @@ void intel_bb_destroy(struct intel_bb *ibb)
 	__intel_bb_destroy_cache(ibb);
 
 	if (ibb->allocator_type != INTEL_ALLOCATOR_NONE) {
+		if (intel_bb_do_tracking) {
+			pthread_mutex_lock(&intel_bb_list_lock);
+			igt_list_del(&ibb->link);
+			pthread_mutex_unlock(&intel_bb_list_lock);
+		}
+
 		intel_allocator_free(ibb->allocator_handle, ibb->handle);
 		intel_allocator_close(ibb->allocator_handle);
 	}
@@ -2958,4 +2977,57 @@ igt_huc_copyfunc_t igt_get_huc_copyfunc(int devid)
 		copy = gen9_huc_copyfunc;
 
 	return copy;
+}
+
+/**
+ * intel_bb_track:
+ * @do_tracking: bool
+ *
+ * Turn on (true) or off (false) tracking for intel_batchbuffers.
+ */
+void intel_bb_track(bool do_tracking)
+{
+	if (intel_bb_do_tracking == do_tracking)
+		return;
+
+	if (intel_bb_do_tracking) {
+		struct intel_bb *entry, *tmp;
+
+		pthread_mutex_lock(&intel_bb_list_lock);
+		igt_list_for_each_entry_safe(entry, tmp, &intel_bb_list, link)
+			igt_list_del(&entry->link);
+		pthread_mutex_unlock(&intel_bb_list_lock);
+	}
+
+	intel_bb_do_tracking = do_tracking;
+}
+
+static void __intel_bb_reinit_alloc(struct intel_bb *ibb)
+{
+	if (ibb->allocator_type == INTEL_ALLOCATOR_NONE)
+		return;
+
+	ibb->allocator_handle = intel_allocator_open_full(ibb->i915, ibb->ctx,
+							  ibb->allocator_start, ibb->allocator_end,
+							  ibb->allocator_type,
+							  ibb->allocator_strategy);
+	intel_bb_reset(ibb, true);
+}
+
+/**
+ * intel_bb_reinit_allocator:
+ *
+ * Reinit allocator and get offsets in tracked intel_batchbuffers.
+ */
+void intel_bb_reinit_allocator(void)
+{
+	struct intel_bb *iter;
+
+	if (!intel_bb_do_tracking)
+		return;
+
+	pthread_mutex_lock(&intel_bb_list_lock);
+	igt_list_for_each_entry(iter, &intel_bb_list, link)
+		__intel_bb_reinit_alloc(iter);
+	pthread_mutex_unlock(&intel_bb_list_lock);
 }

@@ -456,7 +456,10 @@ struct igt_pxp {
  * Batchbuffer without libdrm dependency
  */
 struct intel_bb {
+	struct igt_list_head link;
+
 	uint64_t allocator_handle;
+	uint64_t allocator_start, allocator_end;
 	uint8_t allocator_type;
 	enum allocator_strategy allocator_strategy;
 
@@ -523,6 +526,10 @@ struct intel_bb *intel_bb_create_with_relocs(int i915, uint32_t size);
 struct intel_bb *
 intel_bb_create_with_relocs_and_context(int i915, uint32_t ctx, uint32_t size);
 void intel_bb_destroy(struct intel_bb *ibb);
+
+/* make it safe to use intel_allocator after failed test */
+void intel_bb_reinit_allocator(void);
+void intel_bb_track(bool do_tracking);
 
 static inline void intel_bb_ref(struct intel_bb *ibb)
 {
