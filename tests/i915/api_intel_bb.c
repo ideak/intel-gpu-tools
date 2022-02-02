@@ -1169,7 +1169,7 @@ static void delta_check(struct buf_ops *bops)
 	ptr = gem_mmap__device_coherent(i915, buf->handle, 0,
 					intel_buf_size(buf), PROT_READ);
 	val = ptr[0x2000 / sizeof(uint32_t)];
-	gem_munmap(ptr, ibb->size);
+	gem_munmap(ptr, intel_buf_size(buf));
 
 	intel_buf_destroy(buf);
 	intel_bb_destroy(ibb);
