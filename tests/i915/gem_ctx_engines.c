@@ -298,7 +298,7 @@ static void execute_one(int i915)
 			spin = igt_spin_new(i915,
 					    .ahnd = ahnd,
 					    .ctx = ctx,
-					    .flags = (IGT_SPIN_NO_PREEMPTION |
+					    .flags = (IGT_SPIN_FENCE_OUT |
 						      IGT_SPIN_POLL_RUN));
 
 			do_ioctl(i915, DRM_IOCTL_I915_GEM_BUSY, &busy);
@@ -314,13 +314,13 @@ static void execute_one(int i915)
 			}
 			cfg.num_engines = GEM_MAX_ENGINES;
 			ctx = intel_ctx_create(i915, &cfg);
+			execbuf.rsvd2 = spin->execbuf.rsvd2 >> 32;
 
-			igt_spin_busywait_until_started(spin);
 			for (int j = 0; j <= I915_EXEC_RING_MASK; j++) {
 				int expected = j == i ? 0 : -EINVAL;
 
 				execbuf.rsvd1 = ctx->id;
-				execbuf.flags = j;
+				execbuf.flags = j | I915_EXEC_FENCE_IN;
 				igt_assert_f(__gem_execbuf(i915, &execbuf) == expected,
 					     "Failed to report the %s engine for slot %d (valid at %d)\n",
 					     j == i ? "valid" : "invalid", j, i);
