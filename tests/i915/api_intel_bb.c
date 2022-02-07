@@ -1127,6 +1127,9 @@ static void delta_check(struct buf_ops *bops)
 	struct intel_buf *buf;
 	struct intel_bb *ibb;
 	uint64_t offset;
+	uint64_t obj_size = gem_detect_safe_alignment(i915) + 0x2000;
+	uint64_t obj_offset = (1ULL << 32) - gem_detect_safe_alignment(i915);
+	uint64_t delta = gem_detect_safe_alignment(i915) + 0x1000;
 	bool supports_48bit;
 
 	ibb = intel_bb_create_with_allocator(i915, 0, PAGE_SIZE,
@@ -1139,8 +1142,8 @@ static void delta_check(struct buf_ops *bops)
 	if (debug_bb)
 		intel_bb_set_debug(ibb, true);
 
-	buf = create_buf(bops, 0x1000, 0x10, COLOR_CC);
-	buf->addr.offset = 0xfffff000;
+	buf = create_buf(bops, obj_size, 0x1, COLOR_CC);
+	buf->addr.offset = obj_offset;
 	intel_bb_add_object(ibb, buf->handle, intel_buf_bo_size(buf),
 			    buf->addr.offset, 0, false);
 
@@ -1148,7 +1151,7 @@ static void delta_check(struct buf_ops *bops)
 	intel_bb_emit_reloc(ibb, buf->handle,
 			    I915_GEM_DOMAIN_RENDER,
 			    I915_GEM_DOMAIN_RENDER,
-			    0x2000, buf->addr.offset);
+			    delta, buf->addr.offset);
 	intel_bb_out(ibb, expected);
 
 	intel_bb_out(ibb, MI_BATCH_BUFFER_END);
@@ -1157,9 +1160,9 @@ static void delta_check(struct buf_ops *bops)
 	intel_bb_exec(ibb, intel_bb_offset(ibb), I915_EXEC_DEFAULT, false);
 	intel_bb_sync(ibb);
 
-	/* Buffer should be @ 0xc000_0000 */
+	/* Buffer should be @ obj_offset */
 	offset = intel_bb_get_object_offset(ibb, buf->handle);
-	igt_assert_eq_u64(offset, 0xfffff000);
+	igt_assert_eq_u64(offset, obj_offset);
 
 	ptr = gem_mmap__device_coherent(i915, ibb->handle, 0, ibb->size, PROT_READ);
 	lo = ptr[1];
@@ -1168,7 +1171,7 @@ static void delta_check(struct buf_ops *bops)
 
 	ptr = gem_mmap__device_coherent(i915, buf->handle, 0,
 					intel_buf_size(buf), PROT_READ);
-	val = ptr[0x2000 / sizeof(uint32_t)];
+	val = ptr[delta / sizeof(uint32_t)];
 	gem_munmap(ptr, intel_buf_size(buf));
 
 	intel_buf_destroy(buf);
