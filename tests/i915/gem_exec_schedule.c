@@ -3274,7 +3274,7 @@ igt_main
 
 				igt_fixture {
 					igt_stop_hang_detector();
-					hang = igt_allow_hang(fd, 0, 0);
+					hang = igt_allow_hang(fd, ctx->id, 0);
 				}
 
 				test_each_engine_store("preempt-hang", fd, ctx, e)

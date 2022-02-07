@@ -232,7 +232,7 @@ igt_main
 		igt_hang_t hang;
 
 		igt_fixture {
-			hang = igt_allow_hang(fd, 0, 0);
+			hang = igt_allow_hang(fd, ctx->id, 0);
 			igt_fork_signal_helper();
 		}
 

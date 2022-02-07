@@ -1267,7 +1267,7 @@ igt_main
 		ctx = intel_ctx_create_all_physical(i915);
 
 		igt_require(has_persistence(i915));
-		igt_allow_hang(i915, 0, 0);
+		igt_allow_hang(i915, ctx->id, 0);
 	}
 
 	/* Legacy execbuf engine selection flags. */

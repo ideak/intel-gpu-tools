@@ -195,7 +195,7 @@ static void test_mode(int fd, const intel_ctx_t *ctx, unsigned int flags)
 	if ((flags & HANG) == 0)
 		igt_fork_hang_detector(fd);
 	else
-		hang = igt_allow_hang(fd, 0, 0);
+		hang = igt_allow_hang(fd, ctx->id, 0);
 
 	for_each_ctx_engine(fd, ctx, e) {
 		if (!gem_class_can_store_dword(fd, e->class))
