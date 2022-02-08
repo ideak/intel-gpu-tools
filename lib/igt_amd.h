@@ -42,6 +42,9 @@
 #define DEBUGFS_DP_LINK_SETTINGS "link_settings"
 #define DEBUGFS_HPD_TRIGGER "trigger_hotplug"
 
+#define DEBUGFS_EDP_ILR_SETTING "ilr_setting"
+#define MAX_SUPPORTED_ILR 8
+
 enum amd_dsc_clock_force {
 	DSC_AUTOMATIC = 0,
 	DSC_FORCE_ON,
@@ -126,5 +129,11 @@ void igt_amd_write_link_settings(
 	int drm_fd, char *connector_name, enum dc_lane_count lane_count,
 	enum dc_link_rate link_rate, enum dc_link_training_type training_type);
 bool igt_amd_output_has_link_settings(int drm_fd, char *connector_name);
+void igt_amd_read_ilr_setting(
+	int drm_fd, char *connector_name, int *supported_ilr);
+void igt_amd_write_ilr_setting(
+	int drm_fd, char *connector_name, enum dc_lane_count lane_count,
+	uint8_t link_rate_set);
+bool igt_amd_output_has_ilr_setting(int drm_fd, char *connector_name);
 
 #endif /* IGT_AMD_H */

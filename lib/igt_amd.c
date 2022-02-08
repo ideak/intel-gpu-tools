@@ -892,3 +892,115 @@ bool igt_amd_output_has_link_settings(int drm_fd, char *connector_name)
 	close(fd);
 	return true;
 }
+
+/*
+ * igt_amd_read_ilr_setting:
+ * @drm_fd: DRM file descriptor
+ * @connector_name: The name of the connector to read the link_settings
+ * @supported_ilr: supported link rates
+ *
+ * The indices of @supported_ilr correspond to the supported customized
+ * link rates reported from DPCD 00010h ~ 0001Fh
+ */
+void igt_amd_read_ilr_setting(
+	int drm_fd, char *connector_name, int *supported_ilr)
+{
+	int fd, ret;
+	char buf[256] = {'\0'};
+	int i = 0;
+	char *token_end, *val_token, *tmp;
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+	if (fd < 0) {
+		igt_info("Could not open connector %s debugfs directory\n",
+			 connector_name);
+		return;
+	}
+	ret = igt_debugfs_simple_read(fd, DEBUGFS_EDP_ILR_SETTING, buf, sizeof(buf));
+	igt_assert_f(ret >= 0, "Reading %s for connector %s failed.\n",
+		     DEBUGFS_EDP_ILR_SETTING, connector_name);
+
+	close(fd);
+
+	tmp = strstr(buf, "not supported");
+	if (tmp) {
+		igt_info("Connector %s: eDP panel doesn't support ILR\n%s",
+			 connector_name, buf);
+		return;
+	}
+
+	/* Parse values read from file. */
+	for (char *token = strtok_r(buf, "\n", &token_end);
+	     token != NULL;
+	     token = strtok_r(NULL, "\n", &token_end))
+	{
+		strtok_r(token, "] ", &val_token);
+		supported_ilr[i] = strtol(val_token, &val_token, 10);
+		i++;
+
+		if (i >= MAX_SUPPORTED_ILR) return;
+	}
+}
+
+/*
+ * igt_amd_write_link_settings:
+ * @drm_fd: DRM file descriptor
+ * @connector_name: The name of the connector to write the link_settings
+ * @lane_count: Lane count
+ * @link_rate_set: Intermediate link rate
+ */
+void igt_amd_write_ilr_setting(
+	int drm_fd, char *connector_name, enum dc_lane_count lane_count,
+	uint8_t link_rate_set)
+{
+	int ls_fd, fd;
+	const int buf_len = 40;
+	char buf[buf_len];
+	int wr_len = 0;
+
+	memset(buf, '\0', sizeof(char) * buf_len);
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+	igt_assert(fd >= 0);
+	ls_fd = openat(fd, DEBUGFS_EDP_ILR_SETTING, O_WRONLY);
+	close(fd);
+	igt_assert(ls_fd >= 0);
+
+	/* edp_ilr_write expects a \n at the end or else it will
+	 * dereference a null pointer.
+	 */
+	snprintf(buf, sizeof(buf), "%02x %02x \n", lane_count, link_rate_set);
+
+	wr_len = write(ls_fd, buf, strlen(buf));
+	igt_assert_eq(wr_len, strlen(buf));
+
+	close(ls_fd);
+}
+
+/**
+ * igt_amd_output_has_ilr_setting: check if connector has ilr_setting debugfs entry
+ * @drm_fd: DRM file descriptor
+ * @connector_name: The connector's name, on which we're reading the status
+ */
+bool igt_amd_output_has_ilr_setting(int drm_fd, char *connector_name)
+{
+	int fd;
+	int res;
+	struct stat stat;
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+	if (fd < 0) {
+		igt_info("output %s: debugfs not found\n", connector_name);
+		return false;
+	}
+
+	res = fstatat(fd, DEBUGFS_EDP_ILR_SETTING, &stat, 0);
+	if (res != 0) {
+		igt_info("output %s: %s debugfs not supported\n", connector_name, DEBUGFS_EDP_ILR_SETTING);
+		close(fd);
+		return false;
+	}
+
+	close(fd);
+	return true;
+}

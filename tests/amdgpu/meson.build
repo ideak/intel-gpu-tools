@@ -20,6 +20,7 @@ if libdrm_amdgpu.found()
 			  'amd_dp_dsc',
 			  'amd_psr',
 			  'amd_plane',
+			  'amd_ilr',
 			]
 	amdgpu_deps += libdrm_amdgpu
 endif
