@@ -817,7 +817,7 @@ void igt_amd_read_link_settings(
 	{
 		strtok_r(token, ": ", &val_token);
 		lane_count[i] = strtol(val_token, &val_token, 10);
-		link_rate[i] = strtol(val_token, &val_token, 10);
+		link_rate[i] = strtol(val_token, &val_token, 16);
 		link_spread[i] = strtol(val_token, &val_token, 10);
 		i++;
 
