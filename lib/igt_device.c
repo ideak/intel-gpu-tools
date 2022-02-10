@@ -149,9 +149,9 @@ struct igt_pci_addr {
 	unsigned int function;
 };
 
-static int igt_device_get_pci_addr(int fd, struct igt_pci_addr *pci)
+static int igt_device_get_pci_addr(int fd, unsigned int vf_id, struct igt_pci_addr *pci)
 {
-	char path[IGT_DEV_PATH_LEN];
+	char link[20], path[IGT_DEV_PATH_LEN];
 	char *buf;
 	int sysfs;
 	int len;
@@ -159,11 +159,21 @@ static int igt_device_get_pci_addr(int fd, struct igt_pci_addr *pci)
 	if (!igt_device_is_pci(fd))
 		return -ENODEV;
 
+	if (vf_id)
+		len = snprintf(link, sizeof(link), "device/virtfn%u", vf_id - 1);
+	else
+		len = snprintf(link, sizeof(link), "device");
+	if (igt_warn_on_f(len > sizeof(link) || link[len -1],
+	    "IGT bug: insufficient buffer space for rendering PCI device link name\n"))
+		return -ENOSPC;
+	else if (igt_debug_on_f(len < 0, "unexpected failure from snprintf()\n"))
+		return len;
+
 	sysfs = igt_sysfs_open(fd);
 	if (sysfs == -1)
 		return -ENOENT;
 
-	len = readlinkat(sysfs, "device", path, sizeof(path) - 1);
+	len = readlinkat(sysfs, link, path, sizeof(path) - 1);
 	close(sysfs);
 	if (len == -1)
 		return -ENOENT;
@@ -183,12 +193,25 @@ static int igt_device_get_pci_addr(int fd, struct igt_pci_addr *pci)
 	return 0;
 }
 
-static struct pci_device *__igt_device_get_pci_device(int fd)
+/**
+ * __igt_device_get_pci_device:
+ *
+ * @fd: DRM device file descriptor
+ * @vf_id: virtual function number (0 if native or PF)
+ *
+ * Looks up the graphics pci device using libpciaccess.
+ * Since pci_system_init() is called, users are expected to call pci_sytem_clenup() after use
+ * unless an error occurs and NULL is returned.
+ *
+ * Returns:
+ * The pci_device, NULL on any failures.
+ */
+struct pci_device *__igt_device_get_pci_device(int fd, unsigned int vf_id)
 {
 	struct igt_pci_addr pci_addr;
 	struct pci_device *pci_dev;
 
-	if (igt_device_get_pci_addr(fd, &pci_addr)) {
+	if (igt_device_get_pci_addr(fd, vf_id, &pci_addr)) {
 		igt_warn("Unable to find device PCI address\n");
 		return NULL;
 	}
@@ -206,15 +229,19 @@ static struct pci_device *__igt_device_get_pci_device(int fd)
 		igt_warn("Couldn't find PCI device %04x:%02x:%02x:%02x\n",
 			 pci_addr.domain, pci_addr.bus,
 			 pci_addr.device, pci_addr.function);
-		return NULL;
+		goto cleanup;
 	}
 
 	if (pci_device_probe(pci_dev)) {
 		igt_warn("Couldn't probe PCI device\n");
-		return NULL;
+		goto cleanup;
 	}
 
 	return pci_dev;
+
+cleanup:
+	pci_system_cleanup();
+	return NULL;
 }
 
 /**
@@ -223,6 +250,7 @@ static struct pci_device *__igt_device_get_pci_device(int fd)
  * @fd: the device
  *
  * Looks up the main graphics pci device using libpciaccess.
+ * Since pci_system_init() is called, users are expected to call pci_sytem_clenup() after use.
  *
  * Returns:
  * The pci_device, skips the test on any failures.
@@ -231,7 +259,7 @@ struct pci_device *igt_device_get_pci_device(int fd)
 {
 	struct pci_device *pci_dev;
 
-	pci_dev = __igt_device_get_pci_device(fd);
+	pci_dev = __igt_device_get_pci_device(fd, 0);
 	igt_require(pci_dev);
 
 	return pci_dev;
