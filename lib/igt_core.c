@@ -624,6 +624,12 @@ uint64_t igt_nsec_elapsed(struct timespec *start)
 		(uint64_t)NSEC_PER_SEC*(now.tv_sec - start->tv_sec));
 }
 
+void __igt_assert_in_outer_scope(void)
+{
+	internal_assert(!in_subtest,
+			"must only be called outside of a subtest");
+}
+
 bool __igt_fixture(void)
 {
 	internal_assert(!in_fixture,

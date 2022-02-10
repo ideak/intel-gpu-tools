@@ -38,6 +38,7 @@ lib_sources = [
 	'igt_sysrq.c',
 	'igt_taints.c',
 	'igt_thread.c',
+	'igt_types.c',
 	'igt_vec.c',
 	'igt_vgem.c',
 	'igt_x86.c',

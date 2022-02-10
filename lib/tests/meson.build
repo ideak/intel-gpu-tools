@@ -19,10 +19,12 @@ lib_tests = [
 	'igt_stats',
 	'igt_subtest_group',
 	'igt_thread',
+	'igt_types',
 	'i915_perf_data_alignment',
 ]
 
 lib_fail_tests = [
+	'bad_subtest_type',
 	'igt_no_subtest',
 	'igt_simple_test_subtests',
 	'igt_timeout',
