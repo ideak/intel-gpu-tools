@@ -201,10 +201,16 @@ static bool wait_for_pc8_status(enum pc8_status status)
 
 static bool wait_for_suspended(void)
 {
-	if (has_pc8 && !has_runtime_pm)
+	if (has_pc8 && !has_runtime_pm) {
 		return wait_for_pc8_status(PC8_ENABLED);
-	else
-		return igt_wait_for_pm_status(IGT_RUNTIME_PM_STATUS_SUSPENDED);
+	} else {
+		bool suspended = igt_wait_for_pm_status(IGT_RUNTIME_PM_STATUS_SUSPENDED);
+
+		if (!suspended)
+			igt_debugfs_dump(drm_fd, "i915_runtime_pm_status");
+
+		return suspended;
+	}
 }
 
 static bool wait_for_active(void)
