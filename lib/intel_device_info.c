@@ -1,5 +1,6 @@
 #include "intel_chipset.h"
 #include "i915_pciids.h"
+#include "i915_pciids_local.h"
 
 #include <strings.h> /* ffs() */
 
@@ -389,6 +390,13 @@ static const struct intel_device_info intel_dg1_info = {
 	.codename = "dg1"
 };
 
+static const struct intel_device_info intel_dg2_info = {
+	.graphics_ver = 12,
+	.display_ver = 13,
+	.is_dg2 = true,
+	.codename = "dg2",
+};
+
 static const struct intel_device_info intel_alderlake_s_info = {
 	.graphics_ver = 12,
 	.display_ver = 12,
@@ -506,6 +514,7 @@ static const struct pci_id_match intel_device_match[] = {
 	INTEL_RKL_IDS(&intel_rocketlake_info),
 
 	INTEL_DG1_IDS(&intel_dg1_info),
+	INTEL_DG2_IDS(&intel_dg2_info),
 
 	INTEL_ADLS_IDS(&intel_alderlake_s_info),
 	INTEL_RPLS_IDS(&intel_raptorlake_s_info),
