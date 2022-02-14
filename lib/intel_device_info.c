@@ -395,6 +395,7 @@ static const struct intel_device_info intel_dg2_info = {
 	.display_ver = 13,
 	.is_dg2 = true,
 	.codename = "dg2",
+	.has_flatccs = true,
 };
 
 static const struct intel_device_info intel_alderlake_s_info = {

@@ -40,6 +40,7 @@ struct intel_device_info {
 	unsigned graphics_ver;
 	unsigned display_ver;
 	unsigned gt; /* 0 if unknown */
+	bool has_flatccs;
 	bool is_mobile : 1;
 	bool is_whitney : 1;
 	bool is_almador : 1;
@@ -214,5 +215,7 @@ void intel_check_pch(void);
 				 !(IS_VALLEYVIEW(devid) || \
 				   IS_CHERRYVIEW(devid) || \
 				   IS_BROXTON(devid)))
+
+#define HAS_FLATCCS(devid)	(intel_get_device_info(devid)->has_flatccs)
 
 #endif /* _INTEL_CHIPSET_H */
