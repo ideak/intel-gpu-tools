@@ -2039,31 +2039,6 @@ static void faulting_read(int gem_fd, const struct mmap_offset *t)
 	munmap(ptr, 4096);
 }
 
-static int unload_i915(void)
-{
-	bind_fbcon(false);
-
-	if (igt_kmod_is_loaded("snd_hda_intel")) {
-		igt_terminate_process(SIGTERM, "alsactl");
-		kick_snd_hda_intel();
-		if (igt_kmod_unload("snd_hda_intel", 0))
-			return -EAGAIN;
-	}
-
-	if (igt_kmod_is_loaded("snd_hdmi_lpe_audio")) {
-		igt_terminate_process(SIGTERM, "alsactl");
-		if (igt_kmod_unload("snd_hdmi_lpe_audio", 0))
-			return -EAGAIN;
-	}
-
-	if (igt_kmod_is_loaded("i915")) {
-		if (igt_kmod_unload("i915", 0))
-			return -EBUSY;
-	}
-
-	return 0;
-}
-
 static void test_unload(unsigned int num_engines)
 {
 	igt_fork(child, 1) {
@@ -2126,7 +2101,7 @@ static void test_unload(unsigned int num_engines)
 
 		igt_debug("Read %d events from perf and trial unload\n", count);
 		pmu_read_multi(fd[0], count, buf);
-		igt_assert_eq(unload_i915(), -EBUSY);
+		igt_assert_eq(__igt_i915_driver_unload(NULL), IGT_EXIT_SKIP);
 		pmu_read_multi(fd[0], count, buf);
 
 		igt_debug("Close perf\n");
@@ -2139,7 +2114,7 @@ static void test_unload(unsigned int num_engines)
 	igt_waitchildren();
 
 	igt_debug("Final unload\n");
-	igt_assert_eq(unload_i915(), 0);
+	igt_assert_eq(__igt_i915_driver_unload(NULL), IGT_EXIT_SUCCESS);
 }
 
 #define test_each_engine(T, i915, ctx, e) \
@@ -2419,7 +2394,7 @@ igt_main
 	}
 
 	igt_subtest("module-unload") {
-		igt_require(unload_i915() == 0);
+		igt_require(igt_i915_driver_unload() == IGT_EXIT_SUCCESS);
 		for (int pass = 0; pass < 3; pass++)
 			test_unload(num_engines);
 	}
