@@ -313,10 +313,10 @@ static void standalone(int fd)
 
 	igt_fork(child, 2) {
 		/*
-		 * Use standalone allocator for child 1, detach from parent,
-		 * child 2 use allocator from parent.
+		 * Use standalone allocator for child 0, detach from parent,
+		 * child 1 use allocator from parent.
 		 */
-		if (child == 1)
+		if (child == 0)
 			intel_allocator_init();
 
 		ahnd = intel_allocator_open(fd, 0, INTEL_ALLOCATOR_SIMPLE);
@@ -326,8 +326,8 @@ static void standalone(int fd)
 		intel_allocator_close(ahnd);
 	}
 	igt_waitchildren();
-	igt_assert_eq(offset, shared[1]);
-	igt_assert_neq(offset, shared[2]);
+	igt_assert_eq(offset, shared[0]);
+	igt_assert_neq(offset, shared[1]);
 
 	intel_allocator_free(ahnd, handle);
 	igt_assert_eq(intel_allocator_close(ahnd), true);
