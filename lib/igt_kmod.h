@@ -38,6 +38,7 @@ int igt_kmod_unload(const char *mod_name, unsigned int flags);
 
 int igt_i915_driver_load(const char *opts);
 int igt_i915_driver_unload(void);
+int __igt_i915_driver_unload(const char **whom);
 
 int igt_amdgpu_driver_load(const char *opts);
 int igt_amdgpu_driver_unload(void);

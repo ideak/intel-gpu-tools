@@ -369,6 +369,55 @@ igt_i915_driver_load(const char *opts)
 	return IGT_EXIT_SUCCESS;
 }
 
+int __igt_i915_driver_unload(const char **who)
+{
+	const char *sound[] = {
+		"snd_hda_intel",
+		"snd_hdmi_lpe_audio",
+		NULL,
+	};
+
+	const char *aux[] = {
+		/* gen5: ips uses symbol_get() so only a soft module dependency */
+		"intel_ips",
+		NULL,
+	};
+
+	/* unbind vt */
+	bind_fbcon(false);
+
+	for (const char **m = sound; *m; m++) {
+		if (igt_kmod_is_loaded(*m)) {
+			igt_terminate_process(SIGTERM, "alsactl");
+			kick_snd_hda_intel();
+			if (igt_kmod_unload(*m, 0)) {
+				if (who)
+					*who = *m;
+				return IGT_EXIT_FAILURE;
+			}
+		}
+	}
+
+	for (const char **m = aux; *m; m++) {
+		if (igt_kmod_is_loaded(*m))
+			if (igt_kmod_unload(*m, 0)) {
+				if (who)
+					*who = *m;
+				return IGT_EXIT_FAILURE;
+			}
+	}
+
+	if (igt_kmod_is_loaded("i915")) {
+		if (igt_kmod_unload("i915", 0)) {
+			if (who)
+				*who = "i915";
+			return IGT_EXIT_FAILURE;
+		}
+	}
+
+	return IGT_EXIT_SUCCESS;
+}
+
 /**
  * igt_i915_driver_unload:
  *
@@ -378,45 +427,16 @@ igt_i915_driver_load(const char *opts)
 int
 igt_i915_driver_unload(void)
 {
-	/* unbind vt */
-	bind_fbcon(false);
+	const char *who;
+	int ret;
 
-	if (igt_kmod_is_loaded("snd_hda_intel")) {
-		igt_terminate_process(SIGTERM, "alsactl");
-
-		/* unbind snd_hda_intel */
-		kick_snd_hda_intel();
-
-		if (igt_kmod_unload("snd_hda_intel", 0)) {
-			igt_warn("Could not unload snd_hda_intel\n");
-			igt_kmod_list_loaded();
-			igt_lsof("/dev/snd");
-			return IGT_EXIT_FAILURE;
-		}
-	}
-
-	if (igt_kmod_is_loaded("snd_hdmi_lpe_audio")) {
-		igt_terminate_process(SIGTERM, "alsactl");
-
-		if (igt_kmod_unload("snd_hdmi_lpe_audio", 0)) {
-			igt_warn("Could not unload snd_hdmi_lpe_audio\n");
-			igt_kmod_list_loaded();
-			igt_lsof("/dev/snd");
-			return IGT_EXIT_FAILURE;
-		}
-	}
-
-	/* gen5: ips uses symbol_get() so only a soft module dependency */
-	if (igt_kmod_is_loaded("intel_ips"))
-		igt_kmod_unload("intel_ips", 0);
-
-	if (igt_kmod_is_loaded("i915")) {
-		if (igt_kmod_unload("i915", 0)) {
-			igt_warn("Could not unload i915\n");
-			igt_kmod_list_loaded();
-			igt_lsof("/dev/dri");
-			return IGT_EXIT_SKIP;
-		}
+	ret = __igt_i915_driver_unload(&who);
+	if (ret) {
+		igt_warn("Could not unload %s\n", who);
+		igt_kmod_list_loaded();
+		igt_lsof("/dev/dri");
+		igt_lsof("/dev/snd");
+		return ret;
 	}
 
 	if (igt_kmod_is_loaded("intel-gtt"))
