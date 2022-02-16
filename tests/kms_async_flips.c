@@ -396,9 +396,10 @@ static void test_init(data_t *data)
 
 static void queue_vblank(data_t *data)
 {
+	int pipe = kmstest_get_pipe_from_crtc_id(data->drm_fd, data->crtc_id);
 	drmVBlank wait_vbl = {
 		.request.type = DRM_VBLANK_RELATIVE | DRM_VBLANK_EVENT |
-			kmstest_get_pipe_from_crtc_id(data->drm_fd, data->crtc_id),
+			kmstest_get_vbl_flag(pipe),
 		.request.sequence = 1,
 		.request.signal = (long)data,
 	};
