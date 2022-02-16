@@ -153,9 +153,11 @@ igt_main
 		init();
 	}
 
+	igt_describe("Examine the export of SUBSLICE_TOTAL parameter");
 	igt_subtest("basic-subslice-total")
 		subslice_total();
 
+	igt_describe("Examine the export of EU_TOTAL parameter");
 	igt_subtest("basic-eu-total")
 		eu_total();
 }
