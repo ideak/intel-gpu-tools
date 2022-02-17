@@ -119,6 +119,8 @@ struct engines {
 
 };
 
+static struct termios termios_orig;
+
 __attribute__((format(scanf,3,4)))
 static int igt_sysfs_scanf(int dir, const char *attr, const char *fmt, ...)
 {
@@ -1499,6 +1501,12 @@ print_engines(struct engines *engines, double t, int lines, int w, int h)
 	return lines;
 }
 
+static void restore_term(void)
+{
+	tcsetattr(STDIN_FILENO, TCSANOW, &termios_orig);
+	printf("\n");
+}
+
 static bool stop_top;
 
 static void sigint_handler(int  sig)
@@ -1538,12 +1546,15 @@ static void interactive_stdin(void)
 	struct termios termios = { };
 	int ret;
 
+	ret = tcgetattr(0, &termios);
+	assert(ret == 0);
+
+	memcpy(&termios_orig, &termios, sizeof(struct termios));
+	atexit(restore_term);
+
 	ret = fcntl(0, F_GETFL, NULL);
 	ret |= O_NONBLOCK;
 	ret = fcntl(0, F_SETFL, ret);
-	assert(ret == 0);
-
-	ret = tcgetattr(0, &termios);
 	assert(ret == 0);
 
 	termios.c_lflag &= ~ICANON;
@@ -1689,12 +1700,8 @@ int main(int argc, char **argv)
 		out = stdout;
 	}
 
-	if (output_mode != INTERACTIVE) {
-		sighandler_t sig = signal(SIGINT, sigint_handler);
-
-		if (sig == SIG_ERR)
-			fprintf(stderr, "Failed to install signal handler!\n");
-	}
+	if (signal(SIGINT, sigint_handler) == SIG_ERR)
+		fprintf(stderr, "Failed to install signal handler!\n");
 
 	switch (output_mode) {
 	case INTERACTIVE:
