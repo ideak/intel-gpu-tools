@@ -575,15 +575,20 @@ static void execbuf_with_allocator(int fd)
 
 	/* Blit src -> dst */
 	i = 0;
-	batch[i++] = XY_SRC_COPY_BLT_CMD |
-		  XY_SRC_COPY_BLT_WRITE_ALPHA |
-		  XY_SRC_COPY_BLT_WRITE_RGB;
-	if (gen >= 8)
-		batch[i - 1] |= 8;
-	else
-		batch[i - 1] |= 6;
+	if (gen >= 9) {
+		batch[i++] = XY_FAST_COPY_BLT; /* No tiling */
+		batch[i++] = XY_FAST_COPY_COLOR_DEPTH_32 | 0x10;
+	} else {
+		batch[i++] = XY_SRC_COPY_BLT_CMD |
+			  XY_SRC_COPY_BLT_WRITE_ALPHA |
+			  XY_SRC_COPY_BLT_WRITE_RGB;
+		if (gen >= 8)
+			batch[i - 1] |= 8;
+		else
+			batch[i - 1] |= 6;
 
-	batch[i++] = (3 << 24) | (0xcc << 16) | 4;
+		batch[i++] = (3 << 24) | (0xcc << 16) | 4;
+	}
 	batch[i++] = 0;
 	batch[i++] = (1 << 16) | 4;
 	batch[i++] = object[1].offset;
