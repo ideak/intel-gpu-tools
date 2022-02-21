@@ -12,9 +12,10 @@
 
 int __gem_create(int fd, uint64_t *size, uint32_t *handle);
 uint32_t gem_create(int fd, uint64_t size);
-int __gem_create_ext(int fd, uint64_t *size, uint32_t *handle,
+int __gem_create_ext(int fd, uint64_t *size, uint32_t flags, uint32_t *handle,
                      struct i915_user_extension *ext);
-uint32_t gem_create_ext(int fd, uint64_t size, struct i915_user_extension *ext);
+uint32_t gem_create_ext(int fd, uint64_t size, uint32_t flags,
+			struct i915_user_extension *ext);
 
 void gem_pool_init(void);
 void gem_pool_dump(void);

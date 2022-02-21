@@ -40,7 +40,7 @@ static int create_bo_ext(int i915, uint32_t size, bool protected_is_true, uint32
 		ext = &protected_ext.base;
 
 	*bo_out = 0;
-	ret = __gem_create_ext(i915, &size64, bo_out, ext);
+	ret = __gem_create_ext(i915, &size64, 0, bo_out, ext);
 
 	return ret;
 }

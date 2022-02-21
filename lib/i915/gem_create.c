@@ -61,11 +61,12 @@ uint32_t gem_create(int fd, uint64_t size)
 	return handle;
 }
 
-int __gem_create_ext(int fd, uint64_t *size, uint32_t *handle,
+int __gem_create_ext(int fd, uint64_t *size, uint32_t flags, uint32_t *handle,
 		     struct i915_user_extension *ext)
 {
 	struct drm_i915_gem_create_ext create = {
 		.size = *size,
+		.flags = flags,
 		.extensions = to_user_pointer(ext),
 	};
 	int err = 0;
@@ -86,6 +87,7 @@ int __gem_create_ext(int fd, uint64_t *size, uint32_t *handle,
  * gem_create_ext:
  * @fd: open i915 drm file descriptor
  * @size: desired size of the buffer
+ * @flags: optional flags
  * @ext: optional extensions chain
  *
  * This wraps the GEM_CREATE_EXT ioctl, which allocates a new gem buffer object
@@ -93,11 +95,12 @@ int __gem_create_ext(int fd, uint64_t *size, uint32_t *handle,
  *
  * Returns: The file-private handle of the created buffer object
  */
-uint32_t gem_create_ext(int fd, uint64_t size, struct i915_user_extension *ext)
+uint32_t gem_create_ext(int fd, uint64_t size, uint32_t flags,
+			struct i915_user_extension *ext)
 {
 	uint32_t handle;
 
-	igt_assert_eq(__gem_create_ext(fd, &size, &handle, ext), 0);
+	igt_assert_eq(__gem_create_ext(fd, &size, flags, &handle, ext), 0);
 
 	return handle;
 }

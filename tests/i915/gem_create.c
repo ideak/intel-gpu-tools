@@ -330,38 +330,38 @@ static void create_ext_placement_sanity_check(int fd)
 	 * behaviour.
 	 */
 	size = PAGE_SIZE;
-	igt_assert_eq(__gem_create_ext(fd, &size, &handle, 0), 0);
+	igt_assert_eq(__gem_create_ext(fd, &size, 0, &handle, 0), 0);
 	gem_close(fd, handle);
 
 	/* Try some uncreative invalid combinations */
 	setparam_region.regions = to_user_pointer(&region_smem);
 	setparam_region.num_regions = 0;
 	size = PAGE_SIZE;
-	igt_assert_neq(__gem_create_ext(fd, &size, &handle,
+	igt_assert_neq(__gem_create_ext(fd, &size, 0, &handle,
 					&setparam_region.base), 0);
 
 	setparam_region.regions = to_user_pointer(&region_smem);
 	setparam_region.num_regions = regions->num_regions + 1;
 	size = PAGE_SIZE;
-	igt_assert_neq(__gem_create_ext(fd, &size, &handle,
+	igt_assert_neq(__gem_create_ext(fd, &size, 0, &handle,
 					&setparam_region.base), 0);
 
 	setparam_region.regions = to_user_pointer(&region_smem);
 	setparam_region.num_regions = -1;
 	size = PAGE_SIZE;
-	igt_assert_neq(__gem_create_ext(fd, &size, &handle,
+	igt_assert_neq(__gem_create_ext(fd, &size, 0, &handle,
 					&setparam_region.base), 0);
 
 	setparam_region.regions = to_user_pointer(&region_invalid);
 	setparam_region.num_regions = 1;
 	size = PAGE_SIZE;
-	igt_assert_neq(__gem_create_ext(fd, &size, &handle,
+	igt_assert_neq(__gem_create_ext(fd, &size, 0, &handle,
 					&setparam_region.base), 0);
 
 	setparam_region.regions = to_user_pointer(&region_invalid);
 	setparam_region.num_regions = 0;
 	size = PAGE_SIZE;
-	igt_assert_neq(__gem_create_ext(fd, &size, &handle,
+	igt_assert_neq(__gem_create_ext(fd, &size, 0, &handle,
 					&setparam_region.base), 0);
 
 	uregions = calloc(regions->num_regions + 1, sizeof(uint32_t));
@@ -372,7 +372,7 @@ static void create_ext_placement_sanity_check(int fd)
 	setparam_region.regions = to_user_pointer(uregions);
 	setparam_region.num_regions = regions->num_regions + 1;
 	size = PAGE_SIZE;
-	igt_assert_neq(__gem_create_ext(fd, &size, &handle,
+	igt_assert_neq(__gem_create_ext(fd, &size, 0, &handle,
 					&setparam_region.base), 0);
 
 	if (regions->num_regions > 1)  {
@@ -385,7 +385,7 @@ static void create_ext_placement_sanity_check(int fd)
 			setparam_region.regions = to_user_pointer(dups);
 			setparam_region.num_regions = 2;
 			size = PAGE_SIZE;
-			igt_assert_neq(__gem_create_ext(fd, &size, &handle,
+			igt_assert_neq(__gem_create_ext(fd, &size, 0, &handle,
 							&setparam_region.base), 0);
 		}
 	}
@@ -395,7 +395,7 @@ static void create_ext_placement_sanity_check(int fd)
 	setparam_region.regions = to_user_pointer(uregions);
 	setparam_region.num_regions = regions->num_regions;
 	size = PAGE_SIZE;
-	igt_assert_neq(__gem_create_ext(fd, &size, &handle,
+	igt_assert_neq(__gem_create_ext(fd, &size, 0, &handle,
 					&setparam_region.base), 0);
 
 	free(uregions);
@@ -411,7 +411,7 @@ static void create_ext_placement_sanity_check(int fd)
 				to_user_pointer(&setparam_region_next);
 
 		size = PAGE_SIZE;
-		igt_assert_neq(__gem_create_ext(fd, &size, &handle,
+		igt_assert_neq(__gem_create_ext(fd, &size, 0, &handle,
 						&setparam_region.base), 0);
 		setparam_region.base.next_extension = 0;
 	}
@@ -443,7 +443,7 @@ static void create_ext_placement_all(int fd)
 	setparam_region.num_regions = regions->num_regions;
 
 	size = PAGE_SIZE;
-	igt_assert_eq(__gem_create_ext(fd, &size, &handle,
+	igt_assert_eq(__gem_create_ext(fd, &size, 0, &handle,
 				       &setparam_region.base), 0);
 	gem_close(fd, handle);
 	free(uregions);
@@ -472,7 +472,7 @@ static void create_ext_placement_each(int fd)
 		setparam_region.num_regions = 1;
 
 		size = PAGE_SIZE;
-		igt_assert_eq(__gem_create_ext(fd, &size, &handle,
+		igt_assert_eq(__gem_create_ext(fd, &size, 0, &handle,
 					       &setparam_region.base), 0);
 		gem_close(fd, handle);
 	}
