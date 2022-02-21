@@ -126,8 +126,8 @@ static void wide(int fd, const intel_ctx_t *ctx, int ring_size,
 		if (ahnd)
 			exec[e].exec[0].flags = EXEC_OBJECT_PINNED;
 
-		exec[e].cmd = gem_mmap__wc(fd, exec[e].exec[0].handle,
-					   0, 4096, PROT_WRITE);
+		exec[e].cmd = gem_mmap__device_coherent(fd, exec[e].exec[0].handle,
+							0, 4096, PROT_WRITE);
 
 		gem_set_domain(fd, exec[e].exec[0].handle,
 			       I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
