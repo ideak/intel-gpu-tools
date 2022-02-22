@@ -75,7 +75,7 @@ intel_get_pci_device(void)
 	struct pci_device *pci_dev;
 	int error;
 
-	error = pci_system_init();
+	error = igt_pci_system_init();
 	igt_fail_on_f(error != 0,
 		      "Couldn't initialize PCI system\n");
 

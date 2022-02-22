@@ -193,7 +193,7 @@ static struct pci_device *__igt_device_get_pci_device(int fd)
 		return NULL;
 	}
 
-	if (pci_system_init()) {
+	if (igt_pci_system_init()) {
 		igt_warn("Couldn't initialize PCI system\n");
 		return NULL;
 	}

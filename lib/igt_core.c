@@ -3070,3 +3070,23 @@ err:
 
 	return -1;
 }
+
+/* IGT wrappers around libpciaccess init/cleanup functions */
+
+static void pci_system_exit_handler(int sig)
+{
+	pci_system_cleanup();
+}
+
+static void __pci_system_init(void)
+{
+	if (!igt_warn_on_f(pci_system_init(), "Could not initialize libpciaccess global data\n"))
+		igt_install_exit_handler(pci_system_exit_handler);
+}
+
+int igt_pci_system_init(void)
+{
+	static pthread_once_t once_control = PTHREAD_ONCE_INIT;
+
+	return pthread_once(&once_control, __pci_system_init);
+}

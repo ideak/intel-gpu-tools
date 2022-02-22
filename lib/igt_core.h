@@ -1452,4 +1452,32 @@ void igt_kmsg(const char *format, ...);
 
 #define for_if(expr__) if (!(expr__)) {} else
 
+/**
+ * igt_pci_system_init:
+ * IGT wrapper around pci_system_init()
+ *
+ * Runs pci_system_init() and installs pci_system_cleanup() as IGT exit handler when
+ * called first per thread, subsequent calls are noop.  Tests should use this wrapper
+ * instead of pci_system_init() to avoid memory leaking which happens each time a call
+ * to pci_system_init() is repeated not preceded by pci_system_cleanup() (may easily
+ * happen in consequence of long jumps performed by IGT flow control functions).
+ *
+ * Return value: equal return value of pthread_once() (return value of pci_system_init()
+ *		 can't be passed through pthread_once())
+ */
+int igt_pci_system_init(void);
+
+/**
+ * igt_pci_system_cleanup():
+ * IGT replacement for pci_system_cleanup()
+ *
+ * For use in IGT library and tests to avoid destroying libpciaccess global data.
+ * Direct calls to pci_system_cleanup() should be either dropped or replaced with this
+ * wrapper (for code clarity), otherwise subsequent access to libpciaccess global data
+ * may be lost unless preceded by direct call to pci_system_init() (not recommended).
+ */
+static inline void igt_pci_system_cleanup(void)
+{
+}
+
 #endif /* IGT_CORE_H */
