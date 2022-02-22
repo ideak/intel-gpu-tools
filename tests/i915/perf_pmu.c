@@ -2046,7 +2046,8 @@ static void test_unload(unsigned int num_engines)
 		const struct intel_execution_engine2 *e;
 		int fd[4 + num_engines * 3], i;
 		uint64_t *buf;
-		int count = 0;
+		int count = 0, ret;
+		const char *who;
 		int i915;
 
 		i915 = __drm_open_driver(DRIVER_INTEL);
@@ -2101,7 +2102,8 @@ static void test_unload(unsigned int num_engines)
 
 		igt_debug("Read %d events from perf and trial unload\n", count);
 		pmu_read_multi(fd[0], count, buf);
-		igt_assert_eq(__igt_i915_driver_unload(NULL), IGT_EXIT_SKIP);
+		ret = __igt_i915_driver_unload(&who);
+		igt_assert(ret != 0 && !strcmp(who, "i915"));
 		pmu_read_multi(fd[0], count, buf);
 
 		igt_debug("Close perf\n");
@@ -2114,7 +2116,7 @@ static void test_unload(unsigned int num_engines)
 	igt_waitchildren();
 
 	igt_debug("Final unload\n");
-	igt_assert_eq(__igt_i915_driver_unload(NULL), IGT_EXIT_SUCCESS);
+	igt_assert_eq(__igt_i915_driver_unload(NULL), 0);
 }
 
 #define test_each_engine(T, i915, ctx, e) \
@@ -2394,7 +2396,7 @@ igt_main
 	}
 
 	igt_subtest("module-unload") {
-		igt_require(igt_i915_driver_unload() == IGT_EXIT_SUCCESS);
+		igt_require(igt_i915_driver_unload() == 0);
 		for (int pass = 0; pass < 3; pass++)
 			test_unload(num_engines);
 	}
