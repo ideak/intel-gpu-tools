@@ -355,22 +355,26 @@ igt_kmod_list_loaded(void)
 int
 igt_i915_driver_load(const char *opts)
 {
+	int ret;
+
 	if (opts)
 		igt_info("Reloading i915 with %s\n\n", opts);
 
-	if (igt_kmod_load("i915", opts)) {
+	ret = igt_kmod_load("i915", opts);
+	if (ret) {
 		igt_warn("Could not load i915\n");
-		return IGT_EXIT_FAILURE;
+		return ret;
 	}
 
 	bind_fbcon(true);
 	igt_kmod_load("snd_hda_intel", NULL);
 
-	return IGT_EXIT_SUCCESS;
+	return 0;
 }
 
 int __igt_i915_driver_unload(const char **who)
 {
+	int ret;
 	const char *sound[] = {
 		"snd_hda_intel",
 		"snd_hdmi_lpe_audio",
@@ -390,32 +394,36 @@ int __igt_i915_driver_unload(const char **who)
 		if (igt_kmod_is_loaded(*m)) {
 			igt_terminate_process(SIGTERM, "alsactl");
 			kick_snd_hda_intel();
-			if (igt_kmod_unload(*m, 0)) {
+			ret = igt_kmod_unload(*m, 0);
+			if (ret) {
 				if (who)
 					*who = *m;
-				return IGT_EXIT_FAILURE;
+				return ret;
 			}
 		}
 	}
 
 	for (const char **m = aux; *m; m++) {
-		if (igt_kmod_is_loaded(*m))
-			if (igt_kmod_unload(*m, 0)) {
+		if (igt_kmod_is_loaded(*m)) {
+			ret = igt_kmod_unload(*m, 0);
+			if (ret) {
 				if (who)
 					*who = *m;
-				return IGT_EXIT_FAILURE;
+				return ret;
 			}
-	}
-
-	if (igt_kmod_is_loaded("i915")) {
-		if (igt_kmod_unload("i915", 0)) {
-			if (who)
-				*who = "i915";
-			return IGT_EXIT_FAILURE;
 		}
 	}
 
-	return IGT_EXIT_SUCCESS;
+	if (igt_kmod_is_loaded("i915")) {
+		ret = igt_kmod_unload("i915", 0);
+		if (ret) {
+			if (who)
+				*who = "i915";
+			return ret;
+		}
+	}
+
+	return 0;
 }
 
 /**
@@ -447,10 +455,10 @@ igt_i915_driver_unload(void)
 
 	if (igt_kmod_is_loaded("i915")) {
 		igt_warn("i915.ko still loaded!\n");
-		return IGT_EXIT_FAILURE;
+		return -EBUSY;
 	}
 
-	return IGT_EXIT_SUCCESS;
+	return 0;
 }
 
 /**
