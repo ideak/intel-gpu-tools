@@ -808,7 +808,7 @@ static bool is_drrs_supported(void)
 	char buf[MAX_DRRS_STATUS_BUF_LEN];
 
 	debugfs_read("i915_drrs_status", buf);
-	return strstr(buf, "DRRS Supported: Yes");
+	return strcasestr(buf, "DRRS Supported: Yes");
 }
 
 static bool is_drrs_inactive(void)
