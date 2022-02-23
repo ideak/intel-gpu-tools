@@ -33,6 +33,5 @@ void igt_device_drop_master(int fd);
 
 int igt_device_get_card_index(int fd);
 struct pci_device *igt_device_get_pci_device(int fd);
-struct pci_device *__igt_device_get_pci_device(int fd, unsigned int vf_id);
 
 #endif /* __IGT_DEVICE_H__ */
