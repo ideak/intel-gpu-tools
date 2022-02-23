@@ -206,8 +206,10 @@ static bool wait_for_suspended(void)
 	} else {
 		bool suspended = igt_wait_for_pm_status(IGT_RUNTIME_PM_STATUS_SUSPENDED);
 
-		if (!suspended)
-			igt_debugfs_dump(drm_fd, "i915_runtime_pm_status");
+		if (!suspended) {
+			/* Dump runtime pm status even if test skips */
+			__igt_debugfs_dump(drm_fd, "i915_runtime_pm_status", IGT_LOG_INFO);
+		}
 
 		return suspended;
 	}
