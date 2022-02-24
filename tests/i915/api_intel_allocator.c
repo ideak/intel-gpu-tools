@@ -120,6 +120,34 @@ static void reserve(int fd, uint8_t type)
 	igt_assert_eq(intel_allocator_close(ahnd), true);
 }
 
+static void default_alignment(int fd)
+{
+	struct test_obj obj[3];
+	uint64_t ahnd, default_alignment = 0x4000;
+
+	ahnd = intel_allocator_open_full(fd, 0, 0, 0, INTEL_ALLOCATOR_SIMPLE,
+					 ALLOC_STRATEGY_LOW_TO_HIGH,
+					 default_alignment);
+
+	for (int i = 0; i < ARRAY_SIZE(obj); i++) {
+		obj[i].handle = gem_handle_gen();
+		obj[i].offset = intel_allocator_alloc(ahnd, obj[i].handle, 4096,
+				i == 2 ? 4096 : 0);
+		igt_debug("obj[%d].offset: %llx, handle: %u\n", i,
+			 (long long) obj[i].offset, obj[i].handle);
+	}
+
+	igt_assert_eq(obj[1].offset - obj[0].offset, default_alignment);
+	/* obj[2] should be between obj[0] and obj[1] */
+	igt_assert(obj[0].offset < obj[2].offset);
+	igt_assert(obj[2].offset < obj[1].offset);
+
+	for (int i = 0; i < ARRAY_SIZE(obj); i++)
+		intel_allocator_free(ahnd, obj[i].handle);
+
+	igt_assert_eq(intel_allocator_close(ahnd), true);
+}
+
 static bool overlaps(struct test_obj *buf1, struct test_obj *buf2)
 {
 	uint64_t begin1 = buf1->offset;
@@ -696,6 +724,11 @@ igt_main
 
 	igt_subtest_f("reserve")
 		reserve(fd, INTEL_ALLOCATOR_SIMPLE);
+
+	igt_describe("For simple allocator check does default alignment is "
+		     "properly handled in open and alloc functions");
+	igt_subtest_f("default-alignment")
+		default_alignment(fd);
 
 	for (a = als; a->name; a++) {
 		igt_subtest_with_dynamic_f("%s-allocator", a->name) {
