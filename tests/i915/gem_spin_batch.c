@@ -161,8 +161,6 @@ static void spin_all(int i915, const intel_ctx_t *ctx, unsigned int flags)
 				    .engine = e->flags,
 				    .flags = (IGT_SPIN_POLL_RUN |
 					      IGT_SPIN_NO_PREEMPTION));
-		if (flags & PARALLEL_SPIN_NEW_CTX)
-			intel_ctx_destroy(i915, ctx);
 
 		igt_spin_busywait_until_started(spin);
 		igt_list_move(&spin->link, &list);
@@ -172,6 +170,8 @@ static void spin_all(int i915, const intel_ctx_t *ctx, unsigned int flags)
 		igt_assert(gem_bo_busy(i915, spin->handle));
 		ahnd = spin->ahnd;
 		igt_spin_end(spin);
+		if (flags & PARALLEL_SPIN_NEW_CTX)
+			intel_ctx_destroy(i915, spin->opts.ctx);
 		gem_sync(i915, spin->handle);
 		igt_spin_free(i915, spin);
 		put_ahnd(ahnd);
