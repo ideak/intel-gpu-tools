@@ -55,6 +55,7 @@ struct alloc_req {
 			uint64_t end;
 			uint8_t allocator_type;
 			uint8_t allocator_strategy;
+			uint64_t default_alignment;
 		} open;
 
 		struct {

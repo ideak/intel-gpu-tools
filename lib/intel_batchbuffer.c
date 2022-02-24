@@ -1360,7 +1360,7 @@ __intel_bb_create(int i915, uint32_t ctx, uint32_t size, bool do_relocs,
 		ibb->allocator_handle = intel_allocator_open_full(i915, ctx,
 								  start, end,
 								  allocator_type,
-								  strategy);
+								  strategy, 0);
 	ibb->allocator_type = allocator_type;
 	ibb->allocator_strategy = strategy;
 	ibb->allocator_start = start;
@@ -3010,7 +3010,8 @@ static void __intel_bb_reinit_alloc(struct intel_bb *ibb)
 	ibb->allocator_handle = intel_allocator_open_full(ibb->i915, ibb->ctx,
 							  ibb->allocator_start, ibb->allocator_end,
 							  ibb->allocator_type,
-							  ibb->allocator_strategy);
+							  ibb->allocator_strategy,
+							  0);
 	intel_bb_reset(ibb, true);
 }
 

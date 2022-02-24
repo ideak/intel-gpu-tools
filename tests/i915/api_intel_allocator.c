@@ -174,6 +174,7 @@ static void reuse(int fd, uint8_t type)
 {
 	struct test_obj obj[128], tmp;
 	uint64_t ahnd, prev_offset;
+	uint64_t align = 0x40;
 	int i;
 
 	ahnd = intel_allocator_open(fd, 0, type);
@@ -182,7 +183,7 @@ static void reuse(int fd, uint8_t type)
 		obj[i].handle = gem_handle_gen();
 		obj[i].size = OBJ_SIZE;
 		obj[i].offset = intel_allocator_alloc(ahnd, obj[i].handle,
-						      obj[i].size, 0x40);
+						      obj[i].size, align);
 	}
 
 	/* check simple reuse */
@@ -198,7 +199,7 @@ static void reuse(int fd, uint8_t type)
 	intel_allocator_free(ahnd, obj[i].handle);
 	/* alloc different buffer to fill freed hole */
 	tmp.handle = gem_handle_gen();
-	tmp.offset = intel_allocator_alloc(ahnd, tmp.handle, OBJ_SIZE, 0);
+	tmp.offset = intel_allocator_alloc(ahnd, tmp.handle, OBJ_SIZE, align);
 	igt_assert(prev_offset == tmp.offset);
 
 	obj[i].offset = intel_allocator_alloc(ahnd, obj[i].handle,

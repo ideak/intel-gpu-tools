@@ -991,7 +991,7 @@ static void test_allocator_evict(int fd, const intel_ctx_t *ctx,
 	intel_allocator_multiprocess_start();
 	ahnd = intel_allocator_open_full(fd, 0, 0, size / 16,
 					 INTEL_ALLOCATOR_RELOC,
-					 ALLOC_STRATEGY_NONE);
+					 ALLOC_STRATEGY_NONE, 0);
 
 	intel_require_memory(count, BATCH_SIZE, CHECK_RAM);
 	intel_detect_and_clear_missed_interrupts(fd);
@@ -1038,7 +1038,7 @@ static void test_allocator_evict(int fd, const intel_ctx_t *ctx,
 		/* We need to open the allocator again in the new process */
 		ahnd = intel_allocator_open_full(fd, 0, 0, size / 16,
 						 INTEL_ALLOCATOR_RELOC,
-						 ALLOC_STRATEGY_NONE);
+						 ALLOC_STRATEGY_NONE, 0);
 
 		igt_until_timeout(timeout) {
 			submit(fd, gen, &execbuf, batches, count, ahnd);

@@ -133,6 +133,7 @@ struct intel_allocator {
 	int fd;
 	uint8_t type;
 	enum allocator_strategy strategy;
+	uint64_t default_alignment;
 	_Atomic(int32_t) refcount;
 	pthread_mutex_t mutex;
 
@@ -171,12 +172,14 @@ uint64_t intel_allocator_open(int fd, uint32_t ctx, uint8_t allocator_type);
 uint64_t intel_allocator_open_full(int fd, uint32_t ctx,
 				   uint64_t start, uint64_t end,
 				   uint8_t allocator_type,
-				   enum allocator_strategy strategy);
+				   enum allocator_strategy strategy,
+				   uint64_t default_alignment);
 uint64_t intel_allocator_open_vm(int fd, uint32_t vm, uint8_t allocator_type);
 uint64_t intel_allocator_open_vm_full(int fd, uint32_t vm,
 				      uint64_t start, uint64_t end,
 				      uint8_t allocator_type,
-				      enum allocator_strategy strategy);
+				      enum allocator_strategy strategy,
+				      uint64_t default_alignment);
 
 uint64_t intel_allocator_open_vm_as(uint64_t allocator_handle, uint32_t new_vm);
 bool intel_allocator_close(uint64_t allocator_handle);
@@ -242,7 +245,8 @@ static inline uint64_t get_simple_l2h_ahnd(int fd, uint32_t ctx)
 
 	return do_relocs ? 0 : intel_allocator_open_full(fd, ctx, 0, 0,
 							 INTEL_ALLOCATOR_SIMPLE,
-							 ALLOC_STRATEGY_LOW_TO_HIGH);
+							 ALLOC_STRATEGY_LOW_TO_HIGH,
+							 0);
 }
 
 static inline uint64_t get_simple_h2l_ahnd(int fd, uint32_t ctx)
@@ -251,7 +255,8 @@ static inline uint64_t get_simple_h2l_ahnd(int fd, uint32_t ctx)
 
 	return do_relocs ? 0 : intel_allocator_open_full(fd, ctx, 0, 0,
 							 INTEL_ALLOCATOR_SIMPLE,
-							 ALLOC_STRATEGY_LOW_TO_HIGH);
+							 ALLOC_STRATEGY_HIGH_TO_LOW,
+							 0);
 }
 
 static inline uint64_t get_reloc_ahnd(int fd, uint32_t ctx)

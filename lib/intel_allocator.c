@@ -283,7 +283,8 @@ static bool __allocator_put(struct allocator *al)
 static struct intel_allocator *intel_allocator_create(int fd,
 						      uint64_t start, uint64_t end,
 						      uint8_t allocator_type,
-						      uint8_t allocator_strategy)
+						      uint8_t allocator_strategy,
+						      uint64_t default_alignment)
 {
 	struct intel_allocator *ial = NULL;
 
@@ -321,6 +322,7 @@ static struct intel_allocator *intel_allocator_create(int fd,
 
 	ial->type = allocator_type;
 	ial->strategy = allocator_strategy;
+	ial->default_alignment = default_alignment;
 	pthread_mutex_init(&ial->mutex, NULL);
 
 	return ial;
@@ -337,6 +339,7 @@ static struct allocator *allocator_open(int fd, uint32_t ctx, uint32_t vm,
 					uint64_t start, uint64_t end,
 					uint8_t allocator_type,
 					uint8_t allocator_strategy,
+					uint64_t default_alignment,
 					uint64_t *ahndp)
 {
 	struct intel_allocator *ial;
@@ -347,11 +350,14 @@ static struct allocator *allocator_open(int fd, uint32_t ctx, uint32_t vm,
 
 	al = __allocator_find(fd, ctx, vm);
 	if (!al) {
-		alloc_info("Allocator fd: %d, ctx: %u, vm: %u, <0x%llx : 0x%llx> "
-			    "not found, creating one\n",
-			    fd, ctx, vm, (long long) start, (long long) end);
+		alloc_info("Allocator fd: %d, ctx: %u, vm: %u, <0x%llx : 0x%llx>, "
+			   "default alignment: 0x%llx "
+			   "not found, creating one\n",
+			   fd, ctx, vm, (long long) start, (long long) end,
+			   (long long) alignment);
 		ial = intel_allocator_create(fd, start, end, allocator_type,
-					     allocator_strategy);
+					     allocator_strategy,
+					     default_alignment);
 		al = __allocator_create(fd, ctx, vm, ial);
 	}
 
@@ -362,6 +368,9 @@ static struct allocator *allocator_open(int fd, uint32_t ctx, uint32_t vm,
 
 	igt_assert_f(ial->strategy == allocator_strategy,
 		     "Allocator strategy must be same or fd/%s\n", idstr);
+
+	igt_assert_f(ial->default_alignment == default_alignment,
+		     "Allocator default alignment must be same or fd/%s\n", idstr);
 
 	__allocator_get(al);
 	*ahndp = __handle_create(al);
@@ -484,6 +493,7 @@ static int handle_request(struct alloc_req *req, struct alloc_resp *resp)
 					    req->open.start, req->open.end,
 					    req->open.allocator_type,
 					    req->open.allocator_strategy,
+					    req->open.default_alignment,
 					    &ahnd);
 			refcnt = atomic_load(&al->refcount);
 			ret = atomic_load(&al->ial->refcount);
@@ -494,11 +504,13 @@ static int handle_request(struct alloc_req *req, struct alloc_resp *resp)
 
 			alloc_info("<open> [tid: %ld] fd: %d, ahnd: %" PRIx64
 				   ", ctx: %u, vm: %u"
-				   ", alloc_type: %u, al->refcnt: %ld->%ld"
+				   ", alloc_type: %u, defalign: %llx"
+				   ", al->refcnt: %ld->%ld"
 				   ", refcnt: %d->%d\n",
 				   (long) req->tid, req->open.fd, ahnd,
-				   req->open.ctx,
-				   req->open.vm, req->open.allocator_type,
+				   req->open.ctx, req->open.vm,
+				   req->open.allocator_type,
+				   (long long) req->open.default_alignment,
 				   refcnt - 1, refcnt, ret - 1, ret);
 			break;
 
@@ -588,6 +600,9 @@ static int handle_request(struct alloc_req *req, struct alloc_resp *resp)
 			break;
 
 		case REQ_ALLOC:
+			if (!req->alloc.alignment)
+				req->alloc.alignment = ial->default_alignment;
+
 			resp->response_type = RESP_ALLOC;
 			resp->alloc.offset = ial->alloc(ial,
 							req->alloc.handle,
@@ -879,7 +894,8 @@ static uint64_t __intel_allocator_open_full(int fd, uint32_t ctx,
 					    uint32_t vm,
 					    uint64_t start, uint64_t end,
 					    uint8_t allocator_type,
-					    enum allocator_strategy strategy)
+					    enum allocator_strategy strategy,
+					    uint64_t default_alignment)
 {
 	struct alloc_req req = { .request_type = REQ_OPEN,
 				 .open.fd = fd,
@@ -888,7 +904,8 @@ static uint64_t __intel_allocator_open_full(int fd, uint32_t ctx,
 				 .open.start = start,
 				 .open.end = end,
 				 .open.allocator_type = allocator_type,
-				 .open.allocator_strategy = strategy };
+				 .open.allocator_strategy = strategy,
+				 .open.default_alignment = default_alignment };
 	struct alloc_resp resp;
 	uint64_t gtt_size;
 
@@ -902,6 +919,9 @@ static uint64_t __intel_allocator_open_full(int fd, uint32_t ctx,
 
 		req.open.end = gtt_size;
 	}
+
+	if (!default_alignment)
+		req.open.default_alignment = gem_detect_safe_alignment(fd);
 
 	/* Get child_tid only once at open() */
 	if (child_tid == -1)
@@ -922,7 +942,9 @@ static uint64_t __intel_allocator_open_full(int fd, uint32_t ctx,
  * @end: address of the end
  * @allocator_type: one of INTEL_ALLOCATOR_* define
  * @strategy: passed to the allocator to define the strategy (like order
- * of allocation, see notes below).
+ * of allocation, see notes below)
+ * @default_alignment: default objects alignment - power-of-two requested
+ * alignment, if 0 then safe alignment will be chosen
  *
  * Function opens an allocator instance within <@start, @end) vm for given
  * @fd and @ctx and returns its handle. If the allocator for such pair
@@ -948,20 +970,24 @@ static uint64_t __intel_allocator_open_full(int fd, uint32_t ctx,
 uint64_t intel_allocator_open_full(int fd, uint32_t ctx,
 				   uint64_t start, uint64_t end,
 				   uint8_t allocator_type,
-				   enum allocator_strategy strategy)
+				   enum allocator_strategy strategy,
+				   uint64_t default_alignment)
 {
 	return __intel_allocator_open_full(fd, ctx, 0, start, end,
-					   allocator_type, strategy);
+					   allocator_type, strategy,
+					   default_alignment);
 }
 
 uint64_t intel_allocator_open_vm_full(int fd, uint32_t vm,
 				      uint64_t start, uint64_t end,
 				      uint8_t allocator_type,
-				      enum allocator_strategy strategy)
+				      enum allocator_strategy strategy,
+				      uint64_t default_alignment)
 {
 	igt_assert(vm != 0);
 	return __intel_allocator_open_full(fd, 0, vm, start, end,
-					   allocator_type, strategy);
+					   allocator_type, strategy,
+					   default_alignment);
 }
 
 /**
@@ -983,13 +1009,13 @@ uint64_t intel_allocator_open_vm_full(int fd, uint32_t vm,
 uint64_t intel_allocator_open(int fd, uint32_t ctx, uint8_t allocator_type)
 {
 	return intel_allocator_open_full(fd, ctx, 0, 0, allocator_type,
-					 ALLOC_STRATEGY_HIGH_TO_LOW);
+					 ALLOC_STRATEGY_HIGH_TO_LOW, 0);
 }
 
 uint64_t intel_allocator_open_vm(int fd, uint32_t vm, uint8_t allocator_type)
 {
 	return intel_allocator_open_vm_full(fd, vm, 0, 0, allocator_type,
-					    ALLOC_STRATEGY_HIGH_TO_LOW);
+					    ALLOC_STRATEGY_HIGH_TO_LOW, 0);
 }
 
 uint64_t intel_allocator_open_vm_as(uint64_t allocator_handle, uint32_t new_vm)
@@ -1084,11 +1110,11 @@ uint64_t __intel_allocator_alloc(uint64_t allocator_handle, uint32_t handle,
 				 .allocator_handle = allocator_handle,
 				 .alloc.handle = handle,
 				 .alloc.size = size,
-				 .alloc.strategy = strategy };
+				 .alloc.strategy = strategy,
+				 .alloc.alignment = alignment };
 	struct alloc_resp resp;
 
 	igt_assert((alignment & (alignment-1)) == 0);
-	req.alloc.alignment = max_t(uint64_t, alignment, 1 << 12);
 
 	igt_assert(handle_request(&req, &resp) == 0);
 	igt_assert(resp.response_type == RESP_ALLOC);

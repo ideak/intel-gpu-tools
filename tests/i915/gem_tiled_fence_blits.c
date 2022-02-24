@@ -155,7 +155,7 @@ static void run_test(int fd, int count, uint64_t end)
 	if (!gem_has_relocations(fd))
 		ahnd = intel_allocator_open_full(fd, 0, 0, end,
 						 INTEL_ALLOCATOR_RELOC,
-						 ALLOC_STRATEGY_LOW_TO_HIGH);
+						 ALLOC_STRATEGY_LOW_TO_HIGH, 0);
 	memset(reloc, 0, sizeof(reloc));
 	memset(obj, 0, sizeof(obj));
 	obj[0].flags = EXEC_OBJECT_NEEDS_FENCE;
