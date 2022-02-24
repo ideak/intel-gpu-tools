@@ -421,6 +421,7 @@ emit_recursive_batch(igt_spin_t *spin,
 	}
 
 	spin->cmd_precondition = *spin->condition;
+	spin->opts = *opts;
 
 	return fence_fd;
 }

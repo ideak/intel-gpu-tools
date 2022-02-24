@@ -33,6 +33,28 @@
 #include "i915_drm.h"
 #include "intel_ctx.h"
 
+
+/**
+ * igt_spin_factory_t:
+ * @ctx_id: GEM context handle
+ * @ctx: intel_ctx_t context wrapper
+ * @dependency: GEM object to depend on
+ * @engine: Flags describing the engine to execute on
+ * @flags: Set of IGT_SPIN_* flags
+ * @fence: In-fence to wait on
+ *
+ * A factory struct which contains creation parameters for an igt_spin_t.
+ */
+typedef struct igt_spin_factory {
+	uint32_t ctx_id;
+	const intel_ctx_t *ctx;
+	uint32_t dependency;
+	unsigned int engine;
+	unsigned int flags;
+	int fence;
+	uint64_t ahnd;
+} igt_spin_factory_t;
+
 typedef struct igt_spin {
 	struct igt_list_head link;
 
@@ -60,28 +82,9 @@ typedef struct igt_spin {
 #define SPIN_CLFLUSH (1 << 0)
 
 	uint64_t ahnd;
+	struct igt_spin_factory opts;
 } igt_spin_t;
 
-/**
- * igt_spin_factory_t:
- * @ctx_id: GEM context handle
- * @ctx: intel_ctx_t context wrapper
- * @dependency: GEM object to depend on
- * @engine: Flags describing the engine to execute on
- * @flags: Set of IGT_SPIN_* flags
- * @fence: In-fence to wait on
- *
- * A factory struct which contains creation parameters for an igt_spin_t.
- */
-typedef struct igt_spin_factory {
-	uint32_t ctx_id;
-	const intel_ctx_t *ctx;
-	uint32_t dependency;
-	unsigned int engine;
-	unsigned int flags;
-	int fence;
-	uint64_t ahnd;
-} igt_spin_factory_t;
 
 #define IGT_SPIN_FENCE_IN      (1 << 0)
 #define IGT_SPIN_FENCE_SUBMIT  (1 << 1)
