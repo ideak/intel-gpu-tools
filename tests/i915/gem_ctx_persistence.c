@@ -524,7 +524,7 @@ static void test_noheartbeat_many(int i915, int count, unsigned int flags)
 		}
 
 		for (int n = 0; n < ARRAY_SIZE(spin); n++) {
-			ahnd = spin[n]->ahnd;
+			ahnd = spin[n]->opts.ahnd;
 			igt_spin_free(i915, spin[n]);
 			put_ahnd(ahnd);
 		}

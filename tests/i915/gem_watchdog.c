@@ -261,7 +261,7 @@ static void virtual(int i915, const intel_ctx_cfg_t *base_cfg)
 	count = wait_timeout(i915, spin, num_engines, wait_us, expect);
 
 	for (i = 0; i < num_engines && spin[i]; i++) {
-		ahnd = spin[i]->ahnd;
+		ahnd = spin[i]->opts.ahnd;
 		igt_spin_free(i915, spin[i]);
 		intel_ctx_destroy(i915, ctx[i]);
 		put_ahnd(ahnd);

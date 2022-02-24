@@ -628,7 +628,7 @@ static void unplug_show_queue(int i915, struct igt_cork *c, uint64_t ahnd,
 	usleep(25000);
 
 	for (int n = 0; n < ARRAY_SIZE(spin); n++) {
-		ahnd = spin[n]->ahnd;
+		ahnd = spin[n]->opts.ahnd;
 		igt_spin_free(i915, spin[n]);
 		if (!cfg->vm)
 			put_ahnd(ahnd);

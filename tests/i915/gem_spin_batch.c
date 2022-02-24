@@ -168,7 +168,7 @@ static void spin_all(int i915, const intel_ctx_t *ctx, unsigned int flags)
 
 	igt_list_for_each_entry_safe(spin, n, &list, link) {
 		igt_assert(gem_bo_busy(i915, spin->handle));
-		ahnd = spin->ahnd;
+		ahnd = spin->opts.ahnd;
 		igt_spin_end(spin);
 		if (flags & PARALLEL_SPIN_NEW_CTX)
 			intel_ctx_destroy(i915, spin->opts.ctx);

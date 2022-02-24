@@ -128,7 +128,6 @@ emit_recursive_batch(igt_spin_t *spin,
 		addr += random() % addr / 2;
 		addr &= -4096;
 	} else {
-		spin->ahnd = ahnd;
 		objflags |= EXEC_OBJECT_PINNED;
 	}
 
@@ -612,14 +611,14 @@ static void __igt_spin_free(int fd, igt_spin_t *spin)
 
 	if (spin->poll_handle) {
 		gem_close(fd, spin->poll_handle);
-		if (spin->ahnd)
-			intel_allocator_free(spin->ahnd, spin->poll_handle);
+		if (spin->opts.ahnd)
+			intel_allocator_free(spin->opts.ahnd, spin->poll_handle);
 	}
 
 	if (spin->handle) {
 		gem_close(fd, spin->handle);
-		if (spin->ahnd)
-			intel_allocator_free(spin->ahnd, spin->handle);
+		if (spin->opts.ahnd)
+			intel_allocator_free(spin->opts.ahnd, spin->handle);
 	}
 
 	if (spin->out_fence >= 0)

@@ -252,7 +252,7 @@ static void unplug_show_queue(int fd, struct igt_cork *c,
 	usleep(25000);
 
 	for (int n = 0; n < max; n++) {
-		uint64_t ahnd = spin[n]->ahnd;
+		uint64_t ahnd = spin[n]->opts.ahnd;
 		igt_spin_free(fd, spin[n]);
 		put_ahnd(ahnd);
 	}
@@ -1042,7 +1042,7 @@ static void semaphore_codependency(int i915, const intel_ctx_t *ctx,
 	}
 
 	for (i = 0; i < ARRAY_SIZE(task); i++) {
-		ahnd = task[i].rcs->ahnd;
+		ahnd = task[i].rcs->opts.ahnd;
 		igt_spin_free(i915, task[i].xcs);
 		igt_spin_free(i915, task[i].rcs);
 		put_ahnd(ahnd);
@@ -1994,7 +1994,7 @@ static void preemptive_hang(int fd, const intel_ctx_cfg_t *cfg,
 		 * This is subject to change as the scheduler evolve. The test should
 		 * be updated to reflect such changes.
 		 */
-		ahnd_lo = spin[n]->ahnd;
+		ahnd_lo = spin[n]->opts.ahnd;
 		igt_assert(gem_bo_busy(fd, spin[n]->handle));
 		igt_spin_free(fd, spin[n]);
 		put_ahnd(ahnd_lo);

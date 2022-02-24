@@ -81,7 +81,6 @@ typedef struct igt_spin {
 	unsigned int flags;
 #define SPIN_CLFLUSH (1 << 0)
 
-	uint64_t ahnd;
 	struct igt_spin_factory opts;
 } igt_spin_t;
 

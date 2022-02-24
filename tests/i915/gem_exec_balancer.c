@@ -2387,7 +2387,7 @@ static void hangme(int i915)
 			igt_assert_eq(sync_fence_status(c->spin[1]->out_fence),
 				      -EIO);
 
-			ahnd = c->spin[0]->ahnd;
+			ahnd = c->spin[0]->opts.ahnd;
 			igt_spin_free(i915, c->spin[0]);
 			igt_spin_free(i915, c->spin[1]);
 			put_ahnd(ahnd);

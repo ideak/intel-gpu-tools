@@ -346,7 +346,7 @@ test_engine_hang(const intel_ctx_t *ctx,
 
 	/* But no other engines/clients should be affected */
 	igt_list_for_each_entry_safe(spin, next, &list, link) {
-		ahndN = spin->ahnd;
+		ahndN = spin->opts.ahnd;
 		igt_assert(sync_fence_wait(spin->out_fence, 0) == -ETIME);
 		igt_spin_end(spin);
 
