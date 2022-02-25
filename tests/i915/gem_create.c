@@ -59,9 +59,8 @@
 #include "i915/gem_mman.h"
 #include "i915_drm.h"
 
-IGT_TEST_DESCRIPTION("This is a test for the gem_create ioctl,"
-		     " where the goal is to simply ensure that basics work"
-		     " and invalid input combinations are rejected.");
+IGT_TEST_DESCRIPTION("Ensure that basic gem_create and gem_create_ext works"
+		     " and that invalid input combinations are rejected.");
 
 #define PAGE_SIZE 4096
 
@@ -489,30 +488,46 @@ igt_main
 		fd = drm_open_driver(DRIVER_INTEL);
 	}
 
+	igt_describe("Try to create a gem object of invalid size 0"
+		     " and check if ioctl returns error.");
 	igt_subtest("create-invalid-size")
 		invalid_size_test(fd);
 
+	igt_describe("Exercise creation of buffer object with impossible"
+		     " size and check for the expected error.");
 	igt_subtest("create-massive")
 		massive_test(fd);
 
+	igt_describe("Try to create an object with non-aligned size, check"
+		     " we got one with size aligned up to page size and test"
+		     " we can write into the padded extra memory.");
 	igt_subtest("create-valid-nonaligned")
 		valid_nonaligned_size(fd);
 
+	igt_describe("Try to create a gem object with size 15"
+		     " and check actual created size.");
 	igt_subtest("create-size-update")
 		size_update(fd);
 
+	igt_describe("Verify that all new objects are clear.");
 	igt_subtest("create-clear")
 		always_clear(fd, 30);
 
+	igt_describe("Create buffer objects while GPU is busy.");
 	igt_subtest("busy-create")
 		busy_create(fd, 30);
 
+	igt_describe("Exercise create_ext placements extension.");
 	igt_subtest("create-ext-placement-sanity-check")
 		create_ext_placement_sanity_check(fd);
 
+	igt_describe("Create one object with memory pieces in each"
+		     " memory region using create_ext.");
 	igt_subtest("create-ext-placement-each")
 		create_ext_placement_each(fd);
 
+	igt_describe("Create objects in every  memory region using"
+		     " create_ext.");
 	igt_subtest("create-ext-placement-all")
 		create_ext_placement_all(fd);
 
