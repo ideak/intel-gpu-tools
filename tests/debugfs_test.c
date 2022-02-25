@@ -29,6 +29,8 @@
 #include <sys/types.h>
 #include <dirent.h>
 
+IGT_TEST_DESCRIPTION("Read entries from debugfs and sysfs paths.");
+
 static void read_and_discard_sysfs_entries(int path_fd, int indent)
 {
 	struct dirent *dirent;
@@ -187,11 +189,14 @@ igt_main
 		kmstest_set_vt_graphics_mode();
 	}
 
+	igt_describe("Read all entries from sysfs path.");
 	igt_subtest("sysfs")
 		read_and_discard_sysfs_entries(sysfs, 0);
+	igt_describe("Read all entries from debugfs path.");
 	igt_subtest("read_all_entries")
 		read_and_discard_sysfs_entries(debugfs, 0);
 
+	igt_describe("Read all debugfs entries with display on/off.");
 	igt_subtest_group
 		kms_tests(fd, debugfs);
 
