@@ -143,6 +143,10 @@
 /* DRM definitions - must be kept in sync with the DRM header */
 #define DP_TEST_LINK_VIDEO_PATTERN	(1 << 1)
 
+
+/* DP CTS PATTERN TYPE */
+#define PATTERN_COLOR_RAMP 1
+#define PATTERN_COLOR_SQUARE 3
 /* Global file pointers for the sysfs files */
 FILE *test_active_fp, *test_data_fp, *test_type_fp;
 
@@ -153,6 +157,7 @@ uint16_t hdisplay;
 uint16_t vdisplay;
 uint8_t bitdepth;
 
+uint16_t pattern;
 drmModeRes *resources;
 int drm_fd, modes, gen;
 uint64_t modifier = DRM_FORMAT_MOD_LINEAR;
@@ -172,6 +177,7 @@ struct test_video_pattern {
 	uint16_t hdisplay;
 	uint16_t vdisplay;
 	uint8_t bitdepth;
+	uint16_t pattern;
 	uint32_t fb;
 	uint32_t size;
 	struct igt_fb fb_pattern;
@@ -244,15 +250,15 @@ static unsigned long get_test_type(void)
 static void get_test_videopattern_data(void)
 {
 	int count = 0;
-	uint16_t video_pattern_value[3];
-	char video_pattern_attribute[15];
+	uint16_t video_pattern_value[5];
+	char video_pattern_attribute[20];
 	int ret;
 
 	if (!test_data_fp)
 		fprintf(stderr, "Invalid test_data file\n");
 
 	rewind(test_data_fp);
-	while (!feof(test_data_fp) && count < 3) {
+	while (!feof(test_data_fp) && count < 4) {
 		ret = fscanf(test_data_fp, "%s %u\n", video_pattern_attribute,
 		       (unsigned int *)&video_pattern_value[count++]);
 		if (ret < 2) {
@@ -264,10 +270,11 @@ static void get_test_videopattern_data(void)
 	hdisplay = video_pattern_value[0];
 	vdisplay = video_pattern_value[1];
 	bitdepth = video_pattern_value[2];
+	pattern = video_pattern_value[3];
 	igt_info("Hdisplay = %d\n", hdisplay);
 	igt_info("Vdisplay = %d\n", vdisplay);
 	igt_info("BitDepth = %u\n", bitdepth);
-
+	igt_info("pattern = %d\n", pattern);
 }
 
 static int process_test_request(int test_type)
@@ -325,6 +332,7 @@ static int setup_video_pattern_framebuffer(struct connector *dp_conn)
 
 	dp_conn->test_pattern.size = dp_conn->test_pattern.fb_pattern.size;
 	memset(dp_conn->test_pattern.pixmap, 0, dp_conn->test_pattern.size);
+	igt_info("size: %d\n", dp_conn->test_pattern.size);
 	return 0;
 
 }
@@ -334,6 +342,7 @@ static int set_test_mode(struct connector *dp_conn)
 	int ret = 0;
 	int i;
 	drmModeConnector *c = dp_conn->connector;
+	uint32_t *pixmap;
 
 	/* Ignore any disconnected devices */
 	if (c->connection != DRM_MODE_CONNECTED) {
@@ -374,6 +383,8 @@ static int set_test_mode(struct connector *dp_conn)
 		dp_conn->test_pattern.hdisplay = hdisplay;
 		dp_conn->test_pattern.vdisplay = vdisplay;
 		dp_conn->test_pattern.bitdepth = bitdepth;
+		dp_conn->test_pattern.pattern = pattern;
+		igt_info("Pattern :%d\n", dp_conn->test_pattern.pattern);
 
 		ret = setup_video_pattern_framebuffer(dp_conn);
 		if (ret) {
@@ -382,15 +393,30 @@ static int set_test_mode(struct connector *dp_conn)
 			return ret;
 		}
 
-		ret = igt_fill_cts_framebuffer(dp_conn->test_pattern.pixmap,
+		pixmap = dp_conn->test_pattern.pixmap;
+
+		if (dp_conn->test_pattern.pattern == PATTERN_COLOR_RAMP) {
+			ret = igt_fill_cts_color_ramp_framebuffer(pixmap,
 				dp_conn->test_pattern.hdisplay,
 				dp_conn->test_pattern.vdisplay,
-				dp_conn->test_pattern.bitdepth,
-				0);
-		if (ret) {
-			igt_warn("Filling framebuffer for connector %u failed (%d)\n",
-				 c->connector_id, ret);
-			return ret;
+				dp_conn->test_pattern.bitdepth, 0);
+			if (ret) {
+				igt_warn("Filling framebuffer for connector %u failed (%d)\n",
+					c->connector_id, ret);
+				return ret;
+			}
+		}
+
+		if (dp_conn->test_pattern.pattern == PATTERN_COLOR_SQUARE) {
+			ret = igt_fill_cts_color_square_framebuffer(pixmap,
+					dp_conn->test_pattern.hdisplay,
+					dp_conn->test_pattern.vdisplay,
+					dp_conn->test_pattern.bitdepth, 0);
+			if (ret) {
+				igt_warn("Filling framebuffer for connector %u failed (%d)\n",
+					c->connector_id, ret);
+				return ret;
+			}
 		}
 		/* unmapping the buffer previously mapped during setup */
 		munmap(dp_conn->test_pattern.pixmap,

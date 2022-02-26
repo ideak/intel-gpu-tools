@@ -452,6 +452,7 @@ static int set_test_mode(struct connector *dp_conn)
 	bool found_std = false, found_fs = false;
 	uint32_t alpha;
 	drmModeConnector *c = dp_conn->connector;
+	uint32_t *pixmap;
 
 	/* Ignore any disconnected devices */
 	if (c->connection != DRM_MODE_CONNECTED) {
@@ -532,7 +533,9 @@ static int set_test_mode(struct connector *dp_conn)
 			return ret;
 		}
 
-		ret = igt_fill_cts_framebuffer(dp_conn->test_pattern.pixmap,
+		pixmap = dp_conn->test_pattern.pixmap;
+
+		ret = igt_fill_cts_color_ramp_framebuffer(pixmap,
 				dp_conn->test_pattern.hdisplay,
 				dp_conn->test_pattern.vdisplay,
 				dp_conn->test_pattern.bitdepth,

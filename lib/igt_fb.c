@@ -1461,7 +1461,172 @@ void igt_paint_color(cairo_t *cr, int x, int y, int w, int h,
 }
 
 /**
- * igt_fill_cts_framebuffer:
+ *
+ * igt_fill_cts_color_square_framebuffer:
+ * @pixmap: handle to mapped buffer
+ * @video_width: required width for pattern
+ * @video_height: required height for pattern
+ * @bitdepth: required bitdepth fot pattern
+ * @alpha: required alpha for the pattern
+ *
+ * This function draws a color square pattern for given width and height
+ * as per the specifications mentioned in section 3.2.5.3 of DP CTS spec.
+ */
+int igt_fill_cts_color_square_framebuffer(uint32_t *pixmap,
+		uint32_t video_width, uint32_t video_height,
+		uint32_t bitdepth, int alpha)
+{
+	uint32_t pmax = 0;
+	uint32_t pmin = 0;
+	int tile_width = 64;
+	int tile_height = 64;
+	int reverse = 0;
+	int i;
+	uint32_t colors[8][3];
+	uint32_t reverse_colors[8][3];
+
+	switch (bitdepth) {
+	case 8:
+		pmax  = 235;
+		pmin  = 16;
+		break;
+	case 10:
+		pmax  = 940;
+		pmin  = 64;
+		break;
+	}
+
+	/*
+	 * According to the requirement stated in the 3.2.5.3  DP CTS spec
+	 * the required pattern for color square should look like below
+	 *
+	 *   white | yellow | cyan    | green | magenta | red    | blue  | black | white | ... | ..
+	 *   -------------------------------------------------------------------------------
+	 *   blue  | red    | magenta | green | cyan    | yellow | white | black | blue  | ... | ..
+	 *   -------------------------------------------------------------------------------
+	 *   white | yellow | cyan    | green | magenta | red    | blue  | black | white | ... | ..
+	 *   -------------------------------------------------------------------------------
+	 *   blue  | red    | magenta | green | cyan    | yellow | white | black | blue  | ... | ..
+	 *   --------------------------------------------------------------------------------
+	 *	  .    |   .      |	  .	|  .	|   .     |	.  |   .   |   .   |   .   |  .
+	 *
+	 *	  .    |   .      |	  .	|  .	|   .	  |	.  |   .   |   .   |   .   |  .
+	 *
+	 *
+	 */
+
+	for (i = 0; i < 8; i++) {
+		if ((i % 8) == 0) {
+			/* White Color */
+			colors[i][0] = pmax;
+			colors[i][1] = pmax;
+			colors[i][2] = pmax;
+			/* Blue Color */
+			reverse_colors[i][0] = pmin;
+			reverse_colors[i][1] = pmin;
+			reverse_colors[i][2] = pmax;
+		} else if ((i % 8) == 1) {
+			/* Yellow Color */
+			colors[i][0] = pmax;
+			colors[i][1] = pmax;
+			colors[i][2] = pmin;
+			/* Red Color */
+			reverse_colors[i][0] = pmax;
+			reverse_colors[i][1] = pmin;
+			reverse_colors[i][2] = pmin;
+		} else if ((i % 8) == 2) {
+			/* Cyan Color */
+			colors[i][0] = pmin;
+			colors[i][1] = pmax;
+			colors[i][2] = pmax;
+			/* Magenta Color */
+			reverse_colors[i][0] = pmax;
+			reverse_colors[i][1] = pmin;
+			reverse_colors[i][2] = pmax;
+		} else if ((i % 8) == 3) {
+			/* Green Color */
+			colors[i][0] = pmin;
+			colors[i][1] = pmax;
+			colors[i][2] = pmin;
+			/* Green Color */
+			reverse_colors[i][0] = pmin;
+			reverse_colors[i][1] = pmax;
+			reverse_colors[i][2] = pmin;
+		} else if ((i % 8) == 4) {
+			/* Magenta Color */
+			colors[i][0] = pmax;
+			colors[i][1] = pmin;
+			colors[i][2] = pmax;
+			/* Cyan Color */
+			reverse_colors[i][0] = pmin;
+			reverse_colors[i][1] = pmax;
+			reverse_colors[i][2] = pmax;
+		} else if ((i % 8) == 5) {
+			/* Red Color */
+			colors[i][0] = pmax;
+			colors[i][1] = pmin;
+			colors[i][2] = pmin;
+			/* Yellow Color */
+			reverse_colors[i][0] = pmax;
+			reverse_colors[i][1] = pmax;
+			reverse_colors[i][2] = pmin;
+		} else if ((i % 8) == 6) {
+			/* Blue Color */
+			colors[i][0] = pmin;
+			colors[i][1] = pmin;
+			colors[i][2] = pmax;
+			/* White Color */
+			reverse_colors[i][0] = pmax;
+			reverse_colors[i][1] = pmax;
+			reverse_colors[i][2] = pmax;
+		} else if ((i % 8) == 7) {
+			/* Black Color */
+			colors[i][0] = pmin;
+			colors[i][1] = pmin;
+			colors[i][2] = pmin;
+			/* Black Color */
+			reverse_colors[i][0] = pmin;
+			reverse_colors[i][1] = pmin;
+			reverse_colors[i][2] = pmin;
+		}
+	}
+
+	for (uint32_t height = 0; height < video_height; height++) {
+		uint32_t color = 0;
+		uint8_t *temp = (uint8_t *)pixmap;
+		uint8_t **buf = &temp;
+		uint32_t (*clr_arr)[3];
+
+		temp += (4 * video_width * height);
+
+		for (uint32_t width = 0; width < video_width; width++) {
+
+			if (reverse == 0)
+				clr_arr = colors;
+			else
+				clr_arr = reverse_colors;
+
+			/* using BGRA8888 format */
+			*(*buf)++ = (((uint8_t)clr_arr[color][2]) & 0xFF);
+			*(*buf)++ = (((uint8_t)clr_arr[color][1]) & 0xFF);
+			*(*buf)++ = (((uint8_t)clr_arr[color][0]) & 0xFF);
+			*(*buf)++ = ((uint8_t)alpha & 0xFF);
+
+			if (((width + 1) % tile_width) == 0)
+				color = (color + 1) % 8;
+
+		}
+		if (((height + 1) % tile_height) == 0) {
+			if (reverse == 0)
+				reverse = 1;
+			else
+				reverse = 0;
+		}
+	}
+	return 0;
+}
+/**
+ * igt_fill_cts_color_ramp_framebuffer:
  * @pixmap: handle to the mapped buffer
  * @video_width: required width for the CTS pattern
  * @video_height: required height for the CTS pattern
@@ -1469,7 +1634,7 @@ void igt_paint_color(cairo_t *cr, int x, int y, int w, int h,
  * @alpha: required alpha for the CTS pattern
  * This functions draws the CTS test pattern for a given width, height.
  */
-int igt_fill_cts_framebuffer(uint32_t *pixmap, uint32_t video_width,
+int igt_fill_cts_color_ramp_framebuffer(uint32_t *pixmap, uint32_t video_width,
 		uint32_t video_height, uint32_t bitdepth, int alpha)
 {
 	uint32_t tile_height, tile_width;
