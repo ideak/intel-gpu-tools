@@ -481,6 +481,19 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 			}
 		}
 
+		igt_describe("Tests downscaling with pixel formats for 0.75 scaling factor.");
+		igt_subtest_with_dynamic("downscale-with-pixel-format-factor-0-75") {
+			for_each_pipe_with_single_output(&data.display, pipe, output) {
+				drmModeModeInfo *mode;
+
+				mode = igt_output_get_mode(output);
+
+				igt_dynamic_f("pipe-%s-%s-downscale-with-pixel-format", kmstest_pipe_name(pipe), igt_output_name(output))
+					test_scaler_with_pixel_format_pipe(&data, 0.75 * mode->hdisplay,
+							0.75 * mode->vdisplay, false, pipe, output);
+			}
+		}
+
 		igt_describe("Tests scaling with pixel formats, unity scaling.");
 		igt_subtest_with_dynamic("scaler-with-pixel-format-unity-scaling") {
 			for_each_pipe_with_single_output(&data.display, pipe, output) {
@@ -537,6 +550,19 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 				igt_dynamic_f("pipe-%s-%s-downscale-with-rotation", kmstest_pipe_name(pipe), igt_output_name(output))
 					test_scaler_with_rotation_pipe(&data, 0.5 * mode->hdisplay,
 							0.5 * mode->vdisplay, false, pipe, output);
+			}
+		}
+
+		igt_describe("Tests downscaling with tiling rotation for 0.75 scaling factor.");
+		igt_subtest_with_dynamic("downscale-with-rotation-factor-0-75") {
+			for_each_pipe_with_single_output(&data.display, pipe, output) {
+				drmModeModeInfo *mode;
+
+				mode = igt_output_get_mode(output);
+
+				igt_dynamic_f("pipe-%s-%s-downscale-with-rotation", kmstest_pipe_name(pipe), igt_output_name(output))
+					test_scaler_with_rotation_pipe(&data, 0.75 * mode->hdisplay,
+							0.75 * mode->vdisplay, false, pipe, output);
 			}
 		}
 
