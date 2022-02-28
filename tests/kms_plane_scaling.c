@@ -28,6 +28,10 @@
 
 IGT_TEST_DESCRIPTION("Test display plane scaling");
 
+enum scaler_combo_test_type {
+	TEST_PLANES_UPSCALE = 0,
+};
+
 typedef struct {
 	uint32_t devid;
 	int drm_fd;
@@ -317,6 +321,86 @@ static void find_connected_pipe(igt_display_t *display, bool second, enum pipe *
 		igt_require_f(found, "No valid outputs found\n");
 }
 
+static void
+__test_planes_scaling_combo(data_t *d, int w1, int h1, int w2, int h2,
+			    enum pipe pipe, igt_output_t *output,
+			    igt_plane_t *p1, igt_plane_t *p2,
+			    struct igt_fb *fb1, struct igt_fb *fb2,
+			    enum scaler_combo_test_type test_type)
+{
+	igt_display_t *display = &d->display;
+	drmModeModeInfo *mode;
+	int ret;
+
+	mode = igt_output_get_mode(output);
+
+	igt_plane_set_fb(p1, fb1);
+	igt_plane_set_fb(p2, fb2);
+
+	if (test_type == TEST_PLANES_UPSCALE) {
+		/* first plane upscaling */
+		igt_plane_set_size(p1, mode->hdisplay, mode->vdisplay);
+		/* second plane upscaling */
+		igt_plane_set_size(p2, mode->hdisplay - 20, mode->vdisplay - 20);
+	}
+
+	ret = igt_display_try_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
+
+	igt_plane_set_fb(p1, NULL);
+	igt_plane_set_fb(p2, NULL);
+
+	igt_skip_on_f(ret == -EINVAL || ret == -ERANGE,
+		      "Scaling op not supported by driver\n");
+	igt_assert_eq(ret, 0);
+}
+
+static void setup_fb(int fd, int width, int height,
+		     double r, double g, double b,
+		     struct igt_fb *fb)
+{
+	igt_create_color_pattern_fb(fd, width, height,
+				    DRM_FORMAT_XRGB8888,
+				    I915_TILING_NONE,
+				    r, g, b, fb);
+}
+
+static void
+test_planes_scaling_combo(data_t *d, int w1, int h1, int w2, int h2,
+			  enum pipe pipe, igt_output_t *output,
+			  enum scaler_combo_test_type test_type)
+{
+	igt_display_t *display = &d->display;
+
+	cleanup_crtc(d);
+
+	igt_output_set_pipe(output, pipe);
+
+	if (test_type == TEST_PLANES_UPSCALE) {
+		setup_fb(display->drm_fd, w1, h1, 1.0, 0.0, 0.0, &d->fb[1]);
+		setup_fb(display->drm_fd, w2, h2, 0.0, 1.0, 0.0, &d->fb[2]);
+	}
+
+	for (int k = 0; k < display->pipes[pipe].n_planes; k++) {
+		igt_plane_t *p1, *p2;
+
+		p1 = &display->pipes[pipe].planes[k];
+		igt_require(p1);
+		p2 = &display->pipes[pipe].planes[k+1];
+		igt_require(p2);
+
+		if (p1->type == DRM_PLANE_TYPE_CURSOR || p2->type == DRM_PLANE_TYPE_CURSOR)
+				continue;
+
+		__test_planes_scaling_combo(d, w1, h1, w2, h2,
+					    pipe, output, p1, p2,
+					    &d->fb[1], &d->fb[2],
+					    test_type);
+	}
+
+	igt_remove_fb(display->drm_fd, &d->fb[1]);
+	igt_remove_fb(display->drm_fd, &d->fb[2]);
+}
+
 static void test_scaler_with_multi_pipe_plane(data_t *d)
 {
 	igt_display_t *display = &d->display;
@@ -590,6 +674,44 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 					test_scaler_with_pixel_format_pipe(&data, mode->hdisplay + 100,
 							mode->vdisplay + 100, false, pipe, output);
 			}
+		}
+
+		igt_describe("Tests upscaling of 2 planes, from 20x20 fb.");
+		igt_subtest_with_dynamic("planes-upscale-20x20") {
+			for_each_pipe_with_single_output(&data.display, pipe, output)
+				igt_dynamic_f("pipe-%s-%s-planes-upscale", kmstest_pipe_name(pipe), igt_output_name(output))
+					test_planes_scaling_combo(&data, 20, 20, 20, 20,
+							pipe, output, TEST_PLANES_UPSCALE);
+		}
+
+		igt_describe("Tests upscaling of 2 planes for 0.25 scaling factor.");
+		igt_subtest_with_dynamic("planes-upscale-factor-0-25") {
+			for_each_pipe_with_single_output(&data.display, pipe, output)
+				igt_dynamic_f("pipe-%s-%s-planes-upscale", kmstest_pipe_name(pipe), igt_output_name(output)) {
+					drmModeModeInfo *mode;
+
+					mode = igt_output_get_mode(output);
+
+					test_planes_scaling_combo(&data,
+							0.25 * mode->hdisplay, 0.25 * mode->vdisplay,
+							0.25 * mode->hdisplay, 0.25 * mode->vdisplay,
+							pipe, output, TEST_PLANES_UPSCALE);
+				}
+		}
+
+		igt_describe("Tests scaling of 2 planes, unity scaling.");
+		igt_subtest_with_dynamic("planes-scaling-unity-scaling") {
+			for_each_pipe_with_single_output(&data.display, pipe, output)
+				igt_dynamic_f("pipe-%s-%s-planes-unity-scaling", kmstest_pipe_name(pipe), igt_output_name(output)) {
+					drmModeModeInfo *mode;
+
+					mode = igt_output_get_mode(output);
+
+					test_planes_scaling_combo(&data,
+							mode->hdisplay, mode->vdisplay,
+							mode->hdisplay, mode->vdisplay,
+							pipe, output, TEST_PLANES_UPSCALE);
+				}
 		}
 	}
 
