@@ -31,6 +31,7 @@ IGT_TEST_DESCRIPTION("Test display plane scaling");
 enum scaler_combo_test_type {
 	TEST_PLANES_UPSCALE = 0,
 	TEST_PLANES_DOWNSCALE,
+	TEST_PLANES_UPSCALE_DOWNSCALE
 };
 
 typedef struct {
@@ -40,6 +41,84 @@ typedef struct {
 	struct igt_fb fb[4];
 	bool extended;
 } data_t;
+
+const struct {
+	const char * const describe;
+	const char * const name;
+	const double sf_plane1;
+	const double sf_plane2;
+} upscale_downscale_tests[] = {
+		{
+			"Tests upscaling (20x20) and downscaling (scaling factor 0.25) of 2 planes.",
+			"planes-upscale-20x20-downscale-factor-0-25",
+			0.0,
+			0.25,
+		},
+		{
+			"Tests upscaling (20x20) and downscaling (scaling factor 0.5) of 2 planes.",
+			"planes-upscale-20x20-downscale-factor-0-5",
+			0.0,
+			0.5,
+		},
+		{
+			"Tests upscaling (20x20) and downscaling (scaling factor 0.75) of 2 planes.",
+			"planes-upscale-20x20-downscale-factor-0-75",
+			0.0,
+			0.75,
+		},
+		{
+			"Tests upscaling (scaling factor 0.25) and downscaling (scaling factor 0.25) of 2 planes.",
+			"planes-upscale-factor-0-25-downscale-factor-0-25",
+			0.25,
+			0.25,
+		},
+		{
+			"Tests upscaling (scaling factor 0.25) and downscaling (scaling factor 0.5) of 2 planes.",
+			"planes-upscale-factor-0-25-downscale-factor-0-5",
+			0.25,
+			0.5,
+		},
+		{
+			"Tests upscaling (scaling factor 0.25) and downscaling (scaling factor 0.75) of 2 planes.",
+			"planes-upscale-factor-0-25-downscale-factor-0-75",
+			0.25,
+			0.75,
+		},
+		{
+			"Tests scaling (unity) and downscaling (scaling factor 0.25) of 2 planes.",
+			"planes-unity-scaling-downscale-factor-0-25",
+			1.0,
+			0.25,
+		},
+		{
+			"Tests scaling (unity) and downscaling (scaling factor 0.5) of 2 planes.",
+			"planes-unity-scaling-downscale-factor-0-5",
+			1.0,
+			0.5,
+		},
+		{
+			"Tests scaling (unity) and downscaling (scaling factor 0.75) of 2 planes.",
+			"planes-unity-scaling-downscale-factor-0-75",
+			1.0,
+			0.75,
+		},
+};
+
+static int get_width(drmModeModeInfo *mode, double scaling_factor)
+{
+	if (scaling_factor == 0.0)
+		return 20;
+	else
+		return mode->hdisplay * scaling_factor;
+}
+
+static int get_height(drmModeModeInfo *mode, double scaling_factor)
+{
+	if (scaling_factor == 0.0)
+		return 20;
+	else
+		return mode->vdisplay * scaling_factor;
+}
 
 static void cleanup_fbs(data_t *data)
 {
@@ -350,6 +429,12 @@ __test_planes_scaling_combo(data_t *d, int w1, int h1, int w2, int h2,
 		/* second plane downscaling */
 		igt_plane_set_size(p2, w2, h2);
 	}
+	if (test_type == TEST_PLANES_UPSCALE_DOWNSCALE) {
+		/* first plane upscaling */
+		igt_plane_set_size(p1, mode->hdisplay, mode->vdisplay);
+		/* second plane downscaling */
+		igt_plane_set_size(p2, w2, h2);
+	}
 
 	ret = igt_display_try_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
 
@@ -390,6 +475,10 @@ test_planes_scaling_combo(data_t *d, int w1, int h1, int w2, int h2,
 	}
 	if (test_type == TEST_PLANES_DOWNSCALE) {
 		setup_fb(display->drm_fd, mode->hdisplay, mode->vdisplay, 1.0, 0.0, 0.0, &d->fb[1]);
+		setup_fb(display->drm_fd, mode->hdisplay, mode->vdisplay, 0.0, 1.0, 0.0, &d->fb[2]);
+	}
+	if (test_type == TEST_PLANES_UPSCALE_DOWNSCALE) {
+		setup_fb(display->drm_fd, w1, h1, 1.0, 0.0, 0.0, &d->fb[1]);
 		setup_fb(display->drm_fd, mode->hdisplay, mode->vdisplay, 0.0, 1.0, 0.0, &d->fb[2]);
 	}
 
@@ -770,6 +859,25 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 							0.75 * mode->hdisplay, 0.75 * mode->vdisplay,
 							pipe, output, TEST_PLANES_DOWNSCALE);
 				}
+		}
+
+		for (int index = 0; index < ARRAY_SIZE(upscale_downscale_tests); index++) {
+			igt_describe(upscale_downscale_tests[index].describe);
+			igt_subtest_with_dynamic(upscale_downscale_tests[index].name) {
+			for_each_pipe_with_single_output(&data.display, pipe, output)
+				igt_dynamic_f("pipe-%s-%s-planes-upscale-downscale", kmstest_pipe_name(pipe), igt_output_name(output)) {
+					drmModeModeInfo *mode;
+
+					mode = igt_output_get_mode(output);
+
+					test_planes_scaling_combo(&data,
+							get_width(mode, upscale_downscale_tests[index].sf_plane1),
+							get_height(mode, upscale_downscale_tests[index].sf_plane1),
+							get_width(mode, upscale_downscale_tests[index].sf_plane2),
+							get_height(mode,upscale_downscale_tests[index].sf_plane2),
+							pipe, output, TEST_PLANES_UPSCALE_DOWNSCALE);
+				}
+			}
 		}
 	}
 
