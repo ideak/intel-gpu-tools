@@ -49,6 +49,8 @@ struct intel_register_map {
 
 struct intel_mmio_data {
 	void *igt_mmio;
+	size_t mmio_size;
+	struct pci_device *dev;
 	struct intel_register_map map;
 	uint32_t pci_device_id;
 	int key;
@@ -57,7 +59,9 @@ struct intel_mmio_data {
 
 void intel_mmio_use_pci_bar(struct intel_mmio_data *mmio_data,
 			    struct pci_device *pci_dev);
+void intel_mmio_unmap_pci_bar(struct intel_mmio_data *mmio_data);
 void intel_mmio_use_dump_file(struct intel_mmio_data *mmio_data, char *file);
+void intel_mmio_unmap_dump_file(struct intel_mmio_data *mmio_data);
 
 int intel_register_access_init(struct intel_mmio_data *mmio_data,
 			       struct pci_device *pci_dev, int safe, int fd);
