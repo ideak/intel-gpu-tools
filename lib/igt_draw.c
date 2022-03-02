@@ -226,6 +226,71 @@ static int linear_x_y_to_ytiled_pos(int x, int y, uint32_t stride, int swizzle,
 	return pos / pixel_size;
 }
 
+#define OW_SIZE 16			/* in bytes */
+#define TILE_4_SUBTILE_SIZE 64		/* in bytes */
+#define TILE_4_WIDTH 128		/* in bytes */
+#define TILE_4_HEIGHT 32		/* in pixels */
+#define TILE_4_SUBTILE_WIDTH  OW_SIZE	/* in bytes */
+#define TILE_4_SUBTILE_HEIGHT 4		/* in pixels */
+
+/*
+ * Subtile remapping for tile 4.  Note that map[a]==b implies map[b]==a
+ * so we can use the same table to tile and until.
+ */
+static const int tile4_subtile_map[] = {
+	0,  1,  2,  3,  8,  9, 10, 11,
+	4,  5,  6,  7, 12, 13, 14, 15,
+	16, 17, 18, 19, 24, 25, 26, 27,
+	20, 21, 22, 23, 28, 29, 30, 31,
+	32, 33, 34, 35, 40, 41, 42, 43,
+	36, 37, 38, 39, 44, 45, 46, 47,
+	48, 49, 50, 51, 56, 57, 58, 59,
+	52, 53, 54, 55, 60, 61, 62, 63
+};
+
+static int linear_x_y_to_4tiled_pos(int x, int y, uint32_t stride, int swizzle,
+				    int bpp)
+{
+	int tile_base_pos;
+	int tile_x, tile_y;
+	int subtile_col, subtile_row, subtile_num, new_subtile_num;
+	int pixel_size = bpp / 8;
+	int byte_x = x * pixel_size;
+	int pos;
+
+	/* Modern platforms that have 4-tiling don't use old bit 6 swizzling */
+	igt_assert_eq(swizzle, I915_BIT_6_SWIZZLE_NONE);
+
+	/*
+	* Where does the 4k tile start (in bytes)?  This is the same for Y and
+	* F so we can use the Y-tile algorithm to get to that point.
+	*/
+	tile_base_pos = (y / TILE_4_HEIGHT) * stride * TILE_4_HEIGHT +
+		4096 * (byte_x / TILE_4_WIDTH);
+
+	/* Find pixel within tile */
+	tile_x = (byte_x % TILE_4_WIDTH);
+	tile_y = y % TILE_4_HEIGHT;
+
+	/* And figure out the subtile within the 4k tile */
+	subtile_col = tile_x / TILE_4_SUBTILE_WIDTH;
+	subtile_row = tile_y / TILE_4_SUBTILE_HEIGHT;
+	subtile_num = subtile_row * 8 + subtile_col;
+
+	/* Swizzle the subtile number according to the bspec diagram */
+	new_subtile_num = tile4_subtile_map[subtile_num];
+
+	/* Calculate new position */
+	pos = tile_base_pos +
+		new_subtile_num * TILE_4_SUBTILE_SIZE +
+		(tile_y % TILE_4_SUBTILE_HEIGHT) * OW_SIZE +
+		tile_x % TILE_4_SUBTILE_WIDTH;
+	igt_assert(pos % pixel_size == 0);
+	pos /= pixel_size;
+
+	return pos;
+}
+
 static void xtiled_pos_to_x_y_linear(int tiled_pos, uint32_t stride,
 				     int swizzle, int bpp, int *x, int *y)
 {
@@ -251,6 +316,44 @@ static void ytiled_pos_to_x_y_linear(int tiled_pos, uint32_t stride,
 	*x *= ow_size;
 	*x += tiled_pos % ow_size;
 	*x /= pixel_size;
+}
+
+static void tile4_pos_to_x_y_linear(int tiled_pos, uint32_t stride,
+				    int swizzle, int bpp, int *x, int *y)
+{
+	int pixel_size = bpp / 8;
+	int tiles_per_line = stride / TILE_4_WIDTH;
+	int tile_num, tile_offset, tile_row, tile_col;
+	int tile_origin_x, tile_origin_y;
+	int subtile_num, subtile_offset, subtile_row, subtile_col;
+	int subtile_origin_x, subtile_origin_y;
+	int oword_num, byte_num;
+
+	/* Modern platforms that have 4-tiling don't use old bit 6 swizzling */
+	igt_assert_eq(swizzle, I915_BIT_6_SWIZZLE_NONE);
+
+	/* Calculate the x,y of the start of the 4k tile */
+	tile_num = tiled_pos / 4096;
+	tile_row = tile_num / tiles_per_line;
+	tile_col = tile_num % tiles_per_line;
+	tile_origin_x = tile_col * TILE_4_WIDTH;
+	tile_origin_y = tile_row * TILE_4_HEIGHT;
+
+	/* Now calculate the x,y offset of the start of the subtile */
+	tile_offset = tiled_pos % 4096;
+	subtile_num = tile4_subtile_map[tile_offset / TILE_4_SUBTILE_SIZE];
+	subtile_row = subtile_num / 8;
+	subtile_col = subtile_num % 8;
+	subtile_origin_x = subtile_col * TILE_4_SUBTILE_WIDTH;
+	subtile_origin_y = subtile_row * TILE_4_SUBTILE_HEIGHT;
+
+	/* Next the oword and byte within the subtile */
+	subtile_offset = tiled_pos % TILE_4_SUBTILE_SIZE;
+	oword_num = subtile_offset / OW_SIZE;
+	byte_num = subtile_offset % OW_SIZE;
+
+	*x = (tile_origin_x + subtile_origin_x + byte_num) / pixel_size;
+	*y = tile_origin_y + subtile_origin_y + oword_num;
 }
 
 static void set_pixel(void *_ptr, int index, uint32_t color, int bpp)
@@ -318,8 +421,11 @@ static void draw_rect_ptr_tiled(void *ptr, uint32_t stride, uint32_t tiling,
 							       swizzle, bpp);
 				break;
 			case I915_TILING_Y:
-			case I915_TILING_4:
 				pos = linear_x_y_to_ytiled_pos(x, y, stride,
+							       swizzle, bpp);
+				break;
+			case I915_TILING_4:
+				pos = linear_x_y_to_4tiled_pos(x, y, stride,
 							       swizzle, bpp);
 				break;
 			default:
@@ -470,9 +576,12 @@ static void draw_rect_pwrite_tiled(int fd, struct buf_data *buf,
 						 swizzle, buf->bpp, &x, &y);
 			break;
 		case I915_TILING_Y:
-		case I915_TILING_4:
 			ytiled_pos_to_x_y_linear(tiled_pos, buf->stride,
 						 swizzle, buf->bpp, &x, &y);
+			break;
+		case I915_TILING_4:
+			tile4_pos_to_x_y_linear(tiled_pos, buf->stride,
+						swizzle, buf->bpp, &x, &y);
 			break;
 		default:
 			igt_assert(false);
