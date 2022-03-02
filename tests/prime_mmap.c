@@ -483,31 +483,6 @@ test_aperture_limit(uint32_t region, int size)
 	gem_close(fd, handle2);
 }
 
-static int
-check_for_dma_buf_mmap(struct igt_collection *set)
-{
-	struct igt_collection *region;
-	uint32_t reg;
-	int dma_buf_fd;
-	char *ptr;
-	uint32_t handle;
-	int ret = 1;
-
-	for_each_combination(region, 1, set) {
-		reg = igt_collection_get_value(region, 0);
-		handle = gem_create_in_memory_regions(fd, BO_SIZE, reg);
-
-		dma_buf_fd = prime_handle_to_fd(fd, handle);
-		ptr = mmap(NULL, BO_SIZE, PROT_READ, MAP_SHARED, dma_buf_fd, 0);
-		if (ptr != MAP_FAILED)
-			ret = 0;
-		munmap(ptr, BO_SIZE);
-		gem_close(fd, handle);
-		close(dma_buf_fd);
-	}
-	return ret;
-}
-
 #define SKIP_LMEM (1 << 0)
 #define SKIP_USERPTR (1 << 1)
 
@@ -527,7 +502,7 @@ static bool check_skip(uint32_t skip, uint32_t region)
 
 igt_main
 {
-	struct igt_collection *set, *regions;
+	struct igt_collection *set, *regions, *dma_buf_set;
 	struct drm_i915_query_memory_regions *query_info;
 	struct {
 		const char *name;
@@ -560,13 +535,15 @@ igt_main
 
 		set = get_memory_region_set(query_info, I915_SYSTEM_MEMORY,
 					    I915_DEVICE_MEMORY);
-		igt_assert(check_for_dma_buf_mmap(set) == 0);
+
+		dma_buf_set = get_dma_buf_mmap_supported_set(fd, set);
+		igt_require_f(dma_buf_set, "No dma-buf region supported\n");
 		errno = 0;
 	}
 
 	for (i = 0; i < ARRAY_SIZE(tests); i++)
 		igt_subtest_with_dynamic(tests[i].name) {
-			for_each_combination(regions, 1, set) {
+			for_each_combination(regions, 1, dma_buf_set) {
 				region = igt_collection_get_value(regions, 0);
 				size = gem_get_batch_size(fd, MEMORY_TYPE_FROM_REGION(region));
 				size = max(size, BO_SIZE);
@@ -582,6 +559,7 @@ igt_main
 	igt_fixture {
 		free(query_info);
 		igt_collection_destroy(set);
+		igt_collection_destroy(dma_buf_set);
 		close(fd);
 	}
 }
