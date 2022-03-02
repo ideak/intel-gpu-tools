@@ -456,6 +456,7 @@ void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 	case I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS:
 	case I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC:
 	case I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS:
+	case I915_FORMAT_MOD_4_TILED:
 		igt_require_intel(fd);
 		if (intel_display_ver(intel_get_drm_devid(fd)) == 2) {
 			*width_ret = 128;
@@ -964,6 +965,8 @@ uint64_t igt_fb_mod_to_tiling(uint64_t modifier)
 	case I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC:
 	case I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS:
 		return I915_TILING_Y;
+	case I915_FORMAT_MOD_4_TILED:
+		return I915_TILING_4;
 	case I915_FORMAT_MOD_Yf_TILED:
 	case I915_FORMAT_MOD_Yf_TILED_CCS:
 		return I915_TILING_Yf;
@@ -991,6 +994,8 @@ uint64_t igt_fb_tiling_to_mod(uint64_t tiling)
 		return I915_FORMAT_MOD_X_TILED;
 	case I915_TILING_Y:
 		return I915_FORMAT_MOD_Y_TILED;
+	case I915_TILING_4:
+		return I915_FORMAT_MOD_4_TILED;
 	case I915_TILING_Yf:
 		return I915_FORMAT_MOD_Yf_TILED;
 	default:
@@ -4563,6 +4568,8 @@ const char *igt_fb_modifier_name(uint64_t modifier)
 		return "Y-RC_CCS-CC";
 	case I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS:
 		return "Y-MC_CCS";
+	case I915_FORMAT_MOD_4_TILED:
+		return "4";
 	default:
 		return "?";
 	}

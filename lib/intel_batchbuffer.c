@@ -617,6 +617,7 @@ static uint32_t fast_copy_dword0(unsigned int src_tiling,
 		dword0 |= XY_FAST_COPY_SRC_TILING_X;
 		break;
 	case I915_TILING_Y:
+	case I915_TILING_4:
 	case I915_TILING_Yf:
 		dword0 |= XY_FAST_COPY_SRC_TILING_Yb_Yf;
 		break;
@@ -633,6 +634,7 @@ static uint32_t fast_copy_dword0(unsigned int src_tiling,
 		dword0 |= XY_FAST_COPY_DST_TILING_X;
 		break;
 	case I915_TILING_Y:
+	case I915_TILING_4:
 	case I915_TILING_Yf:
 		dword0 |= XY_FAST_COPY_DST_TILING_Yb_Yf;
 		break;
@@ -653,9 +655,11 @@ static uint32_t fast_copy_dword1(unsigned int src_tiling,
 {
 	uint32_t dword1 = 0;
 
-	if (src_tiling == I915_TILING_Yf)
+	if (src_tiling == I915_TILING_Yf || src_tiling == I915_TILING_4)
+		/* Repurposed as Tile-4 on DG2 */
 		dword1 |= XY_FAST_COPY_SRC_TILING_Yf;
-	if (dst_tiling == I915_TILING_Yf)
+	if (dst_tiling == I915_TILING_Yf || src_tiling == I915_TILING_4)
+		/* Repurposed as Tile-4 on DG2 */
 		dword1 |= XY_FAST_COPY_DST_TILING_Yf;
 
 	switch (bpp) {

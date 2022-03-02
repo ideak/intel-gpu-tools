@@ -156,7 +156,7 @@ gen8_fill_surface_state(struct intel_bb *ibb,
 
 	if (buf->tiling == I915_TILING_X)
 		ss->ss0.tiled_mode = 2;
-	else if (buf->tiling == I915_TILING_Y)
+	else if (buf->tiling == I915_TILING_Y || buf->tiling == I915_TILING_4)
 		ss->ss0.tiled_mode = 3;
 
 	address = intel_bb_offset_reloc(ibb, buf->handle,
@@ -211,7 +211,7 @@ gen11_fill_surface_state(struct intel_bb *ibb,
 
 	if (buf->tiling == I915_TILING_X)
 		ss->ss0.tiled_mode = 2;
-	else if (buf->tiling == I915_TILING_Y)
+	else if (buf->tiling == I915_TILING_Y || buf->tiling == I915_TILING_4)
 		ss->ss0.tiled_mode = 3;
 	else
 		ss->ss0.tiled_mode = 0;

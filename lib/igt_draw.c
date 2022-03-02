@@ -271,7 +271,7 @@ static void switch_blt_tiling(struct intel_bb *ibb, uint32_t tiling, bool on)
 	uint32_t bcs_swctrl;
 
 	/* Default is X-tile */
-	if (tiling != I915_TILING_Y)
+	if (tiling != I915_TILING_Y && tiling != I915_TILING_4)
 		return;
 
 	igt_require(ibb->gen >= 6);
@@ -318,6 +318,7 @@ static void draw_rect_ptr_tiled(void *ptr, uint32_t stride, uint32_t tiling,
 							       swizzle, bpp);
 				break;
 			case I915_TILING_Y:
+			case I915_TILING_4:
 				pos = linear_x_y_to_ytiled_pos(x, y, stride,
 							       swizzle, bpp);
 				break;
@@ -350,6 +351,7 @@ static void draw_rect_mmap_cpu(int fd, struct buf_data *buf, struct rect *rect,
 		break;
 	case I915_TILING_X:
 	case I915_TILING_Y:
+	case I915_TILING_4:
 		draw_rect_ptr_tiled(ptr, buf->stride, tiling, swizzle, rect,
 				    color, buf->bpp);
 		break;
@@ -409,6 +411,7 @@ static void draw_rect_mmap_wc(int fd, struct buf_data *buf, struct rect *rect,
 		break;
 	case I915_TILING_X:
 	case I915_TILING_Y:
+	case I915_TILING_4:
 		draw_rect_ptr_tiled(ptr, buf->stride, tiling, swizzle, rect,
 				    color, buf->bpp);
 		break;
@@ -467,6 +470,7 @@ static void draw_rect_pwrite_tiled(int fd, struct buf_data *buf,
 						 swizzle, buf->bpp, &x, &y);
 			break;
 		case I915_TILING_Y:
+		case I915_TILING_4:
 			ytiled_pos_to_x_y_linear(tiled_pos, buf->stride,
 						 swizzle, buf->bpp, &x, &y);
 			break;
@@ -507,6 +511,7 @@ static void draw_rect_pwrite(int fd, struct buf_data *buf,
 		break;
 	case I915_TILING_X:
 	case I915_TILING_Y:
+	case I915_TILING_4:
 		draw_rect_pwrite_tiled(fd, buf, tiling, rect, color, swizzle);
 		break;
 	default:

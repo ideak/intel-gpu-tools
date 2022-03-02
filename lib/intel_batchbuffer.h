@@ -202,7 +202,7 @@ void intel_copy_bo(struct intel_batchbuffer *batch,
 		   long int size);
 
 /*
- * Yf/Ys tiling
+ * Yf/Ys/4 tiling
  *
  * Tiling mode in the I915_TILING_... namespace for new tiling modes which are
  * defined in the kernel. (They are not fenceable so the kernel does not need
@@ -210,8 +210,9 @@ void intel_copy_bo(struct intel_batchbuffer *batch,
  *
  * They are to be used the the blitting routines below.
  */
-#define I915_TILING_Yf	3
-#define I915_TILING_Ys	4
+#define I915_TILING_4	(I915_TILING_LAST + 1)
+#define I915_TILING_Yf	(I915_TILING_LAST + 2)
+#define I915_TILING_Ys	(I915_TILING_LAST + 3)
 
 enum i915_compression {
 	I915_COMPRESSION_NONE,
