@@ -398,6 +398,9 @@ run_tests_for_pipe(data_t *data, enum pipe pipe)
 	igt_subtest_f("atomic-pipe-%s-tiling-yf", kmstest_pipe_name(pipe))
 		test_plane_position(data, pipe, I915_FORMAT_MOD_Yf_TILED);
 
+	igt_subtest_f("atomic-pipe-%s-tiling-4", kmstest_pipe_name(pipe))
+		test_plane_position(data, pipe, I915_FORMAT_MOD_4_TILED);
+
 	igt_subtest_f("atomic-pipe-%s-tiling-none", kmstest_pipe_name(pipe))
 		test_plane_position(data, pipe, DRM_FORMAT_MOD_LINEAR);
 }
