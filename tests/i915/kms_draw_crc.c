@@ -41,25 +41,24 @@ drmModeConnectorPtr drm_connectors[MAX_CONNECTORS];
 struct buf_ops *bops;
 igt_pipe_crc_t *pipe_crc;
 
-#define N_FORMATS 3
-static const uint32_t formats[N_FORMATS] = {
+static const uint32_t formats[] = {
 	DRM_FORMAT_XRGB8888,
 	DRM_FORMAT_RGB565,
 	DRM_FORMAT_XRGB2101010,
 };
 
-#define N_MODIFIER_METHODS 3
-static const uint64_t modifiers[N_MODIFIER_METHODS] = {
+static const uint64_t modifiers[] = {
 	DRM_FORMAT_MOD_LINEAR,
 	I915_FORMAT_MOD_X_TILED,
 	I915_FORMAT_MOD_Y_TILED,
+	I915_FORMAT_MOD_4_TILED,
 };
 
 struct base_crc {
 	bool set;
 	igt_crc_t crc;
 };
-struct base_crc base_crcs[N_FORMATS];
+struct base_crc base_crcs[ARRAY_SIZE(formats)];
 
 struct modeset_params ms;
 
@@ -177,6 +176,9 @@ static void draw_method_subtest(enum igt_draw_method method,
 				uint32_t format_index, uint64_t modifier)
 {
 	igt_crc_t crc;
+
+	igt_skip_on(modifier == I915_FORMAT_MOD_4_TILED &&
+		    !HAS_4TILE(intel_get_drm_devid(drm_fd)));
 
 	igt_skip_on(method == IGT_DRAW_MMAP_WC && !gem_mmap__has_wc(drm_fd));
 	igt_skip_on(method == IGT_DRAW_MMAP_GTT &&
@@ -315,6 +317,8 @@ static const char *modifier_str(int modifier_index)
 		return "xtiled";
 	case I915_FORMAT_MOD_Y_TILED:
 		return "ytiled";
+	case I915_FORMAT_MOD_4_TILED:
+		return "4tiled";
 	default:
 		igt_assert(false);
 	}
@@ -328,9 +332,9 @@ igt_main
 	igt_fixture
 		setup_environment();
 
-	for (format_idx = 0; format_idx < N_FORMATS; format_idx++) {
+	for (format_idx = 0; format_idx < ARRAY_SIZE(formats); format_idx++) {
 	for (method = 0; method < IGT_DRAW_METHOD_COUNT; method++) {
-	for (modifier_idx = 0; modifier_idx < N_MODIFIER_METHODS; modifier_idx++) {
+	for (modifier_idx = 0; modifier_idx < ARRAY_SIZE(modifiers); modifier_idx++) {
 		igt_describe("This subtest verfies igt_draw library works "
 			     "with different modifiers, DRM_FORMATS, DRAW_METHODS.");
 		igt_subtest_f("draw-method-%s-%s-%s",
