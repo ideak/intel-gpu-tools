@@ -332,6 +332,67 @@ char *memregion_dynamic_subtest_name(struct igt_collection *set)
 	return name;
 }
 
+struct mmap_supported_region {
+	uint32_t region;
+	struct igt_list_head link;
+};
+
+/**
+ * get_dma_buf_mmap_supported_set:
+ * @i915: i915 drm file descriptor
+ * @set: memory regions set
+ *
+ * Function constructs set with regions which supports dma-buf mapping.
+ *
+ * Returns: set of regions which allows do dma-buf mmap or NULL otherwise.
+ *
+ * Note: set (igt_collection) need to be destroyed after use.
+ */
+struct igt_collection *
+get_dma_buf_mmap_supported_set(int i915, struct igt_collection *set)
+{
+	struct igt_collection *region, *supported_set = NULL;
+	uint32_t reg;
+	int dma_buf_fd;
+	char *ptr;
+	uint32_t handle, bosize = 4096;
+	int count = 0;
+	struct mmap_supported_region *mreg, *tmp;
+	IGT_LIST_HEAD(region_list);
+
+	for_each_combination(region, 1, set) {
+		reg = igt_collection_get_value(region, 0);
+		handle = gem_create_in_memory_regions(i915, bosize, reg);
+
+		dma_buf_fd = prime_handle_to_fd(i915, handle);
+		ptr = mmap(NULL, bosize, PROT_READ, MAP_SHARED, dma_buf_fd, 0);
+		if (ptr != MAP_FAILED) {
+			mreg = malloc(sizeof(*mreg));
+			igt_assert(mreg);
+			mreg->region = reg;
+			igt_list_add_tail(&mreg->link, &region_list);
+			count++;
+		}
+		munmap(ptr, bosize);
+		gem_close(i915, handle);
+		close(dma_buf_fd);
+	}
+
+	if (count) {
+		int i = 0;
+
+		supported_set = igt_collection_create(count);
+
+		igt_list_for_each_entry_safe(mreg, tmp, &region_list, link) {
+			igt_collection_set_value(supported_set, i++, mreg->region);
+			igt_list_del(&mreg->link);
+			free(mreg);
+		}
+	}
+
+	return supported_set;
+}
+
 /**
  * intel_dump_gpu_meminfo:
  * @info: pointer to drm_i915_query_memory_regions structure

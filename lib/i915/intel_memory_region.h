@@ -111,6 +111,9 @@ __get_memory_region_set(struct drm_i915_query_memory_regions *regions,
 	__get_memory_region_set(regions, arr__, ARRAY_SIZE(arr__)); \
 })
 
+struct igt_collection *
+get_dma_buf_mmap_supported_set(int i915, struct igt_collection *set);
+
 char *memregion_dynamic_subtest_name(struct igt_collection *set);
 
 void intel_dump_gpu_meminfo(const struct drm_i915_query_memory_regions *info);
