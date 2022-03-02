@@ -983,6 +983,8 @@ static const char *modifier_test_str(uint64_t modifier)
 		return "y-tiled";
 	case I915_FORMAT_MOD_Yf_TILED:
 		return "yf-tiled";
+	case I915_FORMAT_MOD_4_TILED:
+		return "4-tiled";
 	default:
 		igt_assert(0);
 	}
@@ -1041,6 +1043,8 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 		{ I915_FORMAT_MOD_Yf_TILED, IGT_ROTATION_90 },
 		{ I915_FORMAT_MOD_Yf_TILED, IGT_ROTATION_180 },
 		{ I915_FORMAT_MOD_Yf_TILED, IGT_ROTATION_270 },
+		{ I915_FORMAT_MOD_4_TILED, IGT_ROTATION_0 },
+		{ I915_FORMAT_MOD_4_TILED, IGT_ROTATION_180 },
 		{ 0, 0 }
 	};
 
