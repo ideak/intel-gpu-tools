@@ -393,6 +393,7 @@ static const struct intel_device_info intel_dg1_info = {
 static const struct intel_device_info intel_dg2_info = {
 	.graphics_ver = 12,
 	.display_ver = 13,
+	.has_4tile = true,
 	.is_dg2 = true,
 	.codename = "dg2",
 	.has_flatccs = true,
