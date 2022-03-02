@@ -314,6 +314,9 @@ igt_main
 			     "high and low resolution with yf-tiling.");
 		igt_subtest_f("pipe-%s-tiling-yf", kmstest_pipe_name(pipe))
 			test_planes_on_pipe(&data, I915_FORMAT_MOD_Yf_TILED);
+
+		igt_subtest_f("pipe-%s-tiling-4", kmstest_pipe_name(pipe))
+			test_planes_on_pipe(&data, I915_FORMAT_MOD_4_TILED);
 	}
 
 	igt_fixture {
