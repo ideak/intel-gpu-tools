@@ -29,32 +29,12 @@ typedef struct
         igt_display_t display;
         igt_plane_t *primary;
         igt_output_t *output;
-	igt_fb_t fb;
-	igt_pipe_crc_t *pipe_crc;
+        igt_fb_t fb;
 	igt_pipe_t *pipe;
         enum pipe pipe_id;
 	int connector_type;
 	int w, h;
-	igt_crc_t crc_640_480;
 } data_t;
-
-drmModeModeInfo mode_640_480 = {
-	.name		= "640x480",
-	.vrefresh	= 60,
-	.clock		= 25200,
-
-	.hdisplay	= 640,
-	.hsync_start	= 656,
-	.hsync_end	= 752,
-	.htotal		= 800,
-
-	.vdisplay	= 480,
-	.vsync_start	= 490,
-	.vsync_end	= 492,
-	.vtotal		= 525,
-
-	.flags		= DRM_MODE_FLAG_NHSYNC | DRM_MODE_FLAG_NVSYNC,
-};
 
 const enum dc_lane_count lane_count_values[] =
 {
@@ -81,7 +61,6 @@ const enum dc_link_rate edp_link_rate_values[] =
 
 static void test_fini(data_t *data)
 {
-	igt_pipe_crc_free(data->pipe_crc);
 	igt_display_reset(&data->display);
 }
 
@@ -116,7 +95,6 @@ static void test_init(data_t *data, igt_output_t *output)
 	igt_require(data->pipe_id != PIPE_NONE);
 
 	data->pipe = &data->display.pipes[data->pipe_id];
-	data->pipe_crc = igt_pipe_crc_new(data->drm_fd, data->pipe_id, "auto");
 
 	igt_output_set_pipe(output, data->pipe_id);
 
@@ -130,7 +108,6 @@ static void run_link_training_config(data_t *data, igt_output_t *output)
 	const int current = 0;
 	const int verified = 1;
 	char *connector_name = output->name;
-	igt_crc_t crc;
 	const enum dc_link_rate *link_rate_values;
 	int num_link_rates;
 	if (data->connector_type == DRM_MODE_CONNECTOR_DisplayPort) {
@@ -168,22 +145,13 @@ static void run_link_training_config(data_t *data, igt_output_t *output)
 						    link_rate_values[j],
 						    LINK_TRAINING_DEFAULT);
 
-			/* Commit */
-			igt_create_pattern_fb(data->drm_fd, mode_640_480.hdisplay,
-					      mode_640_480.vdisplay, DRM_FORMAT_XRGB8888,
-					      0, &data->fb);
-			igt_plane_set_fb(data->primary, &data->fb);
-			igt_display_commit_atomic(&data->display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
-
 			/* Verify */
 			igt_amd_read_link_settings(data->drm_fd, connector_name,
 						   lane_count, link_rate,
 						   link_spread);
 
-			/* Collect CRC after writing settings */
-			igt_pipe_crc_collect_crc(data->pipe_crc, &crc);
-			igt_assert_crc_equal(&crc, &data->crc_640_480);
-
+			igt_info("Trained lane count: %d; link rate: 0x%02x\n",
+				lane_count[current], link_rate[current]);
 			igt_assert(lane_count[current] == lane_count_values[i]);
 			igt_assert(link_rate[current] == link_rate_values[j]);
 
@@ -214,6 +182,7 @@ static void test_link_training_configs(data_t *data)
 
 		orig_mode = igt_output_get_mode(output);
 		igt_assert(orig_mode);
+		igt_output_override_mode(output, orig_mode);
 
 		/* Collect original mode's LC and LR */
 		igt_amd_read_link_settings(data->drm_fd, output->name, lane_count,
@@ -221,20 +190,17 @@ static void test_link_training_configs(data_t *data)
 		orig_lc = lane_count[current];
 		orig_lr = link_rate[current];
 
-		/* Collect 640x480 CRC */
-		igt_create_pattern_fb(data->drm_fd, mode_640_480.hdisplay,
-				      mode_640_480.vdisplay, DRM_FORMAT_XRGB8888,
+		/* Set display pattern */
+		igt_create_pattern_fb(data->drm_fd, orig_mode->hdisplay,
+				      orig_mode->vdisplay, DRM_FORMAT_XRGB8888,
 				      0, &data->fb);
 		igt_plane_set_fb(data->primary, &data->fb);
 		igt_display_commit_atomic(&data->display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
-
-		igt_pipe_crc_collect_crc(data->pipe_crc, &data->crc_640_480);
 
 		/* Change link settings. */
 		run_link_training_config(data, output);
 
 		/* Revert mode back. */
-		igt_output_override_mode(output, orig_mode);
 		igt_info("%s: Reverting to lane count: %d, link rate: 0x%02x\n", output->name, orig_lc, orig_lr);
 		igt_amd_write_link_settings(data->drm_fd, output->name, orig_lc, orig_lr,
 					    LINK_TRAINING_DEFAULT);
