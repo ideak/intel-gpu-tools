@@ -163,9 +163,6 @@ static void test_link_training_configs(data_t *data)
 {
 	const drmModeModeInfo *orig_mode;
 	igt_output_t *output;
-	int lane_count[4], link_rate[4], link_spread[4];
-	int orig_lc, orig_lr;
-	const int current = 0;
 
 	igt_enable_connectors(data->drm_fd);
 
@@ -184,12 +181,6 @@ static void test_link_training_configs(data_t *data)
 		igt_assert(orig_mode);
 		igt_output_override_mode(output, orig_mode);
 
-		/* Collect original mode's LC and LR */
-		igt_amd_read_link_settings(data->drm_fd, output->name, lane_count,
-					   link_rate, link_spread);
-		orig_lc = lane_count[current];
-		orig_lr = link_rate[current];
-
 		/* Set display pattern */
 		igt_create_pattern_fb(data->drm_fd, orig_mode->hdisplay,
 				      orig_mode->vdisplay, DRM_FORMAT_XRGB8888,
@@ -200,12 +191,10 @@ static void test_link_training_configs(data_t *data)
 		/* Change link settings. */
 		run_link_training_config(data, output);
 
-		/* Revert mode back. */
-		igt_info("%s: Reverting to lane count: %d, link rate: 0x%02x\n", output->name, orig_lc, orig_lr);
-		igt_amd_write_link_settings(data->drm_fd, output->name, orig_lc, orig_lr,
-					    LINK_TRAINING_DEFAULT);
-
-		igt_display_commit_atomic(&data->display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
+		/* Clean up preferred link_setting of driver */
+		igt_info("%s: Clean up preferred link_setting\n", output->name);
+		igt_amd_write_link_settings(data->drm_fd, output->name, 0, 0,
+			LINK_TRAINING_DEFAULT);
 
 		igt_remove_fb(data->drm_fd, &data->fb);
 	}
