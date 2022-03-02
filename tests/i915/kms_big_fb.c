@@ -784,6 +784,7 @@ static const struct {
 	{ I915_FORMAT_MOD_X_TILED, "x-tiled", },
 	{ I915_FORMAT_MOD_Y_TILED, "y-tiled", },
 	{ I915_FORMAT_MOD_Yf_TILED, "yf-tiled", },
+	{ I915_FORMAT_MOD_4_TILED, "4-tiled", },
 };
 
 static const struct {
