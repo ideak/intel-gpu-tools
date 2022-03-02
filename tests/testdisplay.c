@@ -593,7 +593,7 @@ static void set_termio_mode(void)
 	tcsetattr(tio_fd, TCSANOW, &tio);
 }
 
-static char optstr[] = "3Aiaf:s:d:p:mrto:j:y";
+static char optstr[] = "3Aiaf:s:d:p:mrt4o:j:y";
 static struct option long_opts[] = {
 	{"yb", 0, 0, OPT_YB},
 	{"yf", 0, 0, OPT_YF},
@@ -612,6 +612,7 @@ static const char *help_str =
 	"  -t\tuse an X-tiled framebuffer\n"
 	"  -y, --yb\n"
 	"  \tuse a Y-tiled framebuffer\n"
+	"  -4\tuse an Tile-4 framebuffer\n"
 	"  --yf\tuse a Yf-tiled framebuffer\n"
 	"  -j\tdo dpms off, optional arg to select dpms level (1-3)\n"
 	"  -r\tprint a QR code on the screen whose content is \"pass\" for the automatic test\n"
@@ -679,6 +680,9 @@ static int opt_handler(int opt, int opt_index, void *data)
 		break;
 	case OPT_YF:
 		modifier = I915_FORMAT_MOD_Yf_TILED;
+		break;
+	case '4':
+		modifier = I915_FORMAT_MOD_4_TILED;
 		break;
 	case 'r':
 		qr_code = 1;
