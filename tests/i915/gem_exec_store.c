@@ -35,6 +35,8 @@
 #include "igt_device.h"
 #include "igt_gt.h"
 
+IGT_TEST_DESCRIPTION("Exercise store dword functionality using execbuf-ioctl");
+
 #define ENGINE_MASK  (I915_EXEC_RING_MASK | I915_EXEC_BSD_MASK)
 
 /* Without alignment detection we assume the worst-case scenario. */
@@ -432,15 +434,21 @@ igt_main
 		igt_fork_hang_detector(fd);
 	}
 
+	igt_describe("Verify that all capable engines can store dwords to a common buffer object");
 	igt_subtest("basic")
 		store_all(fd, ctx);
 
+	igt_describe("Verify that each capable engine can store a dword to a buffer object");
 	test_each_engine("dword", fd, ctx, e)
 		store_dword(fd, ctx, e);
 
+	igt_describe("Verify that each capable engine can store a dword to different cachelines "
+		     "of a buffer object");
 	test_each_engine("cachelines", fd, ctx, e)
 		store_cachelines(fd, ctx, e, 0);
 
+	igt_describe("Verify that each capable engine can store a dword to various page-sized "
+		     "buffer objects");
 	test_each_engine("pages", fd, ctx, e)
 		store_cachelines(fd, ctx, e, PAGES);
 
