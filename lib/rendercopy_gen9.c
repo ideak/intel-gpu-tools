@@ -116,6 +116,24 @@ static const uint32_t gen12_render_copy[][4] = {
 	{ 0x80040131, 0x00000004, 0x50007144, 0x00c40000 },
 };
 
+/* see lib/i915/shaders/ps/gen12p71_render_copy.asm */
+static const uint32_t gen12p71_render_copy[][4] = {
+	{ 0x8003005b, 0x200002a0, 0x0a0a0664, 0x06040205 },
+	{ 0x8003005b, 0x71040aa8, 0x0a0a2001, 0x06240305 },
+	{ 0x8003005b, 0x200002a0, 0x0a0a0664, 0x06040405 },
+	{ 0x8003005b, 0x72040aa8, 0x0a0a2001, 0x06240505 },
+	{ 0x8003005b, 0x200002a0, 0x0a0a06e4, 0x06840205 },
+	{ 0x8003005b, 0x73040aa8, 0x0a0a2001, 0x06a40305 },
+	{ 0x8003005b, 0x200002a0, 0x0a0a06e4, 0x06840405 },
+	{ 0x8003005b, 0x74040aa8, 0x0a0a2001, 0x06a40505 },
+	{ 0x80031101, 0x00010000, 0x00000000, 0x00000000 },
+	{ 0x80044031, 0x0c440000, 0x20027124, 0x01000000 },
+	{ 0x00042061, 0x71050aa0, 0x00460c05, 0x00000000 },
+	{ 0x00040061, 0x73050aa0, 0x00460e05, 0x00000000 },
+	{ 0x00040061, 0x75050aa0, 0x00461005, 0x00000000 },
+	{ 0x00040061, 0x77050aa0, 0x00461205, 0x00000000 },
+	{ 0x80041131, 0x00000004, 0x50007144, 0x00c40000 },
+};
 
 /*
  * Gen >= 12 onwards don't have a setting for PTE,
@@ -1062,6 +1080,14 @@ void _gen9_render_op(struct intel_bb *ibb,
 
 	gen9_emit_state_base_address(ibb);
 
+	if (IS_DG2(ibb->devid) || intel_gen(ibb->devid) > 12) {
+		intel_bb_out(ibb, GEN4_3DSTATE_BINDING_TABLE_POOL_ALLOC | 2);
+		intel_bb_emit_reloc(ibb, ibb->handle,
+				    I915_GEM_DOMAIN_RENDER | I915_GEM_DOMAIN_INSTRUCTION, 0,
+				    0, ibb->batch_offset);
+		intel_bb_out(ibb, 1 << 12);
+	}
+
 	intel_bb_out(ibb, GEN7_3DSTATE_VIEWPORT_STATE_POINTERS_CC);
 	intel_bb_out(ibb, viewport.cc_state);
 	intel_bb_out(ibb, GEN8_3DSTATE_VIEWPORT_STATE_POINTERS_SF_CLIP);
@@ -1160,6 +1186,27 @@ void gen12_render_copyfunc(struct intel_bb *ibb,
 		        NULL,
 		        gen12_render_copy,
 		        sizeof(gen12_render_copy));
+
+	gen12_aux_pgtable_cleanup(ibb, &pgtable_info);
+}
+
+void gen12p71_render_copyfunc(struct intel_bb *ibb,
+			      struct intel_buf *src,
+			      unsigned int src_x, unsigned int src_y,
+			      unsigned int width, unsigned int height,
+			      struct intel_buf *dst,
+			      unsigned int dst_x, unsigned int dst_y)
+{
+	struct aux_pgtable_info pgtable_info = { };
+
+	gen12_aux_pgtable_init(&pgtable_info, ibb, src, dst);
+
+	_gen9_render_op(ibb, src, src_x, src_y,
+			width, height, dst, dst_x, dst_y,
+			pgtable_info.pgtable_buf,
+			NULL,
+			gen12p71_render_copy,
+			sizeof(gen12p71_render_copy));
 
 	gen12_aux_pgtable_cleanup(ibb, &pgtable_info);
 }
