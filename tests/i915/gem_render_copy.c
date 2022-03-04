@@ -852,6 +852,12 @@ igt_main_args("dac", NULL, help_str, opt_handler, NULL)
 			 force_vebox_dst_copy ? "vebox-" : "",
 			 dst_mode);
 		igt_subtest_with_dynamic(name) {
+			igt_skip_on(IS_DG2(data.devid) &&
+				    ((t->src_tiling == I915_TILING_Y) ||
+				     (t->src_tiling == I915_TILING_Yf) ||
+				     (t->dst_tiling == I915_TILING_Y) ||
+				     (t->dst_tiling == I915_TILING_Yf)));
+
 			igt_require_f(data.vebox_copy || !vebox_copy_used,
 				      "no vebox-copy function\n");
 			for_each_combination(region_set, 1, set) {
