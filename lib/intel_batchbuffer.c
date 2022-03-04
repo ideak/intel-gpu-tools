@@ -1370,7 +1370,7 @@ __intel_bb_create(int i915, uint32_t ctx, uint32_t size, bool do_relocs,
 	ibb->enforce_relocs = do_relocs;
 	ibb->handle = gem_create(i915, size);
 	ibb->size = size;
-	ibb->alignment = 4096;
+	ibb->alignment = gem_detect_safe_alignment(i915);
 	ibb->ctx = ctx;
 	ibb->vm_id = 0;
 	ibb->batch = calloc(1, size);
@@ -1925,9 +1925,10 @@ intel_bb_add_object(struct intel_bb *ibb, uint32_t handle, uint64_t size,
 
 	igt_assert(INVALID_ADDR(offset) || alignment == 0
 		   || ALIGN(offset, alignment) == offset);
+	igt_assert(is_power_of_two(alignment));
 
 	object = __add_to_cache(ibb, handle);
-	alignment = alignment ?: 4096;
+	alignment = max_t(uint64_t, alignment, gem_detect_safe_alignment(ibb->i915));
 	__add_to_objects(ibb, object);
 
 	/*
