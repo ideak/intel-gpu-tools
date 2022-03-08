@@ -31,6 +31,7 @@
 #define IGT_CORE_H
 
 #include <assert.h>
+#include <byteswap.h>
 #include <setjmp.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -1446,6 +1447,14 @@ void igt_kmsg(const char *format, ...);
 
 #define READ_ONCE(x) (*(volatile typeof(x) *)(&(x)))
 #define WRITE_ONCE(x, v) do *(volatile typeof(x) *)(&(x)) = (v); while (0)
+
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#define cpu_to_le32(x)  bswap_32(x)
+#define le32_to_cpu(x)  bswap_32(x)
+#else
+#define cpu_to_le32(x)  (x)
+#define le32_to_cpu(x)  (x)
+#endif
 
 #define MSEC_PER_SEC (1000)
 #define USEC_PER_SEC (1000*MSEC_PER_SEC)

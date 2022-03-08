@@ -244,7 +244,7 @@ static void fill_fb(igt_fb_t *fb, uint32_t pixel)
 
 	pixel_count = fb->strides[0] * fb->height / sizeof(uint32_t);
 	for (i = 0; i < pixel_count; i++)
-		ptr[i] = pixel;
+		ptr[i] = cpu_to_le32(pixel);
 
 	igt_fb_unmap_buffer(fb, ptr);
 }
