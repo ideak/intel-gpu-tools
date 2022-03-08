@@ -4437,13 +4437,17 @@ int igt_fb_get_fnv1a_crc(struct igt_fb *fb, igt_crc_t *crc)
 {
 	const uint32_t FNV1a_OFFSET_BIAS = 2166136261;
 	const uint32_t FNV1a_PRIME = 16777619;
+	uint32_t *line = NULL;
 	uint32_t hash;
 	void *map;
-	char *ptr, *line = NULL;
+	char *ptr;
 	int x, y, cpp = igt_drm_format_to_bpp(fb->drm_format) / 8;
 	uint32_t stride = calc_plane_stride(fb, 0);
 
 	if (fb->num_planes != 1)
+		return -EINVAL;
+
+	if (fb->drm_format != DRM_FORMAT_XRGB8888)
 		return -EINVAL;
 
 	ptr = igt_fb_map_buffer(fb->fd, fb);
@@ -4467,9 +4471,17 @@ int igt_fb_get_fnv1a_crc(struct igt_fb *fb, igt_crc_t *crc)
 
 		igt_memcpy_from_wc(line, ptr, fb->width * cpp);
 
-		for (x = 0; x < fb->width * cpp; x++) {
-			hash ^= line[x];
-			hash *= FNV1a_PRIME;
+		for (x = 0; x < fb->width; x++) {
+			unsigned int i;
+			uint32_t pixel = le32_to_cpu(line[x]);
+			pixel &= 0x00ffffff;
+
+			for (i = 0; i < sizeof(pixel); i++) {
+				uint8_t component = (pixel >> (i * 8)) & 0xff;
+
+				hash ^= component;
+				hash *= FNV1a_PRIME;
+			}
 		}
 	}
 
