@@ -258,9 +258,12 @@ igt_main
 		count = (count + ncpus - 1) / ncpus;
 	}
 
+	igt_describe("Basic blitter functionality check with 2 buffers");
 	igt_subtest("basic")
 		run_test(fd, 2, do_relocs);
 
+	igt_describe("The intent is to push beyond the working GTT size to force"
+			" the driver to rebind the buffers");
 	igt_subtest("normal") {
 		intel_allocator_multiprocess_start();
 		igt_fork(child, ncpus)
@@ -269,6 +272,7 @@ igt_main
 		intel_allocator_multiprocess_stop();
 	}
 
+	igt_describe("Test with interrupts in between the parent process");
 	igt_subtest("interruptible") {
 		intel_allocator_multiprocess_start();
 		igt_fork_signal_helper();
