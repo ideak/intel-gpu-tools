@@ -201,11 +201,10 @@ static void __do_evict(int i915,
 		}
 		obj->handle = create_bo(i915, obj->size, region, params->oom_test);
 
+		move_to_lmem(i915, objects + i, 1, batch, engine,
+			     params->oom_test);
 		if (params->flags & TEST_VERIFY)
 			init_object(i915, obj, rand(), params->flags);
-		else
-			move_to_lmem(i915, objects + i, 1, batch, engine,
-				     params->oom_test);
 	}
 
 	igt_debug("obj size min/max=%lu %s/%lu %s, count=%u, seed: %u\n",
