@@ -653,6 +653,26 @@ static void test_crtc_config(const struct test_config *tconf,
 	return;
 }
 
+static int get_test_name_str(struct crtc_config *crtc, char *buf,
+				size_t buf_size)
+{
+	int pos;
+	int i;
+
+	pos = snprintf(buf, buf_size, "pipe-%s-", kmstest_pipe_name(crtc->pipe_id));
+
+	for (i = 0; i < crtc->connector_count; i++) {
+		drmModeConnector *connector = crtc->cconfs[i].connector;
+
+		pos += snprintf(&buf[pos], buf_size - pos,
+			"%s%s-%d", i ? "-" : "",
+			kmstest_connector_type_str(connector->connector_type),
+			connector->connector_type_id);
+	}
+
+	return pos;
+}
+
 static void test_one_combination(const struct test_config *tconf,
 				 struct connector_config *cconfs,
 				 int connector_count)
@@ -664,8 +684,19 @@ static void test_one_combination(const struct test_config *tconf,
 	setup_crtcs(tconf, cconfs, connector_count, crtcs,
 		    &crtc_count, &config_valid);
 
-	if (config_valid == !(tconf->flags & TEST_INVALID))
-		test_crtc_config(tconf, crtcs, crtc_count);
+	if (config_valid == !(tconf->flags & TEST_INVALID)) {
+		int i, pos = 0;
+		char test_name[256];
+
+		for (i = 0; i < crtc_count; i++) {
+			if (i > 0)
+				pos += snprintf(&test_name[pos], ARRAY_SIZE(test_name) - pos, "-");
+			pos += get_test_name_str(&crtcs[i], &test_name[pos], ARRAY_SIZE(test_name) - pos);
+		}
+
+		igt_dynamic_f("%s", test_name)
+			test_crtc_config(tconf, crtcs, crtc_count);
+	}
 
 	cleanup_crtcs(crtcs, crtc_count);
 }
@@ -939,7 +970,7 @@ igt_main_args("det:", NULL, help_str, opt_handler, NULL)
 
 	for (i = 0; i < ARRAY_SIZE(tests); i++) {
 		igt_describe("Tests the mode by iterating through all valid/invalid crtc/connector combinations");
-		igt_subtest(tests[i].name) {
+		igt_subtest_with_dynamic(tests[i].name) {
 			struct test_config tconf = {
 				.flags		= tests[i].flags,
 				.name		= tests[i].name,
