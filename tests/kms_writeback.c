@@ -265,7 +265,7 @@ static void writeback_sequence(igt_output_t *output, igt_plane_t *plane,
 				igt_fb_t *in_fb, igt_fb_t *out_fbs[], int n_commits)
 {
 	int i = 0;
-	uint32_t in_fb_colors[2] = { 0xffff0000, 0xff00ff00 };
+	uint32_t in_fb_colors[2] = { 0x42ff0000, 0x4200ff00 };
 	uint32_t clear_color = 0xffffffff;
 
 	igt_crc_t cleared_crc, out_expected;
