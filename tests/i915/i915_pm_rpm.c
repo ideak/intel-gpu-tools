@@ -670,6 +670,13 @@ static void format_hex_string(const unsigned char edid[static EDID_BLOCK_SIZE],
 		sprintf(buf+i*5, "0x%02x ", edid[i]);
 }
 
+static bool is_mst_connector(int fd, uint32_t connector_id)
+{
+	return kmstest_get_property(fd, connector_id,
+				    DRM_MODE_OBJECT_CONNECTOR,
+				    "PATH", NULL, NULL, NULL);
+}
+
 static void test_i2c(struct mode_set_data *data)
 {
 	bool edid_mistmach_i2c_vs_drm = false;
@@ -689,6 +696,10 @@ static void test_i2c(struct mode_set_data *data)
 		bool is_vga = data->connectors[i]->connector_type == DRM_MODE_CONNECTOR_VGA;
 
 		bool edids_equal;
+
+		if (data->connectors[i]->connection != DRM_MODE_CONNECTED ||
+		    is_mst_connector(drm_fd, data->connectors[i]->connector_id))
+			continue;
 
 		/* We fail to detect some VGA monitors using our i2c method. If you look
 		 * at the dmesg of these cases, you'll see the Kernel complaining about
