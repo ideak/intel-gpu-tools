@@ -34,6 +34,7 @@ enum psr_mode {
 	PSR_MODE_1,
 	PSR_MODE_2,
 	PSR_MODE_2_SEL_FETCH,
+	PSR_DISABLED,
 };
 
 bool psr_disabled_check(int debugfs_fd);
@@ -46,6 +47,7 @@ bool psr_disable(int device, int debugfs_fd);
 bool psr_sink_support(int device, int debugfs_fd, enum psr_mode mode);
 bool psr2_wait_su(int debugfs_fd, uint16_t *num_su_blocks);
 void psr_print_debugfs(int debugfs_fd);
+enum psr_mode psr_get_mode(int debugfs_fd);
 
 bool i915_psr2_selective_fetch_check(int drm_fd);
 

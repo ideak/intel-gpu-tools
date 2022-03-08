@@ -330,3 +330,32 @@ void i915_psr2_sel_fetch_restore(int drm_fd)
 	psr_set(drm_fd, debugfs_fd, PSR_MODE_2_SEL_FETCH);
 	close(debugfs_fd);
 }
+
+/**
+ * psr_get_mode
+ *
+ * Return the current PSR mode.
+ */
+enum psr_mode psr_get_mode(int debugfs_fd)
+{
+	char buf[PSR_STATUS_MAX_LEN];
+	int ret;
+
+
+	ret = igt_debugfs_simple_read(debugfs_fd, "i915_edp_psr_status", buf,
+				      sizeof(buf));
+	if (ret < 0) {
+		igt_info("Could not read i915_edp_psr_status: %s\n",
+			 strerror(-ret));
+		return PSR_DISABLED;
+	}
+
+	if (strstr(buf, "PSR2 selective fetch: enabled"))
+		return PSR_MODE_2_SEL_FETCH;
+	else if (strstr(buf, "PSR2 enabled"))
+		return PSR_MODE_2;
+	else if (strstr(buf, "PSR1 enabled"))
+		return PSR_MODE_1;
+
+	return PSR_DISABLED;
+}

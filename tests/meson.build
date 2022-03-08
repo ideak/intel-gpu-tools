@@ -243,6 +243,7 @@ i915_progs = [
 	'kms_psr',
 	'kms_psr2_su',
 	'kms_psr2_sf',
+	'kms_psr_stress_test',
 	'kms_pwrite_crc',
 	'sysfs_clients',
 	'sysfs_defaults',
