@@ -410,6 +410,7 @@ igt_main
 {
 	int fd = -1;
 
+	igt_describe("Basic test for handling of module unload.");
 	igt_subtest("unload")
 		test_unload();
 
@@ -417,15 +418,19 @@ igt_main
 		fd = drm_open_driver(DRIVER_VGEM);
 	}
 
+	igt_describe("Check the working of SET_VERSION ioctl.");
 	igt_subtest_f("setversion")
 		test_setversion(fd);
 
+	igt_describe("Check whether it can open multiple clients.");
 	igt_subtest_f("second-client")
 		test_client(fd);
 
+	igt_describe("Check the basic working of vgem_create ioctl.");
 	igt_subtest_f("create")
 		test_create(fd);
 
+	igt_describe("Create a vgem handle and check if it can be mmaped.");
 	igt_subtest_f("mmap")
 		test_mmap(fd);
 
@@ -434,9 +439,13 @@ igt_main
 			igt_require(has_prime_export(fd));
 		}
 
+		igt_describe("Check whether it can export/import the vgem handle"
+			     " using prime.");
 		igt_subtest("dmabuf-export")
 			test_dmabuf_export(fd);
 
+		igt_describe("Export the vgem handle along with RDWR capabilities"
+			     " using prime and check if it can be mmaped.");
 		igt_subtest("dmabuf-mmap")
 			test_dmabuf_mmap(fd);
 
@@ -445,15 +454,22 @@ igt_main
 				igt_require(vgem_has_fences(fd));
 			}
 
+			igt_describe("Check the working of dma-buf fence interop.");
 			igt_subtest("dmabuf-fence")
 				test_dmabuf_fence(fd);
+			igt_describe("Attach a fence before exporting a vgem handle"
+				     " and check the working of fence.");
 			igt_subtest("dmabuf-fence-before")
 				test_dmabuf_fence_before(fd);
 		}
 	}
 
+	igt_describe("Check the basic access to sysfs and also try to"
+		     " read entries in the directory.");
 	igt_subtest("sysfs")
 		test_sysfs_read(fd);
+	igt_describe("Check the basic access to debugfs and also try to"
+		     " read entries in the directory.");
 	igt_subtest("debugfs")
 		test_debugfs_read(fd);
 
