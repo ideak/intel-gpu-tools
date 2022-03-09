@@ -465,6 +465,7 @@ igt_main
 		gem_write(fd, handle, 0, batch, sizeof(batch));
 	}
 
+	igt_describe("Check the basic context batch buffer execution.");
 	igt_subtest("basic") {
 		ctx_id = gem_context_create(fd);
 		igt_assert(exec(fd, handle, 0, ctx_id) == 0);
@@ -480,18 +481,27 @@ igt_main
 		gem_sync(fd, handle);
 	}
 
+	igt_describe("Verify that execbuf with invalid context fails.");
 	igt_subtest("basic-invalid-context")
 		invalid_context(fd, handle);
 
+	igt_describe("Check maximum number of buffers it can"
+		     " evict for a context.");
 	igt_subtest("eviction")
 		big_exec(fd, handle, 0);
 
+	igt_describe("Check the status of context after a hang"
+		     " by setting and unsetting the RECOVERABLE.");
 	igt_subtest("basic-norecovery")
 		norecovery(fd);
 
+	igt_describe("Verify that contexts are automatically shotdown"
+		     " on close, if hangchecking is disabled.");
 	igt_subtest("basic-nohangcheck")
 		nohangcheck_hostile(fd);
 
+	igt_describe("Race the execution and interrupt handlers along a context,"
+	             " while closing it at a random time.");
 	igt_subtest_group {
 		igt_fixture {
 			intel_allocator_multiprocess_start();
@@ -505,6 +515,8 @@ igt_main
 		}
 	}
 
+	igt_describe("Check if the kernel doesn't leak the vma"
+		     " pin_count for the last context on reset.");
 	igt_subtest("reset-pin-leak") {
 		int i;
 		uint64_t ahnd;
