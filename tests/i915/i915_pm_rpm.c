@@ -1384,7 +1384,9 @@ static void gem_execbuf_subtest(void)
 
 /* Assuming execbuf already works, let's see what happens when we force many
  * suspend/resume cycles with commands. */
-static void gem_execbuf_stress_subtest(int rounds, int wait_flags)
+static void
+gem_execbuf_stress_subtest(int rounds, int wait_flags,
+			   struct drm_i915_gem_memory_class_instance *mem_regions)
 {
 	int i;
 	int batch_size = 4 * sizeof(uint32_t);
@@ -1407,7 +1409,12 @@ static void gem_execbuf_stress_subtest(int rounds, int wait_flags)
 
 	disable_all_screens_and_wait(&ms_data);
 
-	handle = gem_create(drm_fd, batch_size);
+	/* PC8 test is only applicable to igfx  */
+	if (wait_flags & WAIT_PC8_RES)
+		handle = gem_create(drm_fd, batch_size);
+	else
+		handle = gem_create_in_memory_region_list(drm_fd, batch_size, mem_regions, 1);
+
 	gem_write(drm_fd, handle, 0, batch_buf, batch_size);
 
 	objs[0].handle = handle;
@@ -2049,8 +2056,9 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 	/* Skip instead of failing in case the machine is not prepared to reach
 	 * PC8+. We don't want bug reports from cases where the machine is just
 	 * not properly configured. */
-	igt_fixture
+	igt_fixture {
 		igt_require(setup_environment(false));
+	}
 
 	if (stay)
 		igt_subtest("stay")
@@ -2162,12 +2170,21 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 		system_suspend_subtest(SUSPEND_STATE_DISK, SUSPEND_TEST_NONE);
 
 	/* GEM stress */
-	igt_subtest("gem-execbuf-stress")
-		gem_execbuf_stress_subtest(rounds, WAIT_STATUS);
+	igt_subtest_with_dynamic("gem-execbuf-stress") {
+		for_each_memory_region(r, drm_fd) {
+			igt_describe("Validate execbuf submission while exercising rpm "
+				     "suspend/resume cycles.");
+			igt_dynamic_f("%s", r->name)
+				gem_execbuf_stress_subtest(rounds, WAIT_STATUS, &r->ci);
+			igt_describe("Validate execbuf submission while exercising rpm "
+				     "suspend/resume cycles with extra wait.");
+			igt_dynamic_f("%s-%s", "extra-wait", r->name)
+				gem_execbuf_stress_subtest(rounds, WAIT_STATUS | WAIT_EXTRA, &r->ci);
+		}
+	}
+
 	igt_subtest("gem-execbuf-stress-pc8")
-		gem_execbuf_stress_subtest(rounds, WAIT_PC8_RES);
-	igt_subtest("gem-execbuf-stress-extra-wait")
-		gem_execbuf_stress_subtest(rounds, WAIT_STATUS | WAIT_EXTRA);
+		gem_execbuf_stress_subtest(rounds, WAIT_PC8_RES, 0);
 
 	/* power-wake reference tests */
 	igt_subtest("pm-tiling") {
