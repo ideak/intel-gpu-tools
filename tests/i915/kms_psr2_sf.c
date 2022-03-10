@@ -44,6 +44,7 @@ enum operations {
 	PLANE_UPDATE,
 	PLANE_UPDATE_CONTINUOUS,
 	PLANE_MOVE,
+	PLANE_MOVE_CONTINUOUS,
 	OVERLAY_PRIM_UPDATE
 };
 
@@ -51,7 +52,9 @@ enum plane_move_postion {
 	POS_TOP_LEFT,
 	POS_TOP_RIGHT,
 	POS_BOTTOM_LEFT,
-	POS_BOTTOM_RIGHT
+	POS_BOTTOM_RIGHT,
+	POS_BOTTOM_LEFT_NEGATIVE,
+	POS_TOP_RIGHT_NEGATIVE,
 };
 
 typedef struct {
@@ -74,6 +77,7 @@ typedef struct {
 	igt_plane_t *test_plane;
 	cairo_t *cr;
 	uint32_t screen_changes;
+	int cur_x, cur_y;
 } data_t;
 
 static const char *op_str(enum operations op)
@@ -81,6 +85,7 @@ static const char *op_str(enum operations op)
 	static const char * const name[] = {
 		[PLANE_UPDATE] = "plane-update",
 		[PLANE_UPDATE_CONTINUOUS] = "plane-update-continuous",
+		[PLANE_MOVE_CONTINUOUS] = "plane-move-continuous",
 		[PLANE_MOVE] = "plane-move",
 		[OVERLAY_PRIM_UPDATE] = "overlay-primary-update",
 	};
@@ -406,6 +411,42 @@ static void plane_move_expected_output(enum plane_move_postion pos)
 	manual(expected);
 }
 
+static void plane_move_continuous_expected_output(enum plane_move_postion pos)
+{
+	char expected[128] = {};
+
+	switch (pos) {
+	case POS_TOP_LEFT:
+		sprintf(expected,
+			"screen Green with Blue box on top left corner");
+		break;
+	case POS_TOP_RIGHT:
+		sprintf(expected,
+			"screen Green with Blue box on top right corner");
+		break;
+	case POS_BOTTOM_LEFT:
+		sprintf(expected,
+			"screen Green with Blue box on bottom left corner");
+		break;
+	case POS_BOTTOM_RIGHT:
+		sprintf(expected,
+			"screen Green with Blue box on bottom right corner");
+		break;
+	case POS_BOTTOM_LEFT_NEGATIVE:
+		sprintf(expected,
+			"screen Green with Blue box on bottom left corner (partly exceeding area)");
+		break;
+	case POS_TOP_RIGHT_NEGATIVE:
+		sprintf(expected,
+			"screen Green with Blue box on top right corner (partly exceeding area)");
+		break;
+	default:
+		igt_assert(false);
+	}
+
+	manual(expected);
+}
+
 static void overlay_prim_update_expected_output(int box_count)
 {
 	char expected[64] = {};
@@ -423,6 +464,9 @@ static void expected_output(data_t *data)
 	switch (data->op) {
 	case PLANE_MOVE:
 		plane_move_expected_output(data->pos);
+		break;
+	case PLANE_MOVE_CONTINUOUS:
+		plane_move_continuous_expected_output(data->pos);
 		break;
 	case PLANE_UPDATE:
 		plane_update_expected_output(data->test_plane_id,
@@ -487,6 +531,59 @@ static void damaged_plane_move(data_t *data)
 	expected_output(data);
 }
 
+static void plane_move_continuous(data_t *data)
+{
+	int target_x, target_y;
+
+	switch (data->pos) {
+	case POS_TOP_LEFT:
+		target_x = 0;
+		target_y = 0;
+		break;
+	case POS_TOP_RIGHT:
+		target_x = data->mode->hdisplay - data->fb_test.width;
+		target_y = 0;
+		break;
+	case POS_TOP_RIGHT_NEGATIVE:
+		target_x = data->mode->hdisplay - data->fb_test.width;
+		target_y = -data->fb_test.width / 2;
+		break;
+	case POS_BOTTOM_LEFT:
+		target_x = 0;
+		target_y = data->mode->vdisplay - data->fb_test.height;
+		break;
+	case POS_BOTTOM_LEFT_NEGATIVE:
+		target_x = -data->fb_test.width / 2;
+		target_y = data->mode->vdisplay - data->fb_test.height;
+		break;
+	case POS_BOTTOM_RIGHT:
+		target_x = data->mode->hdisplay - data->fb_test.width;
+		target_y = data->mode->vdisplay - data->fb_test.height;
+		break;
+	default:
+		igt_assert(false);
+	}
+
+	igt_assert(psr_wait_entry(data->debugfs_fd, PSR_MODE_2));
+
+	while (data->cur_x != target_x || data->cur_y != target_y) {
+		if (data->cur_x < target_x)
+			data->cur_x += min(target_x - data->cur_x, 20);
+		else if (data->cur_x > target_x)
+			data->cur_x -= min(data->cur_x - target_x, 20);
+
+		if (data->cur_y < target_y)
+			data->cur_y += min(target_y - data->cur_y, 20);
+		else if (data->cur_y > target_y)
+			data->cur_y -= min(data->cur_y - target_y, 20);
+
+		igt_plane_set_position(data->test_plane, data->cur_x, data->cur_y);
+		igt_display_commit2(&data->display, COMMIT_ATOMIC);
+	}
+
+	expected_output(data);
+}
+
 static void damaged_plane_update(data_t *data)
 {
 	igt_plane_t *test_plane = data->test_plane;
@@ -526,6 +623,8 @@ static void damaged_plane_update(data_t *data)
 
 static void run(data_t *data)
 {
+	int i;
+
 	igt_assert(psr_wait_entry(data->debugfs_fd, PSR_MODE_2));
 
 	data->screen_changes = 0;
@@ -544,6 +643,17 @@ static void run(data_t *data)
 		break;
 	case PLANE_MOVE:
 		damaged_plane_move(data);
+		break;
+	case PLANE_MOVE_CONTINUOUS:
+		/*
+		 * Start from top left corner and keep plane position
+		 * over iterations.
+		 */
+		data->cur_x = data->cur_y = 0;
+		for (i = POS_TOP_LEFT; i <= POS_TOP_RIGHT_NEGATIVE; i++) {
+			data->pos = i;
+			plane_move_continuous(data);
+		}
 		break;
 	default:
 		igt_assert(false);
@@ -654,6 +764,15 @@ igt_main
 		cleanup(&data);
 	}
 
+	data.op = PLANE_MOVE_CONTINUOUS;
+	igt_describe("Test that selective fetch works on moving cursor plane (no update)");
+	igt_subtest_f("cursor-%s-sf", op_str(data.op)) {
+		data.test_plane_id = DRM_PLANE_TYPE_CURSOR;
+		prepare(&data);
+		run(&data);
+		cleanup(&data);
+	}
+
 	/* Only for overlay plane */
 	data.op = PLANE_MOVE;
 	/* Verify overlay plane move selective fetch */
@@ -666,6 +785,15 @@ igt_main
 			run(&data);
 			cleanup(&data);
 		}
+	}
+
+	data.op = PLANE_MOVE_CONTINUOUS;
+	igt_describe("Test that selective fetch works on moving overlay plane (no update)");
+	igt_subtest_f("overlay-%s-sf", op_str(data.op)) {
+		data.test_plane_id = DRM_PLANE_TYPE_OVERLAY;
+		prepare(&data);
+		run(&data);
+		cleanup(&data);
 	}
 
 	/* Verify primary plane selective fetch with overplay plane blended */
