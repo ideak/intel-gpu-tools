@@ -111,6 +111,14 @@ __get_memory_region_set(struct drm_i915_query_memory_regions *regions,
 	__get_memory_region_set(regions, arr__, ARRAY_SIZE(arr__)); \
 })
 
+struct gem_memory_region {
+	struct gem_memory_region *next;
+	char *name;
+
+	struct drm_i915_gem_memory_class_instance ci;
+	uint64_t size;
+};
+
 struct igt_collection *
 get_dma_buf_mmap_supported_set(int i915, struct igt_collection *set);
 
@@ -136,5 +144,11 @@ uint64_t gem_detect_min_start_offset_for_region(int i915, uint32_t region);
 uint64_t gem_detect_safe_start_offset(int i915);
 uint64_t gem_detect_min_alignment_for_regions(int i915, uint32_t region1, uint32_t region2);
 uint64_t gem_detect_safe_alignment(int i915);
+
+struct gem_memory_region *__gem_get_memory_regions(int i915);
+struct gem_memory_region *
+__gem_next_memory_region(struct gem_memory_region *r);
+
+#define for_each_memory_region(r__, fd__) for (struct gem_memory_region *r__ = __gem_get_memory_regions(fd__); r__; r__ = __gem_next_memory_region(r__))
 
 #endif /* INTEL_MEMORY_REGION_H */

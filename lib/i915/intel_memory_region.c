@@ -914,3 +914,54 @@ out:
 
 	return entry->minalign.alignment;
 }
+
+static const char *
+region_repr(const struct drm_i915_gem_memory_class_instance *ci)
+{
+	switch (ci->memory_class) {
+	case I915_MEMORY_CLASS_SYSTEM:
+		return "smem";
+	case I915_MEMORY_CLASS_DEVICE:
+		return "lmem";
+	default:
+		return "unknown";
+	}
+}
+
+struct gem_memory_region *__gem_get_memory_regions(int i915)
+{
+	struct drm_i915_query_memory_regions *info;
+	struct gem_memory_region *first = NULL;
+
+	info = gem_get_query_memory_regions(i915);
+	for (int i = 0; info && i < info->num_regions; i++) {
+		struct gem_memory_region *r;
+
+		r = malloc(sizeof(*r));
+		igt_assert(r);
+
+		r->ci = info->regions[i].region;
+		r->size = info->regions[i].probed_size;
+		if (r->size == -1ull)
+			r->size = intel_get_avail_ram_mb() << 20;
+
+		asprintf(&r->name, "%s%d",
+			 region_repr(&r->ci), r->ci.memory_instance);
+
+		r->next = first;
+		first = r;
+	}
+	free(info);
+
+	return first;
+}
+
+struct gem_memory_region *__gem_next_memory_region(struct gem_memory_region *r)
+{
+	struct gem_memory_region *next = r->next;
+
+	free(r->name);
+	free(r);
+
+	return next;
+}

@@ -122,6 +122,39 @@ static void test_throttle(int fd)
 	trigger_reset(fd);
 }
 
+static void test_create(int fd)
+{
+	wedge_gpu(fd);
+
+	gem_close(fd, gem_create(fd, 4096));
+
+	trigger_reset(fd);
+}
+
+static void test_create_ext(int fd)
+{
+	wedge_gpu(fd);
+
+	for_each_memory_region(r, fd) {
+		uint64_t size = 4096;
+		uint32_t handle;
+
+		igt_debug("Creating object in %s\n", r->name);
+		igt_assert_eq(__gem_create_in_memory_region_list(fd,
+								 &handle,
+								 &size,
+								 &r->ci, 1),
+			      0);
+
+		gem_read(fd, handle, size / 2, &size, sizeof(size));
+		igt_assert_eq_u64(size, 0);
+
+		gem_close(fd, handle);
+	}
+
+	trigger_reset(fd);
+}
+
 static void test_context_create(int fd)
 {
 	uint32_t ctx;
@@ -996,6 +1029,15 @@ igt_main
 
 	igt_subtest("throttle")
 		test_throttle(fd);
+
+	igt_describe("Validate i915_gem_create_ioctl, while gpu is wedged for fb scanout.");
+	igt_subtest("create")
+		test_create(fd);
+
+	igt_describe("Validate i915_gem_create_ext_ioctl and checks if returns clear backing store "
+		     "while gpu is wedged for fb scanout.");
+	igt_subtest("create-ext")
+		test_create_ext(fd);
 
 	igt_subtest("context-create")
 		test_context_create(fd);
