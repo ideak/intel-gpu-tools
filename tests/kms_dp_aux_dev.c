@@ -53,6 +53,12 @@ static bool test(int drm_fd, uint32_t connector_id)
 	drmModeFreeConnector(connector);
 	igt_assert(dir_fd >= 0);
 
+	if (connector->connection != DRM_MODE_CONNECTED &&
+	    is_mst_connector(drm_fd, connector_id)) {
+		close(dir_fd);
+		return false;
+	}
+
 	dir = fdopendir(dir_fd);
 	igt_assert(dir);
 
