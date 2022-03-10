@@ -430,6 +430,9 @@ static void dump_hmdi_max_data_rate(uint8_t hdmi_max_data_rate)
 		[HDMI_MAX_DATA_RATE_PLATFORM] = 0,
 		[HDMI_MAX_DATA_RATE_297] = 297,
 		[HDMI_MAX_DATA_RATE_165] = 165,
+		[HDMI_MAX_DATA_RATE_594] = 594,
+		[HDMI_MAX_DATA_RATE_340] = 340,
+		[HDMI_MAX_DATA_RATE_300] = 300,
 	};
 
 	if (hdmi_max_data_rate >= ARRAY_SIZE(max_data_rate))
