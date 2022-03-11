@@ -26,7 +26,6 @@
 
 #include "drmtest.h"
 #include "i915_3d.h"
-#include "i915_pciids.h"
 #include "igt_aux.h"
 #include "igt_core.h"
 #include "igt_core.h"
