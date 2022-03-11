@@ -534,6 +534,45 @@ void gem_engine_properties_restore(int fd, const struct gem_engine_properties *s
 	}
 }
 
+static bool
+__gem_engine_has_capability(int i915, const char *engine,
+			    const char *attr, const char *cap)
+{
+	char buf[4096] = {};
+	FILE *file;
+
+	file = __open_attr(igt_sysfs_open(i915), "r",
+			   "engine", engine, attr, NULL);
+	if (!file)
+		return NULL;
+
+	fread(buf, 1, sizeof(buf) - 1, file);
+	fclose(file);
+
+	return strstr(buf, cap);
+}
+
+bool gem_engine_has_capability(int i915, const char *engine, const char *cap)
+{
+	return __gem_engine_has_capability(i915, engine, "capabilities", cap);
+}
+
+bool gem_engine_has_known_capability(int i915, const char *engine, const char *cap)
+{
+	return __gem_engine_has_capability(i915, engine, "known_capabilities", cap);
+}
+
+bool gem_engine_can_block_copy(int i915, const struct intel_execution_engine2 *engine)
+{
+	if (engine->class != I915_ENGINE_CLASS_COPY)
+		return false;
+
+	if (!gem_engine_has_known_capability(i915, engine->name, "block_copy"))
+		return intel_gen(intel_get_drm_devid(i915)) >= 12;
+
+	return gem_engine_has_capability(i915, engine->name, "block_copy");
+}
+
 uint32_t gem_engine_mmio_base(int i915, const char *engine)
 {
 	unsigned int mmio = 0;

@@ -133,6 +133,11 @@ int gem_engine_property_printf(int i915, const char *engine, const char *attr,
 
 uint32_t gem_engine_mmio_base(int i915, const char *engine);
 
+bool gem_engine_has_capability(int i915, const char *engine, const char *cap);
+bool gem_engine_has_known_capability(int i915, const char *engine, const char *cap);
+
+bool gem_engine_can_block_copy(int i915, const struct intel_execution_engine2 *engine);
+
 void dyn_sysfs_engines(int i915, int engines, const char *file,
 		       void (*test)(int i915, int engine));
 
