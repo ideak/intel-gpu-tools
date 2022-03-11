@@ -109,6 +109,7 @@ i915_progs = [
 	'gem_blits',
 	'gem_busy',
 	'gem_caching',
+	'gem_ccs',
 	'gem_close',
 	'gem_close_race',
 	'gem_concurrent_blit',
