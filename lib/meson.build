@@ -12,6 +12,7 @@ lib_sources = [
 	'i915/gem_vm.c',
 	'i915/intel_memory_region.c',
 	'i915/intel_mocs.c',
+	'i915/i915_blt.c',
 	'igt_collection.c',
 	'igt_color_encoding.c',
 	'igt_debugfs.c',
