@@ -22,6 +22,7 @@
  */
 
 #include <errno.h>
+#include <fcntl.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdatomic.h>
@@ -29,6 +30,7 @@
 #include <sys/ptrace.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
+#include <unistd.h>
 #include "drm.h"
 
 #include "i915/gem.h"
@@ -287,6 +289,44 @@ static void *memchr_inv(const void *s, int c, size_t n)
 #pragma GCC diagnostic pop
 
 	return NULL;
+}
+
+static void
+test_oob_read(int i915)
+{
+	unsigned char read_buf[4096];
+	uint32_t handle;
+	uintptr_t addr;
+	int memfd;
+	int ret;
+
+	handle = gem_create(i915, 4096);
+
+	for_each_mmap_offset_type(i915, t) {
+		uint32_t *ptr;
+
+		ptr = __mmap_offset(i915, handle, 0, 4096,
+				    PROT_READ | PROT_WRITE,
+				    t->type);
+		if (!ptr)
+			continue;
+
+		memfd = open("/proc/self/mem", O_RDWR);
+		igt_require_f(memfd != -1, "/proc/self/mem\n");
+
+		addr = (uintptr_t)ptr + 4092;
+		ret = lseek(memfd, addr, SEEK_SET);
+		igt_assert_f(ret != -1, "lseek failed\n");
+
+		/* Triggering the buf (out of bound read) */
+		ret = read(memfd, read_buf, 8);
+		igt_assert(ret == -1 && errno ==  EIO);
+
+		munmap(ptr, 4096);
+		close(memfd);
+	}
+
+	gem_close(i915, handle);
 }
 
 static void test_ptrace(int i915)
@@ -691,6 +731,10 @@ igt_main
 		isolation(i915);
 	igt_subtest_f("pf-nonblock")
 		pf_nonblock(i915);
+
+	igt_describe("Check for out-of-bound access in vm_access");
+	igt_subtest("oob-read")
+		test_oob_read(i915);
 
 	igt_subtest_with_dynamic("ptrace")
 		test_ptrace(i915);
