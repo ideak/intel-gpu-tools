@@ -16,4 +16,8 @@ int __gem_create_ext(int fd, uint64_t *size, uint32_t *handle,
                      struct i915_user_extension *ext);
 uint32_t gem_create_ext(int fd, uint64_t size, struct i915_user_extension *ext);
 
+void gem_pool_init(void);
+void gem_pool_dump(void);
+uint32_t gem_create_from_pool(int fd, uint64_t *size, uint32_t region);
+
 #endif /* GEM_CREATE_H */

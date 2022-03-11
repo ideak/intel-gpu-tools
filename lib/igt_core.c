@@ -58,6 +58,7 @@
 #include <glib.h>
 
 #include "drmtest.h"
+#include "i915/gem_create.h"
 #include "intel_allocator.h"
 #include "intel_batchbuffer.h"
 #include "intel_chipset.h"
@@ -1428,6 +1429,7 @@ __noreturn static void exit_subtest(const char *result)
 	 */
 	intel_allocator_init();
 	intel_bb_reinit_allocator();
+	gem_pool_init();
 
 	if (!in_dynamic_subtest)
 		_igt_dynamic_tests_executed = -1;
