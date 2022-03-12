@@ -26,6 +26,7 @@
 #include <stdint.h>
 #include "igt.h"
 #include "igt_fb.h"
+#include "igt_psr.h"
 
 /* Read & Write DSC parameters */
 #define DEBUGFS_DSC_CLOCK_EN "dsc_clock_en"
@@ -42,8 +43,10 @@
 #define DEBUGFS_DP_LINK_SETTINGS "link_settings"
 #define DEBUGFS_HPD_TRIGGER "trigger_hotplug"
 
+/* eDP related */
 #define DEBUGFS_EDP_ILR_SETTING "ilr_setting"
 #define MAX_SUPPORTED_ILR 8
+#define DEBUGFS_EDP_PSR_CAP	"psr_capability"
 
 enum amd_dsc_clock_force {
 	DSC_AUTOMATIC = 0,
@@ -129,11 +132,16 @@ void igt_amd_write_link_settings(
 	int drm_fd, char *connector_name, enum dc_lane_count lane_count,
 	enum dc_link_rate link_rate, enum dc_link_training_type training_type);
 bool igt_amd_output_has_link_settings(int drm_fd, char *connector_name);
+
+/* eDP debugfs helpers */
 void igt_amd_read_ilr_setting(
 	int drm_fd, char *connector_name, int *supported_ilr);
 void igt_amd_write_ilr_setting(
 	int drm_fd, char *connector_name, enum dc_lane_count lane_count,
 	uint8_t link_rate_set);
 bool igt_amd_output_has_ilr_setting(int drm_fd, char *connector_name);
+bool igt_amd_output_has_psr_cap(int drm_fd, char *connector_name);
+bool igt_amd_psr_support_sink(int drm_fd, char *connector_name, enum psr_mode mode);
+bool igt_amd_psr_support_drv(int drm_fd, char *connector_name, enum psr_mode mode);
 
 #endif /* IGT_AMD_H */

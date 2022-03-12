@@ -1004,3 +1004,96 @@ bool igt_amd_output_has_ilr_setting(int drm_fd, char *connector_name)
 	close(fd);
 	return true;
 }
+
+/**
+ * igt_amd_output_has_psr_cap: check if eDP connector has psr_capability debugfs entry
+ * @drm_fd: DRM file descriptor
+ * @connector_name: The connector's name, on which we're reading the status
+ */
+bool igt_amd_output_has_psr_cap(int drm_fd, char *connector_name)
+{
+	int fd;
+	int res;
+	struct stat stat;
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+	if (fd < 0) {
+		igt_info("output %s: debugfs not found\n", connector_name);
+		return false;
+	}
+
+	res = fstatat(fd, DEBUGFS_EDP_PSR_CAP, &stat, 0);
+	if (res != 0) {
+		igt_info("output %s: %s debugfs not supported\n", connector_name, DEBUGFS_EDP_PSR_CAP);
+		close(fd);
+		return false;
+	}
+
+	close(fd);
+	return true;
+}
+
+/**
+ * igt_amd_psr_support_sink: check if sink device support PSR
+ * @drm_fd: DRM file descriptor
+ * @connector_name: The connector's name, on which we're reading the status
+ * @mode: expected PSR mode, either PSR1 or PSR2
+ */
+bool igt_amd_psr_support_sink(int drm_fd, char *connector_name, enum psr_mode mode)
+{
+	char buf[PSR_STATUS_MAX_LEN];
+	int ret;
+	int fd;
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+	if (fd < 0) {
+		igt_info("output %s: debugfs not found\n", connector_name);
+		return false;
+	}
+
+	ret = igt_debugfs_simple_read(fd, DEBUGFS_EDP_PSR_CAP, buf, sizeof(buf));
+	igt_assert_f(ret >= 0, "Reading %s for connector %s failed.\n",
+		     DEBUGFS_EDP_PSR_CAP, connector_name);
+	close(fd);
+
+	if (ret < 1)
+		return false;
+
+	if (mode == PSR_MODE_1)
+		return strstr(buf, "Sink support: yes [0x01]");
+	else
+		return strstr(buf, "Sink support: yes [0x03]") ||
+		       strstr(buf, "Sink support: yes [0x04]");
+}
+
+/**
+ * igt_amd_psr_support_drv: check if AMDGPU kernel driver support PSR
+ * @drm_fd: DRM file descriptor
+ * @connector_name: The connector's name, on which we're reading the status
+ * @mode: expected PSR mode, either PSR1 or PSR2
+ */
+bool igt_amd_psr_support_drv(int drm_fd, char *connector_name, enum psr_mode mode)
+{
+	char buf[PSR_STATUS_MAX_LEN];
+	int ret;
+	int fd;
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+	if (fd < 0) {
+		igt_info("output %s: debugfs not found\n", connector_name);
+		return false;
+	}
+
+	ret = igt_debugfs_simple_read(fd, DEBUGFS_EDP_PSR_CAP, buf, sizeof(buf));
+	igt_assert_f(ret >= 0, "Reading %s for connector %s failed.\n",
+		     DEBUGFS_EDP_PSR_CAP, connector_name);
+	close(fd);
+
+	if (ret < 1)
+		return false;
+
+	if (mode == PSR_MODE_1)
+		return strstr(buf, "Driver support: yes");
+	else
+		return strstr(buf, "Driver support: yes [0x01]");
+}
