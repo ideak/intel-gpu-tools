@@ -209,8 +209,14 @@ bool psr_sink_support(int device, int debugfs_fd, enum psr_mode mode)
 		/*
 		 * i915 requires PSR version 0x03 that is PSR2 + SU with
 		 * Y-coordinate to support PSR2
+		 *
+		 * or
+		 *
+		 * PSR version 0x4 that is PSR2 + SU w/ Y-coordinate and SU
+		 * Region Early Transport to support PSR2 (eDP 1.5)
 		 */
-		return strstr(buf, "Sink support: yes [0x03]");
+		return strstr(buf, "Sink support: yes [0x03]") ||
+		       strstr(buf, "Sink support: yes [0x04]");
 }
 
 #define PSR2_SU_BLOCK_STR_LOOKUP "PSR2 SU blocks:\n0\t"
