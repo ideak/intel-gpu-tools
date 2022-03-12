@@ -35,7 +35,6 @@
  */
 IGT_TEST_DESCRIPTION("Basic test for enabling Panel Self Refresh for eDP displays");
 
-#define DEBUGFS_PSR_STATE "psr_state"
 /* After a full update, a few fast updates are necessary for PSR to be enabled */
 #define N_FLIPS 6
 /* DMCUB takes some time to actually enable PSR. Worst case delay is 4 seconds */
@@ -109,8 +108,6 @@ static int check_conn_type(data_t *data, uint32_t type) {
 }
 
 static void run_check_psr(data_t *data, bool test_null_crtc) {
-	char buf[8];
-	char *connector_name;
 	int fd, edp_idx, dp_idx, ret, i, psr_state;
 	igt_fb_t ref_fb, ref_fb2;
 	igt_fb_t *flip_fb;
@@ -158,14 +155,7 @@ static void run_check_psr(data_t *data, bool test_null_crtc) {
 		if (output->config.connector->connector_type != DRM_MODE_CONNECTOR_eDP)
 			continue;
 
-		connector_name = output->name;
-		fd = igt_debugfs_connector_dir(data->fd, connector_name, O_RDONLY);
-		igt_assert(fd >= 0);
-
-		ret = igt_debugfs_simple_read(fd, DEBUGFS_PSR_STATE, buf, sizeof(buf));
-		igt_require(ret > 0);
-
-		psr_state =  (int) strtol(buf, NULL, 10);
+		psr_state =  igt_amd_read_psr_state(data->fd, output->name);
 		igt_fail_on_f(psr_state < 1, "PSR was not enabled for connector %s\n", output->name);
 		igt_fail_on_f(psr_state == 0xff, "PSR is invalid for connector %s\n", output->name);
 		igt_fail_on_f(psr_state != 5, "PSR state is expected to be at 5 on a "

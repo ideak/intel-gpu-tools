@@ -289,25 +289,7 @@ static bool igt_amd_output_has_debugfs(int drm_fd, char *connector_name, const c
  */
 static bool igt_amd_output_has_dsc(int drm_fd, char *connector_name)
 {
-	int fd;
-	int res;
-	struct stat stat;
-
-	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
-	if (fd < 0) {
-		igt_info("output %s: debugfs not found\n", connector_name);
-		return false;
-	}
-
-	res = fstatat(fd, DEBUGFS_DSC_CLOCK_EN , &stat, 0);
-	if (res != 0) {
-		igt_info("%s debugfs not supported\n", DEBUGFS_DSC_CLOCK_EN);
-		close(fd);
-		return false;
-	}
-
-	close(fd);
-	return true;
+	return igt_amd_output_has_debugfs(drm_fd, connector_name, DEBUGFS_DSC_CLOCK_EN);
 }
 
 /**
@@ -739,25 +721,7 @@ int igt_amd_read_dsc_param_slice_bpg(int drm_fd, char *connector_name)
  */
 static bool igt_amd_output_has_hpd(int drm_fd, char *connector_name)
 {
-        int fd;
-        int res;
-        struct stat stat;
-
-        fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
-        if (fd < 0) {
-                igt_info("output %s: debugfs not found\n", connector_name);
-                return false;
-        }
-
-        res = fstatat(fd, DEBUGFS_HPD_TRIGGER, &stat, 0);
-        if (res != 0) {
-                igt_info("%s debugfs not supported\n", DEBUGFS_HPD_TRIGGER);
-                close(fd);
-                return false;
-        }
-
-        close(fd);
-        return true;
+        return igt_amd_output_has_debugfs(drm_fd, connector_name, DEBUGFS_HPD_TRIGGER);
 }
 
 /**
@@ -904,25 +868,7 @@ void igt_amd_write_link_settings(
  */
 bool igt_amd_output_has_link_settings(int drm_fd, char *connector_name)
 {
-	int fd;
-	int res;
-	struct stat stat;
-
-	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
-	if (fd < 0) {
-		igt_info("output %s: debugfs not found\n", connector_name);
-		return false;
-	}
-
-	res = fstatat(fd, DEBUGFS_DP_LINK_SETTINGS, &stat, 0);
-	if (res != 0) {
-		igt_info("output %s: %s debugfs not supported\n", connector_name, DEBUGFS_DP_LINK_SETTINGS);
-		close(fd);
-		return false;
-	}
-
-	close(fd);
-	return true;
+	return igt_amd_output_has_debugfs(drm_fd, connector_name, DEBUGFS_DP_LINK_SETTINGS);
 }
 
 /*
@@ -1016,25 +962,7 @@ void igt_amd_write_ilr_setting(
  */
 bool igt_amd_output_has_ilr_setting(int drm_fd, char *connector_name)
 {
-	int fd;
-	int res;
-	struct stat stat;
-
-	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
-	if (fd < 0) {
-		igt_info("output %s: debugfs not found\n", connector_name);
-		return false;
-	}
-
-	res = fstatat(fd, DEBUGFS_EDP_ILR_SETTING, &stat, 0);
-	if (res != 0) {
-		igt_info("output %s: %s debugfs not supported\n", connector_name, DEBUGFS_EDP_ILR_SETTING);
-		close(fd);
-		return false;
-	}
-
-	close(fd);
-	return true;
+	return igt_amd_output_has_debugfs(drm_fd, connector_name, DEBUGFS_EDP_ILR_SETTING);
 }
 
 /**
@@ -1044,25 +972,7 @@ bool igt_amd_output_has_ilr_setting(int drm_fd, char *connector_name)
  */
 bool igt_amd_output_has_psr_cap(int drm_fd, char *connector_name)
 {
-	int fd;
-	int res;
-	struct stat stat;
-
-	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
-	if (fd < 0) {
-		igt_info("output %s: debugfs not found\n", connector_name);
-		return false;
-	}
-
-	res = fstatat(fd, DEBUGFS_EDP_PSR_CAP, &stat, 0);
-	if (res != 0) {
-		igt_info("output %s: %s debugfs not supported\n", connector_name, DEBUGFS_EDP_PSR_CAP);
-		close(fd);
-		return false;
-	}
-
-	close(fd);
-	return true;
+	return igt_amd_output_has_debugfs(drm_fd, connector_name, DEBUGFS_EDP_PSR_CAP);
 }
 
 /**
