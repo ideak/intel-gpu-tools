@@ -702,15 +702,9 @@ static void dump_lvds_data(struct context *context,
 		const uint8_t *timing_data = lfp_data_ptr + dvo_offset;
 		const struct lvds_lfp_data_entry *lfp_data =
 		    (const struct lvds_lfp_data_entry *)lfp_data_ptr;
-		char marker;
 
 		if (i != context->panel_type && !context->dump_all_panel_types)
 			continue;
-
-		if (i == context->panel_type)
-			marker = '*';
-		else
-			marker = ' ';
 
 		hdisplay = _H_ACTIVE(timing_data);
 		hsyncstart = hdisplay + _H_SYNC_OFF(timing_data);
@@ -723,8 +717,9 @@ static void dump_lvds_data(struct context *context,
 		vtotal = vdisplay + _V_BLANK(timing_data);
 		clock = _PIXEL_CLOCK(timing_data) / 1000;
 
-		printf("%c\tpanel type %02i: %dx%d clock %d\n", marker,
-		       i, lfp_data->fp_timing.x_res, lfp_data->fp_timing.y_res,
+		printf("\tPanel %d%s\n", i, context->panel_type == i ? " *" : "");
+		printf("\t\t%dx%d clock %d\n",
+		       lfp_data->fp_timing.x_res, lfp_data->fp_timing.y_res,
 		       _PIXEL_CLOCK(timing_data));
 		printf("\t\tinfo:\n");
 		printf("\t\t  LVDS: 0x%08lx\n",
