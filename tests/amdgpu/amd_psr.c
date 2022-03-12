@@ -24,6 +24,7 @@
 #include "igt.h"
 #include "igt_core.h"
 #include "igt_kms.h"
+#include "igt_amd.h"
 #include <stdint.h>
 #include <fcntl.h>
 #include <xf86drmMode.h>

@@ -47,6 +47,7 @@
 #define DEBUGFS_EDP_ILR_SETTING "ilr_setting"
 #define MAX_SUPPORTED_ILR 8
 #define DEBUGFS_EDP_PSR_CAP	"psr_capability"
+#define DEBUGFS_EDP_PSR_STATE	"psr_state"
 
 enum amd_dsc_clock_force {
 	DSC_AUTOMATIC = 0,
@@ -143,5 +144,7 @@ bool igt_amd_output_has_ilr_setting(int drm_fd, char *connector_name);
 bool igt_amd_output_has_psr_cap(int drm_fd, char *connector_name);
 bool igt_amd_psr_support_sink(int drm_fd, char *connector_name, enum psr_mode mode);
 bool igt_amd_psr_support_drv(int drm_fd, char *connector_name, enum psr_mode mode);
+bool igt_amd_output_has_psr_state(int drm_fd, char *connector_name);
+int  igt_amd_read_psr_state(int drm_fd, char *connector_name);
 
 #endif /* IGT_AMD_H */

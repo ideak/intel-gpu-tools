@@ -251,6 +251,38 @@ bool igt_amd_is_tiled(uint64_t modifier)
 }
 
 /**
+ * @brief generic helper to check if the debugfs entry of given connector has the
+ *        debugfs interface defined.
+ * @param drm_fd: DRM file descriptor
+ * @param connector_name: The connector's name, on which we're reading the status
+ * @param interface_name: The debugfs interface name to check
+ * @return true if <debugfs_root>/connector_name/interface_name exists and defined
+ * @return false otherwise
+ */
+static bool igt_amd_output_has_debugfs(int drm_fd, char *connector_name, const char *interface_name)
+{
+	int fd;
+	int res;
+	struct stat stat;
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+	if (fd < 0) {
+		igt_info("output %s: debugfs not found\n", connector_name);
+		return false;
+	}
+
+	res = fstatat(fd, interface_name, &stat, 0);
+	if (res != 0) {
+		igt_info("output %s: %s debugfs not supported\n", connector_name, interface_name);
+		close(fd);
+		return false;
+	}
+
+	close(fd);
+	return true;
+}
+
+/**
  * igt_amd_output_has_dsc: check if connector has dsc debugfs entry
  * @drm_fd: DRM file descriptor
  * @connector_name: The connector's name, on which we're reading the status
@@ -1096,4 +1128,40 @@ bool igt_amd_psr_support_drv(int drm_fd, char *connector_name, enum psr_mode mod
 		return strstr(buf, "Driver support: yes");
 	else
 		return strstr(buf, "Driver support: yes [0x01]");
+}
+
+/**
+ * igt_amd_output_has_psr_state: check if eDP connector has psr_state debugfs entry
+ * @drm_fd: DRM file descriptor
+ * @connector_name: The connector's name, on which we're reading the status
+ */
+bool igt_amd_output_has_psr_state(int drm_fd, char *connector_name)
+{
+	return igt_amd_output_has_debugfs(drm_fd, connector_name, DEBUGFS_EDP_PSR_STATE);
+}
+
+/**
+ * @brief Read PSR State from debugfs interface
+ * @param drm_fd DRM file descriptor
+ * @param connector_name The connector's name, on which we're reading the status
+ * @return PSR state as integer
+ */
+int igt_amd_read_psr_state(int drm_fd, char *connector_name)
+{
+	char buf[4];
+	int fd, ret;
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+	if (fd < 0) {
+		igt_info("Couldn't open connector %s debugfs directory\n", connector_name);
+		return false;
+	}
+
+	ret = igt_debugfs_simple_read(fd, DEBUGFS_EDP_PSR_STATE, buf, sizeof(buf));
+	close(fd);
+
+	igt_assert_f(ret >= 0, "Reading %s for connector %s failed.\n",
+		     DEBUGFS_EDP_PSR_STATE, connector_name);
+
+	return strtol(buf, NULL, 10);
 }
