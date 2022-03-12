@@ -903,6 +903,39 @@ static void dump_lvds_ptr_data(struct context *context,
 	const struct bdb_lvds_lfp_data_ptrs *ptrs = block_data(block);
 
 	printf("\tNumber of entries: %d\n", ptrs->lvds_entries);
+
+	for (int i = 0; i < 16; i++) {
+		if (i != context->panel_type && !context->dump_all_panel_types)
+			continue;
+
+		printf("\tPanel %d%s\n", i, context->panel_type == i ? " *" : "");
+
+		if (ptrs->lvds_entries >= 1) {
+			printf("\t\tFP timing offset: %d\n",
+			       ptrs->ptr[i].fp_timing.offset);
+			printf("\t\tFP timing table size: %d\n",
+			       ptrs->ptr[i].fp_timing.table_size);
+		}
+		if (ptrs->lvds_entries >= 2) {
+			printf("\t\tDVO timing offset: %d\n",
+			       ptrs->ptr[i].dvo_timing.offset);
+			printf("\t\tDVO timing table size: %d\n",
+			       ptrs->ptr[i].dvo_timing.table_size);
+		}
+		if (ptrs->lvds_entries >= 3) {
+			printf("\t\tPanel PnP ID offset: %d\n",
+			       ptrs->ptr[i].panel_pnp_id.offset);
+			printf("\t\tPanel PnP ID table size: %d\n",
+			       ptrs->ptr[i].panel_pnp_id.table_size);
+		}
+	}
+
+	if (ptrs->panel_name.table_size) {
+		printf("\tPanel name offset: %d\n",
+		       ptrs->panel_name.offset);
+		printf("\tPanel name table size: %d\n",
+		       ptrs->panel_name.table_size);
+	}
 }
 
 static char *decode_pnp_id(u16 mfg_name, char str[4])
