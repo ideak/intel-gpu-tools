@@ -22,7 +22,7 @@ _Static_assert(ABORT_ALL == (ABORT_TAINT | ABORT_LOCKDEP | ABORT_PING), "ABORT_A
 
 #define GCOV_DIR		"/sys/kernel/debug/gcov"
 #define GCOV_RESET GCOV_DIR	"/reset"
-#define CODE_COV_RESULTS_PATH	"/code_cov"
+#define CODE_COV_RESULTS_PATH	"code_cov"
 
 struct regex_list {
 	char **regex_strings;

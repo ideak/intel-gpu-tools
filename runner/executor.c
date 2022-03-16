@@ -20,6 +20,7 @@
 #include <sys/types.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
+#include <dirent.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -1446,8 +1447,11 @@ static bool clear_test_result_directory(int dirfd)
 
 static bool clear_old_results(char *path)
 {
+	struct dirent *entry;
+	char name[PATH_MAX];
 	int dirfd;
 	size_t i;
+	DIR *dir;
 
 	if ((dirfd = open(path, O_DIRECTORY | O_RDONLY)) < 0) {
 		if (errno == ENOENT) {
@@ -1469,7 +1473,6 @@ static bool clear_old_results(char *path)
 	}
 
 	for (i = 0; true; i++) {
-		char name[32];
 		int resdirfd;
 
 		snprintf(name, sizeof(name), "%zd", i);
@@ -1485,6 +1488,31 @@ static bool clear_old_results(char *path)
 		if (unlinkat(dirfd, name, AT_REMOVEDIR)) {
 			errf("Warning: Result directory %s contains extra files\n",
 			     name);
+		}
+	}
+
+	strcpy(name, path);
+	strcat(name, "/" CODE_COV_RESULTS_PATH);
+	if ((dir = opendir(name)) != NULL) {
+		char *p;
+
+		strcat(name, "/");
+		p = name + strlen(name);
+
+		while ((entry = readdir(dir)) != NULL) {
+			if (!strcmp(entry->d_name, ".") || !strcmp(entry->d_name, ".."))
+				continue;
+
+			strcpy(p, entry->d_name);
+			if (unlink(name))  {
+				errf("Error removing %s\n", name);
+			}
+		}
+
+		closedir(dir);
+		if (unlinkat(dirfd, CODE_COV_RESULTS_PATH, AT_REMOVEDIR)) {
+			errf("Warning: Result directory %s/%s contains extra files\n",
+			     path, CODE_COV_RESULTS_PATH);
 		}
 	}
 
@@ -1818,7 +1846,7 @@ static void code_coverage_stop(struct settings *settings, const char *job_name,
 	name[j] = '\0';
 
 	strcpy(fname, settings->results_path);
-	strcat(fname, CODE_COV_RESULTS_PATH "/");
+	strcat(fname, "/" CODE_COV_RESULTS_PATH "/");
 	strcat(fname, name);
 
 	argv[0] = settings->code_coverage_script;
@@ -1844,22 +1872,27 @@ bool execute(struct execute_state *state,
 		return true;
 	}
 
-	if (settings->enable_code_coverage && !settings->cov_results_per_test) {
-		char *reason = NULL;
-
-		code_coverage_start(settings, -1, &reason);
-		if (reason != NULL) {
-			errf("%s\n", reason);
-			free(reason);
-			status = false;
-		}
-	}
-
 	if ((resdirfd = open(settings->results_path, O_DIRECTORY | O_RDONLY)) < 0) {
 		/* Initialize state should have done this */
 		errf("Error: Failure opening results path %s\n",
 		     settings->results_path);
 		return false;
+	}
+
+	if (settings->enable_code_coverage) {
+		if (!settings->cov_results_per_test) {
+			char *reason = NULL;
+
+			code_coverage_start(settings, -1, &reason);
+			if (reason != NULL) {
+				errf("%s\n", reason);
+				free(reason);
+				close(resdirfd);
+				return false;
+			}
+		}
+
+		mkdirat(resdirfd, CODE_COV_RESULTS_PATH, 0755);
 	}
 
 	if ((testdirfd = open(settings->test_root, O_DIRECTORY | O_RDONLY)) < 0) {
