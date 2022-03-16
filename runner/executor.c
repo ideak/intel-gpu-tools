@@ -1,3 +1,4 @@
+#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <glib.h>
@@ -1693,6 +1694,140 @@ static bool should_die_because_signal(int sigfd)
 	return false;
 }
 
+static char *code_coverage_name(struct settings *settings)
+{
+	const char *start, *end, *fname;
+	char *name;
+	int size;
+
+	if (settings->name && *settings->name)
+		return settings->name;
+	else if (!settings->test_list)
+		return NULL;
+
+	/* Use only the base of the test_list, without path and extension */
+	fname = settings->test_list;
+
+	start = strrchr(fname,'/');
+	if (!start)
+		start = fname;
+
+	end = strrchr(start, '.');
+	if (end)
+		size = end - start;
+	else
+		size = strlen(start);
+
+	name = malloc(size + 1);
+	strncpy(name, fname, size);
+	name[size]  = '\0';
+
+	return name;
+}
+
+static void run_as_root(char * const argv[], int sigfd, char **abortreason)
+{
+	struct signalfd_siginfo siginfo;
+	int status = 0, ret;
+	pid_t child;
+
+	child = fork();
+	if (child < 0) {
+		*abortreason = strdup("Failed to fork");
+		return;
+	}
+
+	if (child == 0) {
+		execv(argv[0], argv);
+		perror (argv[0]);
+		exit(IGT_EXIT_INVALID);
+	}
+
+	if (sigfd >= 0) {
+		while (1) {
+			ret = read(sigfd, &siginfo, sizeof(siginfo));
+			if (ret < 0) {
+				errf("Error reading from signalfd: %m\n");
+				continue;
+			} else if (siginfo.ssi_signo == SIGCHLD) {
+				if (child != waitpid(child, &status, WNOHANG)) {
+					errf("Failed to reap child\n");
+					status = 9999;
+					continue;
+				}
+				break;
+			}
+		}
+	} else {
+		waitpid(child, &status, 0);
+	}
+
+	if (WIFSIGNALED(status))
+		asprintf(abortreason, "%s received signal %d while running\n",argv[0], WTERMSIG(status));
+	else if (!WIFEXITED(status))
+		asprintf(abortreason, "%s aborted with unknown status\n", argv[0]);
+	else if (WEXITSTATUS(status))
+		asprintf(abortreason, "%s returned error %d\n", argv[0], WEXITSTATUS(status));
+}
+
+static void code_coverage_start(struct settings *settings, int sigfd, char **abortreason)
+{
+	int fd;
+
+	fd = open(GCOV_RESET, O_WRONLY);
+	if (fd < 0) {
+		asprintf(abortreason, "Failed to open %s", GCOV_RESET);
+		return;
+	}
+	if (write(fd, "0\n", 2) < 0)
+		*abortreason = strdup("Failed to reset gcov counters");
+
+	close(fd);
+}
+
+static void code_coverage_stop(struct settings *settings, const char *job_name,
+			       int sigfd, char **abortreason)
+{
+	int i, j = 0, last_was_escaped = 1;
+	char fname[PATH_MAX];
+	char name[PATH_MAX];
+	char *argv[3] = {};
+
+	/* If name is empty, use a default */
+	if (!job_name || !*job_name)
+		job_name = "code_coverage";
+
+	/*
+	 * Use only letters, numbers and '_'
+	 *
+	 * This way, the tarball name can be used as testname when lcov runs
+	 */
+	for (i = 0; i < strlen(job_name); i++) {
+		if (!isalpha(job_name[i]) && !isalnum(job_name[i])) {
+			if (last_was_escaped)
+				continue;
+			name[j++] = '_';
+			last_was_escaped = 1;
+		} else {
+			name[j++] = job_name[i];
+			last_was_escaped = 0;
+		}
+	}
+	if (j && last_was_escaped)
+		j--;
+	name[j] = '\0';
+
+	strcpy(fname, settings->results_path);
+	strcat(fname, CODE_COV_RESULTS_PATH "/");
+	strcat(fname, name);
+
+	argv[0] = settings->code_coverage_script;
+	argv[1] = fname;
+
+	outf("Storing code coverage results...\n");
+	run_as_root(argv, sigfd, abortreason);
+}
+
 bool execute(struct execute_state *state,
 	     struct settings *settings,
 	     struct job_list *job_list)
@@ -1707,6 +1842,17 @@ bool execute(struct execute_state *state,
 	if (state->dry) {
 		outf("Dry run, not executing. Invoke igt_resume if you want to execute.\n");
 		return true;
+	}
+
+	if (settings->enable_code_coverage && !settings->cov_results_per_test) {
+		char *reason = NULL;
+
+		code_coverage_start(settings, -1, &reason);
+		if (reason != NULL) {
+			errf("%s\n", reason);
+			free(reason);
+			status = false;
+		}
 	}
 
 	if ((resdirfd = open(settings->results_path, O_DIRECTORY | O_RDONLY)) < 0) {
@@ -1795,6 +1941,7 @@ bool execute(struct execute_state *state,
 	for (; state->next < job_list->size;
 	     state->next++) {
 		char *reason = NULL;
+		char *job_name;
 		int result;
 
 		if (should_die_because_signal(sigfd)) {
@@ -1802,14 +1949,26 @@ bool execute(struct execute_state *state,
 			goto end;
 		}
 
-		result = execute_next_entry(state,
-					    job_list->size,
-					    &time_spent,
-					    settings,
-					    &job_list->entries[state->next],
-					    testdirfd, resdirfd,
-					    sigfd, &sigmask,
-					    &reason);
+		if (settings->cov_results_per_test) {
+			code_coverage_start(settings, sigfd, &reason);
+			job_name = entry_display_name(&job_list->entries[state->next]);
+		}
+
+		if (reason == NULL) {
+			result = execute_next_entry(state,
+						job_list->size,
+						&time_spent,
+						settings,
+						&job_list->entries[state->next],
+						testdirfd, resdirfd,
+						sigfd, &sigmask,
+						&reason);
+
+			if (settings->cov_results_per_test) {
+				code_coverage_stop(settings, job_name, sigfd, &reason);
+				free(job_name);
+			}
+		}
 
 		if (reason != NULL || (reason = need_to_abort(settings)) != NULL) {
 			char *prev = entry_display_name(&job_list->entries[state->next]);
@@ -1864,6 +2023,17 @@ bool execute(struct execute_state *state,
 	}
 
  end:
+	if (settings->enable_code_coverage && !settings->cov_results_per_test) {
+		char *reason = NULL;
+
+		code_coverage_stop(settings, code_coverage_name(settings), -1, &reason);
+		if (reason != NULL) {
+			errf("%s\n", reason);
+			free(reason);
+			status = false;
+		}
+	}
+
 	close_watchdogs(settings);
 	sigprocmask(SIG_UNBLOCK, &sigmask, NULL);
 	/* make sure that we do not leave any signals unhandled */

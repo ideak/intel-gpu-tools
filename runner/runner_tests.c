@@ -443,6 +443,9 @@ igt_main
 				       "--use-watchdog",
 				       "--piglit-style-dmesg",
 				       "--dmesg-warn-level=3",
+				       "--collect-code-cov",
+				       "--coverage-per-test",
+				       "--collect-script", "/usr/bin/true",
 				       "test-root-dir",
 				       "path-to-results",
 		};

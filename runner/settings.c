@@ -25,6 +25,9 @@ enum {
 	OPT_OVERALL_TIMEOUT,
 	OPT_PER_TEST_TIMEOUT,
 	OPT_ALLOW_NON_ROOT,
+	OPT_CODE_COV_SCRIPT,
+	OPT_ENABLE_CODE_COVERAGE,
+	OPT_COV_RESULTS_PER_TEST,
 	OPT_VERSION,
 	OPT_HELP = 'h',
 	OPT_NAME = 'n',
@@ -240,6 +243,13 @@ static const char *usage_str =
 	"                        Exclude all test matching to regexes from FILENAME\n"
 	"                        (can be used more than once)\n"
 	"  -L, --list-all        List all matching subtests instead of running\n"
+	"  --collect-code-cov    Enables gcov-based collect of code coverage for tests.\n"
+	"                        Requires --collect-script FILENAME\n"
+	"  --coverage-per-test   Stores code coverage results per each test.\n"
+	"                        Requires --collect-script FILENAME\n"
+	"  --collect-script FILENAME\n"
+	"                        Use FILENAME as script to collect code coverage data.\n"
+	"\n"
 	"  [test_root]           Directory that contains the IGT tests. The environment\n"
 	"                        variable IGT_TEST_ROOT will be used if set, overriding\n"
 	"                        this option if given.\n"
@@ -338,9 +348,19 @@ static void free_regexes(struct regex_list *regexes)
 	free(regexes->regexes);
 }
 
-static bool readable_file(char *filename)
+static bool readable_file(const char *filename)
 {
 	return !access(filename, R_OK);
+}
+
+static bool writeable_file(const char *filename)
+{
+	return !access(filename, W_OK);
+}
+
+static bool executable_file(const char *filename)
+{
+	return !access(filename, X_OK);
 }
 
 static void print_version(void)
@@ -393,6 +413,9 @@ bool parse_options(int argc, char **argv,
 		{"test-list", required_argument, NULL, OPT_TEST_LIST},
 		{"overwrite", no_argument, NULL, OPT_OVERWRITE},
 		{"ignore-missing", no_argument, NULL, OPT_IGNORE_MISSING},
+		{"collect-code-cov", no_argument, NULL, OPT_ENABLE_CODE_COVERAGE},
+		{"coverage-per-test", no_argument, NULL, OPT_COV_RESULTS_PER_TEST},
+		{"collect-script", required_argument, NULL, OPT_CODE_COV_SCRIPT},
 		{"multiple-mode", no_argument, NULL, OPT_MULTIPLE},
 		{"inactivity-timeout", required_argument, NULL, OPT_TIMEOUT},
 		{"per-test-timeout", required_argument, NULL, OPT_PER_TEST_TIMEOUT},
@@ -465,6 +488,16 @@ bool parse_options(int argc, char **argv,
 		case OPT_IGNORE_MISSING:
 			/* Ignored, piglit compatibility */
 			break;
+		case OPT_ENABLE_CODE_COVERAGE:
+			settings->enable_code_coverage = true;
+			break;
+		case OPT_COV_RESULTS_PER_TEST:
+			settings->cov_results_per_test = true;
+			break;
+		case OPT_CODE_COV_SCRIPT:
+			settings->code_coverage_script = absolute_path(optarg);
+			break;
+
 		case OPT_MULTIPLE:
 			settings->multiple_mode = true;
 			break;
@@ -597,6 +630,29 @@ bool validate_settings(struct settings *settings)
 	close(fd);
 	close(dirfd);
 
+	/* enables code coverage when --coverage-per-test is used */
+	if (settings->cov_results_per_test)
+		settings->enable_code_coverage = true;
+
+	if (!settings->allow_non_root && (getuid() != 0)) {
+		fprintf(stderr, "Runner needs to run with UID 0 (root).\n");
+		return false;
+	}
+
+	if (settings->enable_code_coverage) {
+		if (!executable_file(settings->code_coverage_script)) {
+			fprintf(stderr, "%s doesn't exist or is not executable\n", settings->code_coverage_script);
+			return false;
+		}
+		if (!writeable_file(GCOV_RESET)) {
+			if (getuid() != 0)
+				fprintf(stderr, "Code coverage requires root.\n");
+			else
+				fprintf(stderr, "Is GCOV enabled? Can't access %s stat.\n", GCOV_RESET);
+			return false;
+		}
+	}
+
 	return true;
 }
 
@@ -645,7 +701,8 @@ bool serialize_settings(struct settings *settings)
 {
 #define SERIALIZE_LINE(f, s, name, format) fprintf(f, "%s : " format "\n", #name, s->name)
 
-	int dirfd, fd;
+	int dirfd, covfd, fd;
+	char path[PATH_MAX];
 	FILE *f;
 
 	if (!settings->results_path) {
@@ -658,6 +715,18 @@ bool serialize_settings(struct settings *settings)
 		if ((dirfd = open(settings->results_path, O_DIRECTORY | O_RDONLY)) < 0) {
 			usage("Creating results-path failed", stderr);
 			return false;
+		}
+	}
+	if (settings->enable_code_coverage) {
+		strcpy(path, settings->results_path);
+		strcat(path, CODE_COV_RESULTS_PATH);
+		if ((covfd = open(path, O_DIRECTORY | O_RDONLY)) < 0) {
+			if (mkdir(path, 0755)) {
+				usage("Creating code coverage path failed", stderr);
+				return false;
+			}
+		} else {
+			close(covfd);
 		}
 	}
 
@@ -712,6 +781,9 @@ bool serialize_settings(struct settings *settings)
 	SERIALIZE_LINE(f, settings, dmesg_warn_level, "%d");
 	SERIALIZE_LINE(f, settings, test_root, "%s");
 	SERIALIZE_LINE(f, settings, results_path, "%s");
+	SERIALIZE_LINE(f, settings, enable_code_coverage, "%d");
+	SERIALIZE_LINE(f, settings, cov_results_per_test, "%d");
+	SERIALIZE_LINE(f, settings, code_coverage_script, "%s");
 
 	if (settings->sync) {
 		fsync(fd);
@@ -760,6 +832,9 @@ bool read_settings_from_file(struct settings *settings, FILE *f)
 		PARSE_LINE(settings, name, val, dmesg_warn_level, numval);
 		PARSE_LINE(settings, name, val, test_root, val ? strdup(val) : NULL);
 		PARSE_LINE(settings, name, val, results_path, val ? strdup(val) : NULL);
+		PARSE_LINE(settings, name, val, enable_code_coverage, numval);
+		PARSE_LINE(settings, name, val, cov_results_per_test, numval);
+		PARSE_LINE(settings, name, val, code_coverage_script, val ? strdup(val) : NULL);
 
 		printf("Warning: Unknown field in settings file: %s = %s\n",
 		       name, val);

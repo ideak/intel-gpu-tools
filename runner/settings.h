@@ -20,6 +20,10 @@ enum {
 
 _Static_assert(ABORT_ALL == (ABORT_TAINT | ABORT_LOCKDEP | ABORT_PING), "ABORT_ALL must be all conditions bitwise or'd");
 
+#define GCOV_DIR		"/sys/kernel/debug/gcov"
+#define GCOV_RESET GCOV_DIR	"/reset"
+#define CODE_COV_RESULTS_PATH	"/code_cov"
+
 struct regex_list {
 	char **regex_strings;
 	GRegex **regexes;
@@ -48,6 +52,9 @@ struct settings {
 	bool piglit_style_dmesg;
 	int dmesg_warn_level;
 	bool list_all;
+	char *code_coverage_script;
+	bool enable_code_coverage;
+	bool cov_results_per_test;
 };
 
 /**
