@@ -31,10 +31,8 @@ int main(int argc, char **argv)
 		return 127;
 	}
 
-	if (!initialize_execute_state_from_resume(dirfd, &state, &settings, &job_list)) {
-		fprintf(stderr, "Failure reading metadata in %s\n", argv[1]);
+	if (!initialize_execute_state_from_resume(dirfd, &state, &settings, &job_list))
 		return 127;
-	}
 
 	if (!execute(&state, &settings, &job_list)) {
 		exitcode = 1;

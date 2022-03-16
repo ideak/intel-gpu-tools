@@ -112,6 +112,7 @@ static void job_list_filter_test(const char *name, const char *filterarg1, const
 		igt_subtest_f("job-list-filters-%s-%s", name, multiple ? "multiple" : "normal") {
 			struct job_list list;
 			const char *argv[] = { "runner",
+					       "--allow-non-root",
 					       /* Ugly but does the trick */
 					       multiple ? "--multiple-mode" : "--sync",
 					       filterarg1, filterarg2,
@@ -187,6 +188,7 @@ static void assert_settings_equal(struct settings *one, struct settings *two)
 	igt_assert_eqstr(one->test_list, two->test_list);
 	igt_assert_eqstr(one->name, two->name);
 	igt_assert_eq(one->dry_run, two->dry_run);
+	igt_assert_eq(one->allow_non_root, two->allow_non_root);
 	igt_assert_eq(one->sync, two->sync);
 	igt_assert_eq(one->log_level, two->log_level);
 	igt_assert_eq(one->overwrite, two->overwrite);
@@ -264,6 +266,7 @@ igt_main
 
 	igt_subtest("default-settings") {
 		const char *argv[] = { "runner",
+				       "--allow-non-root",
 				       "test-root-dir",
 				       "path-to-results",
 		};
@@ -348,6 +351,7 @@ igt_main
 
 		igt_subtest("absolute-path-usage") {
 			const char *argv[] = { "runner",
+					       "--allow-non-root",
 					       "--test-list", pathtotestlist,
 					       testdatadir,
 					       dirname,
@@ -382,6 +386,7 @@ igt_main
 
 	igt_subtest("environment-overrides-test-root-flag") {
 		const char *argv[] = { "runner",
+				       "--allow-non-root",
 				       "test-root-dir",
 				       "path-to-results",
 		};
@@ -415,6 +420,7 @@ igt_main
 	igt_subtest("parse-all-settings") {
 		char blacklist_name[PATH_MAX], blacklist2_name[PATH_MAX];
 		const char *argv[] = { "runner",
+				       "--allow-non-root",
 				       "-n", "foo",
 				       "--abort-on-monitored-error=taint,lockdep",
 				       "--disk-usage-limit=4096",
@@ -451,6 +457,7 @@ igt_main
 		igt_assert(strstr(settings->test_list, "path-to-test-list") != NULL);
 		igt_assert_eqstr(settings->name, "foo");
 		igt_assert(settings->dry_run);
+		igt_assert(settings->allow_non_root);
 		igt_assert_eq(settings->include_regexes.size, 2);
 		igt_assert_eqstr(settings->include_regexes.regex_strings[0], "pattern1");
 		igt_assert_eqstr(settings->include_regexes.regex_strings[1], "pattern2");
@@ -484,6 +491,7 @@ igt_main
 
 	igt_subtest("dmesg-warn-level-inferred") {
 		const char *argv[] = { "runner",
+				       "--allow-non-root",
 				       "test-root-dir",
 				       "path-to-results",
 		};
@@ -496,6 +504,7 @@ igt_main
 
 	igt_subtest("dmesg-warn-level-inferred-with-piglit-style") {
 		const char *argv[] = { "runner",
+				       "--allow-non-root",
 				       "--piglit-style-dmesg",
 				       "test-root-dir",
 				       "path-to-results",
@@ -509,6 +518,7 @@ igt_main
 
 	igt_subtest("dmesg-warn-level-overridable-with-piglit-style") {
 		const char *argv[] = { "runner",
+				       "--allow-non-root",
 				       "--piglit-style-dmesg",
 				       "--dmesg-warn-level=3",
 				       "test-root-dir",
@@ -560,6 +570,7 @@ igt_main
 	igt_subtest("abort-conditions") {
 		const char *argv[] = { "runner",
 				       "--abort-on-monitored-error=taint",
+				       "--allow-non-root",
 				       "test-root-dir",
 				       "results-path",
 		};
@@ -623,6 +634,7 @@ igt_main
 		const char *argv[] = { "runner",
 				       "-n", "foo",
 				       "--dry-run",
+				       "--allow-non-root",
 				       "test-root-dir",
 				       "results-path",
 		};
@@ -656,6 +668,7 @@ igt_main
 
 		igt_subtest("validate-ok") {
 			const char *argv[] = { "runner",
+					       "--allow-non-root",
 					       "--test-list", filename,
 					       testdatadir,
 					       "path-to-results",
@@ -983,6 +996,7 @@ igt_main
 			struct execute_state state;
 			const char *argv[] = { "runner",
 					       "--dry-run",
+					       "--allow-non-root",
 					       "-x", "^abort",
 					       testdatadir,
 					       dirname,
@@ -1055,6 +1069,7 @@ igt_main
 		igt_subtest("execute-initialize-new-run") {
 			struct execute_state state;
 			const char *argv[] = { "runner",
+					       "--allow-non-root",
 					       testdatadir,
 					       dirname,
 			};
@@ -1102,6 +1117,7 @@ igt_main
 		igt_subtest("execute-initialize-subtest-started") {
 			struct execute_state state;
 			const char *argv[] = { "runner",
+					       "--allow-non-root",
 					       "--multiple-mode",
 					       "-t", "successtest",
 					       testdatadir,
@@ -1158,6 +1174,7 @@ igt_main
 		igt_subtest("execute-initialize-all-subtests-started") {
 			struct execute_state state;
 			const char *argv[] = { "runner",
+					       "--allow-non-root",
 					       "--multiple-mode",
 					       "-t", "successtest@first-subtest",
 					       "-t", "successtest@second-subtest",
@@ -1213,6 +1230,7 @@ igt_main
 		igt_subtest("execute-initialize-subtests-complete") {
 			struct execute_state state;
 			const char *argv[] = { "runner",
+					       "--allow-non-root",
 					       "--multiple-mode",
 					       testdatadir,
 					       dirname,
@@ -1278,6 +1296,7 @@ igt_main
 			igt_subtest_f("execute-subtests-%s", multiple ? "multiple" : "normal") {
 				struct execute_state state;
 				const char *argv[] = { "runner",
+						       "--allow-non-root",
 						       multiple ? "--multiple-mode" : "--sync",
 						       "-t", "successtest.*-subtest",
 						       testdatadir,
@@ -1413,6 +1432,7 @@ igt_main
 			igt_subtest_f("execute-skipper-journal-%s", multiple ? "multiple" : "normal") {
 				struct execute_state state;
 				const char *argv[] = { "runner",
+						       "--allow-non-root",
 						       multiple ? "--multiple-mode" : "--sync",
 						       "-t", "skippers",
 						       testdatadir,
@@ -1499,6 +1519,7 @@ igt_main
 			struct execute_state state;
 			struct json_object *results, *tests;
 			const char *argv[] = { "runner",
+					       "--allow-non-root",
 					       "--test-list", filename,
 					       testdatadir,
 					       dirname,
@@ -1554,6 +1575,7 @@ igt_main
 			struct execute_state state;
 			struct json_object *results, *tests;
 			const char *argv[] = { "runner",
+					       "--allow-non-root",
 					       "-t", "^dynamic$",
 					       testdatadir,
 					       dirname,
@@ -1599,6 +1621,7 @@ igt_main
 			struct execute_state state;
 			struct json_object *results, *tests;
 			const char *argv[] = { "runner",
+					       "--allow-non-root",
 					       "-t", "^abort-simple$",
 					       testdatadir,
 					       dirname,
@@ -1646,6 +1669,7 @@ igt_main
 				struct execute_state state;
 				struct json_object *results, *tests;
 				const char *argv[] = { "runner",
+						       "--allow-non-root",
 						       "-t", "^abort$",
 						       multiple ? "--multiple-mode" : "--sync",
 						       testdatadir,
@@ -1701,6 +1725,7 @@ igt_main
 				struct execute_state state;
 				struct json_object *results, *tests;
 				const char *argv[] = { "runner", multiple ? "--multiple-mode" : "--sync",
+						       "--allow-non-root",
 						       "-t", "^abort-fixture$",
 						       testdatadir,
 						       dirname,
@@ -1767,6 +1792,7 @@ igt_main
 				struct execute_state state;
 				struct json_object *results, *tests;
 				const char *argv[] = { "runner", multiple ? "--multiple-mode" : "--sync",
+						       "--allow-non-root",
 						       "--test-list", filename,
 						       testdatadir,
 						       dirname,
@@ -1822,6 +1848,7 @@ igt_main
 				struct execute_state state;
 				struct json_object *results, *tests;
 				const char *argv[] = { "runner", multiple ? "--multiple-mode" : "--sync",
+						       "--allow-non-root",
 						       "-t", "^abort-dynamic$",
 						       testdatadir,
 						       dirname,

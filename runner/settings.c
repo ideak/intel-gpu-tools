@@ -24,6 +24,7 @@ enum {
 	OPT_DMESG_WARN_LEVEL,
 	OPT_OVERALL_TIMEOUT,
 	OPT_PER_TEST_TIMEOUT,
+	OPT_ALLOW_NON_ROOT,
 	OPT_VERSION,
 	OPT_HELP = 'h',
 	OPT_NAME = 'n',
@@ -199,6 +200,7 @@ static const char *usage_str =
 	"  --ignore-missing      Ignored but accepted, for piglit compatibility\n"
 	"\n"
 	" Incompatible options:\n"
+	"  --allow-non-root      Allow running tests without being the root user.\n"
 	"  -m, --multiple-mode   Run multiple subtests in the same binary execution.\n"
 	"                        If a testlist file is given, consecutive subtests are\n"
 	"                        run in the same execution if they are from the same\n"
@@ -381,6 +383,7 @@ bool parse_options(int argc, char **argv,
 		{"help", no_argument, NULL, OPT_HELP},
 		{"name", required_argument, NULL, OPT_NAME},
 		{"dry-run", no_argument, NULL, OPT_DRY_RUN},
+		{"allow-non-root", no_argument, NULL, OPT_ALLOW_NON_ROOT},
 		{"include-tests", required_argument, NULL, OPT_INCLUDE},
 		{"exclude-tests", required_argument, NULL, OPT_EXCLUDE},
 		{"abort-on-monitored-error", optional_argument, NULL, OPT_ABORT_ON_ERROR},
@@ -422,6 +425,9 @@ bool parse_options(int argc, char **argv,
 			break;
 		case OPT_DRY_RUN:
 			settings->dry_run = true;
+			break;
+		case OPT_ALLOW_NON_ROOT:
+			settings->allow_non_root = true;
 			break;
 		case OPT_INCLUDE:
 			if (!add_regex(&settings->include_regexes, strdup(optarg)))
@@ -693,6 +699,7 @@ bool serialize_settings(struct settings *settings)
 	if (settings->name)
 		SERIALIZE_LINE(f, settings, name, "%s");
 	SERIALIZE_LINE(f, settings, dry_run, "%d");
+	SERIALIZE_LINE(f, settings, allow_non_root, "%d");
 	SERIALIZE_LINE(f, settings, sync, "%d");
 	SERIALIZE_LINE(f, settings, log_level, "%d");
 	SERIALIZE_LINE(f, settings, overwrite, "%d");
@@ -740,6 +747,7 @@ bool read_settings_from_file(struct settings *settings, FILE *f)
 		PARSE_LINE(settings, name, val, test_list, val ? strdup(val) : NULL);
 		PARSE_LINE(settings, name, val, name, val ? strdup(val) : NULL);
 		PARSE_LINE(settings, name, val, dry_run, numval);
+		PARSE_LINE(settings, name, val, allow_non_root, numval);
 		PARSE_LINE(settings, name, val, sync, numval);
 		PARSE_LINE(settings, name, val, log_level, numval);
 		PARSE_LINE(settings, name, val, overwrite, numval);

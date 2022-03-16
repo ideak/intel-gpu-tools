@@ -1526,6 +1526,12 @@ bool initialize_execute_state_from_resume(int dirfd,
 	if (!read_settings_from_dir(settings, dirfd) ||
 	    !read_job_list(list, dirfd)) {
 		close(dirfd);
+		fprintf(stderr, "Failure reading metadata\n");
+		return false;
+	}
+
+	if (!settings->allow_non_root && (getuid() != 0)) {
+		fprintf(stderr, "Runner needs to run with UID 0 (root).\n");
 		return false;
 	}
 
@@ -1573,6 +1579,11 @@ bool initialize_execute_state(struct execute_state *state,
 			      struct settings *settings,
 			      struct job_list *job_list)
 {
+	if (!settings->allow_non_root && (getuid() != 0)) {
+		fprintf(stderr, "Runner needs to run with UID 0 (root).\n");
+		return false;
+	}
+
 	memset(state, 0, sizeof(*state));
 
 	if (!validate_settings(settings))
@@ -1840,7 +1851,8 @@ bool execute(struct execute_state *state,
 			}
 			close(sigfd);
 			close(testdirfd);
-			initialize_execute_state_from_resume(resdirfd, state, settings, job_list);
+			if (initialize_execute_state_from_resume(resdirfd, state, settings, job_list))
+				return false;
 			state->time_left = time_left;
 			return execute(state, settings, job_list);
 		}

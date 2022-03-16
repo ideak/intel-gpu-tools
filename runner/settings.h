@@ -32,6 +32,7 @@ struct settings {
 	char *test_list;
 	char *name;
 	bool dry_run;
+	bool allow_non_root;
 	struct regex_list include_regexes;
 	struct regex_list exclude_regexes;
 	bool sync;
