@@ -349,6 +349,72 @@ size_t edid_get_size(const struct edid *edid)
 	       edid->extensions_len * sizeof(struct edid_ext);
 }
 
+static int ieee_oui(uint8_t oui[CEA_VSDB_HEADER_SIZE])
+{
+         return (oui[2] << 16) | (oui[1] << 8) | oui[0];
+}
+
+/**
+ * edid_get_deep_color_from_vsdb: return the Deep Color info from Vendor
+ * Specific Data Block (VSDB), if VSDB not found then return zero.
+ */
+uint8_t edid_get_deep_color_from_vsdb(const struct edid *edid)
+{
+	const struct edid_ext *edid_ext;
+	const struct edid_cea *edid_cea;
+	const char *cea_data;
+	uint8_t deep_color = 0;
+	int offset, i, j;
+
+	/*
+	 * Read from vendor specific data block first, if vsdb not found
+	 * return 0.
+	 */
+	for (i = 0; i < edid->extensions_len; i++) {
+		edid_ext = &edid->extensions[i];
+		edid_cea = &edid_ext->data.cea;
+
+		if ((edid_ext->tag != EDID_EXT_CEA) ||
+		    (edid_cea->revision != 3))
+			continue;
+
+		offset = edid_cea->dtd_start;
+		cea_data = edid_cea->data;
+
+		for (j = 0; j < offset; j += (cea_data[j] & 0x1F) + 1) {
+			struct edid_cea_data_block *vsdb =
+				(struct edid_cea_data_block *)(cea_data + j);
+
+			if (((vsdb->type_len & 0xE0) >> 5) != EDID_CEA_DATA_VENDOR_SPECIFIC)
+				continue;
+
+			if (ieee_oui(vsdb->data.vsdbs->ieee_oui) == 0x000C03)
+				deep_color = vsdb->data.vsdbs->data.hdmi.flags1;
+
+			if (deep_color & (7 << 4))
+				return deep_color;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * edid_get_bit_depth: Read from the Video Input Definition and return the
+ * Color Bit Depth if Input is a Digital Video, else return zero.
+ */
+uint8_t edid_get_bit_depth_from_vid(const struct edid *edid)
+{
+	/*
+	 * Video Signal Interface: Bit 7 (1:Digital, 0:Analog)
+	 * Color Bit Depth: Bits 6 → 4
+	 */
+	if (!(edid->input & (1 << 7)))
+		return 0;
+
+	return ((edid->input & (7 << 4)) >> 4);
+}
+
 /**
  * cea_sad_init_pcm:
  * @channels: the number of supported channels (max. 8)

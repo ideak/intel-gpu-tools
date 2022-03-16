@@ -36,6 +36,7 @@
 #include "drm.h"
 #include "drmtest.h"
 #include "igt.h"
+#include "igt_edid.h"
 
 
 /* Internal */
@@ -64,6 +65,8 @@ typedef struct {
 	color_t coeffs[];
 } gamma_lut_t;
 
+bool panel_supports_deep_color(int fd, drmModeConnector *connector);
+uint64_t get_max_bpc(igt_output_t *output);
 void paint_gradient_rectangles(data_t *data,
 			       drmModeModeInfo *mode,
 			       color_t *colors,
