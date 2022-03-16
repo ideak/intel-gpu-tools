@@ -4,20 +4,36 @@ KSRC=$1
 KOBJ=$2
 DEST=$3
 
+# Limit scope in order to speedup tarball creation
+GCOV_SCOPE=drivers/gpu/drm/
+
 if [ -z "$KSRC" ] || [ -z "$KOBJ" ] || [ -z "$DEST" ]; then
-  echo "Usage: $0 <ksrc directory> <kobj directory> <output.tar.gz>" >&2
-  exit 1
+	echo "Usage: $0 <ksrc directory> <kobj directory> <output.tar[.gz]>" >&2
+	exit 1
 fi
 
-KSRC=$(cd $KSRC; printf "all:\n\t@echo \${CURDIR}\n" | make -f -)
-KOBJ=$(cd $KOBJ; printf "all:\n\t@echo \${CURDIR}\n" | make -f -)
+if [ "x$(echo $DEST|grep '\.gz')" != "x" ]; then
+	TAR_COMPRESS="z"
+else
+	# gcno files are sparsed. So, if no compression is used, store the
+	# results as a sparse file, in order to save disk space
+	TAR_COMPRESS="S"
+fi
 
-find $KSRC $KOBJ \( -name '*.gcno' -o -name '*.[ch]' -o -type l \) -a \
-                 -perm /u+r,g+r | tar cfz $DEST -P -T -
+KSRC=$(realpath $KSRC)
+KOBJ=$(realpath $KOBJ)
+
+# Source files
+SRCS="${KSRC}/include ${KSRC}/arch/x86/include $(find ${KSRC}/${GCOV_SCOPE} -name '*.[ch]')"
+
+# Generated gcno files and links
+OBJS="$(find $KOBJ/${GCOV_SCOPE} \( -name '*.gcno' -o -name '*.[ch]' -o -type l \) -a -perm /u+r,g+r)"
+
+tar cf${TAR_COMPRESS} $DEST $SRCS $OBJS
 
 if [ $? -eq 0 ] ; then
-  echo "$DEST successfully created, copy to test system and unpack with:"
-  echo "  tar xfz $DEST -P"
+	echo "$DEST successfully created, copy to test system and unpack with:"
+	echo "  tar xf${TAR_COMPRESS} $DEST"
 else
-  echo "Could not create file $DEST"
+	echo "Could not create file $DEST"
 fi
