@@ -2170,14 +2170,12 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 		system_suspend_subtest(SUSPEND_STATE_DISK, SUSPEND_TEST_NONE);
 
 	/* GEM stress */
+	igt_describe("Validate execbuf submission while exercising rpm "
+		     "suspend/resume cycles.");
 	igt_subtest_with_dynamic("gem-execbuf-stress") {
 		for_each_memory_region(r, drm_fd) {
-			igt_describe("Validate execbuf submission while exercising rpm "
-				     "suspend/resume cycles.");
 			igt_dynamic_f("%s", r->name)
 				gem_execbuf_stress_subtest(rounds, WAIT_STATUS, &r->ci);
-			igt_describe("Validate execbuf submission while exercising rpm "
-				     "suspend/resume cycles with extra wait.");
 			igt_dynamic_f("%s-%s", "extra-wait", r->name)
 				gem_execbuf_stress_subtest(rounds, WAIT_STATUS | WAIT_EXTRA, &r->ci);
 		}
