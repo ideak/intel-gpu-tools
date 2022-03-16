@@ -26,10 +26,10 @@
 
 IGT_TEST_DESCRIPTION("Test Color Features at Pipe level");
 
-static void test_pipe_degamma(data_t *data,
+static bool test_pipe_degamma(data_t *data,
 			      igt_plane_t *primary)
 {
-	igt_output_t *output;
+	igt_output_t *output = data->output;
 	igt_display_t *display = &data->display;
 	gamma_lut_t *degamma_linear, *degamma_full;
 	color_t red_green_blue[] = {
@@ -41,15 +41,13 @@ static void test_pipe_degamma(data_t *data,
 	struct igt_fb fb_modeset, fb;
 	igt_crc_t crc_fullgamma, crc_fullcolors;
 	int fb_id, fb_modeset_id;
+	bool ret;
 
 	igt_require(igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_DEGAMMA_LUT));
 	igt_require(igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_GAMMA_LUT));
 
 	degamma_linear = generate_table(data->degamma_lut_size, 1.0);
 	degamma_full = generate_table_max(data->degamma_lut_size);
-
-	output = igt_get_single_output_for_pipe(&data->display, primary->pipe->pipe);
-	igt_require(output);
 
 	igt_output_set_pipe(output, primary->pipe->pipe);
 	mode = igt_output_get_mode(output);
@@ -58,7 +56,7 @@ static void test_pipe_degamma(data_t *data,
 	fb_id = igt_create_fb(data->drm_fd,
 			      mode->hdisplay,
 			      mode->vdisplay,
-			      DRM_FORMAT_XRGB8888,
+			      data->drm_format,
 			      DRM_FORMAT_MOD_LINEAR,
 			      &fb);
 	igt_assert(fb_id);
@@ -66,7 +64,7 @@ static void test_pipe_degamma(data_t *data,
 	fb_modeset_id = igt_create_fb(data->drm_fd,
 				      mode->hdisplay,
 				      mode->vdisplay,
-				      DRM_FORMAT_XRGB8888,
+				      data->drm_format,
 				      DRM_FORMAT_MOD_LINEAR,
 				      &fb_modeset);
 	igt_assert(fb_modeset_id);
@@ -99,7 +97,7 @@ static void test_pipe_degamma(data_t *data,
 	/* Verify that the CRC of the software computed output is
 	 * equal to the CRC of the degamma LUT transformation output.
 	 */
-	igt_assert_crc_equal(&crc_fullgamma, &crc_fullcolors);
+	ret = !igt_skip_crc_compare || igt_check_crc_equal(&crc_fullgamma, &crc_fullcolors);
 
 	disable_degamma(primary->pipe);
 	igt_plane_set_fb(primary, NULL);
@@ -110,16 +108,18 @@ static void test_pipe_degamma(data_t *data,
 
 	free_lut(degamma_linear);
 	free_lut(degamma_full);
+
+	return ret;
 }
 
 /*
  * Draw 3 gradient rectangles in red, green and blue, with a maxed out gamma
  * LUT and verify we have the same CRC as drawing solid color rectangles.
  */
-static void test_pipe_gamma(data_t *data,
+static bool test_pipe_gamma(data_t *data,
 			    igt_plane_t *primary)
 {
-	igt_output_t *output;
+	igt_output_t *output = data->output;
 	igt_display_t *display = &data->display;
 	gamma_lut_t *gamma_full;
 	color_t red_green_blue[] = {
@@ -131,13 +131,11 @@ static void test_pipe_gamma(data_t *data,
 	struct igt_fb fb_modeset, fb;
 	igt_crc_t crc_fullgamma, crc_fullcolors;
 	int fb_id, fb_modeset_id;
+	bool ret;
 
 	igt_require(igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_GAMMA_LUT));
 
 	gamma_full = generate_table_max(data->gamma_lut_size);
-
-	output = igt_get_single_output_for_pipe(&data->display, primary->pipe->pipe);
-	igt_require(output);
 
 	igt_output_set_pipe(output, primary->pipe->pipe);
 	mode = igt_output_get_mode(output);
@@ -146,7 +144,7 @@ static void test_pipe_gamma(data_t *data,
 	fb_id = igt_create_fb(data->drm_fd,
 			      mode->hdisplay,
 			      mode->vdisplay,
-			      DRM_FORMAT_XRGB8888,
+			      data->drm_format,
 			      DRM_FORMAT_MOD_LINEAR,
 			      &fb);
 	igt_assert(fb_id);
@@ -154,7 +152,7 @@ static void test_pipe_gamma(data_t *data,
 	fb_modeset_id = igt_create_fb(data->drm_fd,
 				      mode->hdisplay,
 				      mode->vdisplay,
-				      DRM_FORMAT_XRGB8888,
+				      data->drm_format,
 				      DRM_FORMAT_MOD_LINEAR,
 				      &fb_modeset);
 	igt_assert(fb_modeset_id);
@@ -186,7 +184,7 @@ static void test_pipe_gamma(data_t *data,
 	/* Verify that the CRC of the software computed output is
 	 * equal to the CRC of the gamma LUT transformation output.
 	 */
-	igt_assert_crc_equal(&crc_fullgamma, &crc_fullcolors);
+	ret = !igt_skip_crc_compare || igt_check_crc_equal(&crc_fullgamma, &crc_fullcolors);
 
 	disable_gamma(primary->pipe);
 	igt_plane_set_fb(primary, NULL);
@@ -196,6 +194,8 @@ static void test_pipe_gamma(data_t *data,
 	igt_remove_fb(data->drm_fd, &fb_modeset);
 
 	free_lut(gamma_full);
+
+	return ret;
 }
 
 /*
@@ -439,7 +439,7 @@ static bool test_pipe_ctm(data_t *data,
 		0.0, 0.0, 1.0
 	};
 	gamma_lut_t *degamma_linear, *gamma_linear;
-	igt_output_t *output;
+	igt_output_t *output = data->output;
 	bool ret = true;
 	igt_display_t *display = &data->display;
 	drmModeModeInfo *mode;
@@ -452,9 +452,6 @@ static bool test_pipe_ctm(data_t *data,
 	degamma_linear = generate_table(data->degamma_lut_size, 1.0);
 	gamma_linear = generate_table(data->gamma_lut_size, 1.0);
 
-	output = igt_get_single_output_for_pipe(&data->display, primary->pipe->pipe);
-	igt_require(output);
-
 	igt_output_set_pipe(output, primary->pipe->pipe);
 	mode = igt_output_get_mode(output);
 
@@ -462,7 +459,7 @@ static bool test_pipe_ctm(data_t *data,
 	fb_id = igt_create_fb(data->drm_fd,
 			      mode->hdisplay,
 			      mode->vdisplay,
-			      DRM_FORMAT_XRGB8888,
+			      data->drm_format,
 			      DRM_FORMAT_MOD_LINEAR,
 			      &fb);
 	igt_assert(fb_id);
@@ -470,7 +467,7 @@ static bool test_pipe_ctm(data_t *data,
 	fb_modeset_id = igt_create_fb(data->drm_fd,
 				      mode->hdisplay,
 				      mode->vdisplay,
-				      DRM_FORMAT_XRGB8888,
+				      data->drm_format,
 				      DRM_FORMAT_MOD_LINEAR,
 				      &fb_modeset);
 	igt_assert(fb_modeset_id);
@@ -686,12 +683,15 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 						  INTEL_PIPE_CRC_SOURCE_AUTO);
 
 		igt_display_require_output_on_pipe(&data->display, p);
+		data->output = igt_get_single_output_for_pipe(&data->display, p);
+		igt_require(data->output);
 	}
 
 	/* We assume an 8bits depth per color for degamma/gamma LUTs
 	 * for CRC checks with framebuffer references. */
 	data->color_depth = 8;
 	delta = 1.0 / (1 << data->color_depth);
+	data->drm_format = DRM_FORMAT_XRGB8888;
 
 	igt_describe("Check the color transformation from red to blue");
 	igt_subtest_f("pipe-%s-ctm-red-to-blue", kmstest_pipe_name(p)) {
@@ -851,11 +851,11 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 
 	igt_describe("Verify that degamma LUT transformation works correctly");
 	igt_subtest_f("pipe-%s-degamma", kmstest_pipe_name(p))
-		test_pipe_degamma(data, primary);
+		igt_assert(test_pipe_degamma(data, primary));
 
 	igt_describe("Verify that gamma LUT transformation works correctly");
 	igt_subtest_f("pipe-%s-gamma", kmstest_pipe_name(p))
-		test_pipe_gamma(data, primary);
+		igt_assert(test_pipe_gamma(data, primary));
 
 	igt_describe("Verify that legacy gamma LUT transformation works correctly");
 	igt_subtest_f("pipe-%s-legacy-gamma", kmstest_pipe_name(p))
@@ -865,6 +865,65 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 			"GAMMA_LUT property");
 	igt_subtest_f("pipe-%s-legacy-gamma-reset", kmstest_pipe_name(p))
 		test_pipe_legacy_gamma_reset(data, primary);
+
+	igt_describe("Verify that deep color works correctly");
+	igt_subtest_with_dynamic_f("pipe-%s-deep-color", kmstest_pipe_name(p)) {
+		igt_output_t *output;
+		color_t blue_green_blue[] = {
+			{ 0.0, 0.0, 1.0 },
+			{ 0.0, 1.0, 0.0 },
+			{ 0.0, 0.0, 1.0 }
+		};
+		double ctm[] = { 0.0, 0.0, 0.0,
+				0.0, 1.0, 0.0,
+				1.0, 0.0, 1.0 };
+
+		if (is_i915_device(data->drm_fd))
+			igt_require_f((intel_display_ver(data->devid) >= 11),
+					"At least GEN 11 is required to validate Deep-color.\n");
+
+		for_each_valid_output_on_pipe(&data->display, p, output) {
+			drmModeConnector *connector = output->config.connector;
+			uint64_t max_bpc = get_max_bpc(output);
+			bool ret;
+
+			if (!max_bpc)
+				continue;
+
+			if (!panel_supports_deep_color(data->drm_fd, connector))
+				continue;
+
+			data->color_depth = 10;
+			data->drm_format = DRM_FORMAT_XRGB2101010;
+			data->output = output;
+			igt_output_set_prop_value(output, IGT_CONNECTOR_MAX_BPC, 10);
+
+			igt_dynamic_f("gamma-%s", output->name) {
+				ret = test_pipe_gamma(data, primary);
+
+				igt_output_set_prop_value(output, IGT_CONNECTOR_MAX_BPC, max_bpc);
+				igt_assert(ret);
+			}
+
+			igt_dynamic_f("degamma-%s", output->name) {
+				ret = test_pipe_degamma(data, primary);
+
+				igt_output_set_prop_value(output, IGT_CONNECTOR_MAX_BPC, max_bpc);
+				igt_assert(ret);
+			}
+
+			igt_dynamic_f("ctm-%s", output->name) {
+				ret = test_pipe_ctm(data, primary,
+						    red_green_blue,
+						    blue_green_blue, ctm);
+
+				igt_output_set_prop_value(output, IGT_CONNECTOR_MAX_BPC, max_bpc);
+				igt_assert(ret);
+			}
+
+			break;
+		}
+	}
 
 	igt_fixture {
 		disable_degamma(primary->pipe);

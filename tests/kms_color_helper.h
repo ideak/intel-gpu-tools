@@ -49,7 +49,9 @@ typedef struct {
 	uint32_t devid;
 	igt_display_t display;
 	igt_pipe_crc_t *pipe_crc;
+	igt_output_t *output;
 
+	uint32_t drm_format;
 	uint32_t color_depth;
 	uint64_t degamma_lut_size;
 	uint64_t gamma_lut_size;

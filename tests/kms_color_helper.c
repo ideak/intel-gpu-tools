@@ -206,7 +206,7 @@ struct drm_color_lut *coeffs_to_lut(data_t *data,
 	uint32_t mask;
 
 	if (is_i915_device(data->drm_fd))
-		mask = ((1 << color_depth) - 1) << 8;
+		mask = ((1 << color_depth) - 1) << (16 - color_depth);
 	else
 		mask = max_value;
 
