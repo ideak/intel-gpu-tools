@@ -39,6 +39,8 @@
 #include "drm.h"
 #include "i915/gem_create.h"
 
+IGT_TEST_DESCRIPTION("Tests basic gem_create and gem_close IOCTLs");
+
 static void
 test_bad_close(int fd)
 {
@@ -83,10 +85,15 @@ igt_main
 	igt_fixture
 		fd = drm_open_driver(DRIVER_INTEL);
 
+	igt_describe("Verify that gem_close fails with bad params.");
 	igt_subtest("bad-close")
 		test_bad_close(fd);
+
+	igt_describe("Verify basic functionality of gem_create and gem_close.");
 	igt_subtest("create-close")
 		test_create_close(fd);
+
+	igt_describe("Verify that closing drm driver is possible with opened gem object.");
 	igt_subtest("create-fd-close")
 		test_create_fd_close(fd);
 }
