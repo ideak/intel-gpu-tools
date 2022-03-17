@@ -666,36 +666,91 @@ static void draw_rect_blt(int fd, struct cmd_data *cmd_data,
 	ibb = intel_bb_create(fd, PAGE_SIZE);
 	intel_bb_add_intel_buf(ibb, dst, true);
 
-	switch (buf->bpp) {
-	case 8:
-		blt_cmd_depth = 0;
-		break;
-	case 16: /* we're assuming 565 */
-		blt_cmd_depth = 1 << 24;
-		break;
-	case 32:
-		blt_cmd_depth = 3 << 24;
-		break;
-	default:
-		igt_assert(false);
+	if (IS_DG2(intel_get_drm_devid(fd))) {
+		int buf_height = buf->size / buf->stride;
+
+		switch (buf->bpp) {
+		case 8:
+			blt_cmd_depth = 0;
+			break;
+		case 16: /* we're assuming 565 */
+			blt_cmd_depth = 1 << 19;
+			break;
+		case 32:
+			blt_cmd_depth = 2 << 19;
+			break;
+		case 64:
+			/* Not used or supported yet */
+		default:
+			igt_assert(false);
+		}
+
+		switch (tiling) {
+		case I915_TILING_NONE:
+			blt_cmd_tiling = 0;
+			break;
+		case I915_TILING_X:
+			blt_cmd_tiling = 1 << 30;
+			break;
+		case I915_TILING_4:
+			blt_cmd_tiling = 2 << 30;
+			break;
+		default:
+			igt_assert(false);
+		}
+
+		pitch = tiling ? buf->stride / 4 : buf->stride;
+
+		intel_bb_out(ibb, XY_FAST_COLOR_BLT | blt_cmd_depth);
+		/* DG2 MOCS entry 2 is "UC - Non-Coherent; GO:Memory" */
+		intel_bb_out(ibb, blt_cmd_tiling | 2 << 21 | (pitch-1));
+		intel_bb_out(ibb, (rect->y << 16) | rect->x);
+		intel_bb_out(ibb, ((rect->y + rect->h) << 16) | (rect->x + rect->w));
+		intel_bb_emit_reloc_fenced(ibb, dst->handle, 0,
+					   I915_GEM_DOMAIN_RENDER, 0,
+					   dst->addr.offset);
+		intel_bb_out(ibb, 0);	/* TODO: Pass down enough info for target memory hint */
+		intel_bb_out(ibb, color);
+		intel_bb_out(ibb, 0);	/* 64 bit color */
+		intel_bb_out(ibb, 0);	/* 96 bit color */
+		intel_bb_out(ibb, 0);	/* 128 bit color */
+		intel_bb_out(ibb, 0);	/* clear address */
+		intel_bb_out(ibb, 0);	/* clear address */
+		intel_bb_out(ibb, (1 << 29) | ((pitch-1) << 14) | (buf_height-1));
+		intel_bb_out(ibb, 0);	/* mipmap levels / qpitch */
+		intel_bb_out(ibb, 0);	/* mipmap index / alignment */
+	} else {
+		switch (buf->bpp) {
+		case 8:
+			blt_cmd_depth = 0;
+			break;
+		case 16: /* we're assuming 565 */
+			blt_cmd_depth = 1 << 24;
+			break;
+		case 32:
+			blt_cmd_depth = 3 << 24;
+			break;
+		default:
+			igt_assert(false);
+		}
+
+		blt_cmd_len = (gen >= 8) ?  0x5 : 0x4;
+		blt_cmd_tiling = (tiling) ? XY_COLOR_BLT_TILED : 0;
+		pitch = (gen >= 4 && tiling) ? buf->stride / 4 : buf->stride;
+
+		switch_blt_tiling(ibb, tiling, true);
+
+		intel_bb_out(ibb, XY_COLOR_BLT_CMD_NOLEN | XY_COLOR_BLT_WRITE_ALPHA |
+			     XY_COLOR_BLT_WRITE_RGB | blt_cmd_tiling | blt_cmd_len);
+		intel_bb_out(ibb, blt_cmd_depth | (0xF0 << 16) | pitch);
+		intel_bb_out(ibb, (rect->y << 16) | rect->x);
+		intel_bb_out(ibb, ((rect->y + rect->h) << 16) | (rect->x + rect->w));
+		intel_bb_emit_reloc_fenced(ibb, dst->handle, 0, I915_GEM_DOMAIN_RENDER,
+					   0, dst->addr.offset);
+		intel_bb_out(ibb, color);
+
+		switch_blt_tiling(ibb, tiling, false);
 	}
-
-	blt_cmd_len = (gen >= 8) ?  0x5 : 0x4;
-	blt_cmd_tiling = (tiling) ? XY_COLOR_BLT_TILED : 0;
-	pitch = (gen >= 4 && tiling) ? buf->stride / 4 : buf->stride;
-
-	switch_blt_tiling(ibb, tiling, true);
-
-	intel_bb_out(ibb, XY_COLOR_BLT_CMD_NOLEN | XY_COLOR_BLT_WRITE_ALPHA |
-		     XY_COLOR_BLT_WRITE_RGB | blt_cmd_tiling | blt_cmd_len);
-	intel_bb_out(ibb, blt_cmd_depth | (0xF0 << 16) | pitch);
-	intel_bb_out(ibb, (rect->y << 16) | rect->x);
-	intel_bb_out(ibb, ((rect->y + rect->h) << 16) | (rect->x + rect->w));
-	intel_bb_emit_reloc_fenced(ibb, dst->handle, 0, I915_GEM_DOMAIN_RENDER,
-				   0, dst->addr.offset);
-	intel_bb_out(ibb, color);
-
-	switch_blt_tiling(ibb, tiling, false);
 
 	intel_bb_flush_blit(ibb);
 	intel_bb_destroy(ibb);
