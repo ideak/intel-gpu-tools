@@ -102,7 +102,7 @@ static void cursor_move(data_t *data, int x, int y, int i)
 
 #define XSTEP 8
 #define YSTEP 8
-#define NCRC 128
+#define NCRC SLOW_QUICK(128, 1)
 
 static void test_edge_pos(data_t *data, int sx, int ex, int y, bool swap_axis)
 {
