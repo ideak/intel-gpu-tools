@@ -226,6 +226,7 @@ static void fill_fb_subtest(void)
 	int rc;
 	struct igt_fb fb;
 	igt_crc_t base_crc, crc;
+	bool has_4tile = intel_get_device_info(intel_get_drm_devid(drm_fd))->has_4tile;
 
 	igt_create_fb(drm_fd, ms.mode->hdisplay, ms.mode->vdisplay,
 		      DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, &fb);
@@ -248,7 +249,9 @@ static void fill_fb_subtest(void)
 	igt_assert_crc_equal(&crc, &base_crc);
 
 	if (intel_display_ver(intel_get_drm_devid(drm_fd)) >= 9) {
-		get_fill_crc(I915_FORMAT_MOD_Y_TILED, &crc);
+		get_fill_crc(has_4tile ?
+			     I915_FORMAT_MOD_4_TILED : I915_FORMAT_MOD_Y_TILED,
+			     &crc);
 		igt_assert_crc_equal(&crc, &base_crc);
 	}
 
