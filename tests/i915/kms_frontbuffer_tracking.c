@@ -136,6 +136,7 @@ struct test_mode {
 		TILING_LINEAR = 0,
 		TILING_X,
 		TILING_Y,
+		TILING_4,
 		TILING_COUNT,
 		TILING_DEFAULT = TILING_X,
 	} tiling;
@@ -462,6 +463,8 @@ static uint64_t tiling_to_modifier(enum tiling_type tiling)
 		return I915_FORMAT_MOD_X_TILED;
 	case TILING_Y:
 		return I915_FORMAT_MOD_Y_TILED;
+	case TILING_4:
+		return I915_FORMAT_MOD_4_TILED;
 	default:
 		igt_assert(false);
 	}
@@ -2234,6 +2237,8 @@ static bool tiling_is_valid(int feature_flags, enum tiling_type tiling)
 	case TILING_X:
 	case TILING_Y:
 		return true;
+	case TILING_4:
+		return AT_LEAST_GEN(devid, 12);
 	default:
 		igt_assert(false);
 		return false;
@@ -3210,6 +3215,8 @@ static int opt_handler(int option, int option_index, void *data)
 			opt.tiling = TILING_X;
 		else if (!strcmp(optarg, "y"))
 			opt.tiling = TILING_Y;
+		else if (!strcmp(optarg, "4"))
+			opt.tiling = TILING_4;
 		else if (!strcmp(optarg, "l")) {
 			opt.tiling = TILING_LINEAR;
 		} else {
@@ -3353,6 +3360,8 @@ static const char *tiling_str(enum tiling_type tiling)
 		return "x";
 	case TILING_Y:
 		return "y";
+	case TILING_4:
+		return "4";
 	default:
 		igt_assert(false);
 	}
@@ -3404,9 +3413,12 @@ struct option long_options[] = {
 igt_main_args("", long_options, help_str, opt_handler, NULL)
 {
 	struct test_mode t;
+	int devid;
 
-	igt_fixture
+	igt_fixture {
 		setup_environment();
+		devid = intel_get_drm_devid(drm.fd);
+	}
 
 	for (t.feature = 0; t.feature < FEATURE_COUNT; t.feature++) {
 		if (!opt.show_hidden && t.feature == FEATURE_NONE)
@@ -3604,8 +3616,14 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 
 					/* Tiling Y is only supported on GEN9+ */
 					if (t.tiling == TILING_Y) {
-						int devid = intel_get_drm_devid(drm.fd);
 						igt_require(AT_LEAST_GEN(devid, 9));
+						igt_require(!intel_get_device_info(devid)->has_4tile);
+					}
+
+					/* Tiling 4 is only supported on GEN12+ */
+					if (t.tiling == TILING_4) {
+						igt_require(AT_LEAST_GEN(devid, 12));
+						igt_require(intel_get_device_info(devid)->has_4tile);
 					}
 
 					if (tiling_is_valid(t.feature, t.tiling))
