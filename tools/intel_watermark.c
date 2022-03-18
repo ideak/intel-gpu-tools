@@ -644,8 +644,6 @@ static void ilk_wm_dump(void)
 	if (IS_BROADWELL(devid) || IS_HASWELL(devid))
 		wm_misc = read_reg(0x45260);
 
-	intel_register_access_fini(&mmio_data);
-
 	for (i = 0; i < num_pipes; i++)
 		printf("    WM_PIPE_%c = 0x%08x\n", pipe_name(i), wm_pipe[i]);
 	if (IS_BROADWELL(devid) || IS_HASWELL(devid)) {
@@ -765,6 +763,8 @@ static void ilk_wm_dump(void)
 		/* clear the sticky bits */
 		write_reg(0x45280, wm_dbg);
 	}
+
+	intel_register_access_fini(&mmio_data);
 }
 
 static void vlv_wm_dump(void)
