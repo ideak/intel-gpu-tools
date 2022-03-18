@@ -763,6 +763,22 @@ static void ilk_wm_dump(void)
 		printf("\n");
 		/* clear the sticky bits */
 		write_reg(0x45280, wm_dbg);
+	} else if (IS_IVYBRIDGE(devid)) {
+		uint32_t fpga_dbg;
+
+		fpga_dbg = read_reg(0x42300);
+		printf("FPGA_DBG: 0x%08x\n", fpga_dbg);
+		printf(" LP used:");
+		if (fpga_dbg & (1 << 18))
+			printf(" LP0.5");
+		for (i = 1; i < 4; i++) {
+			if (fpga_dbg & (1 << (18+i)))
+				printf(" LP%d", i);
+		}
+		printf("\n");
+		/* clear the sticky LP bits */
+		fpga_dbg &= 1 << 21 | 1 << 20 | 1 << 19 | 1 << 18;
+		write_reg(0x42300, fpga_dbg);
 	}
 
 	intel_register_access_fini(&mmio_data);
