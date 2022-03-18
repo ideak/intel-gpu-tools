@@ -37,6 +37,8 @@
 /* max combinations with repetitions */
 #define MAX_COMBINATION_ELEMS   MAX_CRTCS
 
+#define MAX_HDISPLAY_PER_CRTC 5120
+
 static int drm_fd;
 static drmModeRes *drm_resources;
 static int filter_test_id;
@@ -663,10 +665,27 @@ static void test_one_combination(const struct test_config *tconf,
 			pos += get_test_name_str(&crtcs[i], &test_name[pos], ARRAY_SIZE(test_name) - pos);
 		}
 
+		for (i = 0; i < crtc_count; i++) {
+			struct crtc_config *crtc = &crtcs[i];
+
+			/*
+			 * if mode.hdisplay > 5120, then ignore
+			 *   - last crtc in single/multi-connector config
+			 *   - consecutive crtcs in multi-connector config
+			 */
+			if ((crtc->mode.hdisplay > MAX_HDISPLAY_PER_CRTC) &&
+			    ((crtc->crtc_idx >= (tconf->resources->count_crtcs - 1)) ||
+			     (i < (crtc_count - 1) && abs(crtcs[i + 1].crtc_idx - crtc->crtc_idx) <= 1))) {
+				igt_info("Combo: %s is not possible with selected mode(s).\n", test_name);
+				goto out;
+			}
+		}
+
 		igt_dynamic_f("%s", test_name)
 			test_crtc_config(tconf, crtcs, crtc_count);
 	}
 
+out:
 	cleanup_crtcs(crtcs, crtc_count);
 }
 
