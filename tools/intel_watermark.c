@@ -760,6 +760,7 @@ static void ilk_wm_dump(void)
 			if (wm_dbg & (1 << (23+i)))
 				printf(" LP%d", i);
 		}
+		printf("\n");
 		/* clear the sticky bits */
 		write_reg(0x45280, wm_dbg);
 	}
