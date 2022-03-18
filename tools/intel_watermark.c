@@ -590,6 +590,8 @@ static void skl_wm_dump(void)
 	printf("\n");
 	/* clear the sticky bits */
 	write_reg(0x45280, wm_dbg);
+
+	intel_register_access_fini(&mmio_data);
 }
 
 static void ilk_wm_dump(void)
