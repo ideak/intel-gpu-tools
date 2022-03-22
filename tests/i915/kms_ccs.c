@@ -101,6 +101,9 @@ static const struct {
 	{I915_FORMAT_MOD_4_TILED_DG2_RC_CCS, "4_tiled_dg2_rc_ccs"},
 	{I915_FORMAT_MOD_4_TILED_DG2_MC_CCS, "4_tiled_dg2_mc_ccs"},
 	{I915_FORMAT_MOD_4_TILED_DG2_RC_CCS_CC, "4_tiled_dg2_rc_ccs_cc"},
+	{I915_FORMAT_MOD_4_TILED_MTL_RC_CCS, "4_tiled_mtl_rc_ccs"},
+	{I915_FORMAT_MOD_4_TILED_MTL_MC_CCS, "4_tiled_mtl_mc_ccs"},
+	{I915_FORMAT_MOD_4_TILED_MTL_RC_CCS_CC, "4_tiled_mtl_rc_ccs_cc"},
 };
 
 static bool check_ccs_planes;
@@ -161,7 +164,8 @@ create_fb_prepare_add(int drm_fd, int width, int height,
 static bool is_ccs_cc_modifier(uint64_t modifier)
 {
 	return modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC ||
-		modifier == I915_FORMAT_MOD_4_TILED_DG2_RC_CCS_CC;
+	       modifier == I915_FORMAT_MOD_4_TILED_DG2_RC_CCS_CC ||
+	       modifier == I915_FORMAT_MOD_4_TILED_MTL_RC_CCS_CC;
 }
 
 /*
