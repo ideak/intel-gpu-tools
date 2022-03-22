@@ -4,6 +4,7 @@
  */
 
 #include <errno.h>
+#include <glib.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <malloc.h>
@@ -40,6 +41,7 @@ struct test_config {
 	bool inplace;
 	bool surfcopy;
 	bool new_ctx;
+	bool suspend_resume;
 };
 
 static void set_object(struct blt_copy_object *obj,
@@ -162,22 +164,23 @@ static void surf_copy(int i915,
 		      const struct blt_copy_object *src,
 		      const struct blt_copy_object *mid,
 		      const struct blt_copy_object *dst,
-		      int run_id)
+		      int run_id, bool suspend_resume)
 {
 	struct blt_copy_data blt = {};
 	struct blt_block_copy_data_ext ext = {};
 	struct blt_ctrl_surf_copy_data surf = {};
-	uint32_t bb, ccs, *ccsmap;
-	uint64_t bb_size = 4096;
-	uint64_t ccssize = mid->size / CCS_RATIO;
+	uint32_t bb, ccs, ccs2, *ccsmap, *ccsmap2;
+	uint64_t bb_size, ccssize = mid->size / CCS_RATIO;
 	uint32_t *ccscopy;
 	uint8_t uc_mocs = intel_get_uc_mocs(i915);
 	int result;
 
 	igt_assert(mid->compression);
 	ccscopy = (uint32_t *) malloc(ccssize);
+	bb_size = 4096;
 	bb = gem_create_from_pool(i915, &bb_size, REGION_SMEM);
 	ccs = gem_create(i915, ccssize);
+	ccs2 = gem_create(i915, ccssize);
 
 	surf.i915 = i915;
 	surf.print_bb = param.print_bb;
@@ -192,6 +195,33 @@ static void surf_copy(int i915,
 	ccsmap = gem_mmap__device_coherent(i915, ccs, 0, surf.dst.size,
 					   PROT_READ | PROT_WRITE);
 	memcpy(ccscopy, ccsmap, ccssize);
+
+	if (suspend_resume) {
+		char *orig, *orig2, *newsum, *newsum2;
+
+		orig = g_compute_checksum_for_data(G_CHECKSUM_SHA1, (void *)ccsmap, surf.dst.size);
+		orig2 = g_compute_checksum_for_data(G_CHECKSUM_SHA1, (void *)mid->ptr, mid->size);
+
+		igt_system_suspend_autoresume(SUSPEND_STATE_FREEZE, SUSPEND_TEST_NONE);
+
+		set_surf_object(&surf.dst, ccs2, REGION_SMEM, ccssize,
+				0, DIRECT_ACCESS);
+		blt_ctrl_surf_copy(i915, ctx, e, ahnd, &surf);
+		gem_sync(i915, surf.dst.handle);
+
+		ccsmap2 = gem_mmap__device_coherent(i915, ccs2, 0, surf.dst.size,
+						    PROT_READ | PROT_WRITE);
+		newsum = g_compute_checksum_for_data(G_CHECKSUM_SHA1, (void *)ccsmap2, surf.dst.size);
+		newsum2 = g_compute_checksum_for_data(G_CHECKSUM_SHA1, (void *)mid->ptr, mid->size);
+
+		munmap(ccsmap2, ccssize);
+		igt_assert(!strcmp(orig, newsum));
+		igt_assert(!strcmp(orig2, newsum2));
+		g_free(orig);
+		g_free(orig2);
+		g_free(newsum);
+		g_free(newsum2);
+	}
 
 	/* corrupt ccs */
 	for (int i = 0; i < surf.dst.size / sizeof(uint32_t); i++)
@@ -209,6 +239,7 @@ static void surf_copy(int i915,
 	set_blt_object(&blt.dst, dst);
 	set_object_ext(&ext.src, mid->compression_type, mid->x2, mid->y2, SURFACE_TYPE_2D);
 	set_object_ext(&ext.dst, 0, dst->x2, dst->y2, SURFACE_TYPE_2D);
+	bb_size = 4096;
 	bb = gem_create_from_pool(i915, &bb_size, REGION_SMEM);
 	set_batch(&blt.bb, bb, bb_size, REGION_SMEM);
 	blt_block_copy(i915, ctx, e, ahnd, &blt, &ext);
@@ -311,7 +342,8 @@ static void block_copy(int i915,
 							      ALLOC_STRATEGY_LOW_TO_HIGH, 0);
 		}
 
-		surf_copy(i915, surf_ctx, &surf_e, surf_ahnd, src, mid, dst, run_id);
+		surf_copy(i915, surf_ctx, &surf_e, surf_ahnd, src, mid, dst, run_id,
+			  config->suspend_resume);
 
 		if (surf_ctx != ctx) {
 			intel_ctx_destroy(i915, surf_ctx);
@@ -506,6 +538,15 @@ igt_main_args("bf:pst:W:H:", NULL, help_str, opt_handler, NULL)
 		struct test_config config = { .compression = true,
 					      .surfcopy = true,
 					      .new_ctx = true };
+
+		block_copy_test(i915, &config, ctx, set);
+	}
+
+	igt_describe("Check flatccs data persists after suspend / resume (S0)");
+	igt_subtest_with_dynamic("suspend-resume") {
+		struct test_config config = { .compression = true,
+					      .surfcopy = true,
+					      .suspend_resume = true };
 
 		block_copy_test(i915, &config, ctx, set);
 	}
