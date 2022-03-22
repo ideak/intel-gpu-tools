@@ -454,6 +454,9 @@ void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 			*height_ret = 8;
 		}
 		break;
+	case I915_FORMAT_MOD_4_TILED_MTL_RC_CCS:
+	case I915_FORMAT_MOD_4_TILED_MTL_RC_CCS_CC:
+	case I915_FORMAT_MOD_4_TILED_MTL_MC_CCS:
 	case I915_FORMAT_MOD_Y_TILED:
 	case I915_FORMAT_MOD_Y_TILED_CCS:
 	case I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS:
@@ -572,7 +575,8 @@ void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 static bool is_gen12_mc_ccs_modifier(uint64_t modifier)
 {
 	return modifier == I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS ||
-		modifier == I915_FORMAT_MOD_4_TILED_DG2_MC_CCS;
+		modifier == I915_FORMAT_MOD_4_TILED_DG2_MC_CCS ||
+		modifier == I915_FORMAT_MOD_4_TILED_MTL_MC_CCS;
 }
 
 static bool is_gen12_ccs_modifier(uint64_t modifier)
@@ -581,7 +585,9 @@ static bool is_gen12_ccs_modifier(uint64_t modifier)
 		modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS ||
 		modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC ||
 		modifier == I915_FORMAT_MOD_4_TILED_DG2_RC_CCS ||
-		modifier == I915_FORMAT_MOD_4_TILED_DG2_RC_CCS_CC;
+		modifier == I915_FORMAT_MOD_4_TILED_DG2_RC_CCS_CC ||
+		modifier == I915_FORMAT_MOD_4_TILED_MTL_RC_CCS ||
+		modifier == I915_FORMAT_MOD_4_TILED_MTL_RC_CCS_CC;
 }
 
 static bool is_ccs_modifier(uint64_t modifier)
@@ -611,8 +617,9 @@ static bool is_gen12_ccs_plane(const struct igt_fb *fb, int plane)
 
 static bool is_gen12_ccs_cc_plane(const struct igt_fb *fb, int plane)
 {
-	if (fb->modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC &&
-	    plane == 2)
+	if (plane == 2 &&
+	    (fb->modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC ||
+	     fb->modifier == I915_FORMAT_MOD_4_TILED_MTL_RC_CCS_CC))
 		return true;
 
 	if (fb->modifier == I915_FORMAT_MOD_4_TILED_DG2_RC_CCS_CC &&
@@ -706,6 +713,7 @@ static int fb_num_planes(const struct igt_fb *fb)
 		num_planes *= 2;
 
 	if (fb->modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC ||
+	    fb->modifier == I915_FORMAT_MOD_4_TILED_MTL_RC_CCS_CC ||
 	    fb->modifier == I915_FORMAT_MOD_4_TILED_DG2_RC_CCS_CC)
 		num_planes++;
 
@@ -903,6 +911,11 @@ static unsigned int get_plane_alignment(struct igt_fb *fb, int color_plane)
 
 	alignment = lcm(tile_row_size, 64 * 1024);
 
+	if (is_yuv_semiplanar_plane(fb, color_plane) &&
+	    fb->modifier == I915_FORMAT_MOD_4_TILED_MTL_MC_CCS &&
+	    (alignment & ((1 << 20) - 1)))
+		alignment = 1 << 20;
+
 	return alignment;
 }
 
@@ -989,6 +1002,9 @@ uint64_t igt_fb_mod_to_tiling(uint64_t modifier)
 	case I915_FORMAT_MOD_4_TILED_DG2_RC_CCS:
 	case I915_FORMAT_MOD_4_TILED_DG2_MC_CCS:
 	case I915_FORMAT_MOD_4_TILED_DG2_RC_CCS_CC:
+	case I915_FORMAT_MOD_4_TILED_MTL_RC_CCS:
+	case I915_FORMAT_MOD_4_TILED_MTL_MC_CCS:
+	case I915_FORMAT_MOD_4_TILED_MTL_RC_CCS_CC:
 		return I915_TILING_4;
 	case I915_FORMAT_MOD_Yf_TILED:
 	case I915_FORMAT_MOD_Yf_TILED_CCS:
@@ -2614,7 +2630,8 @@ igt_fb_create_intel_buf(int fd, struct buf_ops *bops,
 				 end - fb->offsets[i]);
 	}
 
-	if (fb->modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC)
+	if (fb->modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC ||
+	    fb->modifier == I915_FORMAT_MOD_4_TILED_MTL_RC_CCS_CC)
 		buf->cc.offset = fb->offsets[2];
 
 	if (fb->modifier == I915_FORMAT_MOD_4_TILED_DG2_RC_CCS_CC)
@@ -4656,10 +4673,13 @@ const char *igt_fb_modifier_name(uint64_t modifier)
 		return "Y-MC_CCS";
 	case I915_FORMAT_MOD_4_TILED:
 		return "4";
+	case I915_FORMAT_MOD_4_TILED_MTL_RC_CCS:
 	case I915_FORMAT_MOD_4_TILED_DG2_RC_CCS:
 		return "4-RC_CCS";
+	case I915_FORMAT_MOD_4_TILED_MTL_MC_CCS:
 	case I915_FORMAT_MOD_4_TILED_DG2_MC_CCS:
 		return "4-MC_CCS";
+	case I915_FORMAT_MOD_4_TILED_MTL_RC_CCS_CC:
 	case I915_FORMAT_MOD_4_TILED_DG2_RC_CCS_CC:
 		return "4-RC_CCS-CC";
 	default:

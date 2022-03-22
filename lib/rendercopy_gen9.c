@@ -277,7 +277,9 @@ gen8_bind_buf(struct intel_bb *ibb, const struct intel_buf *buf, int is_dst,
 
 			ss->ss12.clear_address = (address + buf->cc.offset) >> 6;
 			ss->ss13.clear_address_hi = (address + buf->cc.offset) >> 32;
-		} else if (HAS_FLATCCS(ibb->devid)) {
+		}
+
+		if (HAS_4TILE(ibb->devid)) {
 			ss->ss7.dg2.memory_compression_type = 0;
 			ss->ss7.dg2.memory_compression_enable = 0;
 			ss->ss7.dg2.disable_support_for_multi_gpu_partial_writes = 1;
@@ -1245,6 +1247,27 @@ void gen12p71_render_copyfunc(struct intel_bb *ibb,
 			sizeof(gen12p71_render_copy));
 }
 
+void mtl_render_copyfunc(struct intel_bb *ibb,
+			 struct intel_buf *src,
+			 unsigned int src_x, unsigned int src_y,
+			 unsigned int width, unsigned int height,
+			 struct intel_buf *dst,
+			 unsigned int dst_x, unsigned int dst_y)
+{
+	struct aux_pgtable_info pgtable_info = { };
+
+	gen12_aux_pgtable_init(&pgtable_info, ibb, src, dst);
+
+	_gen9_render_op(ibb, src, src_x, src_y,
+			width, height, dst, dst_x, dst_y,
+			pgtable_info.pgtable_buf,
+			NULL,
+			gen12p71_render_copy,
+			sizeof(gen12p71_render_copy));
+
+	gen12_aux_pgtable_cleanup(ibb, &pgtable_info);
+}
+
 void gen12_render_clearfunc(struct intel_bb *ibb,
 			    struct intel_buf *dst,
 			    unsigned int dst_x, unsigned int dst_y,
@@ -1276,4 +1299,23 @@ void gen12p71_render_clearfunc(struct intel_bb *ibb,
 			clear_color,
 			gen12p71_render_copy,
 			sizeof(gen12p71_render_copy));
+}
+
+void mtl_render_clearfunc(struct intel_bb *ibb,
+			  struct intel_buf *dst,
+			  unsigned int dst_x, unsigned int dst_y,
+			  unsigned int width, unsigned int height,
+			  const float clear_color[4])
+{
+	struct aux_pgtable_info pgtable_info = { };
+
+	gen12_aux_pgtable_init(&pgtable_info, ibb, NULL, dst);
+
+	_gen9_render_op(ibb, NULL, 0, 0,
+			width, height, dst, dst_x, dst_y,
+			pgtable_info.pgtable_buf,
+			clear_color,
+			gen12p71_render_copy,
+			sizeof(gen12p71_render_copy));
+	gen12_aux_pgtable_cleanup(ibb, &pgtable_info);
 }

@@ -5,28 +5,13 @@
 #include "intel_aux_pgtable.h"
 #include "intel_batchbuffer.h"
 #include "intel_bufops.h"
+#include "intel_chipset.h"
 #include "ioctl_wrappers.h"
 
 #include "i915/gem_mman.h"
 
 #define BITMASK(e, s)		((~0ULL << (s)) & \
 				 (~0ULL >> (BITS_PER_LONG_LONG - 1 - (e))))
-
-/* The unit size to which the AUX CCS surface is aligned to. */
-#define AUX_CCS_UNIT_SIZE	64
-/*
- * The block size on the AUX CCS surface which is mapped by one L1 AUX
- * pagetable entry.
- */
-#define AUX_CCS_BLOCK_SIZE	(4 * AUX_CCS_UNIT_SIZE)
-/*
- * The block size on the main surface mapped by one AUX CCS block:
- *   256 bytes per CCS block *
- *   8   bits per byte /
- *   2   bits per main surface CL *
- *   64  bytes per main surface CL
- */
-#define MAIN_SURFACE_BLOCK_SIZE	(AUX_CCS_BLOCK_SIZE * 8 / 2 * 64)
 
 #define GFX_ADDRESS_BITS	48
 
@@ -357,14 +342,24 @@ pgt_populate_entries_for_buf(struct pgtable *pgt,
 	uint64_t aux_addr = buf->addr.offset + buf->ccs[surface_idx].offset;
 	uint64_t l1_flags = pgt_get_l1_flags(buf, surface_idx);
 	uint64_t lx_flags = pgt_get_lx_flags();
+	uint64_t aux_ccs_block_size = 1 << pgt->level_info->desc[0].entry_ptr_shift;
+
+	/*
+	 * The block size on the main surface mapped by one AUX CCS block:
+	 *       CCS block size *
+	 *   8   bits per byte /
+	 *   2   bits per main surface CL *
+	 *   64  bytes per main surface CL
+	 */
+	uint64_t main_surface_block_size = aux_ccs_block_size * 8 / 2 * 64;
 
 	igt_assert(!(buf->surface[surface_idx].stride % 512));
 	igt_assert_eq(buf->ccs[surface_idx].stride,
 		      buf->surface[surface_idx].stride / 512 * 64);
 
 	for (; surface_addr < surface_end;
-	     surface_addr += MAIN_SURFACE_BLOCK_SIZE,
-	     aux_addr += AUX_CCS_BLOCK_SIZE) {
+	     surface_addr += main_surface_block_size,
+	     aux_addr += aux_ccs_block_size) {
 		uint64_t table = top_table;
 		int level;
 
@@ -445,7 +440,7 @@ struct intel_buf *
 intel_aux_pgtable_create(struct intel_bb *ibb,
 			 struct intel_buf **bufs, int buf_count)
 {
-	static const struct pgtable_level_desc level_desc[] = {
+	static const struct pgtable_level_desc level_desc_table_tgl[] = {
 		{
 			.idx_shift = 16,
 			.idx_bits = 8,
@@ -463,8 +458,31 @@ intel_aux_pgtable_create(struct intel_bb *ibb,
 			.idx_bits = 12,
 			.entry_ptr_shift = 15,
 			.table_size = 32 * 1024,
+		}
+	};
+	static const struct pgtable_level_desc level_desc_table_mtl[] = {
+		{
+			.idx_shift = 20,
+			.idx_bits = 4,
+			.entry_ptr_shift = 12,
+			.table_size = 8 * 1024,
+		},
+		{
+			.idx_shift = 24,
+			.idx_bits = 12,
+			.entry_ptr_shift = 11,
+			.table_size = 32 * 1024,
+		},
+		{
+			.idx_shift = 36,
+			.idx_bits = 12,
+			.entry_ptr_shift = 15,
+			.table_size = 32 * 1024,
 		},
 	};
+
+	const struct pgtable_level_desc *level_desc;
+	uint32_t levels;
 	struct pgtable *pgt;
 	struct buf_ops *bops;
 	struct intel_buf *buf;
@@ -472,7 +490,15 @@ intel_aux_pgtable_create(struct intel_bb *ibb,
 	igt_assert(buf_count);
 	bops = bufs[0]->bops;
 
-	pgt = pgt_create(level_desc, ARRAY_SIZE(level_desc), bufs, buf_count);
+	if (IS_METEORLAKE(ibb->devid)) {
+		level_desc = level_desc_table_mtl;
+		levels = ARRAY_SIZE(level_desc_table_mtl);
+	} else {
+		level_desc = level_desc_table_tgl;
+		levels = ARRAY_SIZE(level_desc_table_tgl);
+	}
+
+	pgt = pgt_create(&level_desc[0], levels, bufs, buf_count);
 	pgt->ibb = ibb;
 	pgt->buf = intel_buf_create(bops, pgt->size, 1, 8, 0, I915_TILING_NONE,
 				    I915_COMPRESSION_NONE);
@@ -637,8 +663,17 @@ gen12_create_aux_pgtable_state(struct intel_bb *ibb,
 void
 gen12_emit_aux_pgtable_state(struct intel_bb *ibb, uint32_t state, bool render)
 {
-	uint32_t table_base_reg = render ? GEN12_GFX_AUX_TABLE_BASE_ADDR :
-					   GEN12_VEBOX_AUX_TABLE_BASE_ADDR;
+	uint32_t table_base_reg;
+
+	if (render) {
+		table_base_reg = GEN12_GFX_AUX_TABLE_BASE_ADDR;
+	} else {
+		/* Vebox */
+		if (IS_METEORLAKE(ibb->devid))
+			table_base_reg = 0x380000 + GEN12_VEBOX_AUX_TABLE_BASE_ADDR;
+		else
+			table_base_reg = GEN12_VEBOX_AUX_TABLE_BASE_ADDR;
+	}
 
 	if (!state)
 		return;

@@ -158,13 +158,36 @@ static bool format_is_interleaved_yuv(int format)
 	return false;
 }
 
+static uint32_t compression_format(int format, struct intel_buf *buf)
+{
+	if (buf->compression == I915_COMPRESSION_NONE)
+		return 0;
+
+	switch (format) {
+	case R8G8B8A8_UNORM:
+		return 0xa;
+	case PLANAR_420_8:
+		return 0xf;
+	case PLANAR_420_16:
+		return 8;
+	case YCRCB_NORMAL:
+		return 3;
+	case PACKED_444A_8:
+		return 9;
+	default:
+		igt_assert(0);
+	}
+}
+
 static void emit_surface_state_cmd(struct intel_bb *ibb,
 				   int surface_id,
-				   int width, int height, int bpp,
-				   int pitch, uint32_t tiling, int format,
-				   uint32_t uv_offset)
+				   int width, int height,
+				   struct intel_buf *buf, int format)
 {
 	struct vebox_surface_state *ss;
+	int pitch = buf->surface[0].stride;
+	uint32_t uv_offset = buf->surface[1].offset;
+	uint32_t tiling = buf->tiling;
 
 	ss = intel_bb_ptr_align(ibb, 4);
 
@@ -185,35 +208,16 @@ static void emit_surface_state_cmd(struct intel_bb *ibb,
 
 	ss->ss4.u_y_offset = uv_offset / pitch;
 
-	if (HAS_FLATCCS(ibb->devid)) {
+	if (HAS_4TILE(ibb->devid)) {
 		/*
-		 * f-tile = 3 (Tile F)
+		 * tile4 = 3
 		 */
 		ss->ss3.dg2.tile_mode = (tiling != I915_TILING_NONE) ? 3 : 0;
 
-		switch (format) {
-		case R8G8B8A8_UNORM:
-			ss->ss7.dg2.compression_format = 0xa;
-			break;
-		case PLANAR_420_8:
-			ss->ss7.dg2.compression_format = 0xf;
-			break;
-		case PLANAR_420_16:
-			ss->ss7.dg2.compression_format = 8;
-			break;
-		case YCRCB_NORMAL:
-			ss->ss7.dg2.compression_format = 3;
-			break;
-		case PACKED_444A_8:
-			ss->ss7.dg2.compression_format = 0x9;
-			break;
-		default:
-			igt_assert(0);
-		}
+		ss->ss7.dg2.compression_format = compression_format(format, buf);
 	} else {
 		ss->ss3.tgl.tile_walk = (tiling == I915_TILING_Y) ||
-			(tiling == I915_TILING_Yf) ||
-			(tiling == I915_TILING_4);
+			(tiling == I915_TILING_Yf);
 		ss->ss3.tgl.tiled_surface = tiling != I915_TILING_NONE;
 	}
 
@@ -246,9 +250,10 @@ static void emit_tiling_convert_cmd(struct intel_bb *ibb,
 	}
 
 	if (HAS_4TILE(ibb->devid))
-		tc->tc1_2.input_mocs_idx = 3;
-	else
-		tc->tc1_2.input_tiled_resource_mode = src->tiling == I915_TILING_Yf;
+		tc->tc1_2.input_mocs_idx = IS_DG2(ibb->devid) ? 3 : 9;
+
+	tc->tc1_2.input_tiled_resource_mode = src->tiling == I915_TILING_Yf;
+
 	reloc_delta = tc->tc1_2_l;
 
 	igt_assert(src->addr.offset == ALIGN(src->addr.offset, 0x1000));
@@ -267,9 +272,9 @@ static void emit_tiling_convert_cmd(struct intel_bb *ibb,
 	}
 
 	if (HAS_4TILE(ibb->devid))
-		tc->tc3_4.output_mocs_idx = 3;
-	else
-		tc->tc3_4.output_tiled_resource_mode = dst->tiling == I915_TILING_Yf;
+		tc->tc3_4.output_mocs_idx = IS_DG2(ibb->devid) ? 3 : 9;
+
+	tc->tc3_4.output_tiled_resource_mode = dst->tiling == I915_TILING_Yf;
 
 	reloc_delta = tc->tc3_4_l;
 
@@ -344,14 +349,12 @@ void gen12_vebox_copyfunc(struct intel_bb *ibb,
 	igt_assert(!src->format_is_yuv_semiplanar ||
 		   (src->surface[1].offset && dst->surface[1].offset));
 	emit_surface_state_cmd(ibb, VEBOX_SURFACE_INPUT,
-			       width, height, src->bpp,
-			       src->surface[0].stride,
-			       src->tiling, format, src->surface[1].offset);
+			       width, height,
+			       src, format);
 
 	emit_surface_state_cmd(ibb, VEBOX_SURFACE_OUTPUT,
-			       width, height, dst->bpp,
-			       dst->surface[0].stride,
-			       dst->tiling, format, dst->surface[1].offset);
+			       width, height,
+			       dst, format);
 
 	emit_tiling_convert_cmd(ibb, src, dst);
 

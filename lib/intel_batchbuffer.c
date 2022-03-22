@@ -671,8 +671,10 @@ igt_render_copyfunc_t igt_get_render_copyfunc(int devid)
 		copy = gen9_render_copyfunc;
 	else if (IS_GEN11(devid))
 		copy = gen11_render_copyfunc;
-	else if (HAS_4TILE(devid))
+	else if (HAS_FLATCCS(devid))
 		copy = gen12p71_render_copyfunc;
+	else if (IS_METEORLAKE(devid))
+		copy = mtl_render_copyfunc;
 	else if (IS_GEN12(devid))
 		copy = gen12_render_copyfunc;
 
@@ -691,7 +693,9 @@ igt_vebox_copyfunc_t igt_get_vebox_copyfunc(int devid)
 
 igt_render_clearfunc_t igt_get_render_clearfunc(int devid)
 {
-	if (IS_DG2(devid)) {
+	if (IS_METEORLAKE(devid)) {
+		return mtl_render_clearfunc;
+	} else if (IS_DG2(devid)) {
 		return gen12p71_render_clearfunc;
 	} else if (IS_GEN12(devid)) {
 		return gen12_render_clearfunc;
@@ -1764,8 +1768,13 @@ __intel_bb_add_intel_buf(struct intel_bb *ibb, struct intel_buf *buf,
 	if (!alignment) {
 		alignment = 0x1000;
 
+		/*
+		 * TODO:
+		 * Find out why MTL need special alignment, spec says 32k
+		 * is enough for MTL.
+		 */
 		if (ibb->gen >= 12 && buf->compression)
-			alignment = 0x10000;
+			alignment = IS_METEORLAKE(ibb->devid) ? 0x100000 : 0x10000;
 
 		/* For gen3 ensure tiled buffers are aligned to power of two size */
 		if (ibb->gen == 3 && buf->tiling) {
