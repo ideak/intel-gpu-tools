@@ -39,6 +39,7 @@ struct test_config {
 	bool compression;
 	bool inplace;
 	bool surfcopy;
+	bool new_ctx;
 };
 
 static void set_object(struct blt_copy_object *obj,
@@ -234,9 +235,8 @@ static void block_copy(int i915,
 		       const intel_ctx_t *ctx,
 		       const struct intel_execution_engine2 *e,
 		       uint32_t region1, uint32_t region2,
-		       enum blt_tiling mid_tiling, bool compression,
-		       bool inplace,
-		       bool surfcopy)
+		       enum blt_tiling mid_tiling,
+		       const struct test_config *config)
 {
 	struct blt_copy_data blt = {};
 	struct blt_block_copy_data_ext ext = {}, *pext = &ext;
@@ -249,7 +249,7 @@ static void block_copy(int i915,
 	uint32_t run_id = mid_tiling;
 	uint32_t mid_region = region2, bb;
 	uint32_t width = param.width, height = param.height;
-	enum blt_compression mid_compression = compression;
+	enum blt_compression mid_compression = config->compression;
 	int mid_compression_format = param.compression_format;
 	enum blt_compression_type comp_type = COMPRESSION_TYPE_3D;
 	uint8_t uc_mocs = intel_get_uc_mocs(i915);
@@ -293,8 +293,31 @@ static void block_copy(int i915,
 	WRITE_PNG(i915, run_id, "src", &blt.src, width, height);
 	WRITE_PNG(i915, run_id, "mid", &blt.dst, width, height);
 
-	if (surfcopy && pext)
-		surf_copy(i915, ctx, e, ahnd, src, mid, dst, run_id);
+	if (config->surfcopy && pext) {
+		const intel_ctx_t *surf_ctx = ctx;
+		uint64_t surf_ahnd = ahnd;
+		struct intel_execution_engine2 surf_e = *e;
+
+		if (config->new_ctx) {
+			intel_ctx_cfg_t cfg = {};
+
+			cfg.num_engines = 1;
+			cfg.engines[0].engine_class = e->class;
+			cfg.engines[0].engine_instance = e->instance;
+			surf_ctx = intel_ctx_create(i915, &cfg);
+			surf_e.flags = 0;
+			surf_ahnd = intel_allocator_open_full(i915, surf_ctx->id, 0, 0,
+							      INTEL_ALLOCATOR_SIMPLE,
+							      ALLOC_STRATEGY_LOW_TO_HIGH, 0);
+		}
+
+		surf_copy(i915, surf_ctx, &surf_e, surf_ahnd, src, mid, dst, run_id);
+
+		if (surf_ctx != ctx) {
+			intel_ctx_destroy(i915, surf_ctx);
+			put_ahnd(surf_ahnd);
+		}
+	}
 
 	memset(&blt, 0, sizeof(blt));
 	blt.color_depth = CD_32bit;
@@ -303,7 +326,7 @@ static void block_copy(int i915,
 	set_blt_object(&blt.dst, dst);
 	set_object_ext(&ext.src, mid_compression_format, width, height, SURFACE_TYPE_2D);
 	set_object_ext(&ext.dst, 0, width, height, SURFACE_TYPE_2D);
-	if (inplace) {
+	if (config->inplace) {
 		set_object(&blt.dst, mid->handle, dst->size, mid->region, 0,
 			   T_LINEAR, COMPRESSION_DISABLED, comp_type);
 		blt.dst.ptr = mid->ptr;
@@ -367,10 +390,7 @@ static void block_copy_test(int i915,
 					      param.compression_format, regtxt) {
 					block_copy(i915, ctx, e,
 						   region1, region2,
-						   tiling,
-						   config->compression,
-						   config->inplace,
-						   config->surfcopy);
+						   tiling, config);
 				}
 				free(regtxt);
 			}
@@ -476,6 +496,16 @@ igt_main_args("bf:pst:W:H:", NULL, help_str, opt_handler, NULL)
 	igt_subtest_with_dynamic("ctrl-surf-copy") {
 		struct test_config config = { .compression = true,
 					      .surfcopy = true };
+
+		block_copy_test(i915, &config, ctx, set);
+	}
+
+	igt_describe("Check flatccs data are physically tagged and visible"
+		     " in different contexts");
+	igt_subtest_with_dynamic("ctrl-surf-copy-new-ctx") {
+		struct test_config config = { .compression = true,
+					      .surfcopy = true,
+					      .new_ctx = true };
 
 		block_copy_test(i915, &config, ctx, set);
 	}
