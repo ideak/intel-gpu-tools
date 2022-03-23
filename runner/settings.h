@@ -24,6 +24,13 @@ _Static_assert(ABORT_ALL == (ABORT_TAINT | ABORT_LOCKDEP | ABORT_PING), "ABORT_A
 #define GCOV_RESET GCOV_DIR	"/reset"
 #define CODE_COV_RESULTS_PATH	"code_cov"
 
+enum {
+	PRUNE_KEEP_DYNAMIC = 0,
+	PRUNE_KEEP_SUBTESTS,
+	PRUNE_KEEP_ALL,
+	PRUNE_KEEP_REQUESTED,
+};
+
 struct regex_list {
 	char **regex_strings;
 	GRegex **regexes;
@@ -51,6 +58,7 @@ struct settings {
 	char *results_path;
 	bool piglit_style_dmesg;
 	int dmesg_warn_level;
+	int prune_mode;
 	bool list_all;
 	char *code_coverage_script;
 	bool enable_code_coverage;

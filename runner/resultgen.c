@@ -1229,19 +1229,64 @@ static void fill_from_journal(int fd,
 	fclose(f);
 }
 
-static void prune_subtests_with_dynamic_subtests(const char *binary,
-						 struct subtest_list *subtests,
-						 struct json_object *tests)
+static bool result_is_requested(struct job_list_entry *entry,
+				const char *subtestname,
+				const char *dynamic_name)
 {
-	char piglit_name[256];
+	char entryname[512];
 	size_t i;
 
+	if (dynamic_name)
+		snprintf(entryname, sizeof(entryname) - 1, "%s@%s", subtestname, dynamic_name);
+	else
+		strncpy(entryname, subtestname, sizeof(entryname) - 1);
+
+	for (i = 0; i < entry->subtest_count; i++) {
+		if (!strcmp(entry->subtests[i], entryname))
+			return true;
+	}
+
+	return false;
+}
+
+static void prune_subtests(struct settings *settings,
+			   struct job_list_entry *entry,
+			   struct subtest_list *subtests,
+			   struct json_object *tests)
+{
+	char piglit_name[256];
+	char dynamic_piglit_name[256];
+	size_t i, k;
+
+	if (settings->prune_mode == PRUNE_KEEP_ALL)
+		return;
+
 	for (i = 0; i < subtests->size; i++) {
-		if (subtests->subs[i].dynamic_size) {
-			generate_piglit_name(binary, subtests->subs[i].name, piglit_name, sizeof(piglit_name));
+		generate_piglit_name(entry->binary, subtests->subs[i].name, piglit_name, sizeof(piglit_name));
+
+		if (settings->prune_mode == PRUNE_KEEP_DYNAMIC) {
+			if (subtests->subs[i].dynamic_size)
+				json_object_object_del(tests, piglit_name);
+
+			continue;
+		}
+
+		assert(settings->prune_mode == PRUNE_KEEP_SUBTESTS || settings->prune_mode == PRUNE_KEEP_REQUESTED);
+
+		if (settings->prune_mode == PRUNE_KEEP_REQUESTED &&
+		    !result_is_requested(entry, subtests->subs[i].name, NULL)) {
 			json_object_object_del(tests, piglit_name);
 		}
 
+		for (k = 0; k < subtests->subs[i].dynamic_size; k++) {
+			if (settings->prune_mode == PRUNE_KEEP_SUBTESTS ||
+			    (settings->prune_mode == PRUNE_KEEP_REQUESTED &&
+			     !result_is_requested(entry, subtests->subs[i].name, subtests->subs[i].dynamic_names[k]))) {
+				generate_piglit_name_for_dynamic(piglit_name, subtests->subs[i].dynamic_names[k],
+								 dynamic_piglit_name, sizeof(dynamic_piglit_name));
+				json_object_object_del(tests, dynamic_piglit_name);
+			}
+		}
 	}
 }
 
@@ -1426,8 +1471,7 @@ static void add_to_totals(const char *binary,
 	for (i = 0; i < subtests->size; i++) {
 		generate_piglit_name(binary, subtests->subs[i].name, piglit_name, sizeof(piglit_name));
 
-		if (subtests->subs[i].dynamic_size == 0) {
-			test = get_or_create_json_object(results->tests, piglit_name);
+		if (json_object_object_get_ex(results->tests, piglit_name, &test)) {
 			if (!json_object_object_get_ex(test, "result", &resultobj)) {
 				fprintf(stderr, "Warning: No results set for %s\n", piglit_name);
 				return;
@@ -1441,17 +1485,18 @@ static void add_to_totals(const char *binary,
 		for (k = 0; k < subtests->subs[i].dynamic_size; k++) {
 			generate_piglit_name_for_dynamic(piglit_name, subtests->subs[i].dynamic_names[k],
 							 dynamic_piglit_name, sizeof(dynamic_piglit_name));
-			test = get_or_create_json_object(results->tests, dynamic_piglit_name);
-			if (!json_object_object_get_ex(test, "result", &resultobj)) {
-				fprintf(stderr, "Warning: No results set for %s\n", dynamic_piglit_name);
-				return;
-			}
-			result = json_object_get_string(resultobj);
-			add_result_to_totals(emptystrtotal, result);
-			add_result_to_totals(roottotal, result);
-			add_result_to_totals(binarytotal, result);
-		}
 
+			if (json_object_object_get_ex(results->tests, dynamic_piglit_name, &test)) {
+				if (!json_object_object_get_ex(test, "result", &resultobj)) {
+					fprintf(stderr, "Warning: No results set for %s\n", dynamic_piglit_name);
+					return;
+				}
+				result = json_object_get_string(resultobj);
+				add_result_to_totals(emptystrtotal, result);
+				add_result_to_totals(roottotal, result);
+				add_result_to_totals(binarytotal, result);
+			}
+		}
 	}
 }
 
@@ -1483,9 +1528,9 @@ static bool parse_test_directory(int dirfd,
 		goto parse_output_end;
 	}
 
-	prune_subtests_with_dynamic_subtests(entry->binary, &subtests, results->tests);
-
 	override_results(entry->binary, &subtests, results->tests);
+	prune_subtests(settings, entry, &subtests, results->tests);
+
 	add_to_totals(entry->binary, &subtests, results);
 
  parse_output_end:

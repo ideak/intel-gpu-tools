@@ -29,6 +29,7 @@ enum {
 	OPT_ENABLE_CODE_COVERAGE,
 	OPT_COV_RESULTS_PER_TEST,
 	OPT_VERSION,
+	OPT_PRUNE_MODE,
 	OPT_HELP = 'h',
 	OPT_NAME = 'n',
 	OPT_DRY_RUN = 'd',
@@ -65,6 +66,18 @@ static struct {
 	{ 0, 0 },
 };
 
+static struct {
+	int value;
+	const char *name;
+} prune_modes[] = {
+	{ PRUNE_KEEP_DYNAMIC, "keep-dynamic-subtests" },
+	{ PRUNE_KEEP_DYNAMIC, "keep-dynamic" },
+	{ PRUNE_KEEP_SUBTESTS, "keep-subtests" },
+	{ PRUNE_KEEP_ALL, "keep-all" },
+	{ PRUNE_KEEP_REQUESTED, "keep-requested" },
+	{ 0, 0 },
+};
+
 static bool set_log_level(struct settings* settings, const char *level)
 {
 	typeof(*log_levels) *it;
@@ -96,6 +109,20 @@ static bool set_abort_condition(struct settings* settings, const char *cond)
 	for (it = abort_conditions; it->name; it++) {
 		if (!strcmp(cond, it->name)) {
 			settings->abort_mask |= it->value;
+			return true;
+		}
+	}
+
+	return false;
+}
+
+static bool set_prune_mode(struct settings* settings, const char *mode)
+{
+	typeof(*prune_modes) *it;
+
+	for (it = prune_modes; it->name; it++) {
+		if (!strcmp(mode, it->name)) {
+			settings->prune_mode = it->value;
 			return true;
 		}
 	}
@@ -239,6 +266,19 @@ static const char *usage_str =
 	"                        (longer) filter list means the test result should\n"
 	"                        change. KERN_NOTICE dmesg level is treated as warn,\n"
 	"                        unless overridden with --dmesg-warn-level.\n"
+	"  --prune-mode <mode>   Control reporting of dynamic subtests by selecting test\n"
+	"                        results that are removed from the final results set.\n"
+	"                        Possible options:\n"
+	"                         keep-dynamic-subtests  - Remove subtests that have dynamic\n"
+	"                                                  subtests. (default)\n"
+	"                         keep-dynamic           - Alias for the above\n"
+	"                         keep-subtests          - Remove dynamic subtests,\n"
+	"                                                  leaving just the parent subtest.\n"
+	"                         keep-all               - Don't remove anything\n"
+	"                         keep-requested         - Remove reported results that are\n"
+	"                                                  not in the requested test set.\n"
+	"                                                  Useful when you have a hand-written\n"
+	"                                                  testlist.\n"
 	"  -b, --blacklist FILENAME\n"
 	"                        Exclude all test matching to regexes from FILENAME\n"
 	"                        (can be used more than once)\n"
@@ -423,6 +463,7 @@ bool parse_options(int argc, char **argv,
 		{"use-watchdog", no_argument, NULL, OPT_WATCHDOG},
 		{"piglit-style-dmesg", no_argument, NULL, OPT_PIGLIT_DMESG},
 		{"dmesg-warn-level", required_argument, NULL, OPT_DMESG_WARN_LEVEL},
+		{"prune-mode", required_argument, NULL, OPT_PRUNE_MODE},
 		{"blacklist", required_argument, NULL, OPT_BLACKLIST},
 		{"list-all", no_argument, NULL, OPT_LIST_ALL},
 		{ 0, 0, 0, 0},
@@ -520,6 +561,12 @@ bool parse_options(int argc, char **argv,
 			break;
 		case OPT_DMESG_WARN_LEVEL:
 			settings->dmesg_warn_level = atoi(optarg);
+			break;
+		case OPT_PRUNE_MODE:
+			if (!set_prune_mode(settings, optarg)) {
+				usage("Cannot parse prune mode", stderr);
+				goto error;
+			}
 			break;
 		case OPT_BLACKLIST:
 			if (!parse_blacklist(&settings->exclude_regexes,
@@ -779,6 +826,7 @@ bool serialize_settings(struct settings *settings)
 	SERIALIZE_LINE(f, settings, use_watchdog, "%d");
 	SERIALIZE_LINE(f, settings, piglit_style_dmesg, "%d");
 	SERIALIZE_LINE(f, settings, dmesg_warn_level, "%d");
+	SERIALIZE_LINE(f, settings, prune_mode, "%d");
 	SERIALIZE_LINE(f, settings, test_root, "%s");
 	SERIALIZE_LINE(f, settings, results_path, "%s");
 	SERIALIZE_LINE(f, settings, enable_code_coverage, "%d");
@@ -830,6 +878,7 @@ bool read_settings_from_file(struct settings *settings, FILE *f)
 		PARSE_LINE(settings, name, val, use_watchdog, numval);
 		PARSE_LINE(settings, name, val, piglit_style_dmesg, numval);
 		PARSE_LINE(settings, name, val, dmesg_warn_level, numval);
+		PARSE_LINE(settings, name, val, prune_mode, numval);
 		PARSE_LINE(settings, name, val, test_root, val ? strdup(val) : NULL);
 		PARSE_LINE(settings, name, val, results_path, val ? strdup(val) : NULL);
 		PARSE_LINE(settings, name, val, enable_code_coverage, numval);
