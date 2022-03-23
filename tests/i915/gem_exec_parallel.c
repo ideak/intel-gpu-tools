@@ -150,9 +150,10 @@ static void *thread(void *data)
 			batch[++i] = offset + 4*t->id;
 			batch[++i] = offset >> 32;
 			obj[0].offset = offset;
-			obj[0].flags |= EXEC_OBJECT_PINNED | EXEC_OBJECT_WRITE;
+			obj[0].flags |= EXEC_OBJECT_PINNED | EXEC_OBJECT_WRITE |
+					EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 			obj[1].offset = get_offset(t->ahnd, obj[1].handle, 4096, 0);
-			obj[1].flags |= EXEC_OBJECT_PINNED;
+			obj[1].flags |= EXEC_OBJECT_PINNED | EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 			gem_write(fd, obj[1].handle, 0, batch, sizeof(batch));
 		}
 
