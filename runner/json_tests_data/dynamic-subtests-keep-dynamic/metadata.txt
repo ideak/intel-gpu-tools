@@ -10,3 +10,4 @@ use_watchdog : 0
 piglit_style_dmesg : 0
 test_root : /path/does/not/exist
 results_path : /path/does/not/exist
+prune_mode : 0

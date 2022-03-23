@@ -162,7 +162,7 @@ static const char *dirnames[] = {
 	"dmesg-warn-level",
 	"dmesg-warn-level-piglit-style",
 	"dmesg-warn-level-one-piglit-style",
-	"dynamic-subtests",
+	"dynamic-subtests-keep-dynamic",
 	"dynamic-subtest-name-in-multiple-subtests",
 	"unprintable-characters",
 	"empty-result-files",
