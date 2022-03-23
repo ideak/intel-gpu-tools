@@ -137,7 +137,7 @@ static void run_test(int fd, const intel_ctx_t *ctx,
 	} else {
 		/* ignore first execbuf offset */
 		obj[0].offset = get_offset(ahnd, obj[0].handle, 4096, 0);
-		obj[0].flags |= EXEC_OBJECT_PINNED;
+		obj[0].flags |= EXEC_OBJECT_PINNED | EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 	}
 
 	for (int i = 0; i < 1024; i++) {
@@ -150,7 +150,7 @@ static void run_test(int fd, const intel_ctx_t *ctx,
 		obj[1].handle = gem_create(fd, 4096);
 		if (ahnd) {
 			obj[1].offset = get_offset(ahnd, obj[1].handle, 4096, 0);
-			obj[1].flags |= EXEC_OBJECT_PINNED;
+			obj[1].flags |= EXEC_OBJECT_PINNED | EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 			offset = obj[0].offset + reloc.delta;
 		} else {
 			offset = reloc.presumed_offset + reloc.delta;
