@@ -200,6 +200,7 @@ static void assert_settings_equal(struct settings *one, struct settings *two)
 	igt_assert_eqstr(one->results_path, two->results_path);
 	igt_assert_eq(one->piglit_style_dmesg, two->piglit_style_dmesg);
 	igt_assert_eq(one->dmesg_warn_level, two->dmesg_warn_level);
+	igt_assert_eq(one->prune_mode, two->prune_mode);
 }
 
 static void assert_job_list_equal(struct job_list *one, struct job_list *two)
@@ -288,6 +289,7 @@ igt_main
 		igt_assert_eq(settings->per_test_timeout, 0);
 		igt_assert_eq(settings->overall_timeout, 0);
 		igt_assert(!settings->use_watchdog);
+		igt_assert_eq(settings->prune_mode, 0);
 		igt_assert(strstr(settings->test_root, "test-root-dir") != NULL);
 		igt_assert(strstr(settings->results_path, "path-to-results") != NULL);
 
@@ -446,6 +448,7 @@ igt_main
 				       "--collect-code-cov",
 				       "--coverage-per-test",
 				       "--collect-script", "/usr/bin/true",
+				       "--prune-mode=keep-subtests",
 				       "test-root-dir",
 				       "path-to-results",
 		};
@@ -477,6 +480,7 @@ igt_main
 		igt_assert_eq(settings->per_test_timeout, 72);
 		igt_assert_eq(settings->overall_timeout, 360);
 		igt_assert(settings->use_watchdog);
+		igt_assert_eq(settings->prune_mode, PRUNE_KEEP_SUBTESTS);
 		igt_assert(strstr(settings->test_root, "test-root-dir") != NULL);
 		igt_assert(strstr(settings->results_path, "path-to-results") != NULL);
 
@@ -631,6 +635,33 @@ igt_main
 		argv[1] = "--disk-usage-limit=1G";
 		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
 		igt_assert_eq_u64(settings->disk_usage_limit, 1024UL * 1024UL * 1024UL);
+	}
+
+	igt_subtest("prune-modes") {
+		const char *argv[] = { "runner",
+			               "--prune-mode=keep-dynamic-subtests",
+				       "test-root-dir",
+				       "results-path",
+		};
+
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+		igt_assert_eq(settings->prune_mode, PRUNE_KEEP_DYNAMIC);
+
+		argv[1] = "--prune-mode=keep-dynamic";
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+		igt_assert_eq(settings->prune_mode, PRUNE_KEEP_DYNAMIC);
+
+		argv[1] = "--prune-mode=keep-subtests";
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+		igt_assert_eq(settings->prune_mode, PRUNE_KEEP_SUBTESTS);
+
+		argv[1] = "--prune-mode=keep-all";
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+		igt_assert_eq(settings->prune_mode, PRUNE_KEEP_ALL);
+
+		argv[1] = "--prune-mode=keep-requested";
+		igt_assert(parse_options(ARRAY_SIZE(argv), (char**)argv, settings));
+		igt_assert_eq(settings->prune_mode, PRUNE_KEEP_REQUESTED);
 	}
 
 	igt_subtest("parse-clears-old-data") {
@@ -898,6 +929,7 @@ igt_main
 					       "--overall-timeout", "360",
 					       "--use-watchdog",
 					       "--piglit-style-dmesg",
+					       "--prune-mode=keep-all",
 					       testdatadir,
 					       dirname,
 			};
