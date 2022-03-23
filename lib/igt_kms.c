@@ -3189,6 +3189,8 @@ static int igt_plane_commit(igt_plane_t *plane,
 			    enum igt_commit_style s,
 			    bool fail_on_error)
 {
+	igt_plane_t *plane_primary = igt_pipe_get_plane_type(pipe, DRM_PLANE_TYPE_PRIMARY);
+
 	if (pipe->display->first_commit || (s == COMMIT_UNIVERSAL &&
 	     igt_plane_is_prop_changed(plane, IGT_PLANE_ROTATION))) {
 		int ret;
@@ -3199,7 +3201,7 @@ static int igt_plane_commit(igt_plane_t *plane,
 
 	if (plane->type == DRM_PLANE_TYPE_CURSOR && s == COMMIT_LEGACY) {
 		return igt_cursor_commit_legacy(plane, pipe, fail_on_error);
-	} else if (plane->type == DRM_PLANE_TYPE_PRIMARY && s == COMMIT_LEGACY) {
+	} else if (plane == plane_primary && s == COMMIT_LEGACY) {
 		return igt_primary_plane_commit_legacy(plane, pipe,
 						       fail_on_error);
 	} else {
