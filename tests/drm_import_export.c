@@ -43,6 +43,7 @@
 #include "i915/gem.h"
 
 #define DURATION 10
+IGT_TEST_DESCRIPTION("Basic check to verify the behaviour of libdrm bo for prime/flink");
 
 int fd;
 drm_intel_bufmgr *bufmgr;
@@ -250,16 +251,22 @@ igt_main {
 		drm_intel_bufmgr_gem_enable_reuse(bufmgr);
 	}
 
+	igt_describe("Verify whether the behaviour of libdrm"
+		     " is consistent for flink or not.");
 	igt_subtest("import-close-race-flink") {
 		use_flink = true;
 		test_import_close_race();
 	}
 
+	igt_describe("Verify whether the behaviour of libdrm"
+		     " is consistent for prime or not.");
 	igt_subtest("import-close-race-prime") {
 		use_flink = false;
 		test_import_close_race();
 	}
 
+	igt_describe("Multithreaded test to validate the (lack of) locking in"
+		     " the flink code in libdrm.");
 	igt_subtest("flink") {
 		use_flink = true;
 
@@ -274,6 +281,8 @@ igt_main {
 		pthread_join(test_thread_id4, NULL);
 	}
 
+	igt_describe("Multithreaded test to validate the (lack of) locking in"
+		     " the prime code in libdrm.");
 	igt_subtest("prime") {
 		use_flink = false;
 
