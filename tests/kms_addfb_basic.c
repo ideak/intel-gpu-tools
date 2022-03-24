@@ -676,6 +676,50 @@ static void addfb25_ytile(int fd)
 	}
 }
 
+static void addfb25_4tile(int fd)
+{
+	struct drm_mode_fb_cmd2 f = {};
+	igt_display_t display;
+
+	igt_fixture {
+		igt_display_require(&display, fd);
+
+		gem_bo = igt_create_bo_with_dimensions(fd, 1024, 1024,
+				DRM_FORMAT_XRGB8888, 0, 0, NULL, NULL, NULL);
+		igt_assert(gem_bo);
+
+		memset(&f, 0, sizeof(f));
+
+		f.width = 1024;
+		f.height = 1024;
+		f.pixel_format = DRM_FORMAT_XRGB8888;
+		f.pitches[0] = 1024*4;
+		f.flags = DRM_MODE_FB_MODIFIERS;
+		f.modifier[0] = DRM_FORMAT_MOD_LINEAR;
+
+		f.handles[0] = gem_bo;
+
+	}
+
+	igt_describe("Check if addfb2 call works for tiling-4");
+	igt_subtest("addfb25-4-tiled") {
+		igt_require_fb_modifiers(fd);
+		igt_require_intel(fd);
+
+		f.modifier[0] = I915_FORMAT_MOD_4_TILED;
+		igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_ADDFB2, &f) ==
+			   addfb_expected_ret(&display, &f));
+		if (!addfb_expected_ret(&display, &f))
+			igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_RMFB, &f.fb_id) == 0);
+		f.fb_id = 0;
+	}
+
+	igt_fixture {
+		gem_close(fd, gem_bo);
+		igt_display_fini(&display);
+	}
+}
+
 static void prop_tests(int fd)
 {
 	struct drm_mode_fb_cmd2 f = {};
@@ -825,6 +869,8 @@ igt_main
 	addfb25_tests(fd);
 
 	addfb25_ytile(fd);
+
+	addfb25_4tile(fd);
 
 	tiling_tests(fd);
 
