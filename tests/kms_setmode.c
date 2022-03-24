@@ -37,12 +37,16 @@
 /* max combinations with repetitions */
 #define MAX_COMBINATION_ELEMS   MAX_CRTCS
 
+/* restricted pipe count */
+#define CRTC_RESTRICT_CNT 2
+
 #define MAX_HDISPLAY_PER_CRTC 5120
 
 static int drm_fd;
 static drmModeRes *drm_resources;
 static int filter_test_id;
 static bool dry_run;
+static bool extended = false;
 
 const drmModeModeInfo mode_640_480 = {
 	.name		= "640x480",
@@ -820,6 +824,14 @@ static void get_combinations(int n, int k, bool allow_repetitions,
 	iterate_combinations(n, k, allow_repetitions, 0, 0, &comb, set);
 }
 
+static int get_crtc_count(int count_crtcs, bool extend)
+{
+	if ((count_crtcs <= CRTC_RESTRICT_CNT) || extend)
+		return count_crtcs;
+	else
+		return CRTC_RESTRICT_CNT;
+}
+
 static void test_combinations(const struct test_config *tconf,
 			      int connector_count)
 {
@@ -827,6 +839,7 @@ static void test_combinations(const struct test_config *tconf,
 	struct combination_set crtc_combs;
 	struct connector_config *cconfs;
 	int i;
+	int crtc_count = get_crtc_count(tconf->resources->count_crtcs, extended);
 
 	if (connector_count > 2 && (tconf->flags & TEST_STEALING))
 		return;
@@ -834,17 +847,15 @@ static void test_combinations(const struct test_config *tconf,
 	igt_assert(tconf->resources);
 
 	connector_combs.capacity = pow(tconf->resources->count_connectors,
-				       tconf->resources->count_crtcs + 1);
-	crtc_combs.capacity = pow(tconf->resources->count_crtcs,
-				  tconf->resources->count_crtcs + 1);
-
+				       crtc_count + 1);
+	crtc_combs.capacity = pow(crtc_count,
+				  crtc_count + 1);
 	connector_combs.items = malloc(connector_combs.capacity * sizeof(struct combination));
 	crtc_combs.items = malloc(crtc_combs.capacity * sizeof(struct combination));
 
 	get_combinations(tconf->resources->count_connectors, connector_count,
 			 false, &connector_combs);
-	get_combinations(tconf->resources->count_crtcs, connector_count,
-			 true, &crtc_combs);
+	get_combinations(crtc_count, connector_count, true, &crtc_combs);
 
 	igt_info("Testing: %s %d connector combinations\n", tconf->name,
 		 connector_count);
@@ -885,9 +896,10 @@ free_cconfs:
 static void run_test(const struct test_config *tconf)
 {
 	int connector_num;
+	int crtc_count = get_crtc_count(tconf->resources->count_crtcs, extended);
 
 	connector_num = tconf->flags & TEST_CLONE ? 2 : 1;
-	for (; connector_num <= tconf->resources->count_crtcs; connector_num++)
+	for (; connector_num <= crtc_count; connector_num++)
 		test_combinations(tconf, connector_num);
 }
 
@@ -896,6 +908,9 @@ static int opt_handler(int opt, int opt_index, void *data)
 	switch (opt) {
 	case 'd':
 		dry_run = true;
+		break;
+	case 'e':
+		extended = true;
 		break;
 	case 't':
 		filter_test_id = atoi(optarg);
@@ -909,9 +924,10 @@ static int opt_handler(int opt, int opt_index, void *data)
 
 const char *help_str =
 	"  -d\t\tDon't run any test, only print what would be done. (still needs DRM access)\n"
-	"  -t <test id>\tRun only the test with this id.";
+	"  -t <test id>\tRun only the test with this id\n"
+	"  -e \t\tExtend to run on all pipes. (By default tests will run on two pipes only)\n";
 
-igt_main_args("dt:", NULL, help_str, opt_handler, NULL)
+igt_main_args("det:", NULL, help_str, opt_handler, NULL)
 {
 	const struct {
 		enum test_flags flags;
