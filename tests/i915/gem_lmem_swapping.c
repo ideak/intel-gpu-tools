@@ -126,6 +126,7 @@ verify_object(int i915, const struct object *obj,  unsigned int flags)
 }
 
 static void move_to_lmem(int i915,
+			 const intel_ctx_t *ctx,
 			 struct object *list,
 			 unsigned int num,
 			 uint32_t batch,
@@ -137,6 +138,7 @@ static void move_to_lmem(int i915,
 		.buffers_ptr = to_user_pointer(obj),
 		.buffer_count = 1 + num,
 		.flags = I915_EXEC_NO_RELOC | I915_EXEC_HANDLE_LUT | engine,
+		.rsvd1 = ctx->id,
 	};
 	unsigned int i, ret;
 
@@ -156,6 +158,7 @@ retry:
 }
 
 static void __do_evict(int i915,
+		       const intel_ctx_t *ctx,
 		       struct drm_i915_gem_memory_class_instance *region,
 		       struct params *params,
 		       unsigned int seed)
@@ -170,7 +173,6 @@ static void __do_evict(int i915,
 	struct timespec t = {};
 	unsigned int num;
 
-	__gem_context_set_persistence(i915, 0, false);
 	size = 4096;
 	batch = create_bo(i915, &size, region, params->oom_test);
 
@@ -201,7 +203,7 @@ static void __do_evict(int i915,
 		}
 		obj->handle = create_bo(i915, &obj->size, region, params->oom_test);
 
-		move_to_lmem(i915, objects + i, 1, batch, engine,
+		move_to_lmem(i915, ctx, objects + i, 1, batch, engine,
 			     params->oom_test);
 		if (params->flags & TEST_VERIFY)
 			init_object(i915, obj, rand(), params->flags);
@@ -226,7 +228,7 @@ static void __do_evict(int i915,
 			idx = (idx + 1) % params->count;
 		}
 
-		move_to_lmem(i915, list, num, batch, engine, params->oom_test);
+		move_to_lmem(i915, ctx, list, num, batch, engine, params->oom_test);
 
 		if (params->flags & TEST_ENGINES)
 			engine = (engine + 1) % __num_engines__;
@@ -342,6 +344,7 @@ static void fill_params(int i915, struct params *params,
 }
 
 static void test_evict(int i915,
+		       const intel_ctx_t *ctx,
 		       struct drm_i915_memory_region_info *region,
 		       unsigned int flags)
 {
@@ -353,14 +356,18 @@ static void test_evict(int i915,
 	if (flags & TEST_PARALLEL) {
 		int fd = gem_reopen_driver(i915);
 
+		ctx = intel_ctx_create_all_physical(fd);
+		__gem_context_set_persistence(fd, ctx->id, false);
+
 		igt_fork(child, nproc)
-			__do_evict(fd, &region->region, &params,
+			__do_evict(fd, ctx, &region->region, &params,
 				   params.seed + child + 1);
 
 		igt_waitchildren();
+		intel_ctx_destroy(fd, ctx);
 		close(fd);
 	} else {
-		__do_evict(i915, &region->region, &params, params.seed);
+		__do_evict(i915, ctx, &region->region, &params, params.seed);
 	}
 }
 
@@ -399,6 +406,7 @@ static void smem_oom_exit_handler(int sig)
 }
 
 static void test_smem_oom(int i915,
+			  const intel_ctx_t *ctx,
 			  struct drm_i915_memory_region_info *region)
 {
 	const uint64_t smem_size = intel_get_total_ram_mb() +
@@ -421,7 +429,7 @@ static void test_smem_oom(int i915,
 		fill_params(i915, &params, region, 0, 1, true);
 
 		igt_install_exit_handler(smem_oom_exit_handler);
-		__do_evict(fd, &region->region, &params,
+		__do_evict(fd, ctx, &region->region, &params,
 			   params.seed + child + 1);
 
 		close(fd);
@@ -513,6 +521,7 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 		{ "parallel-multi", TEST_PARALLEL | TEST_RANDOM | TEST_VERIFY | TEST_ENGINES | TEST_MULTI },
 		{ }
 	};
+	const intel_ctx_t *ctx;
 	int i915 = -1;
 
 	igt_fixture {
@@ -528,19 +537,23 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 		for_each_physical_engine(i915, e)
 			__num_engines__++;
 		igt_require(__num_engines__);
+		ctx = intel_ctx_create_all_physical(i915);
+		__gem_context_set_persistence(i915, ctx->id, false);
+
 	}
 
 	for (test = tests; test->name; test++) {
 		igt_describe("Exercise local memory swapping to system memory");
 		dynamic_lmem_subtest(region, regions, test->name)
-			test_evict(i915, region, test->flags);
+			test_evict(i915, ctx, region, test->flags);
 	}
 
 	igt_describe("Exercise local memory swapping during exhausting system memory");
 	dynamic_lmem_subtest(region, regions, "smem-oom")
-		test_smem_oom(i915, region);
+		test_smem_oom(i915, ctx, region);
 
 	igt_fixture {
+		intel_ctx_destroy(i915, ctx);
 		free(regions);
 		close(i915);
 	}
