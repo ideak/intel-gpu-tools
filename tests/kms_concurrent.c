@@ -116,7 +116,18 @@ create_fb_for_mode_position(data_t *data, drmModeModeInfo *mode,
 			0.0f, 0.0f, 1.0f);
 
 	for (int i = 0; i < max_planes; i++) {
-		if (data->plane[i]->type == DRM_PLANE_TYPE_PRIMARY)
+		/*
+		 * prepare_planes() skips the assignment of data->plane
+		 * for primary planes as they are handled separately.
+		 *
+		 * Only one primary plane is assigned and prepared for
+		 * the test. If there are multiple primary planes, the
+		 * remaining are unassigned.
+		 *
+		 * Check if the data->plane is valid before accessing its
+		 * members to fix this crash
+		 */
+		if (data->plane[i] && data->plane[i]->type == DRM_PLANE_TYPE_PRIMARY)
 			continue;
 
 		igt_paint_color(cr, rect_x[i], rect_y[i],
