@@ -217,7 +217,7 @@ static void __do_evict(int i915,
 	 * For TEST_MULTI runs, make each object counts a loop to
 	 * avoid excessive run times.
 	 */
-	for (l = 0; l < params->loops && igt_seconds_elapsed(&t) < 300; l += num) {
+	for (l = 0; l < params->loops && igt_seconds_elapsed(&t) < 45; l += num) {
 		unsigned int idx = rand() % params->count;
 
 		num = params->flags & TEST_MULTI ? rand() % max_swap_in + 1 : 1;
