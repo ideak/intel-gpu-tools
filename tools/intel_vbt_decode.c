@@ -132,6 +132,21 @@ static const void *find_raw_section(const struct context *context, int section_i
 	return NULL;
 }
 
+/*
+ * Offset from the start of BDB to the start of the
+ * block data (just past the block header).
+ */
+static u32 raw_block_offset(const struct context *context, enum bdb_block_id section_id)
+{
+	const void *block;
+
+	block = find_raw_section(context, section_id);
+	if (!block)
+		return 0;
+
+	return block - (const void *)context->bdb;
+}
+
 static const void *block_data(const struct bdb_block *block)
 {
 	return block->data + 3;
@@ -181,6 +196,37 @@ static size_t block_min_size(const struct context *context, int section_id)
 	}
 }
 
+/* make the data table offsets relative to the data block */
+static bool fixup_lfp_data_ptrs(const struct context *context,
+				void *ptrs_block)
+{
+	struct bdb_lvds_lfp_data_ptrs *ptrs = ptrs_block;
+	u32 offset;
+	int i;
+
+	offset = raw_block_offset(context, BDB_LVDS_LFP_DATA);
+
+	for (i = 0; i < 16; i++) {
+		if (ptrs->ptr[i].fp_timing.offset < offset ||
+		    ptrs->ptr[i].dvo_timing.offset < offset ||
+		    ptrs->ptr[i].panel_pnp_id.offset < offset)
+			return false;
+
+		ptrs->ptr[i].fp_timing.offset -= offset;
+		ptrs->ptr[i].dvo_timing.offset -= offset;
+		ptrs->ptr[i].panel_pnp_id.offset -= offset;
+	}
+
+	if (ptrs->panel_name.table_size) {
+		if (ptrs->panel_name.offset < offset)
+			return false;
+
+		ptrs->panel_name.offset -= offset;
+	}
+
+	return true;
+}
+
 static struct bdb_block *find_section(const struct context *context, int section_id)
 {
 	size_t min_size = block_min_size(context, section_id);
@@ -201,6 +247,13 @@ static struct bdb_block *find_section(const struct context *context, int section
 	block->id = section_id;
 	block->size = size;
 	memcpy(block->data, data - 3, 3 + size);
+
+	if (section_id == BDB_LVDS_LFP_DATA_PTRS &&
+	    !fixup_lfp_data_ptrs(context, 3 + block->data)) {
+		fprintf(stderr, "VBT has malformed LFP data table pointers\n");
+		free(block);
+		return NULL;
+	}
 
 	return block;
 }
