@@ -2031,7 +2031,7 @@ static void hex_dump(const void *data, uint32_t size)
 
 static void hex_dump_block(const struct bdb_block *block)
 {
-	hex_dump(block->data, block->size);
+	hex_dump(block->data - 3, 3 + block->size);
 }
 
 static bool dump_section(struct context *context, int section_id)
