@@ -137,8 +137,53 @@ static const void *block_data(const struct bdb_block *block)
 	return block->data + 3;
 }
 
+static size_t block_min_size(const struct context *context, int section_id)
+{
+	switch (section_id) {
+	case BDB_GENERAL_FEATURES:
+		return sizeof(struct bdb_general_features);
+	case BDB_GENERAL_DEFINITIONS:
+		return sizeof(struct bdb_general_definitions);
+	case BDB_PSR:
+		return sizeof(struct bdb_psr);
+	case BDB_CHILD_DEVICE_TABLE:
+		return sizeof(struct bdb_legacy_child_devices);
+	case BDB_DRIVER_FEATURES:
+		return sizeof(struct bdb_driver_features);
+	case BDB_SDVO_LVDS_OPTIONS:
+		return sizeof(struct bdb_sdvo_lvds_options);
+	case BDB_SDVO_PANEL_DTDS:
+		/* FIXME? */
+		return 0;
+	case BDB_EDP:
+		return sizeof(struct bdb_edp);
+	case BDB_LVDS_OPTIONS:
+		return sizeof(struct bdb_lvds_options);
+	case BDB_LVDS_LFP_DATA_PTRS:
+		return sizeof(struct bdb_lvds_lfp_data_ptrs);
+	case BDB_LVDS_LFP_DATA:
+		return sizeof(struct bdb_lvds_lfp_data);
+	case BDB_LVDS_BACKLIGHT:
+		return sizeof(struct bdb_lfp_backlight_data);
+	case BDB_LFP_POWER:
+		return sizeof(struct bdb_lfp_power);
+	case BDB_MIPI_CONFIG:
+		return sizeof(struct bdb_mipi_config);
+	case BDB_MIPI_SEQUENCE:
+		return sizeof(struct bdb_mipi_sequence);
+	case BDB_COMPRESSION_PARAMETERS:
+		return sizeof(struct bdb_compression_parameters);
+	case BDB_GENERIC_DTD:
+		/* FIXME check spec */
+		return sizeof(struct bdb_generic_dtd);
+	default:
+		return 0;
+	}
+}
+
 static struct bdb_block *find_section(const struct context *context, int section_id)
 {
+	size_t min_size = block_min_size(context, section_id);
 	struct bdb_block *block;
 	const void *data;
 	size_t size;
@@ -149,7 +194,7 @@ static struct bdb_block *find_section(const struct context *context, int section
 
 	size = get_blocksize(data);
 
-	block = calloc(1, sizeof(*block) + 3 + size);
+	block = calloc(1, sizeof(*block) + 3 + max(size, min_size));
 	if (!block)
 		return NULL;
 
