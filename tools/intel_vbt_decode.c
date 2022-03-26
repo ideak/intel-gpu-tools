@@ -476,6 +476,15 @@ static struct bdb_block *find_section(const struct context *context, int section
 
 	size = get_blocksize(data);
 
+	/* expect to have the full definition for each block with modern VBTs */
+	if (min_size && size > min_size &&
+	    section_id != BDB_CHILD_DEVICE_TABLE &&
+	    section_id != BDB_SDVO_LVDS_OPTIONS &&
+	    section_id != BDB_GENERAL_DEFINITIONS &&
+	    context->bdb->version >= 155)
+		fprintf(stderr, "Block %d min size %zu less than block size %zu\n",
+			section_id, min_size, size);
+
 	block = calloc(1, sizeof(*block) + 3 + max(size, min_size));
 	if (!block) {
 		free(temp_block);
