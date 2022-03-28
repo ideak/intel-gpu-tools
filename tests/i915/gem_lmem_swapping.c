@@ -526,10 +526,19 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 
 	igt_fixture {
 		struct intel_execution_engine2 *e;
+		char *tmp;
 
-		i915 = drm_open_driver(DRIVER_INTEL);
+		igt_i915_driver_unload();
+		igt_assert_eq(igt_i915_driver_load("lmem_size=4096"), 0);
+
+		i915 = __drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(i915);
 		igt_require(gem_has_lmem(i915));
+
+		tmp = __igt_params_get(i915, "lmem_size");
+		if (!tmp)
+			igt_info("lmem_size modparam not supported on this kernel. Continuing with full lmem size. This may result in CI timeouts.\n");
+		free(tmp);
 
 		regions = gem_get_query_memory_regions(i915);
 		igt_require(regions);
@@ -556,6 +565,7 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 		intel_ctx_destroy(i915, ctx);
 		free(regions);
 		close(i915);
+		igt_i915_driver_unload();
 	}
 
 	igt_exit();
