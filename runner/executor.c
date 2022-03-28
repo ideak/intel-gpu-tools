@@ -2043,7 +2043,7 @@ bool execute(struct execute_state *state,
 			}
 			close(sigfd);
 			close(testdirfd);
-			if (initialize_execute_state_from_resume(resdirfd, state, settings, job_list))
+			if (!initialize_execute_state_from_resume(resdirfd, state, settings, job_list))
 				return false;
 			state->time_left = time_left;
 			return execute(state, settings, job_list);
