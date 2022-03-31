@@ -1558,6 +1558,27 @@ intel_bb_create_with_relocs_and_context(int i915, uint32_t ctx, uint32_t size)
 				 INTEL_ALLOCATOR_NONE, ALLOC_STRATEGY_NONE);
 }
 
+/**
+ * intel_bb_create_no_relocs:
+ * @i915: drm fd
+ * @size: size of the batchbuffer
+ *
+ * Creates bb with disabled relocations.
+ * This enables passing addresses and requires pinning objects.
+ *
+ * Returns:
+ *
+ * Pointer the intel_bb, asserts on failure.
+ */
+struct intel_bb *intel_bb_create_no_relocs(int i915, uint32_t size)
+{
+	igt_require(gem_uses_full_ppgtt(i915));
+
+	return __intel_bb_create(i915, 0, size, false, 0, 0,
+				 INTEL_ALLOCATOR_SIMPLE,
+				 ALLOC_STRATEGY_HIGH_TO_LOW);
+}
+
 static void __intel_bb_destroy_relocations(struct intel_bb *ibb)
 {
 	uint32_t i;
