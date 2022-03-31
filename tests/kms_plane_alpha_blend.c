@@ -386,7 +386,6 @@ static void alpha_7efc(data_t *data, enum pipe pipe, igt_plane_t *plane)
 {
 	igt_display_t *display = &data->display;
 	igt_crc_t ref_crc = {}, crc = {};
-	int i;
 
 	if (plane->type != DRM_PLANE_TYPE_PRIMARY)
 		igt_plane_set_fb(igt_pipe_get_plane_type(&display->pipes[pipe], DRM_PLANE_TYPE_PRIMARY), &data->gray_fb);
@@ -394,21 +393,18 @@ static void alpha_7efc(data_t *data, enum pipe pipe, igt_plane_t *plane)
 	igt_display_commit2(display, COMMIT_ATOMIC);
 	igt_pipe_crc_start(data->pipe_crc);
 
-	/* for coverage, plane alpha and fb alpha should be swappable, so swap fb and alpha */
-	for (i = 0; i < 256; i += 8) {
-		igt_plane_set_prop_value(plane, IGT_PLANE_ALPHA, ((i/2) << 8) | (i/2));
-		igt_plane_set_fb(plane, &data->argb_fb_fc);
-		igt_display_commit2(display, COMMIT_ATOMIC);
+	igt_plane_set_prop_value(plane, IGT_PLANE_ALPHA, 0x7e7e);
+	igt_plane_set_fb(plane, &data->argb_fb_fc);
+	igt_display_commit2(display, COMMIT_ATOMIC);
 
-		igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc, &ref_crc);
+	igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc, &ref_crc);
 
-		igt_plane_set_prop_value(plane, IGT_PLANE_ALPHA, (i << 8) | i);
-		igt_plane_set_fb(plane, &data->argb_fb_7e);
-		igt_display_commit2(display, COMMIT_ATOMIC);
+	igt_plane_set_prop_value(plane, IGT_PLANE_ALPHA, 0xfcfc);
+	igt_plane_set_fb(plane, &data->argb_fb_7e);
+	igt_display_commit2(display, COMMIT_ATOMIC);
 
-		igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc, &crc);
-		igt_assert_crc_equal(&ref_crc, &crc);
-	}
+	igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc, &crc);
+	igt_assert_crc_equal(&ref_crc, &crc);
 
 	igt_pipe_crc_stop(data->pipe_crc);
 }
@@ -536,7 +532,8 @@ static void run_subtests(data_t *data, enum pipe pipe)
 	igt_subtest_f("pipe-%s-alpha-basic", kmstest_pipe_name(pipe))
 		run_test_on_pipe_planes(data, pipe, false, true, basic_alpha);
 
-	igt_describe("Tests plane alpha-7efc properties.");
+	igt_describe("Uses alpha values 0x7e and 0xfc to validate fg.alpha and "
+		     "plane_alpha are swappable on pre-multiplied blend mode.");
 	igt_subtest_f("pipe-%s-alpha-7efc", kmstest_pipe_name(pipe))
 		run_test_on_pipe_planes(data, pipe, false, true, alpha_7efc);
 
