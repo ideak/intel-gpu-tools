@@ -1995,6 +1995,7 @@ igt_main
 						if (posix_memalign(&pinned, 4096, pin_sz) ||
 						    mlock(pinned, pin_sz) ||
 						    madvise(pinned, pin_sz, MADV_DONTFORK)) {
+							munlock(pinned, pin_sz);
 							free(pinned);
 							pinned = NULL;
 						}
@@ -2006,12 +2007,10 @@ igt_main
 				}
 				run_modes(name, c, modes, s, count);
 
-				igt_fixture {
-					if (pinned) {
-						munlock(pinned, pin_sz);
-						free(pinned);
-						pinned = NULL;
-					}
+				if (pinned) {
+					munlock(pinned, pin_sz);
+					free(pinned);
+					pinned = NULL;
 				}
 			}
 		}
