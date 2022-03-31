@@ -1385,10 +1385,8 @@ static void override_results(char *binary,
 
 	for (i = 0; i < subtests->size; i++) {
 		generate_piglit_name(binary, subtests->subs[i].name, piglit_name, sizeof(piglit_name));
-		if (subtests->subs[i].dynamic_size == 0) {
-			obj = get_or_create_json_object(tests, piglit_name);
-			override_result_single(obj);
-		}
+		obj = get_or_create_json_object(tests, piglit_name);
+		override_result_single(obj);
 
 		for (k = 0; k < subtests->subs[i].dynamic_size; k++) {
 			generate_piglit_name_for_dynamic(piglit_name, subtests->subs[i].dynamic_names[k],
