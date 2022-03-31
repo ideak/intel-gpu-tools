@@ -290,8 +290,7 @@ static void exec_shared_gtt(int i915, const intel_ctx_cfg_t *cfg,
 	execbuf.flags |= I915_EXEC_FENCE_IN;
 
 	scratch = gem_create(i915, 4096);
-	s = gem_mmap__wc(i915, scratch, 0, 4096, PROT_WRITE);
-
+	s =  gem_mmap__device_coherent(i915, scratch, 0, 4096, PROT_WRITE);
 	gem_set_domain(i915, scratch, I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
 	s[0] = bbe;
 	s[64] = bbe;
