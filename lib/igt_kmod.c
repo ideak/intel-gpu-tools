@@ -401,6 +401,10 @@ int __igt_i915_driver_unload(const char **who)
 	const char *aux[] = {
 		/* gen5: ips uses symbol_get() so only a soft module dependency */
 		"intel_ips",
+		/* mei_gsc uses an i915 aux dev and the other mei mods depend on it */
+		"mei_pxp",
+		"mei_hdcp",
+		"mei_gsc",
 		NULL,
 	};
 
