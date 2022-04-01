@@ -143,6 +143,12 @@ out:
 	return ret;
 }
 
+static bool
+igt_kmod_is_loading(struct kmod_module *kmod)
+{
+	return kmod_module_get_initstate(kmod) == KMOD_MODULE_COMING;
+}
+
 static int modprobe(struct kmod_module *kmod, const char *options)
 {
 	unsigned int flags;
@@ -260,6 +266,17 @@ static int igt_kmod_unload_r(struct kmod_module *kmod, unsigned int flags)
 	kmod_module_unref_list(holders);
 	if (err < 0)
 		return err;
+
+	if (igt_kmod_is_loading(kmod)) {
+		const char *mod_name = kmod_module_get_name(kmod);
+		igt_debug("%s still initializing\n", mod_name);
+		err = igt_wait(!igt_kmod_is_loading(kmod), 10000, 100);
+		if (err < 0) {
+			igt_debug("%s failed to complete init within the timeout\n",
+				  mod_name);
+			return err;
+		}
+	}
 
 	return kmod_module_remove_module(kmod, flags);
 }
