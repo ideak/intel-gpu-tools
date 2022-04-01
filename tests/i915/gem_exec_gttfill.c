@@ -33,6 +33,7 @@ IGT_TEST_DESCRIPTION("Fill the GTT with batches.");
 struct batch {
 	uint32_t handle;
 	void *ptr;
+	uint64_t offset;
 };
 
 static void xchg_batch(void *array, unsigned int i, unsigned int j)
@@ -45,7 +46,7 @@ static void xchg_batch(void *array, unsigned int i, unsigned int j)
 	batches[j] = tmp;
 }
 
-static void submit(int fd, int gen,
+static void submit(int fd, uint64_t ahnd, int gen,
 		   struct drm_i915_gem_execbuffer2 *eb,
 		   struct drm_i915_gem_relocation_entry *reloc,
 		   struct batch *batches, unsigned int count)
@@ -56,7 +57,7 @@ static void submit(int fd, int gen,
 
 	memset(&obj, 0, sizeof(obj));
 	obj.relocs_ptr = to_user_pointer(reloc);
-	obj.relocation_count = 2;
+	obj.relocation_count = !ahnd ? 2 : 0;
 
 	memset(reloc, 0, 2*sizeof(*reloc));
 	reloc[0].offset = eb->batch_start_offset;
@@ -93,7 +94,17 @@ static void submit(int fd, int gen,
 		reloc[0].target_handle = obj.handle;
 		reloc[1].target_handle = obj.handle;
 
-		obj.offset = 0;
+		if (ahnd) {
+			uint32_t *delta_ptr = batches[i].ptr + reloc[0].delta;
+
+			*delta_ptr = batches[i].offset;
+			batch[1] = batches[i].offset + reloc[0].delta;
+			obj.flags = EXEC_OBJECT_PINNED;
+			obj.offset = batches[i].offset;
+			batch[3] = batches[i].offset;
+		} else {
+			obj.offset = 0;
+		}
 		reloc[0].presumed_offset = obj.offset;
 		reloc[1].presumed_offset = obj.offset;
 
@@ -118,6 +129,7 @@ static void fillgtt(int fd, const intel_ctx_t *ctx, unsigned ring, int timeout)
 	unsigned nengine;
 	unsigned count;
 	uint64_t size;
+	uint64_t ahnd;
 
 	shared = mmap(NULL, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 	igt_assert(shared != MAP_FAILED);
@@ -157,6 +169,7 @@ static void fillgtt(int fd, const intel_ctx_t *ctx, unsigned ring, int timeout)
 		execbuf.flags |= I915_EXEC_SECURE;
 	execbuf.rsvd1 = ctx->id;
 
+	ahnd = get_reloc_ahnd(fd, ctx->id);
 	batches = calloc(count, sizeof(*batches));
 	igt_assert(batches);
 	for (unsigned i = 0; i < count; i++) {
@@ -164,10 +177,12 @@ static void fillgtt(int fd, const intel_ctx_t *ctx, unsigned ring, int timeout)
 		batches[i].ptr =
 			gem_mmap__device_coherent(fd, batches[i].handle,
 						  0, BATCH_SIZE, PROT_WRITE);
+		batches[i].offset = get_offset(ahnd, batches[i].handle, BATCH_SIZE, 0);
+		batches[i].offset %= (1ull << 32) - BATCH_SIZE;
 	}
 
 	/* Flush all memory before we start the timer */
-	submit(fd, gen, &execbuf, reloc, batches, count);
+	submit(fd, ahnd, gen, &execbuf, reloc, batches, count);
 
 	igt_info("Setup %u batches in %.2fms\n",
 		 count, 1e-6 * igt_nsec_elapsed(&tv));
@@ -179,7 +194,7 @@ static void fillgtt(int fd, const intel_ctx_t *ctx, unsigned ring, int timeout)
 		execbuf.batch_start_offset = child*64;
 		execbuf.flags |= engines[child];
 		igt_until_timeout(timeout) {
-			submit(fd, gen, &execbuf, reloc, batches, count);
+			submit(fd, ahnd, gen, &execbuf, reloc, batches, count);
 			for (unsigned i = 0; i < count; i++) {
 				uint64_t offset, delta;
 
@@ -216,9 +231,9 @@ igt_main
 	igt_fixture {
 		i915 = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(i915);
-		igt_require(gem_has_relocations(i915));
 		ctx = intel_ctx_create_all_physical(i915);
 		igt_fork_hang_detector(i915);
+		intel_allocator_multiprocess_start();
 	}
 
 	igt_subtest("basic") /* just enough to run a single pass */
@@ -238,6 +253,7 @@ igt_main
 		fillgtt(i915, ctx, ALL_ENGINES, 20);
 
 	igt_fixture {
+		intel_allocator_multiprocess_stop();
 		igt_stop_hang_detector();
 		intel_ctx_destroy(i915, ctx);
 		close(i915);
