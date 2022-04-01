@@ -36,6 +36,8 @@
 #include "igt_rand.h"
 #include "sw_sync.h"
 
+IGT_TEST_DESCRIPTION("Test the context create ioctls");
+
 #define ENGINE_FLAGS  (I915_EXEC_RING_MASK | I915_EXEC_BSD_MASK)
 
 static unsigned all_engines[I915_EXEC_RING_MASK + 1];
@@ -585,6 +587,7 @@ igt_main
 		igt_fork_hang_detector(fd);
 	}
 
+	igt_describe("Test random context creation");
 	igt_subtest("basic") {
 		memset(&create, 0, sizeof(create));
 		create.ctx_id = rand();
@@ -594,41 +597,67 @@ igt_main
 		gem_context_destroy(fd, create.ctx_id);
 	}
 
+	igt_describe("Verify valid and invalid context extensions");
 	igt_subtest("ext-param")
 		basic_ext_param(fd);
+
+	igt_describe("Set, validate and execute particular context params");
 	igt_subtest("iris-pipeline")
 		iris_pipeline(fd);
 
+	igt_describe("Create contexts upto available RAM size, calculate the average "
+		     "performance of their execution on multiple parallel processes");
 	igt_subtest("maximum-mem")
 		maximum(fd, &cfg, ncpus, CHECK_RAM);
+
+	igt_describe("Create contexts upto available RAM+SWAP size, calculate the average "
+		     "performance of their execution on multiple parallel processes");
 	igt_subtest("maximum-swap")
 		maximum(fd, &cfg, ncpus, CHECK_RAM | CHECK_SWAP);
 
+	igt_describe("Exercise implicit per-fd context creation");
 	igt_subtest("basic-files")
 		files(fd, &cfg, 2, 1);
+
+	igt_describe("Exercise implicit per-fd context creation on 1 CPU for long duration");
 	igt_subtest("files")
 		files(fd, &cfg, 20, 1);
+
+	igt_describe("Exercise implicit per-fd context creation on all CPUs for long duration");
 	igt_subtest("forked-files")
 		files(fd, &cfg, 20, ncpus);
 
 	/* NULL value means all engines */
+	igt_describe("Calculate the average performance of context creation and "
+		     "it's execution using all engines");
 	igt_subtest("active-all")
 		active(fd, &cfg, NULL, 20, 1);
+
+	igt_describe("Calculate the average performance of context creation and it's execution "
+		     "using all engines on multiple parallel processes");
 	igt_subtest("forked-active-all")
 		active(fd, &cfg, NULL, 20, ncpus);
 
+	igt_describe("For each engine calculate the average performance of context creation "
+		     "execution and exercise context reclaim");
 	igt_subtest_with_dynamic("active") {
 		for_each_ctx_cfg_engine(fd, &cfg, e) {
 			igt_dynamic_f("%s", e->name)
 				active(fd, &cfg, e, 20, 1);
 		}
 	}
+
+	igt_describe("For each engine calculate the average performance of context creation "
+		     "and execution on multiple parallel processes");
 	igt_subtest_with_dynamic("forked-active") {
 		for_each_ctx_cfg_engine(fd, &cfg, e) {
 			igt_dynamic_f("%s", e->name)
 				active(fd, &cfg, e, 20, ncpus);
 		}
 	}
+
+	igt_describe("For each engine calculate the average performance of context creation "
+		     "and execution while all other engines are hogging the resources");
 	igt_subtest_with_dynamic("hog") {
 		for_each_ctx_cfg_engine(fd, &cfg, e) {
 			igt_dynamic_f("%s", e->name)
