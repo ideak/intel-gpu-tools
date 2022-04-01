@@ -492,7 +492,8 @@ static void independent(int i915, const intel_ctx_t *base_ctx,
 	param.ctx_id = gem_context_create(i915);
 	gem_context_set_param(i915, &param);
 
-	gem_set_caching(i915, results.handle, I915_CACHING_CACHED);
+	if (!gem_has_lmem(i915))
+		gem_set_caching(i915, results.handle, I915_CACHING_CACHED);
 	map = gem_mmap__cpu(i915, results.handle, 0, 4096, PROT_READ);
 	gem_set_domain(i915, results.handle,
 		       I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
