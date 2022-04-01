@@ -428,10 +428,14 @@ static void test_smem_oom(int i915,
 
 		fill_params(i915, &params, region, 0, 1, true);
 
+		ctx = intel_ctx_create_all_physical(fd);
+		__gem_context_set_persistence(fd, ctx->id, false);
+
 		igt_install_exit_handler(smem_oom_exit_handler);
 		__do_evict(fd, ctx, &region->region, &params,
 			   params.seed + child + 1);
 
+		intel_ctx_destroy(fd, ctx);
 		close(fd);
 	}
 
