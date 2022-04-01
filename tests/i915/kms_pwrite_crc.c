@@ -50,7 +50,6 @@ static void test(data_t *data)
 	igt_output_t *output = data->output;
 	struct igt_fb *fb = &data->fb[1];
 	drmModeModeInfo *mode;
-	uint32_t caching;
 	void *buf;
 	igt_crc_t crc;
 
@@ -76,9 +75,14 @@ static void test(data_t *data)
 			0, 0, fb->width, fb->height,
 			0, 0, fb->width << 16, fb->height << 16);
 
-	/* make sure caching mode has become UC/WT */
-	caching = gem_get_caching(data->drm_fd, fb->gem_handle);
-	igt_assert(caching == I915_CACHING_NONE || caching == I915_CACHING_DISPLAY);
+	if (!gem_has_lmem(data->drm_fd)) {
+		uint32_t caching;
+
+		/* make sure caching mode has become UC/WT */
+		caching = gem_get_caching(data->drm_fd, fb->gem_handle);
+		igt_assert(caching == I915_CACHING_NONE ||
+			   caching == I915_CACHING_DISPLAY);
+	}
 
 	/* use pwrite to make the other fb all white too */
 	buf = malloc(fb->size);
