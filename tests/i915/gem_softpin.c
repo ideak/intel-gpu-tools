@@ -1073,6 +1073,78 @@ static void test_allocator_evict(int fd, const intel_ctx_t *ctx,
 	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
 }
 
+#define MINIMAL_OFFSET 0x200000
+static void single_offset_submit(int fd, struct drm_i915_gem_execbuffer2 *eb,
+				 struct batch *batches, unsigned int count)
+{
+	struct drm_i915_gem_exec_object2 obj = {
+		.offset = max_t(uint64_t, gem_detect_safe_start_offset(fd), MINIMAL_OFFSET),
+		.flags = EXEC_OBJECT_PINNED,
+	};
+
+	eb->buffers_ptr = to_user_pointer(&obj);
+
+	for (unsigned int i = 0; i < count; i++) {
+		obj.handle = batches[i].handle;
+		gem_execbuf(fd, eb);
+	}
+}
+
+static void evict_single_offset(int fd, const intel_ctx_t *ctx, int timeout)
+{
+	struct drm_i915_gem_execbuffer2 execbuf;
+	struct intel_execution_engine2 *e;
+	unsigned int engines[I915_EXEC_RING_MASK + 1];
+	struct batch *batches;
+	unsigned int nengine;
+	unsigned int count;
+	uint64_t size, batch_size = BATCH_SIZE;
+
+	nengine = 0;
+	for_each_ctx_engine(fd, ctx, e) {
+		engines[nengine++] = e->flags;
+	}
+	igt_require(nengine);
+
+	size = gem_aperture_size(fd);
+	if (size > 1ull<<32) /* Limit to 4GiB as we do not use allow-48b */
+		size = 1ull << 32;
+	igt_require(size < (1ull<<32) * BATCH_SIZE);
+
+	count = size / BATCH_SIZE + 1;
+	igt_debug("Using %'d batches (size: %'dMB) to fill %'llu MB aperture on "
+		  "%d engines (timeout: %d)\n", count, BATCH_SIZE >> 20,
+		  (long long)size >> 20, nengine, timeout);
+
+	intel_require_memory(count, BATCH_SIZE, CHECK_RAM);
+	intel_detect_and_clear_missed_interrupts(fd);
+
+	memset(&execbuf, 0, sizeof(execbuf));
+	execbuf.buffer_count = 1;
+	execbuf.rsvd1 = ctx->id;
+
+	batches = calloc(count, sizeof(*batches));
+	igt_assert(batches);
+	for (unsigned int i = 0; i < count; i++)
+		batches[i].handle = batch_create(fd, &batch_size);
+
+	/* Flush all memory before we start the timer */
+	single_offset_submit(fd, &execbuf, batches, count);
+
+	igt_fork(child, nengine) {
+		execbuf.flags |= engines[child];
+		igt_until_timeout(timeout)
+			single_offset_submit(fd, &execbuf, batches, count);
+	}
+	igt_waitchildren();
+
+	for (unsigned int i = 0; i < count; i++)
+		gem_close(fd, batches[i].handle);
+	free(batches);
+
+	igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
+}
+
 static void make_batch(int i915, uint32_t handle, uint64_t size)
 {
 	uint32_t *bb = gem_mmap__device_coherent(i915, handle, 0, size, PROT_WRITE);
@@ -1213,8 +1285,9 @@ igt_main
 		test_each_engine("allocator-evict", fd, ctx, e)
 			test_allocator_evict(fd, ctx, e->flags, 20);
 
-		igt_subtest("allocator-evict-all-engines")
-			test_allocator_evict(fd, ctx, ALL_ENGINES, 20);
+		igt_describe("Use same offset for all engines and for different handles");
+		igt_subtest("evict-single-offset")
+			evict_single_offset(fd, ctx, 20);
 	}
 
 	igt_describe("Check start offset and alignment detection");
