@@ -1002,6 +1002,7 @@ static void test_allocator_evict(int fd, const intel_ctx_t *ctx,
 	execbuf.buffer_count = 1;
 	if (gen < 6)
 		execbuf.flags |= I915_EXEC_SECURE;
+	execbuf.rsvd1 = ctx->id;
 
 	batches = calloc(count, sizeof(*batches));
 	igt_assert(batches);
