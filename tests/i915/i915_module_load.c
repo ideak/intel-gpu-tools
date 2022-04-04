@@ -37,6 +37,8 @@
 #include "igt_sysfs.h"
 #include "igt_core.h"
 
+IGT_TEST_DESCRIPTION("Tests the i915 module loading.");
+
 static void store_all(int i915)
 {
 	const unsigned int gen = intel_gen(intel_get_drm_devid(i915));
@@ -236,6 +238,7 @@ hda_dynamic_debug(bool enable)
 
 igt_main
 {
+	igt_describe("Verify the basic functionality of i915 driver after it's reloaded.");
 	igt_subtest("reload") {
 		int load_error;
 
@@ -252,6 +255,7 @@ igt_main
 		/* only default modparams, can leave module loaded */
 	}
 
+	igt_describe("Verify that i915 driver can be successfully loaded with disabled display.");
 	igt_subtest("reload-no-display") {
 		igt_i915_driver_unload();
 
@@ -260,6 +264,8 @@ igt_main
 		igt_i915_driver_unload();
 	}
 
+	igt_describe("Verify that i915 driver can be successfully reloaded at least once"
+		     " with fault injection.");
 	igt_subtest("reload-with-fault-injection") {
 		const char *param;
 		int i = 0;
