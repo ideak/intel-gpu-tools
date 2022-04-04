@@ -1111,9 +1111,14 @@ igt_main
 
 			igt_display_require(&display, fd);
 			igt_display_require_output(&display);
+			intel_allocator_multiprocess_start();
 		}
 
 		igt_subtest("kms")
 			test_kms(fd, &display);
+
+		igt_fixture {
+			intel_allocator_multiprocess_stop();
+		}
 	}
 }
