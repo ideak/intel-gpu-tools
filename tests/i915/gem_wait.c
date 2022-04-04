@@ -32,6 +32,8 @@
 #include "igt.h"
 #include "igt_vgem.h"
 
+IGT_TEST_DESCRIPTION("Tests the GEM_WAIT ioctl");
+
 static int __gem_wait(int fd, struct drm_i915_gem_wait *w)
 {
 	int err;
@@ -185,9 +187,11 @@ igt_main
 		ctx = intel_ctx_create_all_physical(fd);
 	}
 
+	igt_describe("Verify that GEM_WAIT called with invalid flag will fail.");
 	igt_subtest("invalid-flags")
 		invalid_flags(fd);
 
+	igt_describe("Verify that GEM_WAIT called with invalid buffer object will fail.");
 	igt_subtest("invalid-buf")
 		invalid_buf(fd);
 
@@ -209,8 +213,11 @@ igt_main
 			igt_fork_signal_helper();
 		}
 
-		for (const typeof(*tests) *t = tests; t->name; t++)
+		for (const typeof(*tests) *t = tests; t->name; t++) {
+			igt_describe_f("Verify GEM_WAIT functionality in"
+				       " %s mode.", t->name);
 			test_all_engines(t->name, fd, ctx, t->flags);
+		}
 
 		igt_fixture {
 			igt_stop_signal_helper();
@@ -236,8 +243,11 @@ igt_main
 			igt_fork_signal_helper();
 		}
 
-		for (const typeof(*tests) *t = tests; t->name; t++)
+		for (const typeof(*tests) *t = tests; t->name; t++) {
+			igt_describe_f("Verify GEM_WAIT functionality in %s mode,"
+				       " when hang is allowed.", (t->name+5));
 			test_all_engines(t->name, fd, ctx, t->flags);
+		}
 
 		igt_fixture {
 			igt_stop_signal_helper();
