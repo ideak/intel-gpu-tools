@@ -366,7 +366,7 @@ static uint32_t read_regs(int fd,
 	return obj[0].handle;
 }
 
-static void write_regs(int fd,
+static void write_regs(int fd, uint64_t ahnd,
 		       const intel_ctx_t *ctx,
 		       const struct intel_execution_engine2 *e,
 		       unsigned int flags,
@@ -423,8 +423,13 @@ static void write_regs(int fd,
 	execbuf.buffer_count = 1;
 	execbuf.flags = e->flags;
 	execbuf.rsvd1 = ctx->id;
+	if (ahnd) {
+		obj.flags |= EXEC_OBJECT_PINNED;
+		obj.offset = get_offset(ahnd, obj.handle, batch_size, 0);
+	}
 	gem_execbuf(fd, &execbuf);
 	gem_close(fd, obj.handle);
+	put_offset(ahnd, obj.offset);
 }
 
 static void restore_regs(int fd,
@@ -658,7 +663,7 @@ static void nonpriv(int fd, const intel_ctx_cfg_t *cfg,
 
 		igt_debug("%s[%d]: Setting all registers to 0x%08x\n",
 			  __func__, v, values[v]);
-		write_regs(fd, ctx, e, flags, values[v]);
+		write_regs(fd, ahnd, ctx, e, flags, values[v]);
 
 		if (flags & DIRTY2) {
 			const intel_ctx_t *sw = intel_ctx_create(fd, &ctx->cfg);
@@ -750,7 +755,7 @@ static void isolation(int fd, const intel_ctx_cfg_t *cfg,
 		if (flags & DIRTY1) {
 			igt_debug("%s[%d]: Setting all registers of ctx 0 to 0x%08x\n",
 				  __func__, v, values[v]);
-			write_regs(fd, ctx[0], e, flags, values[v]);
+			write_regs(fd, ahnd[0], ctx[0], e, flags, values[v]);
 		}
 
 		/*
@@ -768,7 +773,7 @@ static void isolation(int fd, const intel_ctx_cfg_t *cfg,
 		if (flags & DIRTY2) {
 			igt_debug("%s[%d]: Setting all registers of ctx 1 to 0x%08x\n",
 				  __func__, v, ~values[v]);
-			write_regs(fd, ctx[1], e, flags, ~values[v]);
+			write_regs(fd, ahnd[1], ctx[1], e, flags, ~values[v]);
 		}
 
 		/*
@@ -882,7 +887,7 @@ static void preservation(int fd, const intel_ctx_cfg_t *cfg,
 	for (int v = 0; v < num_values; v++) {
 		ctx[v] = intel_ctx_create(fd, cfg);
 		ahnd[v] = get_reloc_ahnd(fd, ctx[v]->id);
-		write_regs(fd, ctx[v], e, flags, values[v]);
+		write_regs(fd, ahnd[v], ctx[v], e, flags, values[v]);
 
 		regs[v][0] = read_regs(fd, ahnd[v], ctx[v], e, flags);
 	}
