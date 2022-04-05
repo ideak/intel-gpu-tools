@@ -34,10 +34,6 @@ igt@gem_flink_basic@double-flink
 igt@gem_flink_basic@flink-lifetime
 igt@gem_huc_copy@huc-copy
 igt@gem_linear_blits@basic
-igt@gem_lmem_swapping@basic
-igt@gem_lmem_swapping@parallel-random-engines
-igt@gem_lmem_swapping@random-engines
-igt@gem_lmem_swapping@verify-random
 igt@gem_mmap@basic
 igt@gem_mmap_gtt@basic
 igt@gem_render_linear_blits@basic
@@ -170,6 +166,10 @@ igt@vgem_basic@sysfs
 # They will sometimes reveal issues of earlier tests leaving the
 # driver in a broken state that is not otherwise noticed in that test.
 
+igt@gem_lmem_swapping@basic
+igt@gem_lmem_swapping@parallel-random-engines
+igt@gem_lmem_swapping@random-engines
+igt@gem_lmem_swapping@verify-random
 igt@core_hotunplug@unbind-rebind
 igt@vgem_basic@unload
 igt@i915_module_load@reload
