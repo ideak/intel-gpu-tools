@@ -217,7 +217,6 @@ static void run_check_psr_su_mpo(data_t *data)
 	igt_fb_t *flip_fb;
 	int ret;
 	const int run_sec = 5;
-	enum amdgpu_psr_state psr_state = PSR_STATE0;
 	int frame_rate = 0;
 
 	/* skip the test run if no eDP sink detected */
@@ -293,18 +292,6 @@ static void run_check_psr_su_mpo(data_t *data)
 				      flip_fb->fb_id, DRM_MODE_PAGE_FLIP_EVENT, NULL);
 		igt_require(ret == 0);
 		kmstest_wait_for_pageflip(data->fd);
-
-		/* check PSR state */
-		if (i > PSR_SETTLE_DELAY * frame_rate) {
-			psr_state = igt_amd_read_psr_state(data->fd, data->output->name);
-			igt_fail_on_f(psr_state < 0, "Open PSR state debugfs failed\n");
-			igt_fail_on_f(psr_state == PSR_STATE0,
-				"PSR was not enabled for connector %s\n", data->output->name);
-			igt_fail_on_f(psr_state == PSR_STATE_INVALID,
-				"PSR is invalid for connector %s\n", data->output->name);
-			igt_fail_on_f(psr_state != PSR_STATE3,
-				"PSR state is expected to be STATE_3 for connector %s\n", data->output->name);
-		}
 	}
 
 	/* fini */
