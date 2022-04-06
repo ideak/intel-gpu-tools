@@ -25,6 +25,7 @@
 
 #include "igt_amd.h"
 #include "igt.h"
+#include "igt_sysfs.h"
 #include <amdgpu_drm.h>
 
 #define X0 1
@@ -249,6 +250,38 @@ bool igt_amd_is_tiled(uint64_t modifier)
 	else
 		return false;
 }
+
+/**
+ * @brief generic helper to check if the amdgpu dm debugfs entry defined
+ *
+ * @param drm_fd DRM file descriptor
+ * @param interface_name The debugfs interface entry name with prefix "amdgpu_"
+ * @return true if <debugfs_root>/interface_name exists and defined
+ * @return false otherwise
+ */
+static bool amd_has_debugfs(int drm_fd, const char *interface_name)
+{
+	int fd;
+	int res;
+	struct stat stat;
+
+	fd = igt_debugfs_dir(drm_fd);
+	if (fd < 0) {
+		igt_info("Couldn't open debugfs dir!\n");
+		return false;
+	}
+
+	res = fstatat(fd, interface_name, &stat, 0);
+	if (res != 0) {
+		igt_info("debugfs %s not supported\n", interface_name);
+		close(fd);
+		return false;
+	}
+
+	close(fd);
+	return true;
+}
+
 
 /**
  * @brief generic helper to check if the debugfs entry of given connector has the
@@ -1074,4 +1107,71 @@ int igt_amd_read_psr_state(int drm_fd, char *connector_name)
 		     DEBUGFS_EDP_PSR_STATE, connector_name);
 
 	return strtol(buf, NULL, 10);
+}
+
+/**
+ * @brief check if AMDGPU DM visual confirm debugfs interface entry exist and defined
+ *
+ * @param drm_fd DRM file descriptor
+ * @return true if visual confirm debugfs interface exists and defined
+ * @return false otherwise
+ */
+bool igt_amd_has_visual_confirm(int drm_fd)
+{
+	return amd_has_debugfs(drm_fd, DEBUGFS_DM_VISUAL_CONFIRM);
+}
+
+/**
+ * @brief Read amdgpu DM visual confirm debugfs interface
+ *
+ * @param drm_fd DRM file descriptor
+ * @return int visual confirm debug option as integer
+ */
+int  igt_amd_get_visual_confirm(int drm_fd)
+{
+	char buf[4];	/* current 4 bytes are enough */
+	int fd, ret;
+
+	fd = igt_debugfs_dir(drm_fd);
+	if (fd < 0) {
+		igt_info("Couldn't open debugfs dir!\n");
+		return -1;
+	}
+
+	ret = igt_debugfs_simple_read(fd, DEBUGFS_DM_VISUAL_CONFIRM, buf, sizeof(buf));
+	close(fd);
+
+	igt_assert_f(ret >= 0, "Reading %s failed.\n",
+		     DEBUGFS_DM_VISUAL_CONFIRM);
+
+	return strtol(buf, NULL, 10);
+}
+
+/**
+ * @brief Write amdgpu DM visual confirm debug option to debugfs interface
+ *
+ * @param drm_fd DRM file descriptor
+ * @param option amdgpu DC visual confirm debug option
+ * @return true if set visual confirm option success
+ * @return false otherwise
+ */
+bool igt_amd_set_visual_confirm(int drm_fd, enum amdgpu_debug_visual_confirm option)
+{
+	char buf[4];
+	int fd;
+	bool res;
+
+	fd = igt_debugfs_dir(drm_fd);
+	if (fd < 0) {
+		igt_info("Couldn't open debugfs dir!\n");
+		return false;
+	}
+
+	memset(buf, '\0', sizeof(buf));
+	snprintf(buf, sizeof(buf), "%d\n", option);
+
+	res = igt_sysfs_set(fd, DEBUGFS_DM_VISUAL_CONFIRM, buf);
+	close(fd);
+
+	return res;
 }

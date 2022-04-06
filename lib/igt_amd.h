@@ -49,6 +49,9 @@
 #define DEBUGFS_EDP_PSR_CAP	"psr_capability"
 #define DEBUGFS_EDP_PSR_STATE	"psr_state"
 
+/* amdgpu DM interface entries */
+#define DEBUGFS_DM_VISUAL_CONFIRM "amdgpu_dm_visual_confirm"
+
 enum amd_dsc_clock_force {
 	DSC_AUTOMATIC = 0,
 	DSC_FORCE_ON,
@@ -115,6 +118,19 @@ enum amdgpu_psr_state {
 	PSR_STATE_INVALID = 0xFF
 };
 
+/*
+ * enumeration of amdgpu DC visual confirm debug option
+ * aligned to the upstreamed amdgpu kernel driver 'enum visual_confirm' in dc.h
+ */
+enum amdgpu_debug_visual_confirm {
+	VISUAL_CONFIRM_DISABLE	= 0,
+	VISUAL_CONFIRM_SURFACE	= 1,
+	VISUAL_CONFIRM_HDR	= 2,
+	VISUAL_CONFIRM_MPCTREE	= 4,
+	VISUAL_CONFIRM_PSR	= 5,
+	VISUAL_CONFIRM_SWIZZLE	= 9
+};
+
 uint32_t igt_amd_create_bo(int fd, uint64_t size);
 void *igt_amd_mmap_bo(int fd, uint32_t handle, uint64_t size, int prot);
 unsigned int igt_amd_compute_offset(unsigned int* swizzle_pattern,
@@ -172,4 +188,8 @@ bool igt_amd_psr_support_drv(int drm_fd, char *connector_name, enum psr_mode mod
 bool igt_amd_output_has_psr_state(int drm_fd, char *connector_name);
 int  igt_amd_read_psr_state(int drm_fd, char *connector_name);
 
+/* DM interface helpers */
+bool igt_amd_has_visual_confirm(int drm_fd);
+int  igt_amd_get_visual_confirm(int drm_fd);
+bool igt_amd_set_visual_confirm(int drm_fd, enum amdgpu_debug_visual_confirm option);
 #endif /* IGT_AMD_H */
