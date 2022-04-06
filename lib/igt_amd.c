@@ -1097,7 +1097,7 @@ int igt_amd_read_psr_state(int drm_fd, char *connector_name)
 	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
 	if (fd < 0) {
 		igt_info("Couldn't open connector %s debugfs directory\n", connector_name);
-		return false;
+		return -1;
 	}
 
 	ret = igt_debugfs_simple_read(fd, DEBUGFS_EDP_PSR_STATE, buf, sizeof(buf));

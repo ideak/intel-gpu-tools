@@ -179,6 +179,7 @@ static void run_check_psr(data_t *data, bool test_null_crtc) {
 			continue;
 
 		psr_state =  igt_amd_read_psr_state(data->fd, output->name);
+		igt_fail_on_f(psr_state < 0, "Open PSR state debugfs failed\n");
 		igt_fail_on_f(psr_state < 1, "PSR was not enabled for connector %s\n", output->name);
 		igt_fail_on_f(psr_state == 0xff, "PSR is invalid for connector %s\n", output->name);
 		igt_fail_on_f(psr_state != 5, "PSR state is expected to be at 5 on a "
@@ -295,6 +296,7 @@ static void run_check_psr_su_mpo(data_t *data)
 		/* check PSR state */
 		if (i > PSR_SETTLE_DELAY * frame_rate) {
 			psr_state = igt_amd_read_psr_state(data->fd, data->output->name);
+			igt_fail_on_f(psr_state < 0, "Open PSR state debugfs failed\n");
 			igt_fail_on_f(psr_state == PSR_STATE0,
 				"PSR was not enabled for connector %s\n", data->output->name);
 			igt_fail_on_f(psr_state == PSR_STATE_INVALID,
