@@ -398,7 +398,7 @@ igt_main
 				if (rval == NOREQUESTEDFORMATONPIPE)
 					igt_debug("No requested format/modifier on pipe %s\n", kmstest_pipe_name(pipe));
 			}
-			igt_require_f(validtests > 0, "No valid pipe/connector/format/mod combination found");
+			igt_require_f(validtests > 0, "No valid pipe/connector/format/mod combination found\n");
 		}
 	}
 	igt_fixture {
