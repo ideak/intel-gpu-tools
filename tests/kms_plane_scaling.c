@@ -327,17 +327,11 @@ static void test_scaler_with_rotation_pipe(data_t *d,
 	}
 }
 
-static const uint64_t modifiers[] = {
-	DRM_FORMAT_MOD_LINEAR,
-	I915_FORMAT_MOD_X_TILED,
-	I915_FORMAT_MOD_Y_TILED,
-	I915_FORMAT_MOD_Yf_TILED
-};
-
 static void test_scaler_with_pixel_format_pipe(data_t *d, int width, int height, bool is_upscale,
 					       enum pipe pipe, igt_output_t *output)
 {
 	igt_display_t *display = &d->display;
+	uint64_t modifier = DRM_FORMAT_MOD_LINEAR;
 	igt_plane_t *plane;
 
 	cleanup_crtc(d);
@@ -345,33 +339,30 @@ static void test_scaler_with_pixel_format_pipe(data_t *d, int width, int height,
 	igt_output_set_pipe(output, pipe);
 
 	for_each_plane_on_pipe(display, pipe, plane) {
+		struct igt_vec tested_formats;
+
 		if (plane->type == DRM_PLANE_TYPE_CURSOR)
 			continue;
 
-		for (int i = 0; i < ARRAY_SIZE(modifiers); i++) {
-			uint64_t modifier = modifiers[i];
-			struct igt_vec tested_formats;
+		igt_vec_init(&tested_formats, sizeof(uint32_t));
 
-			igt_vec_init(&tested_formats, sizeof(uint32_t));
+		for (int j = 0; j < plane->drm_plane->count_formats; j++) {
+			uint32_t format = plane->drm_plane->formats[j];
 
-			for (int j = 0; j < plane->drm_plane->count_formats; j++) {
-				uint32_t format = plane->drm_plane->formats[j];
+			if (!test_pipe_iteration(d, pipe, j))
+				continue;
 
-				if (!test_pipe_iteration(d, pipe, j))
-					continue;
-
-				if (test_format(d, &tested_formats, format) &&
-				    igt_plane_has_format_mod(plane, format, modifier) &&
-				    can_scale(d, format))
-					check_scaling_pipe_plane_rot(d, plane,
-								     format, modifier,
-								     width, height,
-								     is_upscale,
-								     pipe, output, IGT_ROTATION_0);
-			}
-
-			igt_vec_fini(&tested_formats);
+			if (test_format(d, &tested_formats, format) &&
+			    igt_plane_has_format_mod(plane, format, modifier) &&
+			    can_scale(d, format))
+			    check_scaling_pipe_plane_rot(d, plane,
+							 format, modifier,
+							 width, height,
+							 is_upscale,
+							 pipe, output, IGT_ROTATION_0);
 		}
+
+		igt_vec_fini(&tested_formats);
 	}
 }
 
