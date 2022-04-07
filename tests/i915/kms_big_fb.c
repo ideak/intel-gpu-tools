@@ -420,9 +420,8 @@ static bool test_pipe(data_t *data)
 	if (igt_rotation_90_or_270(data->rotation))
 		igt_swap(width, height);
 
-	igt_create_color_fb(data->drm_fd, width, height,
-			    data->format, data->modifier,
-			    0, 1, 0, &data->small_fb);
+	igt_create_fb(data->drm_fd, width, height,
+		      data->format, data->modifier, &data->small_fb);
 
 	igt_output_set_pipe(data->output, data->pipe);
 
