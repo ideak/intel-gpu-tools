@@ -370,12 +370,12 @@ static bool test_plane(data_t *data)
 		 * rendering pipeline introduces slight differences into
 		 * the result if we try that, and so the crc will not match.
 		 */
-		igt_pipe_crc_start(data->pipe_crc);
 		copy_pattern(data, small_fb, 0, 0, big_fb, x, y,
 			     small_fb->width, small_fb->height);
 
 		igt_display_commit2(&data->display, data->display.is_atomic ?
 				    COMMIT_ATOMIC : COMMIT_UNIVERSAL);
+		igt_pipe_crc_start(data->pipe_crc);
 		igt_pipe_crc_get_current(data->display.drm_fd, data->pipe_crc, &small_crc);
 
 		igt_plane_set_fb(plane, big_fb);
