@@ -196,35 +196,6 @@ static const igt_rotation_t rotations[] = {
 	IGT_ROTATION_270,
 };
 
-static bool can_rotate(data_t *d, unsigned format, uint64_t modifier,
-		       igt_rotation_t rot)
-{
-	if (!is_i915_device(d->drm_fd))
-		return true;
-
-	switch (format) {
-	case DRM_FORMAT_RGB565:
-		if (intel_display_ver(d->devid) >= 11)
-			break;
-		/* fall through */
-	case DRM_FORMAT_C8:
-	case DRM_FORMAT_XRGB16161616F:
-	case DRM_FORMAT_XBGR16161616F:
-	case DRM_FORMAT_ARGB16161616F:
-	case DRM_FORMAT_ABGR16161616F:
-	case DRM_FORMAT_Y210:
-	case DRM_FORMAT_Y212:
-	case DRM_FORMAT_Y216:
-	case DRM_FORMAT_XVYU12_16161616:
-	case DRM_FORMAT_XVYU16161616:
-		return false;
-	default:
-		break;
-	}
-
-	return true;
-}
-
 static bool can_scale(data_t *d, unsigned format)
 {
 	if (!is_i915_device(d->drm_fd))
@@ -286,6 +257,7 @@ static void test_scaler_with_rotation_pipe(data_t *d,
 					   igt_output_t *output)
 {
 	igt_display_t *display = &d->display;
+	unsigned format = DRM_FORMAT_XRGB8888;
 	uint64_t modifier = DRM_FORMAT_MOD_LINEAR;
 	igt_plane_t *plane;
 
@@ -299,30 +271,14 @@ static void test_scaler_with_rotation_pipe(data_t *d,
 
 		for (int i = 0; i < ARRAY_SIZE(rotations); i++) {
 			igt_rotation_t rot = rotations[i];
-			struct igt_vec tested_formats;
 
-			igt_vec_init(&tested_formats, sizeof(uint32_t));
-
-			for (int j = 0; j < plane->drm_plane->count_formats; j++) {
-				unsigned format = plane->drm_plane->formats[j];
-
-				if (!test_pipe_iteration(d, pipe, j))
-					continue;
-
-				if (test_format(d, &tested_formats, format) &&
-				    igt_plane_has_format_mod(plane, format, modifier) &&
-				    igt_plane_has_rotation(plane, rot) &&
-				    can_rotate(d, format, modifier, rot) &&
-				    can_scale(d, format))
+				if (igt_plane_has_rotation(plane, rot))
 					check_scaling_pipe_plane_rot(d, plane,
 								     format, modifier,
 								     width, height,
 								     is_upscale,
 								     pipe, output,
 								     rot);
-			}
-
-			igt_vec_fini(&tested_formats);
 		}
 	}
 }
@@ -750,14 +706,14 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 			}
 		}
 
-		igt_describe("Tests upscaling with tiling rotation, from 20x20 fb.");
+		igt_describe("Tests upscaling with rotation, from 20x20 fb.");
 		igt_subtest_with_dynamic("upscale-with-rotation-20x20") {
 			for_each_pipe_with_single_output(&data.display, pipe, output)
 				igt_dynamic_f("pipe-%s-%s-upscale-with-rotation", kmstest_pipe_name(pipe), igt_output_name(output))
 					test_scaler_with_rotation_pipe(&data, 20, 20, true, pipe, output);
 		}
 
-		igt_describe("Tests upscaling with tiling rotation for 0.25 scaling factor.");
+		igt_describe("Tests upscaling with rotation for 0.25 scaling factor.");
 		igt_subtest_with_dynamic("upscale-with-rotation-factor-0-25") {
 			for_each_pipe_with_single_output(&data.display, pipe, output) {
 				drmModeModeInfo *mode;
@@ -770,7 +726,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 			}
 		}
 
-		igt_describe("Tests downscaling with tiling rotation for 0.25 scaling factor.");
+		igt_describe("Tests downscaling with rotation for 0.25 scaling factor.");
 		igt_subtest_with_dynamic("downscale-with-rotation-factor-0-25") {
 			for_each_pipe_with_single_output(&data.display, pipe, output) {
 				drmModeModeInfo *mode;
@@ -783,7 +739,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 			}
 		}
 
-		igt_describe("Tests downscaling with tiling rotation for 0.5 scaling factor.");
+		igt_describe("Tests downscaling with rotation for 0.5 scaling factor.");
 		igt_subtest_with_dynamic("downscale-with-rotation-factor-0-5") {
 			for_each_pipe_with_single_output(&data.display, pipe, output) {
 				drmModeModeInfo *mode;
@@ -796,7 +752,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 			}
 		}
 
-		igt_describe("Tests downscaling with tiling rotation for 0.75 scaling factor.");
+		igt_describe("Tests downscaling with rotation for 0.75 scaling factor.");
 		igt_subtest_with_dynamic("downscale-with-rotation-factor-0-75") {
 			for_each_pipe_with_single_output(&data.display, pipe, output) {
 				drmModeModeInfo *mode;
@@ -809,7 +765,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 			}
 		}
 
-		igt_describe("Tests scaling with tiling rotation, unity scaling.");
+		igt_describe("Tests scaling with rotation, unity scaling.");
 		igt_subtest_with_dynamic("scaler-with-rotation-unity-scaling") {
 			for_each_pipe_with_single_output(&data.display, pipe, output) {
 				drmModeModeInfo *mode;
