@@ -948,4 +948,11 @@ int igt_force_dsc_enable_bpp(int drmfd, drmModeConnector *connector,
 				int bpp);
 int igt_get_dsc_debugfs_fd(int drmfd, drmModeConnector *connector);
 
+unsigned int igt_get_output_max_bpc(int drmfd, char *connector_name);
+unsigned int igt_get_pipe_current_bpc(int drmfd, enum pipe pipe);
+void igt_assert_output_bpc_equal(int drmfd, enum pipe pipe,
+				char *output_name, unsigned int bpc);
+bool igt_check_output_bpc_equal(int drmfd, enum pipe pipe,
+				char *output_name, unsigned int bpc);
+
 #endif /* __IGT_KMS_H__ */
