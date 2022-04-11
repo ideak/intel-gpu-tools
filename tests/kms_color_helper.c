@@ -25,49 +25,13 @@
 #include "kms_color_helper.h"
 
 bool
-panel_supports_deep_color(int fd, drmModeConnector *connector)
+panel_supports_deep_color(int drm_fd, char *output_name)
 {
-	uint64_t edid_blob_id;
-	uint8_t bit_depth, rev;
-	const struct edid *edid;
-	bool result;
-	drmModePropertyBlobPtr edid_blob = NULL;
+	unsigned int maximum = igt_get_output_max_bpc(drm_fd, output_name);
 
-	igt_assert(kmstest_get_property(fd, connector->connector_id,
-					DRM_MODE_OBJECT_CONNECTOR, "EDID", NULL,
-					&edid_blob_id, NULL));
-	edid_blob = drmModeGetPropertyBlob(fd, edid_blob_id);
-	igt_require_f(edid_blob, "EDID blob is NULL\n");
+	igt_info("Max supported bit depth: %d\n", maximum);
 
-	edid = (const struct edid *) edid_blob->data;
-	rev = edid->revision;
-
-	if (rev >= 4) {
-		bit_depth = edid_get_bit_depth_from_vid(edid);
-
-		if (bit_depth > 0 && bit_depth < 7)
-			igt_info("Max supported bit depth: %d\n", ((bit_depth << 1) + 4));
-		else
-			igt_info("Max supported bit depth: Undefined\n");
-
-		result = (bit_depth >= 3) && (bit_depth < 7);
-	} else {
-		bit_depth = edid_get_deep_color_from_vsdb(edid);
-
-		if (bit_depth &	HDMI_VSDB_DC_48BIT)
-			igt_info("Max supported bit depth: 16\n");
-		else if (bit_depth & HDMI_VSDB_DC_36BIT)
-			igt_info("Max supported bit depth: 12\n");
-		else if (bit_depth & HDMI_VSDB_DC_30BIT)
-			igt_info("Max supported bit depth: 10\n");
-		else
-			igt_info("Max supported bit depth: Undefined\n");
-
-		result = !!(bit_depth & (7 << 4));
-	}
-	drmModeFreePropertyBlob(edid_blob);
-
-	return result;
+	return maximum >= 10;
 }
 
 uint64_t get_max_bpc(igt_output_t *output)

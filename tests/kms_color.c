@@ -883,20 +883,25 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 					"At least GEN 11 is required to validate Deep-color.\n");
 
 		for_each_valid_output_on_pipe(&data->display, p, output) {
-			drmModeConnector *connector = output->config.connector;
 			uint64_t max_bpc = get_max_bpc(output);
 			bool ret;
 
 			if (!max_bpc)
 				continue;
 
-			if (!panel_supports_deep_color(data->drm_fd, connector))
+			if (!panel_supports_deep_color(data->drm_fd, output->name))
 				continue;
 
 			data->color_depth = 10;
 			data->drm_format = DRM_FORMAT_XRGB2101010;
 			data->output = output;
 			igt_output_set_prop_value(output, IGT_CONNECTOR_MAX_BPC, 10);
+			igt_display_commit(&data->display);
+
+			if (!igt_check_output_bpc_equal(data->drm_fd, p, output->name, 10)) {
+				igt_output_set_prop_value(output, IGT_CONNECTOR_MAX_BPC, max_bpc);
+				igt_fail_on_f(true, "Failed to set max_bpc as: 10\n");
+			}
 
 			igt_dynamic_f("gamma-%s", output->name) {
 				ret = test_pipe_gamma(data, primary);
