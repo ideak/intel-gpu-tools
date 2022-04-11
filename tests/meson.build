@@ -8,6 +8,7 @@ test_progs = [
 	'debugfs_test',
 	'dmabuf',
 	'device_reset',
+	'drm_buddy',
 	'drm_import_export',
 	'drm_mm',
 	'drm_read',
