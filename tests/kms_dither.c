@@ -99,13 +99,11 @@ static dither_status_t get_dither_state(data_t *data)
 	igt_require(res > 0);
 	close(dir);
 
-	igt_assert(start_loc = strstr(buf, ", bpp="));
-	igt_assert_eq(sscanf(start_loc, ", bpp=%u", &status.bpc), 1);
-	status.bpc /= 3;
-
 	igt_assert(start_loc = strstr(buf, ", dither="));
 	igt_assert_eq(sscanf(start_loc, ", dither=%s", tmp), 1);
 	status.dither = !strcmp(tmp, "yes,");
+
+	status.bpc = igt_get_pipe_current_bpc(data->drm_fd, data->pipe_id);
 
 	return status;
 }
@@ -144,6 +142,11 @@ static void test_dithering(data_t *data, enum pipe pipe,
 				output->name, output_bpc);
 
 	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
+
+	if (!igt_check_output_bpc_equal(data->drm_fd, pipe, output->name, output_bpc)) {
+		igt_output_set_prop_value(output, IGT_CONNECTOR_MAX_BPC, bpc);
+		igt_fail_on_f(true, "Failed to set max_bpc as: %d\n", output_bpc);
+	}
 
 	/*
 	 * Check the status of Dithering block:
