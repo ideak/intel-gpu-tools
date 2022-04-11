@@ -43,12 +43,6 @@ typedef struct data {
 	int fd;
 } data_t;
 
-/* BPC connector state. */
-typedef struct output_bpc {
-	unsigned int current;
-	unsigned int maximum;
-} output_bpc_t;
-
 /* Common test cleanup. */
 static void test_fini(data_t *data)
 {
@@ -431,51 +425,6 @@ static void test_dsc_link_settings(data_t *data)
     test_fini(data);
 }
 
-/* Returns the current and maximum bpc from the connector debugfs. */
-static output_bpc_t get_output_bpc(int data_fd, char *connector_name)
-{
-	char buf[256];
-	char *start_loc;
-	int fd, res;
-	output_bpc_t info;
-
-	fd = igt_debugfs_connector_dir(data_fd, connector_name, O_RDONLY);
-	igt_assert(fd >= 0);
-
-	res = igt_debugfs_simple_read(fd, "output_bpc", buf, sizeof(buf));
-
-	igt_require(res > 0);
-
-	close(fd);
-
-	igt_assert(start_loc = strstr(buf, "Current: "));
-	igt_assert_eq(sscanf(start_loc, "Current: %u", &info.current), 1);
-
-	igt_assert(start_loc = strstr(buf, "Maximum: "));
-	igt_assert_eq(sscanf(start_loc, "Maximum: %u", &info.maximum), 1);
-
-	return info;
-}
-
-/* Verifies that connector has the correct output bpc */
-static void assert_output_bpc(int data_fd, char *connector_name, unsigned int bpc)
-{
-	output_bpc_t info = get_output_bpc(data_fd, connector_name);
-
-	igt_require_f(info.maximum >= bpc,
-		      "Monitor doesn't support %u bpc, max is %u\n", bpc,
-		      info.maximum);
-
-	igt_assert_eq(info.current, bpc);
-}
-
-/* Returns the highest bpc this dispaly supports */
-static int get_max_supported_bpc(int data_fd, char *connector_name)
-{
-	output_bpc_t info = get_output_bpc(data_fd, connector_name);
-	return info.maximum;
-}
-
 static void test_dsc_bpc(data_t *data)
 {
 	igt_output_t *output;
@@ -494,7 +443,7 @@ static void test_dsc_bpc(data_t *data)
 		if (!output || !igt_output_is_connected(output))
 			continue;
 		igt_info("Checking bpc support of conn %s\n", output->name);
-		max_supported_bpc[i] = get_max_supported_bpc(data->fd, output->name);
+		max_supported_bpc[i] = igt_get_output_max_bpc(data->fd, output->name);
 	}
 
     /* Setup all outputs */
@@ -538,7 +487,8 @@ static void test_dsc_bpc(data_t *data)
 
 			/* Check current bpc */
 			igt_info("Verifying display %s has correct bpc\n", output->name);
-			assert_output_bpc(data->fd, output->name, bpc_vals[bpc]);
+			igt_assert_output_bpc_equal(data->fd, data->pipe_id[i],
+						    output->name, bpc_vals[bpc]);
 
 			/* Log current mode and DSC status */
 			dsc_on = igt_amd_read_dsc_clock_status(data->fd, output->name) == 1;

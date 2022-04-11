@@ -40,12 +40,6 @@ typedef struct data {
 	int h;
 } data_t;
 
-/* BPC connector state. */
-typedef struct output_bpc {
-	unsigned int current;
-	unsigned int maximum;
-} output_bpc_t;
-
 static drmModeModeInfo uhd_mode = {
 	  594000,
 	  3840, 4016, 4104, 4400, 0,
@@ -54,44 +48,6 @@ static drmModeModeInfo uhd_mode = {
 	  0x40,
 	  "3840x2160@60", /* VIC 107 */
 	  };
-
-/* Returns the current and maximum bpc from the connector debugfs. */
-static output_bpc_t get_output_bpc(data_t *data)
-{
-	char buf[256];
-	char *start_loc;
-	int fd, res;
-	output_bpc_t info;
-
-	fd = igt_debugfs_connector_dir(data->fd, data->output->name, O_RDONLY);
-	igt_assert(fd >= 0);
-
-	res = igt_debugfs_simple_read(fd, "output_bpc", buf, sizeof(buf));
-
-	igt_require(res > 0);
-
-	close(fd);
-
-	igt_assert(start_loc = strstr(buf, "Current: "));
-	igt_assert_eq(sscanf(start_loc, "Current: %u", &info.current), 1);
-
-	igt_assert(start_loc = strstr(buf, "Maximum: "));
-	igt_assert_eq(sscanf(start_loc, "Maximum: %u", &info.maximum), 1);
-
-	return info;
-}
-
-/* Verifies that connector has the correct output bpc. */
-static void assert_output_bpc(data_t *data, unsigned int bpc)
-{
-	output_bpc_t info = get_output_bpc(data);
-
-	igt_require_f(info.maximum >= bpc,
-		      "Monitor doesn't support %u bpc, max is %u\n", bpc,
-		      info.maximum);
-
-	igt_assert_eq(info.current, bpc);
-}
 
 /* Common test setup. */
 static void test_init(data_t *data)
@@ -120,7 +76,8 @@ static void test_init(data_t *data)
 
 	data->mode = igt_output_get_mode(data->output);
 	igt_assert(data->mode);
-	assert_output_bpc(data, 8);
+	igt_assert_output_bpc_equal(data->fd, data->pipe_id,
+				    data->output->name, 8);
 
 	data->primary =
 		igt_pipe_get_plane_type(data->pipe, DRM_PLANE_TYPE_PRIMARY);
