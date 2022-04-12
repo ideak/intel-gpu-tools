@@ -21,6 +21,8 @@ extern "C" {
  */
 #define I915_ENGINE_CLASS_COMPUTE 4
 
+#define DRM_I915_QUERY_GEOMETRY_SUBSLICES      6
+
 #if defined(__cplusplus)
 }
 #endif

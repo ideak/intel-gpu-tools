@@ -244,6 +244,15 @@ static bool query_topology_supported(int fd)
 	return __i915_query_items(fd, &item, 1) == 0 && item.length > 0;
 }
 
+static bool query_geometry_subslices_supported(int fd)
+{
+	struct drm_i915_query_item item = {
+		.query_id= DRM_I915_QUERY_GEOMETRY_SUBSLICES,
+	};
+
+	return __i915_query_items(fd, &item, 1) == 0 && item.length > 0;
+}
+
 static void test_query_topology_unsupported(int fd)
 {
 	struct drm_i915_query_item item = {
@@ -842,6 +851,67 @@ static void engines(int fd)
 	free(engines);
 }
 
+static void test_query_geometry_subslices(int fd)
+{
+	const struct intel_execution_engine2 *e;
+	struct drm_i915_query_item item = {};
+	struct drm_i915_query_topology_info *topo_info;
+
+	/*
+	 * Submit an initial request with an invalid engine.  Should return
+	 * -EINVAL via item.length.
+	 */
+	item.query_id = DRM_I915_QUERY_GEOMETRY_SUBSLICES;
+	item.flags = ~0;
+	i915_query_items(fd, &item, 1);
+	igt_assert_eq(item.length, -EINVAL);
+
+	for_each_physical_engine(fd, e) {
+		memset(&item, 0, sizeof(item));
+
+		/* Obtain the necessary topology buffer size */
+		item.query_id = DRM_I915_QUERY_GEOMETRY_SUBSLICES;
+		item.flags =  e->class | (e->instance << 16);
+		i915_query_items(fd, &item, 1);
+
+		/* Non-render engines should return -EINVAL */
+		if (e->class != I915_ENGINE_CLASS_RENDER) {
+			igt_assert_eq(item.length, -EINVAL);
+			continue;
+		}
+		igt_assert(item.length > 0);
+
+		/* Re-submit with a properly allocated buffer */
+		topo_info = calloc(1, item.length);
+		igt_assert(topo_info);
+		item.data_ptr = to_user_pointer(topo_info);
+		i915_query_items(fd, &item, 1);
+
+		igt_assert(topo_info->max_subslices > 0);
+		igt_assert(topo_info->max_eus_per_subslice > 0);
+
+		igt_assert(topo_info->subslice_offset >=
+			   DIV_ROUND_UP(topo_info->max_slices, 8));
+		igt_assert(topo_info->eu_offset >=
+			   topo_info->subslice_offset + DIV_ROUND_UP(topo_info->max_subslices, 8));
+
+		igt_assert(topo_info->subslice_stride >=
+			   DIV_ROUND_UP(topo_info->max_subslices, 8));
+		igt_assert(topo_info->eu_stride >=
+			   DIV_ROUND_UP(topo_info->max_eus_per_subslice, 8));
+
+		/*
+		 * This query is only supported on Xe_HP and beyond, and all
+		 * such platforms don't have slices; we should just get a
+		 * hardcoded 0x1 for the slice mask.
+		 */
+		igt_assert_eq(topo_info->max_slices, 1);
+		igt_assert_eq(((char*)topo_info->data)[0], 0x1);
+
+		free(topo_info);
+	}
+}
+
 igt_main
 {
 	int fd = -1;
@@ -887,6 +957,11 @@ igt_main
 			    IS_SKYLAKE(devid) || IS_KABYLAKE(devid) ||
 			    IS_COFFEELAKE(devid));
 		test_query_topology_known_pci_ids(fd, devid);
+	}
+
+	igt_subtest("test-query-geometry-subslices") {
+		igt_require(query_geometry_subslices_supported(fd));
+		test_query_geometry_subslices(fd);
 	}
 
 	igt_subtest("query-regions-garbage-items") {
