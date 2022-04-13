@@ -100,10 +100,15 @@ static void get_ccs_fb(int fd, struct drm_mode_fb_cmd2 *ret)
 		size = add.pitches[0] * ALIGN(add.height, 8);
 		size = ALIGN(size, 4096);
 	} else if ((intel_display_ver(devid)) >= 12) {
-		add.modifier[0] = I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS;
-		add.modifier[1] = I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS;
+		add.modifier[0] = IS_METEORLAKE(devid) ?
+			I915_FORMAT_MOD_4_TILED_MTL_RC_CCS :
+			I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS;
 
-		/* The main surface for TGL is 4x4 tiles aligned
+		add.modifier[1] = IS_METEORLAKE(devid) ?
+			I915_FORMAT_MOD_4_TILED_MTL_RC_CCS :
+			I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS;
+
+		/* The main surface for Gen12+ is 4x4 tiles aligned
 		 * For 32bpp the pitch is 4*4*32 bytes i.e. 512 bytes
 		 */
 		add.pitches[0] = ALIGN(add.width * 4, 4 * 128);
@@ -138,7 +143,7 @@ static void get_ccs_fb(int fd, struct drm_mode_fb_cmd2 *ret)
 	add.handles[0] = gem_buffer_create_fb_obj(fd, size);
 	igt_require(add.handles[0] != 0);
 
-	if (!HAS_FLATCCS(intel_get_drm_devid(fd)))
+	if (!HAS_FLATCCS(devid))
 		add.handles[1] = add.handles[0];
 
 	if (drmIoctl(fd, DRM_IOCTL_MODE_ADDFB2, &add) == 0)
