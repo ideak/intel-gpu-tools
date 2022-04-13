@@ -719,6 +719,25 @@ static unsigned set_combinations(data_t *data, unsigned mask, struct igt_fb *fb)
 	for_each_pipe(&data->display, pipe) {
 		igt_plane_t *plane = igt_pipe_get_plane_type(&data->display.pipes[pipe],
 			DRM_PLANE_TYPE_PRIMARY);
+
+		enum pipe old_pipe = plane->ref->pipe->pipe;
+
+		/*
+		 * If a plane is being shared by multiple pipes, we must disable the pipe that
+		 * currently is holding the plane
+		 */
+		if (old_pipe != pipe) {
+			igt_plane_t *old_plane = igt_pipe_get_plane_type(&data->display.pipes[old_pipe],
+				DRM_PLANE_TYPE_PRIMARY);
+
+			igt_plane_set_fb(old_plane, NULL);
+			igt_display_commit2(&data->display, COMMIT_ATOMIC);
+		}
+	}
+
+	for_each_pipe(&data->display, pipe) {
+		igt_plane_t *plane = igt_pipe_get_plane_type(&data->display.pipes[pipe],
+			DRM_PLANE_TYPE_PRIMARY);
 		drmModeModeInfo *mode = NULL;
 
 		if (!(mask & (1 << pipe))) {
