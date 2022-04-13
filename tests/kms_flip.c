@@ -81,6 +81,8 @@
 #define RUN_TEST		1
 #define RUN_PAIR		2
 
+#define MAX_HDISPLAY_PER_CRTC 5120
+
 #ifndef DRM_CAP_TIMESTAMP_MONOTONIC
 #define DRM_CAP_TIMESTAMP_MONOTONIC 6
 #endif
@@ -1364,14 +1366,7 @@ retry:
 
 	igt_flush_uevents(mon);
 
-	if (set_mode(o, o->fb_ids[0], 0, 0)) {
-		/* We may fail to apply the mode if there are hidden
-		 * constraints, such as bandwidth on the third pipe.
-		 */
-		igt_assert_f(crtc_count > 1 || crtc_idxs[0] < 2,
-			     "set_mode may only fail on the 3rd pipe or in multiple crtc tests\n");
-		goto out;
-	}
+	igt_assert(!set_mode(o, o->fb_ids[0], 0, 0));
 	igt_assert(fb_is_bound(o, o->fb_ids[0]));
 
 	vblank = kms_has_vblank(drm_fd);
@@ -1443,9 +1438,11 @@ out:
 }
 
 static void run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
-				 int crtc_count, int duration_ms)
+				 int crtc_count, int total_crtcs,
+				 int duration_ms)
 {
 	char test_name[128];
+	int i;
 
 	switch (crtc_count) {
 	case RUN_TEST:
@@ -1476,6 +1473,29 @@ static void run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
 	}
 
 	igt_assert_eq(o->count, crtc_count);
+
+	/*
+	 * Handle BW limitations:
+	 *
+	 * if mode.hdisplay > 5120, then ignore
+	 *  - last crtc in single/multi-connector config
+	 *  - consecutive crtcs in multi-connector config
+	 *
+	 * in multi-connector config ignore if
+	 *  - previous crtc mode.hdisplay > 5120 and
+	 *  - current & previous crtcs are consecutive
+	 */
+	for (i = 0; i < crtc_count; i++) {
+		if (((o->kmode[i].hdisplay > MAX_HDISPLAY_PER_CRTC) &&
+		     ((crtc_idxs[i] >= (total_crtcs - 1)) ||
+		      ((i < (crtc_count - 1)) && (abs(crtc_idxs[i + 1] - crtc_idxs[i]) <= 1)))) ||
+		    ((i > 0) && (o->kmode[i - 1].hdisplay > MAX_HDISPLAY_PER_CRTC) &&
+		     (abs(crtc_idxs[i] - crtc_idxs[i - 1]) <= 1))) {
+
+			igt_debug("Combo: %s is not possible with selected mode(s).\n", test_name);
+			return;
+		}
+	}
 
 	igt_dynamic_f("%s", test_name)
 		__run_test_on_crtc_set(o, crtc_idxs, crtc_count, duration_ms);
@@ -1538,7 +1558,8 @@ static int run_test(int duration, int flags)
 			o.depth = 24;
 
 			crtc_idx = n;
-			run_test_on_crtc_set(&o, &crtc_idx, RUN_TEST, duration);
+			run_test_on_crtc_set(&o, &crtc_idx, RUN_TEST,
+					     resources->count_crtcs, duration);
 		}
 	}
 
@@ -1607,6 +1628,7 @@ static int run_pair(int duration, int flags)
 
 					run_test_on_crtc_set(&o, crtc_idxs,
 							     RUN_PAIR,
+							     resources->count_crtcs,
 							     duration);
 				}
 			}
