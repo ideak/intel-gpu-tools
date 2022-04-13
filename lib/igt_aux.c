@@ -31,6 +31,7 @@
 #endif
 #include <stdio.h>
 #include <fcntl.h>
+#include <pwd.h>
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <string.h>
@@ -1460,6 +1461,162 @@ igt_lsof(const char *dpath)
 	__igt_lsof(sanitized);
 
 	free(sanitized);
+}
+
+static void pulseaudio_unload_module(proc_t *proc_info)
+{
+	char xdg_dir[PATH_MAX];
+	const char *homedir;
+	struct passwd *pw;
+
+	igt_fork(child, 1) {
+		pw = getpwuid(proc_info->euid);
+		homedir = pw->pw_dir;
+		snprintf(xdg_dir, sizeof(xdg_dir), "/run/user/%d", proc_info->euid);
+
+		igt_info("Ask pulseaudio to stop using audio device\n");
+
+		setgid(proc_info->egid);
+		setuid(proc_info->euid);
+		clearenv();
+		setenv("HOME", homedir, 1);
+		setenv("XDG_RUNTIME_DIR",xdg_dir, 1);
+
+		system("for i in $(pacmd list-sources|grep module:|cut -d : -f 2); do pactl unload-module $i; done");
+	}
+	igt_waitchildren();
+}
+
+/**
+ * __igt_lsof_audio_and_kill_proc() - check if a given process is using an
+ *	audio device. If so, stop or prevent them to use such devices.
+ *
+ * @proc_info: process struct, as returned by readproc()
+ * @proc_path: path of the process under procfs
+ *
+ * No processes can be using an audio device by the time it gets removed.
+ * This function checks if a process is using an audio device from /dev/snd.
+ * If so, it will check:
+ * 	- if the process is pulseaudio, it can't be killed, as systemd will
+ * 	  respawn it. So, instead, send a request for it to stop bind the
+ * 	  audio devices.
+ * If the check fails, it means that the process can simply be killed.
+ */
+static int
+__igt_lsof_audio_and_kill_proc(proc_t *proc_info, char *proc_path)
+{
+	const char *audio_dev = "/dev/snd/";
+	char path[PATH_MAX * 2];
+	struct dirent *d;
+	struct stat st;
+	char *fd_lnk;
+	int fail = 0;
+	ssize_t read;
+
+	DIR *dp = opendir(proc_path);
+	igt_assert(dp);
+
+	while ((d = readdir(dp))) {
+		if (*d->d_name == '.')
+			continue;
+
+		memset(path, 0, sizeof(path));
+		snprintf(path, sizeof(path), "%s/%s", proc_path, d->d_name);
+
+		if (lstat(path, &st) == -1)
+			continue;
+
+		fd_lnk = malloc(st.st_size + 1);
+
+		igt_assert((read = readlink(path, fd_lnk, st.st_size + 1)));
+		fd_lnk[read] = '\0';
+
+		if (strncmp(audio_dev, fd_lnk, strlen(audio_dev))) {
+			free(fd_lnk);
+			continue;
+		}
+
+		free(fd_lnk);
+
+		/*
+		 * In order to avoid racing against pa/systemd, ensure that
+		 * pulseaudio will close all audio files. This should be
+		 * enough to unbind audio modules and won't cause race issues
+		 * with systemd trying to reload it.
+		 */
+		if (!strcmp(proc_info->cmd, "pulseaudio")) {
+			pulseaudio_unload_module(proc_info);
+			break;
+		}
+
+		/*
+		 * FIXME: terminating pipewire-pulse is not that easy, as
+		 * pipewire there's no standard way up to pipewire version
+		 * 0.3.49. Just trying to kill pipewire will start a race
+		 * between IGT and systemd. If IGT wins, the audio driver
+		 * will be unloaded before systemd tries to reload it, but
+		 * if systemd wins, the audio device will be re-opened and
+		 * used before IGT has a chance to remove the audio driver.
+		 * Pipewire version 0.3.50 should bring a standard way:
+		 *
+		 * 1) start a thread running:
+		 *	 pw-reserve -n Audio0 -r
+		 * 2) unload/unbind the the audio driver(s);
+		 * 3) stop the pw-reserve thread.
+		 *
+		 * We should add support for it once distros start shipping it.
+		 */
+
+		/* For all other processes, just kill them */
+		igt_info("process %d (%s) is using audio device. Should be terminated.\n",
+				proc_info->tid, proc_info->cmd);
+
+		if (kill(proc_info->tid, SIGTERM) < 0) {
+			igt_info("Fail to terminate %s (pid: %d) with SIGTERM\n",
+				proc_info->cmd, proc_info->tid);
+			if (kill(proc_info->tid, SIGABRT) < 0) {
+				fail++;
+				igt_info("Fail to terminate %s (pid: %d) with SIGABRT\n",
+					proc_info->cmd, proc_info->tid);
+			}
+		}
+
+		break;
+	}
+
+	closedir(dp);
+	return fail;
+}
+
+/*
+ * This function identifies each process running on the machine that is
+ * opening an audio device and tries to stop it.
+ *
+ * Special care should be taken with pipewire and pipewire-pulse, as those
+ * daemons are respanned if they got killed.
+ */
+int
+igt_lsof_kill_audio_processes(void)
+{
+	char path[PATH_MAX];
+	proc_t *proc_info;
+	PROCTAB *proc;
+	int fail = 0;
+
+	proc = openproc(PROC_FILLCOM | PROC_FILLSTAT | PROC_FILLARG);
+	igt_assert(proc != NULL);
+
+	while ((proc_info = readproc(proc, NULL))) {
+		if (snprintf(path, sizeof(path), "/proc/%d/fd", proc_info->tid) < 1)
+			fail++;
+		else
+			fail += __igt_lsof_audio_and_kill_proc(proc_info, path);
+
+		freeproc(proc_info);
+	}
+	closeproc(proc);
+
+	return fail;
 }
 
 static struct igt_siglatency {

@@ -152,19 +152,14 @@ static void driver_unbind(struct hotunplug *priv, const char *prefix,
 	 * safest and easiest way out.
 	 */
 	if (priv->snd_unload) {
-		igt_terminate_process(SIGTERM, "alsactl");
-
-		/* unbind snd_hda_intel */
-		kick_snd_hda_intel();
-
-		if (igt_kmod_unload("snd_hda_intel", 0)) {
+		if (igt_audio_driver_unload(NULL)) {
 			priv->snd_unload = false;
-			igt_warn("Could not unload snd_hda_intel\n");
+			igt_warn("Could not unload audio driver\n");
 			igt_kmod_list_loaded();
 			igt_lsof("/dev/snd");
 			igt_skip("Audio is in use, skipping\n");
 		} else {
-			igt_info("Preventively unloaded snd_hda_intel\n");
+			igt_info("Preventively unloaded audio driver\n");
 		}
 	}
 

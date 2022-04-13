@@ -389,7 +389,7 @@ igt_i915_driver_load(const char *opts)
 	return 0;
 }
 
-int __igt_i915_driver_unload(const char **who)
+int igt_audio_driver_unload(const char **who)
 {
 	int ret;
 	const char *sound[] = {
@@ -397,6 +397,27 @@ int __igt_i915_driver_unload(const char **who)
 		"snd_hdmi_lpe_audio",
 		NULL,
 	};
+
+	for (const char **m = sound; *m; m++) {
+		if (igt_kmod_is_loaded(*m)) {
+			if (igt_lsof_kill_audio_processes())
+				return EACCES;
+
+			kick_snd_hda_intel();
+			ret = igt_kmod_unload(*m, 0);
+			if (ret) {
+				if (who)
+					*who = *m;
+				return ret;
+			}
+		}
+	}
+	return 0;
+}
+
+int __igt_i915_driver_unload(const char **who)
+{
+	int ret;
 
 	const char *aux[] = {
 		/* gen5: ips uses symbol_get() so only a soft module dependency */
@@ -411,27 +432,19 @@ int __igt_i915_driver_unload(const char **who)
 	/* unbind vt */
 	bind_fbcon(false);
 
-	for (const char **m = sound; *m; m++) {
-		if (igt_kmod_is_loaded(*m)) {
-			igt_terminate_process(SIGTERM, "alsactl");
-			kick_snd_hda_intel();
-			ret = igt_kmod_unload(*m, 0);
-			if (ret) {
-				if (who)
-					*who = *m;
-				return ret;
-			}
-		}
-	}
+	ret = igt_audio_driver_unload(who);
+	if (ret)
+		return ret;
 
 	for (const char **m = aux; *m; m++) {
-		if (igt_kmod_is_loaded(*m)) {
-			ret = igt_kmod_unload(*m, 0);
-			if (ret) {
-				if (who)
-					*who = *m;
-				return ret;
-			}
+		if (!igt_kmod_is_loaded(*m))
+			continue;
+
+		ret = igt_kmod_unload(*m, 0);
+		if (ret) {
+			if (who)
+				*who = *m;
+			return ret;
 		}
 	}
 
