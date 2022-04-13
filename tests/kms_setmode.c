@@ -676,10 +676,16 @@ static void test_one_combination(const struct test_config *tconf,
 			 * if mode.hdisplay > 5120, then ignore
 			 *   - last crtc in single/multi-connector config
 			 *   - consecutive crtcs in multi-connector config
+			 *
+			 * in multi-connector config ignore if
+			 *   - previous crtc mode.hdisplay > 5120 and
+			 *   - current & previous crtcs are consecutive
 			 */
-			if ((crtc->mode.hdisplay > MAX_HDISPLAY_PER_CRTC) &&
-			    ((crtc->crtc_idx >= (tconf->resources->count_crtcs - 1)) ||
-			     (i < (crtc_count - 1) && abs(crtcs[i + 1].crtc_idx - crtc->crtc_idx) <= 1))) {
+			if (((crtc->mode.hdisplay > MAX_HDISPLAY_PER_CRTC) &&
+			     ((crtc->crtc_idx >= (tconf->resources->count_crtcs - 1)) ||
+			      ((i < (crtc_count - 1)) && (abs(crtcs[i + 1].crtc_idx - crtc->crtc_idx) <= 1)))) ||
+			    ((i > 0) && (crtc[i - 1].mode.hdisplay > MAX_HDISPLAY_PER_CRTC) &&
+			     (abs(crtc->crtc_idx - crtcs[i - 1].crtc_idx) <= 1))) {
 				igt_info("Combo: %s is not possible with selected mode(s).\n", test_name);
 				goto out;
 			}
