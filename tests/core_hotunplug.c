@@ -621,13 +621,12 @@ igt_main
 		igt_skip_on_f(fd_drm < 0, "No known DRM device found\n");
 
 		if (is_i915_device(fd_drm)) {
-			uint32_t devid = intel_get_drm_devid(fd_drm);
-
-			if ((IS_HASWELL(devid) || IS_BROADWELL(devid) ||
-			     IS_DG1(devid)) && (igt_kmod_is_loaded("snd_hda_intel"))) {
-				igt_debug("Enable WA to unload snd driver\n");
-				priv.snd_unload = true;
-			}
+			/*
+			 * Audio driver does not support hot unplug via DRM
+			 * audio component framework, so driver must be unloaded
+			 * explicitly for i915 unbind tests.
+			 */
+			priv.snd_unload = true;
 
 			gem_quiescent_gpu(fd_drm);
 			igt_require_gem(fd_drm);
