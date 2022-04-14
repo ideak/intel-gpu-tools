@@ -17,8 +17,8 @@ my %used_source;
 my %record;
 my %files;
 my @func_regexes;
+my %test_names;
 my @src_regexes;
-my $testname = "";
 
 my $verbose = 0;
 my $ignore_unused = 0;
@@ -99,11 +99,7 @@ sub parse_info_data($)
 		if (m/^TN:(.*)/) {
 			if ($1 ne $cur_test) {
 				$cur_test = $1;
-				if (!$testname) {
-					$testname = $cur_test;
-				} else {
-					$testname = "Code_coverage_tests";
-				}
+				$test_names{$cur_test} = 1;
 			}
 			$source = $before_sf;
 			$func = $before_sf;
@@ -297,9 +293,13 @@ sub write_filtered_file($)
 {
 	my $filter = shift;
 
-	# Generates filtered data
-	my $filtered = "TN:$testname\n";
+	my $filtered = "";
 
+	foreach my $testname(sort keys %test_names) {
+		$filtered .= "TN:$testname\n";
+	}
+
+	# Generates filtered data
 	foreach my $source(sort keys %record) {
 		next if (!$used_source{$source});
 
@@ -363,10 +363,6 @@ sub print_code_coverage($$$)
 
 	return if (!$print_used && !$print_unused);
 
-	if ($testname ne "") {
-		$testname =~ s/(.*)_on_(\w+)$/$1 on $2/;
-		print "TEST: $testname\n";
-	}
 	my $prev_file = "";
 
 	foreach my $func (sort keys(%all_func)) {
