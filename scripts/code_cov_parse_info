@@ -513,7 +513,7 @@ my $filter_str = "";
 my $has_filter;
 
 if ($func_filters) {
-	open IN, $func_filters || die "Can't open $func_filters";
+	open IN, $func_filters or die "Can't open $func_filters";
 	while (<IN>) {
 		s/^\s+//;
 		s/\s+$//;
@@ -524,7 +524,7 @@ if ($func_filters) {
 }
 
 if ($src_filters) {
-	open IN, $src_filters || die "Can't open $src_filters";
+	open IN, $src_filters or die "Can't open $src_filters";
 	while (<IN>) {
 		s/^\s+//;
 		s/\s+$//;
