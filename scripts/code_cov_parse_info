@@ -378,8 +378,10 @@ sub print_code_coverage($$$)
 			}
 
 			if ($show_lines) {
+				my $ln = $all_func{$func}{$file}->{ln};
 				$file =~ s,$prefix,linux/,;
-				$name = "$func() from $file:" . $all_func{$func}{$file}->{ln};
+				$name = "$func() from $file";
+				$name .= ":" . $ln if ($ln);
 			} elsif (scalar @keys > 1) {
 				$file =~ s,$prefix,linux/,;
 				$name = "$func() from $file:";
