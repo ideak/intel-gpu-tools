@@ -17,20 +17,26 @@ my %used_source;
 my %record;
 my %files;
 my @func_regexes;
+my @func_exclude_regexes;
 my %test_names;
 my @src_regexes;
+my @src_exclude_regexes;
 
 my $verbose = 0;
 my $ignore_unused = 0;
-my $only_i915 = 0;
-my $only_drm = 0;
 my $skip_func = 0;
 
 sub is_function_excluded($)
 {
-	return 0 if (!@func_regexes);
+	return 0 if (!@func_regexes && !@func_exclude_regexes);
 
 	my $func = shift;
+
+	foreach my $r (@func_exclude_regexes) {
+		return 1 if ($func =~ m/$r/);
+	}
+
+	return 0 if (!@func_regexes);
 
 	foreach my $r (@func_regexes) {
 		return 0 if ($func =~ m/$r/);
@@ -43,30 +49,13 @@ sub filter_file($)
 {
 	my $s = shift;
 
-	if ($only_drm) {
-		# Please keep --only-drm doc updated with any changes her
-		if ($s =~ m/\.h$/) {
-			if ($s =~ m/trace/ || !($s =~ m/drm/)) {
-				return 1;
-			}
-		}
-	}
+	return 0 if (!@src_regexes && !@src_exclude_regexes);
 
-	if ($only_i915) {
-		# Please keep --only-i915 doc updated with any changes here
-		if ($s =~ m/selftest/) {
-			return 1;
-		}
-
-		# Please keep --only-i915 doc updated with any changes here
-		if (!($s =~ m#drm/i915/# || $s =~ m#drm/ttm# || $s =~ m#drm/vgem#)) {
-			return 1;
-		}
+	foreach my $r (@src_exclude_regexes) {
+		return 1 if ($s =~ m/$r/);
 	}
 
 	return 0 if (!@src_regexes);
-
-	my $func = shift;
 
 	foreach my $r (@src_regexes) {
 		return 0 if ($s =~ m/$r/);
@@ -468,6 +457,63 @@ sub print_summary()
 	}
 }
 
+sub open_filter_file($$$)
+{
+	my $fname = shift;
+	my $include = shift;
+	my $exclude = shift;
+	my $match_str = "";
+	my $not_match_str = "";
+	my $filter = "";
+	my $i;
+
+	# Handle regexes that came from command line params
+
+	for ($i = 0;$i < scalar(@{$include}); $i++) {
+		my $op = @{$include}[$i];
+		$match_str .= sprintf "m`$op` ";
+		@{$include}[$i] = qr /$op/;
+	}
+
+	for ($i = 0;$i < scalar(@{$exclude}); $i++) {
+		my $op = @{$exclude}[$i];
+		$not_match_str .= sprintf "m`$op` ";
+		@{$exclude}[$i] = qr /$op/;
+	}
+
+	if ($fname) {
+		open IN, $fname or die "Can't open $fname";
+		while (<IN>) {
+			s/^\s+//;
+			s/\s+$//;
+			next if (m/^#/ || m/^$/);
+			if (m/^([+\-])\s*(.*)/) {
+				if ($1 eq "+") {
+					$match_str .= sprintf "m`$2` ";
+					push @{$include}, qr /$2/;
+				} else {
+					$not_match_str .= sprintf "m`$2` ";
+					push @{$exclude}, qr /$2/;
+				}
+			} else {
+				$match_str .= sprintf "m`$_` ";
+				push @{$include}, qr /$_/;
+			}
+		}
+		close IN;
+	}
+
+	$filter .= "not match: $not_match_str" if ($not_match_str);
+	if ($match_str) {
+		$filter .= "and " if ($filter ne "");
+		$filter .= "match: $match_str";
+	}
+
+	$filter =~ s/\s+$//;
+
+	return $filter;
+}
+
 #
 # Argument handling
 #
@@ -482,6 +528,8 @@ my $func_filters;
 my $src_filters;
 my $show_files;
 my $show_lines;
+my $only_i915;
+my $only_drm;
 
 GetOptions(
 	"print-coverage|print_coverage|print|p" => \$print_used,
@@ -493,7 +541,11 @@ GetOptions(
 	"only-i915|only_i915" => \$only_i915,
 	"only-drm|only_drm" => \$only_drm,
 	"func-filters|f=s" => \$func_filters,
+	"include-func=s" => \@func_regexes,
+	"exclude-func=s" => \@func_exclude_regexes,
 	"source-filters|S=s" => \$src_filters,
+	"include-source=s" => \@src_regexes,
+	"exclude-source=s" => \@src_exclude_regexes,
 	"show-files|show_files" => \$show_files,
 	"show-lines|show_lines" => \$show_lines,
 	"help" => \$help,
@@ -513,64 +565,41 @@ pod2usage(1) if (!$print_used && !$filter && !$stat && !$print_unused);
 
 my $filter_str = "";
 my $has_filter;
-
-if ($func_filters) {
-	open IN, $func_filters or die "Can't open $func_filters";
-	while (<IN>) {
-		s/^\s+//;
-		s/\s+$//;
-		next if (m/^#/ || m/^$/);
-		push @func_regexes, qr /$_/;
-	}
-	close IN;
-}
-
-if ($src_filters) {
-	open IN, $src_filters or die "Can't open $src_filters";
-	while (<IN>) {
-		s/^\s+//;
-		s/\s+$//;
-		next if (m/^#/ || m/^$/);
-		push @src_regexes, qr /$_/;
-	}
-	close IN;
-}
-
-$ignore_unused = 1 if (@func_regexes);
+my $str;
 
 if ($only_i915) {
-	$filter_str = " non-i915 files";
-	$has_filter = 1;
+	# Please keep in sync with the documentation
+	push @src_exclude_regexes, "selftest";
+	push @src_regexes, "drm/i915";
+	push @src_regexes, "drm/ttm";
+	push @src_regexes, "drm/vgem";
 }
 
 if ($only_drm) {
+	# Please keep in sync with the documentation
+	push @src_exclude_regexes, "trace.*\.h";
+	push @src_exclude_regexes, "drm.*\.h";
+}
+
+$str = open_filter_file($func_filters, \@func_regexes, \@func_exclude_regexes);
+if ($str) {
 	$filter_str .= "," if ($filter_str ne "");
-	$filter_str .= " non-drm headers";
+	$filter_str .= " function regex ($str)";
 	$has_filter = 1;
 }
 
-if (@func_regexes) {
+$str = open_filter_file($src_filters, \@src_regexes, \@src_exclude_regexes);
+if ($str) {
 	$filter_str .= "," if ($filter_str ne "");
-	$filter_str .= " unmatched functions";
-	foreach my $r (@func_regexes) {
-		$filter_str .= " m/$r/";
-	}
-
+	$filter_str .= " source regex ($str)";
 	$has_filter = 1;
 }
 
-if (@src_regexes) {
-	$filter_str .= "," if ($filter_str ne "");
-	$filter_str .= " unmatched source files";
-	foreach my $r (@src_regexes) {
-		$filter_str .= " m/$r/";
-	}
-	$has_filter = 1;
-}
+$ignore_unused = 1 if (@func_regexes || @func_exclude_regexes);
 
 if ($ignore_unused) {
 	$filter_str .= "," if ($filter_str ne "");
-	$filter_str .= " source files where none of its code ran";
+	$filter_str .= " ignored source files where none of its code ran";
 	$has_filter = 1;
 }
 
@@ -594,7 +623,7 @@ if ($has_filter) {
 	my $percent = 100. * $used_files / $all_files;
 
 	$filter_str =~ s/(.*),/$1 and/;
-	printf "Ignored......:%s.\n", $filter_str;
+	printf "Filters......:%s.\n", $filter_str;
 	printf "Source files.: %.2f%% (%d of %d total)",
 		$percent, $used_files, $all_files;
 
@@ -699,16 +728,93 @@ Excluding files that match:
 
 =item B<--func-filters>  B<[filter's file]> or B<-f>  B<[filter's file]>
 
-Take into account only the code coverage for the functions that match
-the regular expressions contained at the B<[filter's file]>.
+Use a file containing regular expressions (regex) to filter functions.
 
-When this filter is used, B<--ignore-unused> will be automaticaly enabled,
-as the final goal is to report per-function usage, and not per-file.
+Each line at B<[filter's file]> may contain a new regex:
+
+=over 4
+
+- Blank lines and lines starting with B<#> will be ignored;
+
+- Each line of the file will be handled as a new regex;
+
+- If B<+regex> is used, the filter will include B<regex> to the matches;
+
+- If B<-regex> is used, the filter will exclude B<regex> from the matches;
+
+- If the line doesn't start with neither B<+> nor B<->, containing just
+  B<regex>, the filter will include B<regex> to the matches.
+
+- Any whitespace/tab before or after B<regex> will be ignored.
+
+=back
+
+When both include and exclude regexes are found, exclude regexes are
+applied first and any functions that don't match the include regular
+expressions from the B<[filter's file]> will be ignored.
+
+Please notice that, when this filter is used, B<--ignore-unused> will be
+automaticaly enabled, as the final goal is to report per-function usage.
+
+=item B<--include-func> B<regex>
+
+Include B<regex> to the function filter. Can be used multiple times.
+
+When used together with B<--func-filters>, regexes here are handled first.
+
+Please notice that, when this filter is used, B<--ignore-unused> will be
+automaticaly enabled, as the final goal is to report per-function usage.
+
+=item B<--exclude-func> B<regex>
+
+Include B<regex> to the function filter. Can be used multiple times.
+
+When used together with B<--func-filters>, regexes here are handled first.
+
+Please notice that, when this filter is used, B<--ignore-unused> will be
+automaticaly enabled, as the final goal is to report per-function usage.
 
 =item B<--source-filters>  B<[filter's file]> or B<-S>  B<[filter's file]>
 
-Takes into account only the code coverage for the source files that match
-the regular expressions contained at the B<[filter's file]>.
+Use a file containing regular expressions to filter source files.
+
+Each line of the file will be handled as a new regular expressions.
+Blank lines and lines starting with B<#> will be ignored.
+
+Each line at B<[filter's file]> may contain a new regex:
+
+=over 4
+
+- Blank lines and lines starting with B<#> will be ignored;
+
+- Each line of the file will be handled as a new regex;
+
+- If B<+regex> is used, the filter will include B<regex> to the matches;
+
+- If B<-regex> is used, the filter will exclude B<regex> from the matches;
+
+- If the line doesn't start with neither B<+> nor B<->, containing just
+  B<regex>, the filter will include B<regex> to the matches.
+
+- Any whitespace/tab before or after B<regex> will be ignored.
+
+=back
+
+When both include and exclude regexes are found, exclude regexes are
+applied first and any functions that don't match the include regular
+expressions from the B<[filter's file]> will be ignored.
+
+=item B<--include-src> B<regex>
+
+Include B<regex> to the sources filter. Can be used multiple times.
+
+When used together with B<--src-filters>, regexes here are handled first.
+
+=item B<--exclude-src> B<regex>
+
+Include B<regex> to the sources filter. Can be used multiple times.
+
+When used together with B<--src-filters>, regexes here are handled first.
 
 =item B<--ignore-unused> or B<--ignore_unused>
 
