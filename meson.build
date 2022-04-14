@@ -315,6 +315,7 @@ if libdrm_intel.found()
 endif
 subdir('overlay')
 subdir('man')
+subdir('scripts')
 
 gtk_doc = dependency('gtk-doc', required : build_docs)
 if build_tests and gtk_doc.found()
