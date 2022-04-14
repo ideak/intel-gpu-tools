@@ -403,6 +403,73 @@ static bool executable_file(const char *filename)
 	return !access(filename, X_OK);
 }
 
+static char *_dirname(const char *path)
+{
+	char *tmppath = strdup(path);
+	char *tmpname = dirname(tmppath);
+	tmpname = strdup(tmpname);
+	free(tmppath);
+	return tmpname;
+}
+
+static char *_basename(const char *path)
+{
+	char *tmppath = strdup(path);
+	char *tmpname = basename(tmppath);
+	tmpname = strdup(tmpname);
+	free(tmppath);
+	return tmpname;
+}
+
+char *absolute_path(char *path)
+{
+	char *result = NULL;
+	char *base, *dir;
+	char *ret;
+
+	result = realpath(path, NULL);
+	if (result != NULL)
+		return result;
+
+	dir = _dirname(path);
+	ret = absolute_path(dir);
+	free(dir);
+
+	base = _basename(path);
+	asprintf(&result, "%s/%s", ret, base);
+	free(base);
+	free(ret);
+
+	return result;
+}
+
+static char *bin_path(char *fname)
+{
+	char *path, *p;
+	char file[PATH_MAX];
+
+	if (strchr(fname, '/'))
+		return absolute_path(fname);
+
+	path = strdup(getenv("PATH"));
+	p = strtok(path, ":");
+	do {
+		if (*p) {
+			strcpy(file, p);
+			strcat(file, "/");
+			strcat(file, fname);
+			if (executable_file(file)) {
+				free(path);
+				return strdup(file);
+			}
+		}
+		p = strtok(NULL, ":");
+	} while (p);
+
+	free(path);
+	return strdup(fname);
+}
+
 static void print_version(void)
 {
 	struct utsname uts;
@@ -536,7 +603,7 @@ bool parse_options(int argc, char **argv,
 			settings->cov_results_per_test = true;
 			break;
 		case OPT_CODE_COV_SCRIPT:
-			settings->code_coverage_script = absolute_path(optarg);
+			settings->code_coverage_script = bin_path(optarg);
 			break;
 
 		case OPT_MULTIPLE:
@@ -701,46 +768,6 @@ bool validate_settings(struct settings *settings)
 	}
 
 	return true;
-}
-
-static char *_dirname(const char *path)
-{
-	char *tmppath = strdup(path);
-	char *tmpname = dirname(tmppath);
-	tmpname = strdup(tmpname);
-	free(tmppath);
-	return tmpname;
-}
-
-static char *_basename(const char *path)
-{
-	char *tmppath = strdup(path);
-	char *tmpname = basename(tmppath);
-	tmpname = strdup(tmpname);
-	free(tmppath);
-	return tmpname;
-}
-
-char *absolute_path(char *path)
-{
-	char *result = NULL;
-	char *base, *dir;
-	char *ret;
-
-	result = realpath(path, NULL);
-	if (result != NULL)
-		return result;
-
-	dir = _dirname(path);
-	ret = absolute_path(dir);
-	free(dir);
-
-	base = _basename(path);
-	asprintf(&result, "%s/%s", ret, base);
-	free(base);
-	free(ret);
-
-	return result;
 }
 
 static char settings_filename[] = "metadata.txt";
