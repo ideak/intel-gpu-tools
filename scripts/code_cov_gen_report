@@ -16,6 +16,8 @@ Usage:
     $(basename $0)
 	--read <file or dir> --kernel-source <dir> --kernel-object <dir>
 	--output-dir <dir> [--info or --tar] [--force-override]
+	[--print] [--stat] [--ignore-unused] [--only-i915] [--only-drm]
+	[--show-files] [--func-filters <file>] [--source-filters <file>]
 
 --kernel-object is only needed when Kernel was built with make O=dir
 "
@@ -28,6 +30,7 @@ KSRC=
 KOBJ=
 DEST_DIR=
 FORCE=
+PARSE_ARGS=
 
 while [ "$1" != "" ]; do
 	case $1 in
@@ -66,6 +69,17 @@ while [ "$1" != "" ]; do
 			usage 1
 		else
 			RESULTS=$(realpath $2)
+			shift
+		fi
+		;;
+	--print|--stat|--ignore-unused|--only-i915|--only-drm|--show-files)
+		PARSE_ARGS="$PARSE_ARGS $1"
+		;;
+	--func-filters|--source-filters)
+		if [ "$2" == "" ]; then
+			usage 1
+		else
+			PARSE_ARGS="$PARSE_ARGS $1 $2"
 			shift
 		fi
 		;;
@@ -164,6 +178,11 @@ else
 		TITLE=$(basename $RESULTS)
 		TITLE=${TITLE/.info/}
 	fi
+fi
+
+if [ "x$PARSE_ARGS" != "x" ]; then
+	${SCRIPT_DIR}/$PARSE_INFO $PARSE_ARGS --output filtered_${TITLE}.info ${TITLE}.info
+	TITLE=filtered_${TITLE}
 fi
 
 echo "Generating HTML files..."
