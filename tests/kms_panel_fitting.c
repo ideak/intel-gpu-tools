@@ -242,6 +242,7 @@ static void test_atomic_fastset(data_t *data)
 	int valid_tests = 0;
 	struct stat sb;
 
+	igt_require_f(is_i915_device(display->drm_fd), "not valid for non-i915 devices\n");
 
 	if (is_i915_device(display->drm_fd)) {
 		/* Until this is force enabled, force modeset evasion. */
