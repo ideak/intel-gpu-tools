@@ -107,8 +107,13 @@ static void test_panel_fitting(data_t *d)
 				      DRM_FORMAT_MOD_LINEAR, &d->fb2);
 
 		/* Set up display to enable panel fitting */
-		mode->hdisplay = 640;
-		mode->vdisplay = 480;
+		if (is_amdgpu_device(display->drm_fd)) {
+			mode->hdisplay = 800;
+			mode->vdisplay = 600;
+		} else {
+			mode->hdisplay = 640;
+			mode->vdisplay = 480;
+		}
 		d->plane1 = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 		prepare_crtc(d, output, pipe, d->plane1, mode, COMMIT_LEGACY);
 
