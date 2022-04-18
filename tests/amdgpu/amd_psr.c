@@ -54,6 +54,7 @@ typedef struct data {
 	igt_output_t *output;
 	igt_pipe_t *pipe;
 	igt_pipe_crc_t *pipe_crc;
+	igt_fb_t ov_fb[2];
 	drmModeModeInfo *mode;
 	enum pipe pipe_id;
 	int fd;
@@ -75,6 +76,7 @@ static void draw_color_alpha(igt_fb_t *fb, int x, int y, int w, int h,
 
 	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
 	igt_paint_color_alpha(cr, x, y, w, h, r, g, b, a);
+	cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
 
 	igt_put_cairo_ctx(cr);
 }
@@ -308,6 +310,124 @@ static void run_check_psr_su_mpo(data_t *data)
 	test_fini(data);
 }
 
+static void panning_rect_fb(data_t *data, igt_fb_t *rect_fb, int rect_w, int rect_h, int curr_x, int curr_y)
+{
+	int ret;
+
+	/* set new position for primary plane */
+	igt_plane_set_position(data->primary, curr_x, curr_y);
+	igt_plane_set_size(data->primary, rect_w, rect_h);
+
+	/* fill in entire overlay planes w/ different colors and set opaque */
+	draw_color_alpha(&data->ov_fb[0], 0, 0, data->w, data->h, 1.0, 1.0, 1.0, 1.0); /* white overlay */
+	draw_color_alpha(&data->ov_fb[1], 0, 0, data->w, data->h, .0, 1.0, .0, 1.0);   /* greeen overlay */
+
+	/* update alpha region in overlay w/ size of primary plane and set transparent */
+	draw_color_alpha(&data->ov_fb[0], curr_x, curr_y, rect_w, rect_h, 1.0, 1.0, 1.0, .0);
+	draw_color_alpha(&data->ov_fb[1], curr_x, curr_y, rect_w, rect_h, .0, 1.0, .0, .0);
+
+	/* flip overlay for couple of frames */
+	igt_info("\n  primary at (%d, %d) of size (%d, %d), flipping overlay ...\n", curr_x, curr_y, rect_w, rect_h);
+	for (int i = 0; i < N_FLIPS; ++i) {
+		/* do flip overlay */
+		igt_plane_set_fb(data->overlay, &data->ov_fb[i % 2]);
+		igt_plane_set_fb(data->primary, rect_fb);
+		igt_plane_set_size(data->primary, rect_w, rect_h);
+		igt_output_set_pipe(data->output, data->pipe_id);
+
+		ret = igt_display_try_commit_atomic(&data->display, DRM_MODE_PAGE_FLIP_EVENT, NULL);
+		igt_require(ret == 0);
+		kmstest_wait_for_pageflip(data->fd);
+	}
+}
+
+static void run_check_psr_su_ffu(data_t *data)
+{
+	int edp_idx = check_conn_type(data, DRM_MODE_CONNECTOR_eDP);
+	bool sink_support_psrsu = false;
+	bool drv_suport_psrsu = false;
+	igt_fb_t rect_fb; 	// rectangle fbs for primary
+	igt_fb_t ref_fb;	// reference fb
+	int pb_w, pb_h;
+
+	/* skip the test run if no eDP sink detected */
+	igt_skip_on_f(edp_idx == -1, "no eDP connector found\n");
+
+	/* init */
+	test_init(data);
+	pb_w = data->w / 2;
+	pb_h = data->h / 2;
+
+	/* run the test i.i.f. eDP panel supports and kernel driver both support PSR-SU  */
+	igt_skip_on(!igt_amd_output_has_psr_cap(data->fd, data->output->name));
+	igt_skip_on(!igt_amd_output_has_psr_state(data->fd, data->output->name));
+	sink_support_psrsu = igt_amd_psr_support_sink(data->fd, data->output->name, PSR_MODE_2);
+	igt_skip_on_f(!sink_support_psrsu, "output %s not support PSR-SU\n", data->output->name);
+	drv_suport_psrsu = igt_amd_psr_support_drv(data->fd, data->output->name, PSR_MODE_2);
+	igt_skip_on_f(!drv_suport_psrsu, "kernel driver not support PSR-SU\n");
+
+	/* reference background pattern in grey */
+	igt_create_color_fb(data->fd, data->w, data->h, DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR,
+			    .5, .5, .5, &ref_fb);
+	igt_plane_set_fb(data->primary, &ref_fb);
+	igt_output_set_pipe(data->output, data->pipe_id);
+	igt_display_commit_atomic(&data->display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
+
+	/*
+	 * overlay and primary fbs creation
+	 * for full frame update (FFU) test case, we don't change primary FB content but to change
+	 * the position of primary FB (panning) and update the overlay plane alpha region.
+	 * Any overlay change is expected to be regarded as FFU from KMD's perspective.
+	 *
+	 * 1. create two overlay FBs of full screen size and different colors and
+	 *    one primary FB of quarter screen size
+	 * 2. panning the primary plane to top-left and flip for couple of frames
+	 * 3. wait for couple of seconds to allow visual confirm
+	 * 4. panning the primary plane from top-left to middle of screen
+	 * 5. repeat step 3
+	 * 6. panning the primary plane from middle to bottom-right of screen
+	 * 7. repeat step 3
+	 *
+	 * Note:
+	 * Ideally we only want 0.0 alpha over the primary plane region, with the
+	 * rest as solid (1.0) alpha:
+	 * +----------------------------+
+	 * | +-------------+            |
+	 * | |             |            |
+	 * | |  Primary    |		|
+	 * | |  (alpha=0.0)|            |
+	 * | +-------------+            |
+	 * |                Overlay     |
+	 * |              (alpha=1.0)   |
+	 * +----------------------------+
+	 */
+
+	/* step 1 */
+	igt_create_fb(data->fd, data->w, data->h, DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_LINEAR, &data->ov_fb[0]);
+	igt_create_fb(data->fd, data->w, data->h, DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_LINEAR, &data->ov_fb[1]);
+	igt_create_color_fb(data->fd, pb_w, pb_h, DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR,
+			    1.0, .0, 1.0, &rect_fb); /* magenta primary */
+
+	/* step 2 & 3 */
+	panning_rect_fb(data, &rect_fb, pb_w, pb_h, 0, 0);
+	sleep(5);
+
+	/* step 4 & 5 */
+	panning_rect_fb(data, &rect_fb, pb_w, pb_h, pb_w / 2, pb_h / 2);
+	sleep(5);
+
+	/* step 6 & 7 */
+	panning_rect_fb(data, &rect_fb, pb_w, pb_h, pb_w, pb_h);
+	sleep(5);
+
+	/* fini */
+	igt_remove_fb(data->fd, &ref_fb);
+	igt_remove_fb(data->fd, &data->ov_fb[0]);
+	igt_remove_fb(data->fd, &data->ov_fb[1]);
+	igt_remove_fb(data->fd, &rect_fb);
+	test_fini(data);
+}
+
 const char *help_str =
 "  --visual-confirm           PSR visual confirm debug option enable\n";
 
@@ -366,6 +486,10 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 	igt_describe("Test to validate PSR SU enablement with Visual Confirm "
 		     "and to imitate Multiplane Overlay video playback scenario");
 	igt_subtest("psr_su_mpo") run_check_psr_su_mpo(&data);
+
+	igt_describe("Test to validate PSR SU enablement with Visual Confirm "
+		     "and to validate Full Frame Update scenario");
+	igt_subtest("psr_su_ffu") run_check_psr_su_ffu(&data);
 
 	igt_fixture
 	{
