@@ -1003,6 +1003,16 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 static bool skip_plane(data_t *data, igt_plane_t *plane)
 {
 	int index = plane->index;
+	int i;
+
+	for (i = 0; i < plane->format_mod_count; i++) {
+		if (IS_AMD_FMT_MOD(plane->modifiers[i]) &&
+		    (AMD_FMT_MOD_GET(DCC, plane->modifiers[i]) ||
+		     AMD_FMT_MOD_GET(DCC_RETILE, plane->modifiers[i]))) {
+			igt_debug("Skipping planes with DCC or DCC_RETILE\n");
+			return true;
+		}
+	}
 
 	if (data->extended)
 		return false;
