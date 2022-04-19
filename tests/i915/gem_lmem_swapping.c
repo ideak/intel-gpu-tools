@@ -756,10 +756,29 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 		struct intel_execution_engine2 *e;
 		char *tmp;
 
+		/*
+		 * If the driver is already loaded, check that it has
+		 * lmem before unloading to prevent a needless
+		 * unload-load cycle on integrated platforms.
+		 */
+		if (igt_kmod_is_loaded("i915")) {
+			i915 = __drm_open_driver(DRIVER_INTEL);
+			igt_require_fd(i915);
+			igt_require_gem(i915);
+			igt_require(gem_has_lmem(i915));
+			close(i915);
+		}
+
 		igt_i915_driver_unload();
 		igt_assert_eq(igt_i915_driver_load("lmem_size=4096"), 0);
 
 		i915 = __drm_open_driver(DRIVER_INTEL);
+		igt_require_fd(i915);
+		/*
+		 * Even if we did the lmem check above, do it again in
+		 * case the reload messed something up (as unlikely it
+		 * is)
+		 */
 		igt_require_gem(i915);
 		igt_require(gem_has_lmem(i915));
 
