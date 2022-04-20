@@ -28,8 +28,21 @@
 #include <stdbool.h>
 #include <stdarg.h>
 
+#define for_each_sysfs_gt_path(i915__, path__, pathlen__) \
+	for (int gt__ = 0; \
+	     igt_sysfs_gt_path(i915__, gt__, path__, pathlen__) != NULL; \
+	     gt__++)
+
+#define for_each_sysfs_gt_dirfd(i915__, dirfd__, gt__) \
+	for (gt__ = 0; \
+	     (dirfd__ = igt_sysfs_gt_open(i915__, gt__)) != -1; \
+	     close(dirfd__), gt__++)
+
 char *igt_sysfs_path(int device, char *path, int pathlen);
 int igt_sysfs_open(int device);
+char *igt_sysfs_gt_path(int device, int gt, char *path, int pathlen);
+int igt_sysfs_gt_open(int device, int gt);
+bool igt_sysfs_has_attr(int dir, const char *attr);
 
 int igt_sysfs_read(int dir, const char *attr, void *data, int len);
 int igt_sysfs_write(int dir, const char *attr, const void *data, int len);

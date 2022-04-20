@@ -55,6 +55,21 @@
  */
 
 /**
+ * igt_sysfs_has_attr:
+ * @dir: sysfs directory fd
+ * @attr: attr inside sysfs dir that needs to be checked for existence
+ *
+ * This checks if specified attr exists in device sysfs directory.
+ *
+ * Returns:
+ * true if attr exists in sysfs, false otherwise.
+ */
+bool igt_sysfs_has_attr(int dir, const char *attr)
+{
+	return !faccessat(dir, attr, F_OK, 0);
+}
+
+/**
  * igt_sysfs_path:
  * @device: fd of the device
  * @path: buffer to fill with the sysfs path to the device
@@ -99,6 +114,61 @@ int igt_sysfs_open(int device)
 	char path[80];
 
 	if (igt_debug_on(!igt_sysfs_path(device, path, sizeof(path))))
+		return -1;
+
+	return open(path, O_RDONLY);
+}
+
+/**
+ * igt_sysfs_gt_path:
+ * @device: fd of the device
+ * @gt: gt number
+ * @path: buffer to fill with the sysfs gt path to the device
+ * @pathlen: length of @path buffer
+ *
+ * This finds the sysfs directory corresponding to @device and @gt. If the gt
+ * specific directory is not available and gt is 0, path is filled with sysfs
+ * base directory.
+ *
+ * Returns:
+ * The directory path, or NULL on failure.
+ */
+char *igt_sysfs_gt_path(int device, int gt, char *path, int pathlen)
+{
+	struct stat st;
+
+	if (device < 0)
+		return NULL;
+
+	if (igt_debug_on(fstat(device, &st)) || igt_debug_on(!S_ISCHR(st.st_mode)))
+		return NULL;
+
+	snprintf(path, pathlen, "/sys/dev/char/%d:%d/gt/gt%d",
+		 major(st.st_rdev), minor(st.st_rdev), gt);
+
+	if (!access(path, F_OK))
+		return path;
+	if (!gt)
+		return igt_sysfs_path(device, path, pathlen);
+	return NULL;
+}
+
+/**
+ * igt_sysfs_gt_open:
+ * @device: fd of the device
+ * @gt: gt number
+ *
+ * This opens the sysfs gt directory corresponding to device and gt for use
+ * with igt_sysfs_set() and igt_sysfs_get().
+ *
+ * Returns:
+ * The directory fd, or -1 on failure.
+ */
+int igt_sysfs_gt_open(int device, int gt)
+{
+	char path[96];
+
+	if (igt_debug_on(!igt_sysfs_gt_path(device, gt, path, sizeof(path))))
 		return -1;
 
 	return open(path, O_RDONLY);
