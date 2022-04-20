@@ -54,6 +54,96 @@
  * provides basic support for like igt_sysfs_open().
  */
 
+enum {
+	GT,
+	RPS,
+
+	SYSFS_NUM_TYPES,
+};
+
+static const char *i915_attr_name[SYSFS_NUM_TYPES][SYSFS_NUM_ATTR] = {
+	{
+		"gt_act_freq_mhz",
+		"gt_cur_freq_mhz",
+		"gt_min_freq_mhz",
+		"gt_max_freq_mhz",
+		"gt_RP0_freq_mhz",
+		"gt_RP1_freq_mhz",
+		"gt_RPn_freq_mhz",
+		"gt_idle_freq_mhz",
+		"gt_boost_freq_mhz",
+		"power/rc6_enable",
+		"power/rc6_residency_ms",
+		"power/rc6p_residency_ms",
+		"power/rc6pp_residency_ms",
+		"power/media_rc6_residency_ms",
+	},
+	{
+		"rps_act_freq_mhz",
+		"rps_cur_freq_mhz",
+		"rps_min_freq_mhz",
+		"rps_max_freq_mhz",
+		"rps_RP0_freq_mhz",
+		"rps_RP1_freq_mhz",
+		"rps_RPn_freq_mhz",
+		"rps_idle_freq_mhz",
+		"rps_boost_freq_mhz",
+		"rc6_enable",
+		"rc6_residency_ms",
+		"rc6p_residency_ms",
+		"rc6pp_residency_ms",
+		"media_rc6_residency_ms",
+	},
+};
+
+/**
+ * igt_sysfs_dir_id_to_name:
+ * @dir: sysfs directory fd
+ * @id: sysfs attribute id
+ *
+ * Returns attribute name corresponding to attribute id in either the
+ * per-gt or legacy per-device sysfs
+ *
+ * Returns:
+ * Attribute name in sysfs
+ */
+const char *igt_sysfs_dir_id_to_name(int dir, enum i915_attr_id id)
+{
+	igt_assert((uint32_t)id < SYSFS_NUM_ATTR);
+
+	if (igt_sysfs_has_attr(dir, i915_attr_name[RPS][id]))
+		return i915_attr_name[RPS][id];
+	if (igt_sysfs_has_attr(dir, i915_attr_name[GT][id]))
+		return i915_attr_name[GT][id];
+
+	igt_assert_f(0, "attr_id not found %d\n", id);
+}
+
+/**
+ * igt_sysfs_path_id_to_name:
+ * @path: sysfs directory path
+ * @id: sysfs attribute id
+ *
+ * Returns attribute name corresponding to attribute id in either the
+ * per-gt or legacy per-device sysfs
+ *
+ * Returns:
+ * Attribute name in sysfs
+ */
+const char *igt_sysfs_path_id_to_name(const char *path, enum i915_attr_id id)
+{
+	int dir;
+	const char *name;
+
+	dir = open(path, O_RDONLY);
+	igt_assert(dir);
+
+	name = igt_sysfs_dir_id_to_name(dir, id);
+	close(dir);
+
+	return name;
+}
+
 /**
  * igt_sysfs_has_attr:
  * @dir: sysfs directory fd

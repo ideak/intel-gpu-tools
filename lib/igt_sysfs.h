@@ -38,11 +38,65 @@
 	     (dirfd__ = igt_sysfs_gt_open(i915__, gt__)) != -1; \
 	     close(dirfd__), gt__++)
 
+#define igt_sysfs_rps_write(dir, id, data, len) \
+	igt_sysfs_write(dir, igt_sysfs_dir_id_to_name(dir, id), data, len)
+
+#define igt_sysfs_rps_read(dir, id, data, len) \
+	igt_sysfs_read(dir, igt_sysfs_dir_id_to_name(dir, id), data, len)
+
+#define igt_sysfs_rps_set(dir, id, value) \
+	igt_sysfs_set(dir, igt_sysfs_dir_id_to_name(dir, id), value)
+
+#define igt_sysfs_rps_get(dir, id) \
+	igt_sysfs_get(dir, igt_sysfs_dir_id_to_name(dir, id))
+
+#define igt_sysfs_rps_scanf(dir, id, fmt, ...) \
+	igt_sysfs_scanf(dir, igt_sysfs_dir_id_to_name(dir, id), fmt, ##__VA_ARGS__)
+
+#define igt_sysfs_rps_vprintf(dir, id, fmt, ap) \
+	igt_sysfs_vprintf(dir, igt_sysfs_dir_id_to_name(id), fmt, ap)
+
+#define igt_sysfs_rps_printf(dir, id, fmt, ...) \
+	igt_sysfs_printf(dir, igt_sysfs_dir_id_to_name(dir, id), fmt, ##__VA_ARGS__)
+
+#define igt_sysfs_rps_get_u32(dir, id) \
+	igt_sysfs_get_u32(dir, igt_sysfs_dir_id_to_name(dir, id))
+
+#define igt_sysfs_rps_set_u32(dir, id, value) \
+	igt_sysfs_set_u32(dir, igt_sysfs_dir_id_to_name(dir, id), value)
+
+#define igt_sysfs_rps_get_boolean(dir, id) \
+	igt_sysfs_get_boolean(dir, igt_sysfs_dir_id_to_name(dir, id))
+
+#define igt_sysfs_rps_set_boolean(dir, id, value) \
+	igt_sysfs_set_boolean(dir, igt_sysfs_dir_id_to_name(dir, id), value)
+
+enum i915_attr_id {
+	RPS_ACT_FREQ_MHZ,
+	RPS_CUR_FREQ_MHZ,
+	RPS_MIN_FREQ_MHZ,
+	RPS_MAX_FREQ_MHZ,
+	RPS_RP0_FREQ_MHZ,
+	RPS_RP1_FREQ_MHZ,
+	RPS_RPn_FREQ_MHZ,
+	RPS_IDLE_FREQ_MHZ,
+	RPS_BOOST_FREQ_MHZ,
+	RC6_ENABLE,
+	RC6_RESIDENCY_MS,
+	RC6P_RESIDENCY_MS,
+	RC6PP_RESIDENCY_MS,
+	MEDIA_RC6_RESIDENCY_MS,
+
+	SYSFS_NUM_ATTR,
+};
+
 char *igt_sysfs_path(int device, char *path, int pathlen);
 int igt_sysfs_open(int device);
 char *igt_sysfs_gt_path(int device, int gt, char *path, int pathlen);
 int igt_sysfs_gt_open(int device, int gt);
 bool igt_sysfs_has_attr(int dir, const char *attr);
+const char *igt_sysfs_dir_id_to_name(int dir, enum i915_attr_id id);
+const char *igt_sysfs_path_id_to_name(const char *path, enum i915_attr_id id);
 
 int igt_sysfs_read(int dir, const char *attr, void *data, int len);
 int igt_sysfs_write(int dir, const char *attr, const void *data, int len);
