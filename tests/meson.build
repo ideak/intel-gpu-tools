@@ -63,9 +63,6 @@ test_progs = [
 	'kms_vrr',
 	'kms_writeback',
 	'meta_test',
-	'msm_mapping',
-	'msm_recovery',
-	'msm_submit',
 	'panfrost_get_param',
 	'panfrost_gem_new',
 	'panfrost_prime',
@@ -253,6 +250,12 @@ i915_progs = [
 	'sysfs_timeslice_duration',
 ]
 
+msm_progs = [
+	'msm_mapping',
+	'msm_recovery',
+	'msm_submit'
+]
+
 test_deps = [ igt_deps ]
 
 if libdrm_nouveau.found()
@@ -291,6 +294,15 @@ foreach prog : i915_progs
 		   install_dir : libexecdir,
 		   install_rpath : libexecdir_rpathdir,
 		   install : true)
+	test_list += prog
+endforeach
+
+foreach prog : msm_progs
+	test_executables += executable(prog, join_paths('msm', prog + '.c'),
+				       dependencies : test_deps,
+				       install_dir : libexecdir,
+				       install_rpath : libexecdir_rpathdir,
+				       install : true)
 	test_list += prog
 endforeach
 
