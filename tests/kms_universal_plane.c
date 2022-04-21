@@ -154,8 +154,8 @@ functional_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 		else if (display->pipes[pipe].planes[i].type == DRM_PLANE_TYPE_CURSOR)
 			num_cursor++;
 
-	igt_assert_eq(num_primary, 1);
-	igt_assert_lte(num_cursor, 1);
+	igt_warn_on(num_primary != 1);
+	igt_warn_on(num_cursor > 1);
 
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	sprite = igt_output_get_plane_type(output, DRM_PLANE_TYPE_OVERLAY);
