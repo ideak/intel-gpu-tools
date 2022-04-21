@@ -576,6 +576,7 @@ static void test_evict(int i915,
 	if (flags & TEST_PARALLEL) {
 		int fd = gem_reopen_driver(i915);
 
+		intel_allocator_multiprocess_start();
 		ctx = intel_ctx_create_all_physical(fd);
 		__gem_context_set_persistence(fd, ctx->id, false);
 
@@ -586,6 +587,7 @@ static void test_evict(int i915,
 		igt_waitchildren();
 		intel_ctx_destroy(fd, ctx);
 		close(fd);
+		intel_allocator_multiprocess_stop();
 	} else {
 		__do_evict(i915, ctx, &region->region, &params, params.seed);
 	}
@@ -747,6 +749,7 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 		{ "verify-random-ccs", TEST_CCS | TEST_RANDOM },
 		{ "heavy-verify-random-ccs", TEST_CCS | TEST_RANDOM | TEST_HEAVY },
 		{ "heavy-verify-multi-ccs", TEST_CCS | TEST_RANDOM | TEST_HEAVY | TEST_ENGINES | TEST_MULTI },
+		{ "parallel-random-verify-ccs", TEST_PARALLEL | TEST_RANDOM | TEST_CCS },
 		{ }
 	};
 	const intel_ctx_t *ctx;
