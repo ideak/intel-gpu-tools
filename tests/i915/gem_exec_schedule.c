@@ -568,7 +568,7 @@ static void timeslice(int i915, const intel_ctx_cfg_t *cfg,
 		.buffers_ptr = to_user_pointer(&obj),
 		.buffer_count = 1,
 	};
-	const intel_ctx_t *ctx;
+	const intel_ctx_t *ctx[2];
 	uint32_t *result;
 	int out;
 
@@ -582,22 +582,25 @@ static void timeslice(int i915, const intel_ctx_cfg_t *cfg,
 	igt_require(gem_scheduler_has_timeslicing(i915));
 	igt_require(intel_gen(intel_get_drm_devid(i915)) >= 8);
 
+	ctx[0] = intel_ctx_create(i915, cfg);
 	obj.handle = timeslicing_batches(i915, &offset);
 	result = gem_mmap__device_coherent(i915, obj.handle, 0, 4096, PROT_READ);
 
 	execbuf.flags = engine | I915_EXEC_FENCE_OUT;
 	execbuf.batch_start_offset = 0;
+	execbuf.rsvd1 = ctx[0]->id;
 	gem_execbuf_wr(i915, &execbuf);
+	intel_ctx_destroy(i915, ctx[0]);
 
 	/* No coupling between requests; free to timeslice */
 
-	ctx = intel_ctx_create(i915, cfg);
-	execbuf.rsvd1 = ctx->id;
+	ctx[1] = intel_ctx_create(i915, cfg);
+	execbuf.rsvd1 = ctx[1]->id;
 	execbuf.rsvd2 >>= 32;
 	execbuf.flags = engine | I915_EXEC_FENCE_OUT;
 	execbuf.batch_start_offset = offset;
 	gem_execbuf_wr(i915, &execbuf);
-	intel_ctx_destroy(i915, ctx);
+	intel_ctx_destroy(i915, ctx[1]);
 
 	gem_sync(i915, obj.handle);
 	gem_close(i915, obj.handle);
