@@ -1065,7 +1065,7 @@ static void semaphore_resolve(int i915, const intel_ctx_cfg_t *cfg,
 	const struct intel_execution_engine2 *e;
 	const uint32_t SEMAPHORE_ADDR = 64 << 10;
 	uint32_t semaphore, *sema;
-	const intel_ctx_t *outer, *inner;
+	const intel_ctx_t *spin_ctx, *outer, *inner;
 	uint64_t ahnd = get_reloc_ahnd(i915, 0);
 
 	/*
@@ -1080,6 +1080,7 @@ static void semaphore_resolve(int i915, const intel_ctx_cfg_t *cfg,
 	igt_require(gem_scheduler_has_preemption(i915));
 	igt_require(intel_get_drm_devid(i915) >= 8); /* for MI_SEMAPHORE_WAIT */
 
+	spin_ctx = intel_ctx_create(i915, cfg);
 	outer = intel_ctx_create(i915, cfg);
 	inner = intel_ctx_create(i915, cfg);
 
@@ -1097,7 +1098,7 @@ static void semaphore_resolve(int i915, const intel_ctx_cfg_t *cfg,
 		if (!gem_class_can_store_dword(i915, e->class))
 			continue;
 
-		spin = __igt_spin_new(i915, .ahnd = ahnd,
+		spin = __igt_spin_new(i915, .ahnd = ahnd, .ctx = spin_ctx,
 				      .engine = e->flags, .flags = flags);
 		igt_spin_end(spin); /* we just want its address for later */
 		gem_sync(i915, spin->handle);
@@ -1190,6 +1191,7 @@ static void semaphore_resolve(int i915, const intel_ctx_cfg_t *cfg,
 
 	intel_ctx_destroy(i915, inner);
 	intel_ctx_destroy(i915, outer);
+	intel_ctx_destroy(i915, spin_ctx);
 	put_ahnd(ahnd);
 }
 
