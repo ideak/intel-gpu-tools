@@ -116,7 +116,13 @@ static const struct named_register {
 	{ "OACTXID", GEN8, RCS0, 0x2364 },
 	{ "PS_INVOCATION_COUNT_2", GEN8, RCS0, 0x2448, 2, .write_mask = ~0x3 },
 	{ "PS_DEPTH_COUNT_2", GEN8, RCS0, 0x2450, 2 },
-	{ "Cache_Mode_0", GEN7, RCS0, 0x7000, .masked = true },
+	{ "Cache_Mode_0", GEN7, RCS0, 0x7000, .masked = true,
+	  /*
+	   * bit8 is "Depth Relate Cache Pipelined Flush Disable",
+	   * set this to enable slow mode, and the test catches
+	   * "GPU hung" on DG2, so mask off to poison this bit.
+	   */
+	  .write_mask = ~0x100 },
 	{ "Cache_Mode_1", GEN7, RCS0, 0x7004, .masked = true },
 	{ "GT_MODE", GEN8, RCS0, 0x7008, .masked = true },
 	{ "L3_Config", GEN_RANGE(8, 11), RCS0, 0x7034 },
