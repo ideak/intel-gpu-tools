@@ -125,7 +125,6 @@ static void reset_device(int i915)
 		igt_info("Found wedged device, trying to reset and continue\n");
 		igt_sysfs_printf(dir, "i915_wedged", "%llu", -1ull);
 	}
-	igt_sysfs_set(dir, "i915_next_seqno", "1");
 
 	close(dir);
 }
