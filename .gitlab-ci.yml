@@ -193,39 +193,40 @@ test:ninja-test-minimal:
   stage: test
   script: meson test -C build --num-processes ${FDO_CI_CONCURRENT:-4}
 
-test:ninja-test-arm64:
-  tags:
-    - gstreamer
-  retry: 2
-  image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-arm64:commit-$CI_COMMIT_SHA
-  dependencies:
-    - build:tests-debian-meson-arm64
-  stage: test
-  script:
-    - export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig/
-    - env > build/envdump.txt
-    - meson test -C build --num-processes ${FDO_CI_CONCURRENT:-4}
-  artifacts:
-    paths:
-      - build
-    when: on_failure
-
-test:ninja-test-armhf:
-  tags:
-    - gstreamer
-  retry: 2
-  image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-armhf:commit-$CI_COMMIT_SHA
-  dependencies:
-    - build:tests-debian-meson-armhf
-  stage: test
-  script:
-    - export PKG_CONFIG_PATH=/usr/lib/arm-linux-gnueabihf/pkgconfig/
-    - env > build/envdump.txt
-    - meson test -C build --num-processes ${FDO_CI_CONCURRENT:-4}
-  artifacts:
-    paths:
-      - build
-    when: on_failure
+# arm testing temporarily disabled until converted to run on native arm HW
+# test:ninja-test-arm64:
+#   tags:
+#     - gstreamer
+#   retry: 2
+#   image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-arm64:commit-$CI_COMMIT_SHA
+#   dependencies:
+#     - build:tests-debian-meson-arm64
+#   stage: test
+#   script:
+#     - export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig/
+#     - env > build/envdump.txt
+#     - meson test -C build --num-processes ${FDO_CI_CONCURRENT:-4}
+#   artifacts:
+#     paths:
+#       - build
+#     when: on_failure
+#
+# test:ninja-test-armhf:
+#   tags:
+#     - gstreamer
+#   retry: 2
+#   image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-armhf:commit-$CI_COMMIT_SHA
+#   dependencies:
+#     - build:tests-debian-meson-armhf
+#   stage: test
+#   script:
+#     - export PKG_CONFIG_PATH=/usr/lib/arm-linux-gnueabihf/pkgconfig/
+#     - env > build/envdump.txt
+#     - meson test -C build --num-processes ${FDO_CI_CONCURRENT:-4}
+#   artifacts:
+#     paths:
+#       - build
+#     when: on_failure
 
 test:ninja-test-mips:
   tags:
