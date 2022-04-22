@@ -82,7 +82,8 @@ static void test_fini(data_t *data, enum pipe pipe, int n_planes,
 	}
 
 	/* reset the constraint on the pipe */
-	igt_output_set_pipe(output, PIPE_ANY);
+	igt_output_set_pipe(output, PIPE_NONE);
+	igt_display_commit2(&data->display, data->display.is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 
 	free(data->plane);
 	data->plane = NULL;
@@ -289,35 +290,28 @@ test_resolution_with_output(data_t *data, enum pipe pipe, int max_planes, igt_ou
 static void
 run_test(data_t *data, enum pipe pipe, igt_output_t *output)
 {
-	int connected_outs;
 	int n_planes = data->display.pipes[pipe].n_planes;
+	igt_display_reset(&data->display);
 
 	if (!opt.user_seed)
 		opt.seed = time(NULL);
 
-	connected_outs = 0;
-	for_each_valid_output_on_pipe(&data->display, pipe, output) {
-		igt_info("Testing resolution with connector %s using pipe %s with seed %d\n",
-			 igt_output_name(output), kmstest_pipe_name(pipe), opt.seed);
+	igt_info("Testing resolution with connector %s using pipe %s with seed %d\n",
+		 igt_output_name(output), kmstest_pipe_name(pipe), opt.seed);
 
-		srand(opt.seed);
+	srand(opt.seed);
 
-		test_init(data, pipe, n_planes, output);
+	test_init(data, pipe, n_planes, output);
 
-		igt_fork(child, 1) {
-			test_plane_position_with_output(data, pipe, n_planes, output);
-		}
-
-		test_resolution_with_output(data, pipe, n_planes, output);
-
-		igt_waitchildren();
-
-		test_fini(data, pipe, n_planes, output);
-
-		connected_outs++;
+	igt_fork(child, 1) {
+		test_plane_position_with_output(data, pipe, n_planes, output);
 	}
 
-	igt_skip_on(connected_outs == 0);
+	test_resolution_with_output(data, pipe, n_planes, output);
+
+	igt_waitchildren();
+
+	test_fini(data, pipe, n_planes, output);
 }
 
 static void
@@ -326,15 +320,10 @@ run_tests_for_pipe(data_t *data, enum pipe pipe)
 	igt_output_t *output;
 
 	igt_fixture {
-		int valid_tests = 0;
-
 		igt_require_pipe(&data->display, pipe);
 		igt_require(data->display.pipes[pipe].n_planes > 0);
 
-		for_each_valid_output_on_pipe(&data->display, pipe, output)
-			valid_tests++;
-
-		igt_require_f(valid_tests, "no valid crtc/connector combinations found\n");
+		igt_display_require_output(&data->display);
 	}
 
 	igt_describe("Test atomic mode setting concurrently with multiple planes and screen "
