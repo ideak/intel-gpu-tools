@@ -140,54 +140,45 @@ static void run_test(data_t *data, int fd, void (*testfunc)(data_t *, int, int))
 {
 	int nchildren =
 		data->flags & FORKED ? sysconf(_SC_NPROCESSORS_ONLN) : 1;
-	igt_display_t *display = &data->display;
-	igt_output_t *output;
-	enum pipe p;
-	unsigned int valid_tests = 0;
+	igt_output_t *output = data->output;
 
-	for_each_pipe_with_valid_output(display, p, output) {
-		data->pipe = p;
-		prepare_crtc(data, fd, output);
+	prepare_crtc(data, fd, output);
 
-		igt_info("Beginning %s on pipe %s, connector %s (%d threads)\n",
-			 igt_subtest_name(),
-			 kmstest_pipe_name(data->pipe),
-			 igt_output_name(output),
-			 nchildren);
+	igt_info("Beginning %s on pipe %s, connector %s (%d threads)\n",
+		 igt_subtest_name(),
+		 kmstest_pipe_name(data->pipe),
+		 igt_output_name(output),
+		 nchildren);
 
-		if (data->flags & BUSY) {
-			struct drm_crtc_queue_sequence cqs;
+	if (data->flags & BUSY) {
+		struct drm_crtc_queue_sequence cqs;
 
-			memset(&cqs, 0, sizeof(cqs));
-			cqs.crtc_id = data->crtc_id;
-			cqs.flags = DRM_CRTC_SEQUENCE_RELATIVE;
-			cqs.sequence = 120 + 12;
-			igt_assert_eq(crtc_queue_sequence(fd, &cqs), 0);
-		}
-
-		igt_fork(child, nchildren)
-			testfunc(data, fd, nchildren);
-		igt_waitchildren();
-
-		if (data->flags & BUSY) {
-			struct drm_event_vblank buf;
-			igt_assert_eq(read(fd, &buf, sizeof(buf)), sizeof(buf));
-		}
-
-		igt_assert(poll(&(struct pollfd){fd, POLLIN}, 1, 0) == 0);
-
-		igt_info("\n%s on pipe %s, connector %s: PASSED\n\n",
-			 igt_subtest_name(),
-			 kmstest_pipe_name(data->pipe),
-			 igt_output_name(output));
-
-		/* cleanup what prepare_crtc() has done */
-		cleanup_crtc(data, fd, output);
-		valid_tests++;
+		memset(&cqs, 0, sizeof(cqs));
+		cqs.crtc_id = data->crtc_id;
+		cqs.flags = DRM_CRTC_SEQUENCE_RELATIVE;
+		cqs.sequence = 120 + 12;
+		igt_assert_eq(crtc_queue_sequence(fd, &cqs), 0);
 	}
 
-	igt_require_f(valid_tests,
-		      "no valid crtc/connector combinations found\n");
+	igt_fork(child, nchildren)
+	testfunc(data, fd, nchildren);
+	igt_waitchildren();
+
+	if (data->flags & BUSY) {
+		struct drm_event_vblank buf;
+
+		igt_assert_eq(read(fd, &buf, sizeof(buf)), sizeof(buf));
+	}
+
+	igt_assert(poll(&(struct pollfd){fd, POLLIN}, 1, 0) == 0);
+
+	igt_info("\n%s on pipe %s, connector %s: PASSED\n\n",
+		 igt_subtest_name(),
+		 kmstest_pipe_name(data->pipe),
+		 igt_output_name(output));
+
+	/* cleanup what prepare_crtc() has done */
+	cleanup_crtc(data, fd, output);
 }
 
 static void sequence_get(data_t *data, int fd, int nchildren)
@@ -255,6 +246,8 @@ static void sequence_queue(data_t *data, int fd, int nchildren)
 igt_main
 {
 	int fd;
+	igt_output_t *output;
+	enum pipe p;
 	data_t data;
 	const struct {
 		const char *name;
@@ -280,6 +273,7 @@ igt_main
 		fd = drm_open_driver_master(DRIVER_ANY);
 		kmstest_set_vt_graphics_mode();
 		igt_display_require(&data.display, fd);
+		igt_display_require_output(&data.display);
 	}
 
 	for (f = funcs; f->name; f++) {
@@ -289,9 +283,15 @@ igt_main
 
 			igt_describe("This is a test of drmCrtcGetSequence and "
 				     "drmCrtcQueueSequence");
-			igt_subtest_f("%s-%s", f->name, m->name) {
-				data.flags = m->flags;
-				run_test(&data, fd, f->func);
+			igt_subtest_with_dynamic_f("%s-%s", f->name, m->name) {
+				for_each_pipe_with_valid_output(&data.display, p, output) {
+					igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(p)) {
+						data.pipe = p;
+						data.output = output;
+						data.flags = m->flags;
+						run_test(&data, fd, f->func);
+					}
+				}
 			}
 		}
 	}
