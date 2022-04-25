@@ -232,6 +232,7 @@ igt_main
 		bops = buf_ops_create(fd);
 	}
 
+	igt_describe("Check for proper synchronization of untiled->tiled transition.");
 	igt_subtest("untiled-to-tiled") {
 		tiling = I915_TILING_NONE;
 		tiling_after = I915_TILING_X;
@@ -240,6 +241,7 @@ igt_main
 		igt_assert(tiling_after == I915_TILING_X);
 	}
 
+	igt_describe("Check for proper synchronization of tiled->untiled transition.");
 	igt_subtest("tiled-to-untiled") {
 		tiling = I915_TILING_X;
 		tiling_after = I915_TILING_NONE;
@@ -248,6 +250,7 @@ igt_main
 		igt_assert(tiling_after == I915_TILING_NONE);
 	}
 
+	igt_describe("Check for proper synchronization of tiled->tiled transition.");
 	igt_subtest("tiled-to-tiled") {
 		tiling = I915_TILING_X;
 		tiling_after = I915_TILING_X;
