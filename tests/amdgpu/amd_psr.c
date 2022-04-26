@@ -81,6 +81,53 @@ static void draw_color_alpha(igt_fb_t *fb, int x, int y, int w, int h,
 	igt_put_cairo_ctx(cr);
 }
 
+/* draw a cursor pattern assuming the FB given is square w/ FORMAT ARGB */
+static void draw_color_cursor(igt_fb_t *fb, int size, double r, double g, double b)
+{
+	cairo_t *cr = igt_get_cairo_ctx(fb->fd, fb);
+	int x, y, line_w;
+
+	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+
+	/*
+	 * draw cursor
+	 * recall that alpha blending value:
+	 * - 0, output pixel is the background
+	 * - 1, output pixel is simply the foreground
+	 * - (0, 1), mix of background + foreground
+	 */
+
+	/* set cursor FB to background first */
+	igt_paint_color_alpha(cr, 0, 0, size, size, 1.0, 1.0, 1.0, .0);
+
+	/*
+	 * draw cursur pattern w/ alpha set to 1
+	 * - 1. draw triangle part
+	 * - 2. draw rectangle part
+	 */
+	for (x = y = 0, line_w = size / 2; line_w > 0; ++y, --line_w)
+		igt_paint_color_alpha(cr, x, y, line_w, 1, r, g, b, 1.0);
+
+	/*
+	 * draw rectangle part, split into three geometry parts
+	 * - triangle
+	 * - rhombus
+	 * - reversed triangle
+	 */
+	for (x = size * 3 / 8, y = size / 8, line_w = 1; y < size * 3 / 8; --x, ++y, line_w += 2)
+		igt_paint_color_alpha(cr, x, y, line_w, 1, r, g, b, 1.0);
+
+	for (x = size / 8, y = size * 3 / 8; y < size * 3 / 4; ++x, ++y)
+		igt_paint_color_alpha(cr, x, y, line_w, 1, r, g, b, 1.0);
+
+	for (; line_w > 0; ++x, ++y, line_w -= 2)
+		igt_paint_color_alpha(cr, x, y, line_w, 1, r, g, b, 1.0);
+
+	cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
+
+	igt_put_cairo_ctx(cr);
+}
+
 /* Common test setup. */
 static void test_init(data_t *data)
 {
