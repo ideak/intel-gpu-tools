@@ -63,6 +63,13 @@ typedef struct data {
 	int h;
 } data_t;
 
+enum cursor_move {
+	HORIZONTAL,
+	VERTICAL,
+	DIAGONAL,
+	INVALID
+};
+
 struct {
 	bool visual_confirm;
 } opt = {
@@ -290,9 +297,9 @@ static void run_check_psr(data_t *data, bool test_null_crtc) {
 static void run_check_psr_su_mpo(data_t *data)
 {
 	int edp_idx = check_conn_type(data, DRM_MODE_CONNECTOR_eDP);
-	igt_fb_t ov_fb;		// fb for overlay
-	igt_fb_t rect_fb[N_MPO_TEST_RECT_FB]; 	// rectangle fbs for primary, emulate as video playback region
-	igt_fb_t ref_fb;	// reference fb
+	igt_fb_t ov_fb;		/* fb for overlay */
+	igt_fb_t rect_fb[N_MPO_TEST_RECT_FB]; 	/* rectangle fbs for primary, emulate as video playback region */
+	igt_fb_t ref_fb;	/* reference fb */
 	igt_fb_t *flip_fb;
 	int ret;
 	const int run_sec = 5;
@@ -410,8 +417,8 @@ static void panning_rect_fb(data_t *data, igt_fb_t *rect_fb, int rect_w, int rec
 static void run_check_psr_su_ffu(data_t *data)
 {
 	int edp_idx = check_conn_type(data, DRM_MODE_CONNECTOR_eDP);
-	igt_fb_t rect_fb; 	// rectangle fbs for primary
-	igt_fb_t ref_fb;	// reference fb
+	igt_fb_t rect_fb; 	/* rectangle fbs for primary */
+	igt_fb_t ref_fb;	/* reference fb */
 	int pb_w, pb_h;
 
 	/* skip the test run if no eDP sink detected */
@@ -487,6 +494,101 @@ static void run_check_psr_su_ffu(data_t *data)
 	test_fini(data);
 }
 
+static void test_cursor_movement(data_t *data, int iters, igt_fb_t * pfb, int cs_size, enum cursor_move move_type)
+{
+	int i, pos_x, pos_y;
+	int ret;
+
+	/* incremental step == cursor size / 16 */
+	for (i = 0, pos_y = 0, pos_x = 0; i < iters; ++i) {
+		if (move_type == HORIZONTAL && (pos_x + cs_size > data->w))
+			pos_x = 0;
+		else if (move_type == VERTICAL && (pos_y + cs_size > data->h))
+			pos_y = 0;
+		else if (move_type == DIAGONAL && ((pos_y + cs_size > data->h) || (pos_x + cs_size > data->w)))
+			pos_x = pos_y = 0;
+
+		igt_plane_set_position(data->cursor, pos_x, pos_y);
+		igt_plane_set_fb(data->primary, pfb);
+
+		ret = igt_display_try_commit_atomic(&data->display, DRM_MODE_PAGE_FLIP_EVENT, NULL);
+		igt_require(ret == 0);
+		kmstest_wait_for_pageflip(data->fd);
+
+		/* update position */
+		if (move_type == HORIZONTAL)
+			pos_x += cs_size / 16;
+		else if (move_type == VERTICAL)
+			pos_y += cs_size / 16;
+		else if (move_type == DIAGONAL) {
+			pos_x += cs_size / 16;
+			pos_y += cs_size / 16;
+		}
+	}
+}
+
+static void run_check_psr_su_cursor(data_t *data)
+{
+	int edp_idx = check_conn_type(data, DRM_MODE_CONNECTOR_eDP);
+	igt_fb_t rect_fb;	/* primary FB */
+	igt_fb_t cs_fb;		/* cursor FB */
+	const int cs_size = 128;
+	const int delay_sec = 5; /* seconds */
+	int frame_rate = 0;
+	int pb_w, pb_h, ob_w, ob_h;
+
+	igt_skip_on_f(edp_idx == -1, "no eDP connector found\n");
+
+	test_init(data);
+	igt_skip_on(!psr_su_supported(data));
+
+	ob_w = data->w;
+	ob_h = data->h;
+	pb_w = data->w / 2;
+	pb_h = data->h / 2;
+	frame_rate = data->mode->vrefresh;
+
+	/* primary & overlay FB creation and set alpha region of overlay to show */
+	igt_create_color_fb(data->fd, pb_w, pb_h, DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR,
+			    .0, .0, 1.0, &rect_fb);
+	igt_create_color_fb(data->fd, ob_w, ob_h, DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_LINEAR,
+			    1.0, 1.0, 1.0, &data->ov_fb[0]);
+	draw_color_alpha(&data->ov_fb[0], 0, 0, pb_w, pb_h, 1.0, 1.0, 1.0, .0);
+
+	/* cursor FB creation, draw cursor pattern/set alpha regions */
+	igt_create_fb(data->fd, cs_size, cs_size, DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_LINEAR, &cs_fb);
+	draw_color_cursor(&cs_fb, cs_size, 1.0, .0, 1.0);
+
+	igt_plane_set_fb(data->primary, &rect_fb);
+	igt_plane_set_fb(data->overlay, &data->ov_fb[0]);
+	igt_plane_set_fb(data->cursor, &cs_fb);
+	igt_plane_set_position(data->cursor, 0, 0);
+
+	igt_output_set_pipe(data->output, data->pipe_id);
+	igt_display_commit_atomic(&data->display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
+
+	/*
+	 * test by setting different cursor position in screen
+	 * - horizontal movement
+	 * - vertial movement
+	 * - diagonal movement
+	 */
+
+	/* horizontal */
+	test_cursor_movement(data, frame_rate * delay_sec, &rect_fb, cs_size, HORIZONTAL);
+
+	/* vertical */
+	test_cursor_movement(data, frame_rate * delay_sec, &rect_fb, cs_size, VERTICAL);
+
+	/* diagonal */
+	test_cursor_movement(data, frame_rate * delay_sec, &rect_fb, cs_size, DIAGONAL);
+
+	igt_remove_fb(data->fd, &rect_fb);
+	igt_remove_fb(data->fd, &cs_fb);
+	igt_remove_fb(data->fd, &data->ov_fb[0]);
+	test_fini(data);
+}
+
 const char *help_str =
 "  --visual-confirm           PSR visual confirm debug option enable\n";
 
@@ -549,6 +651,10 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 	igt_describe("Test to validate PSR SU enablement with Visual Confirm "
 		     "and to validate Full Frame Update scenario");
 	igt_subtest("psr_su_ffu") run_check_psr_su_ffu(&data);
+
+	igt_describe("Test to validate PSR SU enablement with Visual Confirm "
+		     "and to validate cursor movement + static background scenario");
+	igt_subtest("psr_su_cursor") run_check_psr_su_cursor(&data);
 
 	igt_fixture
 	{
