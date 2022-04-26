@@ -66,7 +66,7 @@ typedef struct data {
 struct {
 	bool visual_confirm;
 } opt = {
-	.visual_confirm = true,	/* visual confirm debug option */
+	.visual_confirm = false,	/* visual confirm debug option */
 };
 
 static void draw_color_alpha(igt_fb_t *fb, int x, int y, int w, int h,
@@ -491,7 +491,7 @@ const char *help_str =
 "  --visual-confirm           PSR visual confirm debug option enable\n";
 
 struct option long_options[] = {
-	{"visual-confirm",	optional_argument, NULL, 'v'},
+	{"visual-confirm",	required_argument, NULL, 'v'},
 	{ 0, 0, 0, 0 }
 };
 
