@@ -429,19 +429,29 @@ igt_main
 	struct {
 		const char *name;
 		void (*fn)(void);
+		const char *describe;
 	} tests[] = {
-		{ "basic-with_one_bo", test_with_one_bo },
-		{ "basic-with_one_bo_two_files", test_with_one_bo_two_files },
-		{ "basic-with_two_bos", test_with_two_bos },
-		{ "basic-with_fd_dup", test_with_fd_dup },
-		{ "export-vs-gem_close-race", test_export_close_race },
-		{ "reimport-vs-gem_close-race", test_reimport_close_race },
-		{ "basic-llseek-size", test_llseek_size },
-		{ "basic-llseek-bad", test_llseek_bad },
+		{ "basic-with_one_bo", test_with_one_bo,
+			"Check prime import/export with one buffer object." },
+		{ "basic-with_one_bo_two_files", test_with_one_bo_two_files,
+			"Check prime/flink with one buffer object." },
+		{ "basic-with_two_bos", test_with_two_bos,
+			"Check prime import/export with two buffer objects."},
+		{ "basic-with_fd_dup", test_with_fd_dup,
+			"Check prime export with duplicate fd."},
+		{ "export-vs-gem_close-race", test_export_close_race,
+			"Check race of gem close against prime export." },
+		{ "reimport-vs-gem_close-race", test_reimport_close_race,
+			"Check race of gem close against reimport." },
+		{ "basic-llseek-size", test_llseek_size,
+			"Check dmabuf llseek support." },
+		{ "basic-llseek-bad", test_llseek_bad,
+			"Check dmabuf llseek support with invalid values."},
 	};
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(tests); i++) {
+		igt_describe(tests[i].describe);
 		igt_subtest(tests[i].name)
 			tests[i].fn();
 	}
