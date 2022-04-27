@@ -94,6 +94,7 @@ char *igt_sysfs_path(int device, char *path, int pathlen);
 int igt_sysfs_open(int device);
 char *igt_sysfs_gt_path(int device, int gt, char *path, int pathlen);
 int igt_sysfs_gt_open(int device, int gt);
+int igt_sysfs_get_num_gt(int device);
 bool igt_sysfs_has_attr(int dir, const char *attr);
 const char *igt_sysfs_dir_id_to_name(int dir, enum i915_attr_id id);
 const char *igt_sysfs_path_id_to_name(const char *path, enum i915_attr_id id);

@@ -265,6 +265,29 @@ int igt_sysfs_gt_open(int device, int gt)
 }
 
 /**
+ * igt_sysfs_get_num_gt:
+ * @device: fd of the device
+ *
+ * Reads number of GT sysfs entries.
+ * Asserts for atleast one GT entry.
+ * (see igt_sysfs_gt_path).
+ *
+ * Returns: Number of GTs.
+ */
+int igt_sysfs_get_num_gt(int device)
+{
+	int num_gts = 0;
+	char path[96];
+
+	while (igt_sysfs_gt_path(device, num_gts, path, sizeof(path)))
+		++num_gts;
+
+	igt_assert_f(num_gts > 0, "No GT sysfs entry is found.");
+
+	return num_gts;
+}
+
+/**
  * igt_sysfs_write:
  * @dir: directory for the device from igt_sysfs_open()
  * @attr: name of the sysfs node to open
