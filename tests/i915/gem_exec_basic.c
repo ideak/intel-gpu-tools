@@ -63,6 +63,8 @@ igt_main
 					    I915_DEVICE_MEMORY);
 	}
 
+	igt_describe("Check basic functionality of GEM_EXECBUFFER2 ioctl on every"
+		     " ring and iterating over memory regions.");
 	igt_subtest_with_dynamic("basic") {
 		for_each_combination(regions, 1, set) {
 			char *sub_name = memregion_dynamic_subtest_name(regions);
