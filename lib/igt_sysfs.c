@@ -203,7 +203,7 @@ int igt_sysfs_open(int device)
 {
 	char path[80];
 
-	if (igt_debug_on(!igt_sysfs_path(device, path, sizeof(path))))
+	if (!igt_sysfs_path(device, path, sizeof(path)))
 		return -1;
 
 	return open(path, O_RDONLY);
