@@ -1474,7 +1474,7 @@ static void pulseaudio_unload_module(proc_t *proc_info)
 		homedir = pw->pw_dir;
 		snprintf(xdg_dir, sizeof(xdg_dir), "/run/user/%d", proc_info->euid);
 
-		igt_info("Ask pulseaudio to stop using audio device\n");
+		igt_info("Request pulseaudio to stop using audio device\n");
 
 		setgid(proc_info->egid);
 		setuid(proc_info->euid);

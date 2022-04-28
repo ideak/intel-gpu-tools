@@ -400,16 +400,15 @@ int igt_audio_driver_unload(const char **who)
 
 	for (const char **m = sound; *m; m++) {
 		if (igt_kmod_is_loaded(*m)) {
+			if (who)
+				*who = *m;
 			if (igt_lsof_kill_audio_processes())
 				return EACCES;
 
 			kick_snd_hda_intel();
 			ret = igt_kmod_unload(*m, 0);
-			if (ret) {
-				if (who)
-					*who = *m;
+			if (ret)
 				return ret;
-			}
 		}
 	}
 	return 0;
