@@ -170,6 +170,16 @@ static void test_init(data_t *data)
 
 	data->w = data->mode->hdisplay;
 	data->h = data->mode->vdisplay;
+
+	if (opt.visual_confirm) {
+		/**
+		 * if visual confirm option is enabled, we'd trigger a full modeset before test run
+		 * to make PSR visual confirm enable take effect. DPMS off -> ON transition is one of
+		 * the approaches.
+		 */
+		kmstest_set_connector_dpms(data->fd, data->output->config.connector, DRM_MODE_DPMS_OFF);
+		kmstest_set_connector_dpms(data->fd, data->output->config.connector, DRM_MODE_DPMS_ON);
+	}
 }
 /* Common test cleanup. */
 static void test_fini(data_t *data)
