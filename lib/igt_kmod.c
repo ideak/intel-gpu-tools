@@ -408,18 +408,34 @@ static int igt_always_unload_audio_driver(char **who)
 		NULL,
 	};
 
+	/*
+	 * With old Kernels, the dependencies between audio and DRM drivers
+	 * are not shown. So, it may not be mandatory to remove the audio
+	 * driver before unload/unbind the DRM one. So, let's print warnings,
+	 * but return 0 on errors, as, if the dependency is mandatory, this
+	 * will be detected later when trying to unbind/unload the DRM driver.
+	 */
 	for (const char **m = sound; *m; m++) {
 		if (igt_kmod_is_loaded(*m)) {
 			if (who)
 				*who = strdup_realloc(*who, *m);
 
-			if (igt_lsof_kill_audio_processes())
-				return EACCES;
+			ret = igt_lsof_kill_audio_processes();
+			if (ret) {
+				igt_warn("Could not stop %d audio process(es)\n", ret);
+				igt_kmod_list_loaded();
+				igt_lsof("/dev/snd");
+				return 0;
+			}
 
 			kick_snd_hda_intel();
 			ret = igt_kmod_unload(*m, 0);
-			if (ret)
-				return ret;
+			if (ret) {
+				igt_warn("Could not unload audio driver %s\n", *m);
+				igt_kmod_list_loaded();
+				igt_lsof("/dev/snd");
+				return 0;
+			}
 		}
 	}
 	return 0;
@@ -610,6 +626,13 @@ int igt_audio_driver_unload(char **who)
 	}
 
 ret:
+	if (ret) {
+		igt_warn("Couldn't unload %s, which is using the %s driver\n",
+			 mod[pos].name, drm_driver);
+		igt_kmod_list_loaded();
+		igt_lsof("/dev/snd");
+	}
+
 	free_module_ref(mod, num_mod);
 
 	return ret;

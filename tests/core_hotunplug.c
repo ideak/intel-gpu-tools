@@ -149,11 +149,8 @@ static void driver_unbind(struct hotunplug *priv, const char *prefix,
 	 * unbind i915 driver, reloading it when binding again.
 	 */
 	if (igt_audio_driver_unload(&priv->snd_driver)) {
-		if (priv->snd_driver)
-			igt_warn("Could not unload audio driver %s\n", priv->snd_driver);
-		igt_kmod_list_loaded();
-		igt_lsof("/dev/snd");
-		igt_skip("Audio is in use, skipping\n");
+		igt_skip("Audio driver %s in use, skipping test\n",
+			 priv->snd_driver);
 	} else if (priv->snd_driver) {
 		igt_info("Unloaded audio driver %s\n", priv->snd_driver);
 	}
