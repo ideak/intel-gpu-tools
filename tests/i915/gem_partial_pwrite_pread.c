@@ -280,12 +280,18 @@ static void do_tests(data_t *data, int cache_level, const char *suffix)
 			gem_set_caching(data->drm_fd, scratch_buf->handle, cache_level);
 	}
 
+	igt_describe_f("Verify if pread is consistent while accessing partial cachelines "
+		       "with %s caching level", cache_level == -1 ? "default" : suffix+1);
 	igt_subtest_f("reads%s", suffix)
 		test_partial_reads(data);
 
+	igt_describe_f("Verify if pwrite is consistent while accessing partial cachelines "
+		       "with %s caching level", cache_level == -1 ? "default" : suffix+1);
 	igt_subtest_f("write%s", suffix)
 		test_partial_writes(data);
 
+	igt_describe_f("Verify if both pread, pwrite are consistent while accessing partial "
+		       "cachelines with %s caching level", cache_level == -1 ? "default" : suffix+1);
 	igt_subtest_f("writes-after-reads%s", suffix)
 		test_partial_read_writes(data);
 }
