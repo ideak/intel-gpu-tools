@@ -197,12 +197,17 @@ igt_main
 		gem_require_blitter(fd);
 	}
 
+	igt_describe("SNA behaviour is compressing batch buffer which leads to negative"
+		     " relocation deltas. Negative self-relocation happening with"
+		     " real offset 0.\n");
 	igt_subtest("negative-reloc")
 		negative_reloc(fd, 0);
 
+	igt_describe("Similar to previous test with flags for lut_based_execbuffer.");
 	igt_subtest("negative-reloc-lut")
 		negative_reloc(fd, USE_LUT);
 
+	igt_describe("Exercising blitter operation with negative reloc.\n");
 	igt_subtest("negative-reloc-bltcopy")
 		negative_reloc_blt(fd);
 
