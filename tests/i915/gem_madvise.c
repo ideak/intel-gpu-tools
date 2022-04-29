@@ -190,15 +190,23 @@ dontneed_before_exec(void)
 
 igt_main
 {
+	igt_describe("Check signal for Segmentation Fault and bus error before"
+		     " obtaining a purgeable object and calling for sighandler.");
 	igt_subtest("dontneed-before-mmap")
 		dontneed_before_mmap();
 
+	igt_describe("Check signal for Segmentation Fault and bus error after"
+		     " obtaining a purgeable object and calling for sighandler.");
 	igt_subtest("dontneed-after-mmap")
 		dontneed_after_mmap();
 
+	igt_describe("Check if PWRITE reports EFAULT when trying to use purged bo"
+		     " for write operation.");
 	igt_subtest("dontneed-before-pwrite")
 		dontneed_before_pwrite();
 
+	igt_describe("Check if EXECBUFFER2 reports EFAULT when trying to submit"
+		     " purged bo for GPU.");
 	igt_subtest("dontneed-before-exec")
 		dontneed_before_exec();
 }
