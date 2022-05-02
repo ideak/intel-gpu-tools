@@ -401,6 +401,7 @@ igt_i915_driver_load(const char *opts)
 
 static int igt_always_unload_audio_driver(char **who)
 {
+	int pipewire_pulse_pid;
 	int ret;
 	const char *sound[] = {
 		"snd_hda_intel",
@@ -420,7 +421,7 @@ static int igt_always_unload_audio_driver(char **who)
 			if (who)
 				*who = strdup_realloc(*who, *m);
 
-			ret = igt_lsof_kill_audio_processes();
+			ret = igt_lsof_kill_audio_processes(&pipewire_pulse_pid);
 			if (ret) {
 				igt_warn("Could not stop %d audio process(es)\n", ret);
 				igt_kmod_list_loaded();
@@ -428,8 +429,12 @@ static int igt_always_unload_audio_driver(char **who)
 				return 0;
 			}
 
+			ret = pipewire_pulse_start_reserve(pipewire_pulse_pid);
+			if (ret)
+				igt_warn("Failed to notify pipewire_pulse\n");
 			kick_snd_hda_intel();
 			ret = igt_kmod_unload(*m, 0);
+			pipewire_pulse_stop_reserve(pipewire_pulse_pid);
 			if (ret) {
 				igt_warn("Could not unload audio driver %s\n", *m);
 				igt_kmod_list_loaded();
@@ -574,6 +579,7 @@ int igt_audio_driver_unload(char **who)
 {
 	const char *drm_driver = "i915";
 	unsigned int num_mod, i, j;
+	int pipewire_pulse_pid = 0;
 	struct module_ref *mod;
 	int pos = -1;
 	int ret = 0;
@@ -617,12 +623,19 @@ int igt_audio_driver_unload(char **who)
 		 * first, in order to make it possible to unload the driver
 		 */
 		if (strstr(mod[pos].name, "snd")) {
-			if (igt_lsof_kill_audio_processes()) {
+			if (igt_lsof_kill_audio_processes(&pipewire_pulse_pid)) {
 				ret = EACCES;
 				goto ret;
 			}
 		}
+
+		ret = pipewire_pulse_start_reserve(pipewire_pulse_pid);
+		if (ret)
+			igt_warn("Failed to notify pipewire_pulse\n");
 		ret = igt_unload_driver(mod, num_mod, pos);
+		pipewire_pulse_stop_reserve(pipewire_pulse_pid);
+		if (ret)
+			break;
 	}
 
 ret:

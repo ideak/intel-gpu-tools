@@ -1487,12 +1487,120 @@ static void pulseaudio_unload_module(proc_t *proc_info)
 	igt_waitchildren();
 }
 
+static void pipewire_reserve_wait(int pipewire_pulse_pid)
+{
+	char xdg_dir[PATH_MAX];
+	const char *homedir;
+	struct passwd *pw;
+	proc_t *proc_info;
+	PROCTAB *proc;
+
+	igt_fork(child, 1) {
+		igt_info("Preventing pipewire-pulse to use the audio drivers\n");
+
+		proc = openproc(PROC_FILLCOM | PROC_FILLSTAT | PROC_FILLARG);
+		igt_assert(proc != NULL);
+
+		while ((proc_info = readproc(proc, NULL))) {
+			if (pipewire_pulse_pid == proc_info->tid)
+				break;
+			freeproc(proc_info);
+		}
+		closeproc(proc);
+
+		/* Sanity check: if it can't find the process, it means it has gone */
+		if (pipewire_pulse_pid != proc_info->tid)
+			exit(0);
+
+		pw = getpwuid(proc_info->euid);
+		homedir = pw->pw_dir;
+		snprintf(xdg_dir, sizeof(xdg_dir), "/run/user/%d", proc_info->euid);
+		setgid(proc_info->egid);
+		setuid(proc_info->euid);
+		clearenv();
+		setenv("HOME", homedir, 1);
+		setenv("XDG_RUNTIME_DIR",xdg_dir, 1);
+		freeproc(proc_info);
+
+		/*
+		 * pw-reserve will run in background. It will only exit when
+		 * igt_kill_children() is called later on. So, it shouldn't
+		 * call igt_waitchildren(). Instead, just exit with the return
+		 * code from pw-reserve.
+		 */
+		exit(system("pw-reserve -n Audio0 -r"));
+	}
+}
+
+static int pipewire_pw_reserve_pid = 0;
+
+/* Maximum time waiting for pw-reserve to start running */
+#define PIPEWIRE_RESERVE_MAX_TIME 1000 /* milisseconds */
+
+int pipewire_pulse_start_reserve(int pipewire_pulse_pid)
+{
+	bool is_pw_reserve_running = false;
+	proc_t *proc_info;
+	int attempts = 0;
+	PROCTAB *proc;
+
+	if (!pipewire_pulse_pid)
+		return 0;
+
+	pipewire_reserve_wait(pipewire_pulse_pid);
+
+	/*
+	 * Note: using pw-reserve to stop using audio only works with
+	 * pipewire version 0.3.50 or upper.
+	 */
+	for (attempts = 0; attempts < PIPEWIRE_RESERVE_MAX_TIME; attempts++) {
+		usleep(1000);
+		proc = openproc(PROC_FILLCOM | PROC_FILLSTAT | PROC_FILLARG);
+		igt_assert(proc != NULL);
+
+		while ((proc_info = readproc(proc, NULL))) {
+			if (!strcmp(proc_info->cmd, "pw-reserve")) {
+				is_pw_reserve_running = true;
+				pipewire_pw_reserve_pid = proc_info->tid;
+				freeproc(proc_info);
+				break;
+			}
+			freeproc(proc_info);
+		}
+		closeproc(proc);
+		if (is_pw_reserve_running)
+			break;
+	}
+	if (!is_pw_reserve_running) {
+		igt_warn("Failed to remove audio drivers from pipewire\n");
+		return 1;
+	}
+	/* Let's grant some time for pw_reserve to notify pipewire via D-BUS */
+	usleep(50000);
+
+	/*
+	 * pw-reserve is running, and should have stopped using the audio
+	 * drivers. We can now remove the driver.
+	 */
+
+	return 0;
+}
+
+void pipewire_pulse_stop_reserve(int pipewire_pulse_pid)
+{
+	if (!pipewire_pulse_pid)
+		return;
+
+	igt_kill_children(SIGTERM);
+}
+
 /**
  * __igt_lsof_audio_and_kill_proc() - check if a given process is using an
  *	audio device. If so, stop or prevent them to use such devices.
  *
  * @proc_info: process struct, as returned by readproc()
  * @proc_path: path of the process under procfs
+ * @pipewire_pulse_pid: PID of pipewire-pulse process
  *
  * No processes can be using an audio device by the time it gets removed.
  * This function checks if a process is using an audio device from /dev/snd.
@@ -1500,10 +1608,15 @@ static void pulseaudio_unload_module(proc_t *proc_info)
  * 	- if the process is pulseaudio, it can't be killed, as systemd will
  * 	  respawn it. So, instead, send a request for it to stop bind the
  * 	  audio devices.
+ *	- if the process is pipewire-pulse, it can't be killed, as systemd will
+ *	  respawn it. So, instead, the caller should call pw-reserve, remove
+ *	  the kernel driver and then stop pw-reserve. On such case, this
+ *	  function returns the PID of pipewire-pulse, but won't touch it.
  * If the check fails, it means that the process can simply be killed.
  */
 static int
-__igt_lsof_audio_and_kill_proc(proc_t *proc_info, char *proc_path)
+__igt_lsof_audio_and_kill_proc(proc_t *proc_info, char *proc_path,
+			       int *pipewire_pulse_pid)
 {
 	const char *audio_dev = "/dev/snd/";
 	char path[PATH_MAX * 2];
@@ -1512,8 +1625,43 @@ __igt_lsof_audio_and_kill_proc(proc_t *proc_info, char *proc_path)
 	char *fd_lnk;
 	int fail = 0;
 	ssize_t read;
+	DIR *dp;
 
-	DIR *dp = opendir(proc_path);
+	/*
+	 * Terminating pipewire-pulse require an special procedure, which
+	 * is only available at version 0.3.50 and upper. Just trying to
+	 * kill pipewire will start a race between IGT and systemd. If IGT
+	 * wins, the audio driver will be unloaded before systemd tries to
+	 * reload it, but if systemd wins, the audio device will be re-opened
+	 * and used before IGT has a chance to remove the audio driver.
+	 * Pipewire version 0.3.50 should bring a standard way:
+	 *
+	 * 1) start a thread running:
+	 *	 pw-reserve -n Audio0 -r
+	 * 2) unload/unbind the the audio driver(s);
+	 * 3) stop the pw-reserve thread.
+	 */
+	if (!strcmp(proc_info->cmd, "pipewire-pulse")) {
+		igt_info("process %d (%s) is using audio device. Should be requested to stop using them.\n",
+			 proc_info->tid, proc_info->cmd);
+		*pipewire_pulse_pid = proc_info->tid;
+		return 0;
+	}
+	/*
+	 * pipewire-pulse itself doesn't hook into a /dev/snd device. Instead,
+	 * the actual binding happens at the Pipewire Session Manager, e.g.
+	 * either wireplumber or pipewire media-session.
+	 *
+	 * Just killing such processes won't produce any effect, as systemd
+	 * will respawn them. So, just ignore here, they'll honor pw-reserve,
+	 * when the time comes.
+	 */
+	if (!strcmp(proc_info->cmd, "pipewire-media-session"))
+		return 0;
+	if (!strcmp(proc_info->cmd, "wireplumber"))
+		return 0;
+
+	dp = opendir(proc_path);
 	igt_assert(dp);
 
 	while ((d = readdir(dp))) {
@@ -1549,24 +1697,6 @@ __igt_lsof_audio_and_kill_proc(proc_t *proc_info, char *proc_path)
 			break;
 		}
 
-		/*
-		 * FIXME: terminating pipewire-pulse is not that easy, as
-		 * pipewire there's no standard way up to pipewire version
-		 * 0.3.49. Just trying to kill pipewire will start a race
-		 * between IGT and systemd. If IGT wins, the audio driver
-		 * will be unloaded before systemd tries to reload it, but
-		 * if systemd wins, the audio device will be re-opened and
-		 * used before IGT has a chance to remove the audio driver.
-		 * Pipewire version 0.3.50 should bring a standard way:
-		 *
-		 * 1) start a thread running:
-		 *	 pw-reserve -n Audio0 -r
-		 * 2) unload/unbind the the audio driver(s);
-		 * 3) stop the pw-reserve thread.
-		 *
-		 * We should add support for it once distros start shipping it.
-		 */
-
 		/* For all other processes, just kill them */
 		igt_info("process %d (%s) is using audio device. Should be terminated.\n",
 				proc_info->tid, proc_info->cmd);
@@ -1596,7 +1726,7 @@ __igt_lsof_audio_and_kill_proc(proc_t *proc_info, char *proc_path)
  * daemons are respanned if they got killed.
  */
 int
-igt_lsof_kill_audio_processes(void)
+igt_lsof_kill_audio_processes(int *pipewire_pulse_pid)
 {
 	char path[PATH_MAX];
 	proc_t *proc_info;
@@ -1605,12 +1735,13 @@ igt_lsof_kill_audio_processes(void)
 
 	proc = openproc(PROC_FILLCOM | PROC_FILLSTAT | PROC_FILLARG);
 	igt_assert(proc != NULL);
+	*pipewire_pulse_pid = 0;
 
 	while ((proc_info = readproc(proc, NULL))) {
 		if (snprintf(path, sizeof(path), "/proc/%d/fd", proc_info->tid) < 1)
 			fail++;
 		else
-			fail += __igt_lsof_audio_and_kill_proc(proc_info, path);
+			fail += __igt_lsof_audio_and_kill_proc(proc_info, path, pipewire_pulse_pid);
 
 		freeproc(proc_info);
 	}

@@ -325,7 +325,9 @@ bool igt_allow_unlimited_files(void);
 int igt_is_process_running(const char *comm);
 int igt_terminate_process(int sig, const char *comm);
 void igt_lsof(const char *dpath);
-int igt_lsof_kill_audio_processes(void);
+int igt_lsof_kill_audio_processes(int *pipewire_pulse_pid);
+int pipewire_pulse_start_reserve(int pipewire_pulse_pid);
+void pipewire_pulse_stop_reserve(int pipewire_pulse_pid);
 
 #define igt_hweight(x) \
 	__builtin_choose_expr(sizeof(x) == 8, \
