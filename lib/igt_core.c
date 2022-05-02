@@ -2028,11 +2028,11 @@ void __igt_fail_assert(const char *domain, const char *file, const int line,
 	igt_fail(IGT_EXIT_FAILURE);
 }
 
-static void kill_children(void)
+void igt_kill_children(int signal)
 {
 	for (int c = 0; c < num_test_children; c++) {
 		if (test_children[c] > 0)
-			kill(test_children[c], SIGKILL);
+			kill(test_children[c], signal);
 	}
 }
 
@@ -2060,7 +2060,7 @@ void __igt_abort(const char *domain, const char *file, const int line,
 	}
 
 	/* just try our best, we are aborting the execution anyway */
-	kill_children();
+	igt_kill_children(SIGKILL);
 
 	print_backtrace();
 
@@ -2124,7 +2124,7 @@ void igt_exit(void)
 			 command_str, igt_exitcode);
 	igt_debug("Exiting with status code %d\n", igt_exitcode);
 
-	kill_children();
+	igt_kill_children(SIGKILL);
 	assert(!num_test_children);
 
 	assert(waitpid(-1, &tmp, WNOHANG) == -1 && errno == ECHILD);
@@ -2390,7 +2390,7 @@ int __igt_waitchildren(void)
 				err = 256;
 			}
 
-			kill_children();
+			igt_kill_children(SIGKILL);
 		}
 
 		count++;
@@ -2424,7 +2424,7 @@ static void igt_alarm_killchildren(int signal)
 {
 	igt_info("Timed out waiting for children\n");
 
-	kill_children();
+	igt_kill_children(SIGKILL);
 }
 
 /**

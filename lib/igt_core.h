@@ -1103,6 +1103,7 @@ bool __igt_fork(void);
 int __igt_waitchildren(void);
 void igt_waitchildren(void);
 void igt_waitchildren_timeout(int seconds, const char *reason);
+void igt_kill_children(int signal);
 
 /**
  * igt_helper_process:
