@@ -21,6 +21,7 @@
  *
  */
 #include "igt.h"
+#include "igt_amd.h"
 
 /*
  * internal use
@@ -314,6 +315,14 @@ static void bypass_8bpc_test(data_t *data)
 	enum pattern ptn;
 
 	test_init(data);
+
+	/**
+	 * 8bpc bypass only makes sense without DSC.
+	 * DSC is visually lossless but actually still loss exists and any bypass mode
+	 * cannot be run w/ DSC enabled.
+	 */
+	igt_skip_on_f(igt_amd_read_dsc_clock_status(data->drm_fd, data->output->name) == 1,
+		      "DSC enabled on %s and no sense to validate bypass mode\n", data->output->name);
 
 	igt_create_fb(data->drm_fd, data->width, data->height,
 		      DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, &fb);
