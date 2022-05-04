@@ -147,7 +147,8 @@ igt_main
 
 		igt_require_gem(data.fd);
 		gem_require_blitter(data.fd);
-		gem_require_caching(data.fd);
+		if (!gem_has_lmem(data.fd))
+			gem_require_caching(data.fd);
 
 		data.devid = intel_get_drm_devid(data.fd);
 		if (IS_GEN2(data.devid)) /* chipset only handles cached -> uncached */
@@ -162,7 +163,8 @@ igt_main
 		scratch_buf = intel_buf_create(data.bops, BO_SIZE/4, 1,
 					       32, 0, I915_TILING_NONE, 0);
 
-		gem_set_caching(data.fd, scratch_buf->handle, 1);
+		if (!gem_has_lmem(data.fd))
+			gem_set_caching(data.fd, scratch_buf->handle, 1);
 
 		staging_buf = intel_buf_create(data.bops, BO_SIZE/4, 1,
 					       32, 0, I915_TILING_NONE, 0);
