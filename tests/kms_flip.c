@@ -1537,8 +1537,11 @@ static int run_test(int duration, int flags)
 	}
 
 	igt_require(modes);
-	duration = duration * 1000 / modes;
-	duration = max(500, duration);
+
+	if (duration) {
+		duration = duration * 1000 / modes;
+		duration = max(500, duration);
+	}
 
 	/* Find any connected displays */
 	for (i = 0; i < resources->count_connectors; i++) {
@@ -1605,8 +1608,11 @@ static int run_pair(int duration, int flags)
 	/* If we have fewer than 2 connected outputs then we won't have any
 	 * configuration at all. So skip in that case. */
 	igt_require_f(modes, "At least two displays required\n");
-	duration = duration * 1000 / modes;
-	duration = max(duration, 500);
+
+	if (duration) {
+		duration = duration * 1000 / modes;
+		duration = max(duration, 500);
+	}
 
 	/* Find a pair of connected displays */
 	for (i = 0; i < resources->count_connectors; i++) {
