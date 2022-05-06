@@ -95,44 +95,6 @@ static void test_cycle_flags(data_t *data, uint32_t test_flags)
 					      SUSPEND_TEST_NONE);
 }
 
-/* Returns the current and maximum bpc from the connector debugfs. */
-static output_bpc_t get_output_bpc(data_t *data)
-{
-	char buf[256];
-	char *start_loc;
-	int fd, res;
-	output_bpc_t info;
-
-	fd = igt_debugfs_connector_dir(data->fd, data->output->name, O_RDONLY);
-	igt_assert(fd >= 0);
-
-	res = igt_debugfs_simple_read(fd, "output_bpc", buf, sizeof(buf));
-
-	igt_require(res > 0);
-
-	close(fd);
-
-	igt_assert(start_loc = strstr(buf, "Current: "));
-	igt_assert_eq(sscanf(start_loc, "Current: %u", &info.current), 1);
-
-	igt_assert(start_loc = strstr(buf, "Maximum: "));
-	igt_assert_eq(sscanf(start_loc, "Maximum: %u", &info.maximum), 1);
-
-	return info;
-}
-
-/* Verifies that connector has the correct output bpc. */
-static void assert_output_bpc(data_t *data, unsigned int bpc)
-{
-	output_bpc_t info = get_output_bpc(data);
-
-	igt_require_f(info.maximum >= bpc,
-		      "Monitor doesn't support %u bpc, max is %u\n", bpc,
-		      info.maximum);
-
-	igt_assert_eq(info.current, bpc);
-}
-
 /* Fills the FB with a test HDR pattern. */
 static void draw_hdr_pattern(igt_fb_t *fb)
 {
@@ -204,12 +166,7 @@ static void test_bpc_switch_on_output(data_t *data, enum pipe pipe,
 	/* Start in 8bpc. */
 	igt_output_set_prop_value(data->output, IGT_CONNECTOR_MAX_BPC, 8);
 	igt_display_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
-	/*
-	 * i915 driver doesn't expose max bpc as debugfs entry,
-	 * so limiting assert only for amd driver.
-	 */
-	if (is_amdgpu_device(data->fd))
-		assert_output_bpc(data, 8);
+	igt_assert_output_bpc_equal(data->fd, pipe, output->name, 8);
 
 	/*
 	 * amdgpu requires a primary plane when the CRTC is enabled.
@@ -223,8 +180,7 @@ static void test_bpc_switch_on_output(data_t *data, enum pipe pipe,
 	/* Switch to 10bpc. */
 	igt_output_set_prop_value(data->output, IGT_CONNECTOR_MAX_BPC, 10);
 	igt_display_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
-	if (is_amdgpu_device(data->fd))
-		assert_output_bpc(data, 10);
+	igt_assert_output_bpc_equal(data->fd, pipe, output->name, 10);
 
 	/* Verify that the CRC are equal after DPMS or suspend. */
 	igt_pipe_crc_collect_crc(data->pipe_crc, &ref_crc);
@@ -234,8 +190,7 @@ static void test_bpc_switch_on_output(data_t *data, enum pipe pipe,
 	/* Drop back to 8bpc. */
 	igt_output_set_prop_value(data->output, IGT_CONNECTOR_MAX_BPC, 8);
 	igt_display_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
-	if (is_amdgpu_device(data->fd))
-		assert_output_bpc(data, 8);
+	igt_assert_output_bpc_equal(data->fd, pipe, output->name, 8);
 
 	/* CRC capture is clamped to 8bpc, so capture should match. */
 	igt_assert_crc_equal(&ref_crc, &new_crc);
@@ -428,15 +383,13 @@ static void test_static_toggle(data_t *data, enum pipe pipe,
 	set_hdr_output_metadata(data, NULL);
 	igt_output_set_prop_value(data->output, IGT_CONNECTOR_MAX_BPC, 8);
 	igt_display_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
-	if (is_amdgpu_device(data->fd))
-		assert_output_bpc(data, 8);
+	igt_assert_output_bpc_equal(data->fd, pipe, output->name, 8);
 
 	/* Apply HDR metadata and 10bpc. We expect a modeset for entering. */
 	set_hdr_output_metadata(data, &hdr);
 	igt_output_set_prop_value(data->output, IGT_CONNECTOR_MAX_BPC, 10);
 	igt_display_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
-	if (is_amdgpu_device(data->fd))
-		assert_output_bpc(data, 10);
+	igt_assert_output_bpc_equal(data->fd, pipe, output->name, 10);
 
 	/* Verify that the CRC are equal after DPMS or suspend. */
 	igt_pipe_crc_collect_crc(data->pipe_crc, &ref_crc);
@@ -447,8 +400,7 @@ static void test_static_toggle(data_t *data, enum pipe pipe,
 	set_hdr_output_metadata(data, NULL);
 	igt_output_set_prop_value(data->output, IGT_CONNECTOR_MAX_BPC, 8);
 	igt_display_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
-	if (is_amdgpu_device(data->fd))
-		assert_output_bpc(data, 8);
+	igt_assert_output_bpc_equal(data->fd, pipe, output->name, 8);
 
 	igt_assert_crc_equal(&ref_crc, &new_crc);
 
@@ -507,16 +459,14 @@ static void test_static_swap(data_t *data, enum pipe pipe, igt_output_t *output)
 	igt_plane_set_size(data->primary, data->w, data->h);
 	igt_output_set_prop_value(data->output, IGT_CONNECTOR_MAX_BPC, 8);
 	igt_display_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
-	if (is_amdgpu_device(data->fd))
-		assert_output_bpc(data, 8);
+	igt_assert_output_bpc_equal(data->fd, pipe, output->name, 8);
 
 	/* Enter HDR, a modeset is allowed here. */
 	fill_hdr_output_metadata_st2048(&hdr);
 	set_hdr_output_metadata(data, &hdr);
 	igt_output_set_prop_value(data->output, IGT_CONNECTOR_MAX_BPC, 10);
 	igt_display_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
-	if (is_amdgpu_device(data->fd))
-		assert_output_bpc(data, 10);
+	igt_assert_output_bpc_equal(data->fd, pipe, output->name, 10);
 
 	igt_pipe_crc_collect_crc(data->pipe_crc, &ref_crc);
 
@@ -549,8 +499,7 @@ static void test_static_swap(data_t *data, enum pipe pipe, igt_output_t *output)
 	set_hdr_output_metadata(data, NULL);
 	igt_output_set_prop_value(data->output, IGT_CONNECTOR_MAX_BPC, 8);
 	igt_display_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
-	if (is_amdgpu_device(data->fd))
-		assert_output_bpc(data, 8);
+	igt_assert_output_bpc_equal(data->fd, pipe, output->name, 8);
 
 	/* Verify that the CRC didn't change while cycling metadata. */
 	igt_assert_crc_equal(&ref_crc, &new_crc);
