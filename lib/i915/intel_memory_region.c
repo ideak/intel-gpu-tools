@@ -630,7 +630,7 @@ uint64_t gem_detect_min_start_offset_for_region(int i915, uint32_t region)
 	struct drm_i915_gem_execbuffer2 eb;
 	uint64_t start_offset = 0;
 	uint64_t bb_size = PAGE_SIZE;
-	uint32_t *batch;
+	uint32_t *batch, ctx = 0;
 	uint16_t devid = intel_get_drm_devid(i915);
 	struct cache_entry *entry, *newentry;
 
@@ -640,12 +640,16 @@ uint64_t gem_detect_min_start_offset_for_region(int i915, uint32_t region)
 		goto out;
 	pthread_mutex_unlock(&cache_mutex);
 
+	/* Use separate context if possible to avoid offset overlapping */
+	__gem_context_create(i915, &ctx);
+
 	memset(&obj, 0, sizeof(obj));
 	memset(&eb, 0, sizeof(eb));
 
 	eb.buffers_ptr = to_user_pointer(&obj);
 	eb.buffer_count = 1;
 	eb.flags = I915_EXEC_DEFAULT;
+	eb.rsvd1 = ctx;
 	igt_assert(__gem_create_in_memory_regions(i915, &obj.handle, &bb_size, region) == 0);
 	obj.flags = EXEC_OBJECT_PINNED;
 
@@ -670,6 +674,8 @@ uint64_t gem_detect_min_start_offset_for_region(int i915, uint32_t region)
 		igt_assert(start_offset <= 1ull << 48);
 	}
 	gem_close(i915, obj.handle);
+	if (ctx)
+		gem_context_destroy(i915, ctx);
 
 	newentry = malloc(sizeof(*newentry));
 	if (!newentry)
@@ -770,7 +776,7 @@ uint64_t gem_detect_min_alignment_for_regions(int i915,
 	struct drm_i915_gem_execbuffer2 eb;
 	uint64_t min_alignment = PAGE_SIZE;
 	uint64_t bb_size = PAGE_SIZE, obj_size = PAGE_SIZE;
-	uint32_t *batch;
+	uint32_t *batch, ctx = 0;
 	uint16_t devid = intel_get_drm_devid(i915);
 	struct cache_entry *entry, *newentry;
 
@@ -780,6 +786,9 @@ uint64_t gem_detect_min_alignment_for_regions(int i915,
 		goto out;
 	pthread_mutex_unlock(&cache_mutex);
 
+	/* Use separate context if possible to avoid offset overlapping */
+	__gem_context_create(i915, &ctx);
+
 	memset(obj, 0, sizeof(obj));
 	memset(&eb, 0, sizeof(eb));
 
@@ -787,6 +796,7 @@ uint64_t gem_detect_min_alignment_for_regions(int i915,
 	eb.buffers_ptr = to_user_pointer(obj);
 	eb.buffer_count = ARRAY_SIZE(obj);
 	eb.flags = I915_EXEC_BATCH_FIRST | I915_EXEC_DEFAULT;
+	eb.rsvd1 = ctx;
 	igt_assert(__gem_create_in_memory_regions(i915, &obj[0].handle,
 						  &bb_size, region1) == 0);
 
@@ -815,6 +825,8 @@ uint64_t gem_detect_min_alignment_for_regions(int i915,
 
 	gem_close(i915, obj[0].handle);
 	gem_close(i915, obj[1].handle);
+	if (ctx)
+		gem_context_destroy(i915, ctx);
 
 	newentry = malloc(sizeof(*newentry));
 	if (!newentry)
