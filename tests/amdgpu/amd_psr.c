@@ -351,9 +351,9 @@ static void run_check_psr_su_mpo(data_t *data)
 		cr = igt_get_cairo_ctx(data->fd, &rect_fb[i]);
 		igt_assert_f(cr, "Failed to get cairo context\n");
 		/* background in black */
-		igt_paint_color(cr, 0, 0, data->w, data->h, .0, .0, .0);
+		igt_paint_color(cr, 0, 0, data->w / 2, data->h / 2, .0, .0, .0);
 		/* foreground (megenta strip) */
-		igt_paint_color(cr, i * strip_w, 0, strip_w, data->h, 1.0, .0, 1.0);
+		igt_paint_color(cr, i * strip_w, 0, strip_w, data->h / 2, 1.0, .0, 1.0);
 
 		igt_put_cairo_ctx(cr);
 	}
@@ -364,8 +364,18 @@ static void run_check_psr_su_mpo(data_t *data)
 	igt_plane_set_position(data->primary, 0, 0);
 	igt_plane_set_size(data->primary, data->w / 2, data->h / 2);
 
-	/* adjust alpha for vpb (primary plane) region in overlay */
-	draw_color_alpha(&ov_fb, 0, 0, data->w / 2, data->h / 2, .5, .5, .5, .3);
+	/**
+	 * adjust alpha for vpb (primary plane) region in overlay.
+	 * given alpha, we have below formula:
+	 * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	 *    blended = alpha * overlay + (1 - alpha) * underlay
+	 * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	 * since primary plane is underlay while overlay plane is overlay,
+	 * to display the content of primary plane w/ blending, we'd set
+	 * the alpha of each pixel in overlay corresponding to primary plane
+	 * position/size to be zero.
+	 */
+	draw_color_alpha(&ov_fb, 0, 0, data->w / 2, data->h / 2, .5, .5, .5, .0);
 
 	igt_output_set_pipe(data->output, data->pipe_id);
 	igt_display_commit_atomic(&data->display, 0, NULL);
