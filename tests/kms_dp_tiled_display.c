@@ -497,8 +497,8 @@ igt_main
 	#endif
 	igt_fixture {
 		free(data.conns);
-		close(data.drm_fd);
 		kmstest_restore_vt_mode();
 		igt_display_fini(data.display);
+		close(data.drm_fd);
 	}
 }
