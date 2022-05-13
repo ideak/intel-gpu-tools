@@ -139,6 +139,11 @@ static igt_output_t *kms_writeback_get_output(igt_display_t *display)
 	return NULL;
 }
 
+static void detach_crtc(igt_display_t *display, igt_output_t *output) {
+	igt_output_set_pipe(output, PIPE_NONE);
+	igt_display_commit2(display, COMMIT_ATOMIC);
+}
+
 static void check_writeback_fb_id(igt_output_t *output)
 {
 	uint64_t check_fb_id;
@@ -449,6 +454,7 @@ igt_main
 	}
 
 	igt_fixture {
+		detach_crtc(&display, output);
 		igt_remove_fb(display.drm_fd, &input_fb);
 		igt_display_fini(&display);
 	}
