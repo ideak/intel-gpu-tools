@@ -658,7 +658,7 @@ static uint32_t fast_copy_dword1(unsigned int src_tiling,
 	if (src_tiling == I915_TILING_Yf || src_tiling == I915_TILING_4)
 		/* Repurposed as Tile-4 on DG2 */
 		dword1 |= XY_FAST_COPY_SRC_TILING_Yf;
-	if (dst_tiling == I915_TILING_Yf || src_tiling == I915_TILING_4)
+	if (dst_tiling == I915_TILING_Yf || dst_tiling == I915_TILING_4)
 		/* Repurposed as Tile-4 on DG2 */
 		dword1 |= XY_FAST_COPY_DST_TILING_Yf;
 
