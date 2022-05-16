@@ -186,10 +186,29 @@ enum igt_suspend_test {
 	SUSPEND_TEST_NUM,
 };
 
+/**
+ * igt_mem_sleep:
+ * @MEM_SLEEP_NONE: no support
+ * @MEM_SLEEP_FREEZE: suspend-to-idle target state, aka S0ix or freeze,
+ * @MEM_SLEEP_STANDBY: standby target state, aka S1
+ * @MEM_SLEEP_MEM: suspend-to-mem target state aka S3
+ */
+enum igt_mem_sleep {
+	MEM_SLEEP_NONE,
+	MEM_SLEEP_FREEZE,
+	MEM_SLEEP_STANDBY,
+	MEM_SLEEP_MEM,
+
+	/*<private>*/
+	MEM_SLEEP_NUM,
+};
+
 void igt_system_suspend_autoresume(enum igt_suspend_state state,
 				   enum igt_suspend_test test);
 void igt_set_autoresume_delay(int delay_secs);
 int igt_get_autoresume_delay(enum igt_suspend_state state);
+
+int igt_get_memsleep_state(void);
 
 /* dropping priviledges */
 void igt_drop_root(void);
