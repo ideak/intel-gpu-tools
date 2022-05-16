@@ -204,12 +204,14 @@ test_forcewake(int fd, bool hibernate)
 }
 
 static void
-test_suspend_without_i915(void)
+test_suspend_without_i915(int state)
 {
 	igt_kmsg(KMSG_INFO "Unloading i915\n");
 	igt_assert_eq(igt_i915_driver_unload(),0);
 
-	igt_system_suspend_autoresume(SUSPEND_STATE_MEM, SUSPEND_TEST_NONE);
+	igt_skip_on_f(igt_get_memsleep_state() == MEM_SLEEP_FREEZE && state > SUSPEND_STATE_FREEZE,
+		      "Platform default mem_sleep state is s2idle\n");
+	igt_system_suspend_autoresume(state, SUSPEND_TEST_NONE);
 
 	igt_kmsg(KMSG_INFO "Re-loading i915 \n");
 	igt_assert_eq(igt_i915_driver_load(NULL), 0);
@@ -219,9 +221,13 @@ int fd;
 
 igt_main
 {
-	igt_describe("Validate system suspend cycle without i915 module");
-	igt_subtest("system-suspend-without-i915")
-		test_suspend_without_i915();
+	igt_describe("Validate suspend-to-idle without i915 module");
+	igt_subtest("basic-s2idle-without-i915")
+		test_suspend_without_i915(SUSPEND_STATE_FREEZE);
+
+	igt_describe("Validate S3 without i915 module");
+	igt_subtest("basic-s3-without-i915")
+		test_suspend_without_i915(SUSPEND_STATE_MEM);
 
 	igt_fixture
 		fd = drm_open_driver(DRIVER_INTEL);
