@@ -36,11 +36,11 @@ bool igt_kmod_has_param(const char *mod_name, const char *param);
 int igt_kmod_load(const char *mod_name, const char *opts);
 int igt_kmod_unload(const char *mod_name, unsigned int flags);
 
-int igt_audio_driver_unload(const char **whom);
+int igt_audio_driver_unload(char **whom);
 
 int igt_i915_driver_load(const char *opts);
 int igt_i915_driver_unload(void);
-int __igt_i915_driver_unload(const char **whom);
+int __igt_i915_driver_unload(char **whom);
 
 int igt_amdgpu_driver_load(const char *opts);
 int igt_amdgpu_driver_unload(void);

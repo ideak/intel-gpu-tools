@@ -2047,7 +2047,7 @@ static void test_unload(unsigned int num_engines)
 		int fd[4 + num_engines * 3], i;
 		uint64_t *buf;
 		int count = 0, ret;
-		const char *who;
+		char *who = NULL;
 		int i915;
 
 		i915 = __drm_open_driver(DRIVER_INTEL);
@@ -2104,6 +2104,7 @@ static void test_unload(unsigned int num_engines)
 		pmu_read_multi(fd[0], count, buf);
 		ret = __igt_i915_driver_unload(&who);
 		igt_assert(ret != 0 && !strcmp(who, "i915"));
+		free(who);
 		pmu_read_multi(fd[0], count, buf);
 
 		igt_debug("Close perf\n");

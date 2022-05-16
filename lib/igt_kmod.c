@@ -363,6 +363,15 @@ igt_kmod_list_loaded(void)
 	kmod_module_unref_list(list);
 }
 
+static void *strdup_realloc(char *origptr, const char *strdata)
+{
+	size_t nbytes = strlen(strdata) + 1;
+	char *newptr = realloc(origptr, nbytes);
+
+	memcpy(newptr, strdata, nbytes);
+	return newptr;
+}
+
 /**
  * igt_i915_driver_load:
  * @opts: options to pass to i915 driver
@@ -390,7 +399,7 @@ igt_i915_driver_load(const char *opts)
 	return 0;
 }
 
-static int igt_always_unload_audio_driver(const char **who)
+static int igt_always_unload_audio_driver(char **who)
 {
 	int ret;
 	const char *sound[] = {
@@ -402,7 +411,8 @@ static int igt_always_unload_audio_driver(const char **who)
 	for (const char **m = sound; *m; m++) {
 		if (igt_kmod_is_loaded(*m)) {
 			if (who)
-				*who = *m;
+				*who = strdup_realloc(*who, *m);
+
 			if (igt_lsof_kill_audio_processes())
 				return EACCES;
 
@@ -544,7 +554,7 @@ static int linux_kernel_version(void)
 	return LINUX_VERSION(ver[0], ver[1], ver[2]);
 }
 
-int igt_audio_driver_unload(const char **who)
+int igt_audio_driver_unload(char **who)
 {
 	const char *drm_driver = "i915";
 	unsigned int num_mod, i, j;
@@ -584,7 +594,8 @@ int igt_audio_driver_unload(const char **who)
 	for (j = 0; j < mod[i].num_required; j++) {
 		pos = mod[i].required_by[j];
 		if (who)
-			*who = strdup(mod[pos].name);
+			*who = strdup_realloc(*who, mod[pos].name);
+
 		/*
 		 * If a sound driver depends on drm_driver, kill audio processes
 		 * first, in order to make it possible to unload the driver
@@ -604,7 +615,7 @@ ret:
 	return ret;
 }
 
-int __igt_i915_driver_unload(const char **who)
+int __igt_i915_driver_unload(char **who)
 {
 	int ret;
 
@@ -632,7 +643,8 @@ int __igt_i915_driver_unload(const char **who)
 		ret = igt_kmod_unload(*m, 0);
 		if (ret) {
 			if (who)
-				*who = *m;
+				*who = strdup_realloc(*who, *m);
+
 			return ret;
 		}
 	}
@@ -641,7 +653,8 @@ int __igt_i915_driver_unload(const char **who)
 		ret = igt_kmod_unload("i915", 0);
 		if (ret) {
 			if (who)
-				*who = "i915";
+				*who = strdup_realloc(*who, "i915");
+
 			return ret;
 		}
 	}
@@ -658,7 +671,7 @@ int __igt_i915_driver_unload(const char **who)
 int
 igt_i915_driver_unload(void)
 {
-	const char *who;
+	char *who = NULL;
 	int ret;
 
 	ret = __igt_i915_driver_unload(&who);
@@ -667,8 +680,10 @@ igt_i915_driver_unload(void)
 		igt_kmod_list_loaded();
 		igt_lsof("/dev/dri");
 		igt_lsof("/dev/snd");
+		free(who);
 		return ret;
 	}
+	free(who);
 
 	if (igt_kmod_is_loaded("intel-gtt"))
 		igt_kmod_unload("intel-gtt", 0);
