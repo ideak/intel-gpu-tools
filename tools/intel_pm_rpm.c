@@ -34,6 +34,9 @@
 #include "igt_device_scan.h"
 #include "igt_pm.h"
 
+#define DONT_SET_AUTOSUSPEND_DELAY (1 << 0)
+#define SET_I915_AUTOSUSPEND_DELAY (1 << 1)
+
 typedef struct {
 	int drm_fd;
 	int debugfs_fd;
@@ -45,15 +48,18 @@ typedef struct {
 const char *help_str =
 	"  --disable-display-wait\t\tDisable all screens and try to go into runtime pm.\n"
 	"  --force-d3cold-wait\t\tForce dgfx gfx card to enter runtime D3Cold.\n"
+	"  --setup-d3cold\t\tEnable gfx card runtime pm and optionally set autosupend delay to"
+	"  i915 autosuspend delay. Use --setup-d3cold=i915-auto-delay as optional argument.\n"
 	"  --help\t\tProvide help. Provide card name with IGT_DEVICE=drm:/dev/dri/card*.";
 static struct option long_options[] = {
 	{"disable-display-wait", 0, 0, 'd'},
 	{"force-d3cold-wait", 0, 0, 'f'},
+	{"setup-d3cold", 2, 0, 's'},
 	{"help", 0, 0, 'h'},
 	{ 0, 0, 0, 0 }
 };
 
-const char *optstr = "dfh";
+const char *optstr = "dfs::h";
 
 static void usage(const char *name)
 {
@@ -70,6 +76,23 @@ static void disable_all_displays(data_t *data)
 		igt_output_set_pipe(output, PIPE_NONE);
 		igt_display_commit(&data->display);
 	}
+}
+
+static void
+setup_gfx_card_d3cold(data_t *data, unsigned char setup_d3cold)
+{
+	struct pci_device *root, *i915;
+
+	root = igt_device_get_pci_root_port(data->drm_fd);
+	if (setup_d3cold == DONT_SET_AUTOSUSPEND_DELAY) {
+		igt_pm_enable_pci_card_runtime_pm(root, NULL);
+	} else if (setup_d3cold == SET_I915_AUTOSUSPEND_DELAY) {
+		i915 = igt_device_get_pci_device(data->drm_fd);
+		igt_pm_enable_pci_card_runtime_pm(root, i915);
+	}
+
+	igt_info("Enabled pci devs runtime pm under Root port %04x:%02x:%02x.%01x\n",
+		 root->domain, root->bus, root->dev, root->func);
 }
 
 static void force_gfx_card_d3cold(data_t *data)
@@ -107,6 +130,7 @@ static void force_gfx_card_d3cold(data_t *data)
 int main(int argc, char *argv[])
 {
 	bool disable_display = false, force_d3cold = false;
+	unsigned char setup_d3cold = 0;
 	struct igt_device_card card;
 	char *env_device = NULL;
 	int c, option_index = 0;
@@ -143,6 +167,19 @@ int main(int argc, char *argv[])
 			break;
 		case 'f':
 			force_d3cold = true;
+			break;
+		case 's':
+			if (optarg) {
+				if (!strcmp(optarg, "i915-auto-delay")) {
+					setup_d3cold = SET_I915_AUTOSUSPEND_DELAY;
+				} else	{
+					usage(argv[0]);
+					ret = EXIT_SUCCESS;
+					goto exit;
+				}
+			} else {
+				setup_d3cold = DONT_SET_AUTOSUSPEND_DELAY;
+			}
 			break;
 		default:
 		case 'h':
@@ -195,6 +232,9 @@ int main(int argc, char *argv[])
 
 	if (force_d3cold)
 		force_gfx_card_d3cold(&data);
+
+	if (setup_d3cold)
+		setup_gfx_card_d3cold(&data, setup_d3cold);
 
 exit:
 	igt_restore_runtime_pm();
