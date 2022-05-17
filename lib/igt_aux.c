@@ -1487,7 +1487,10 @@ static void pulseaudio_unload_module(proc_t *proc_info)
 	igt_waitchildren();
 }
 
-static void pipewire_reserve_wait(int pipewire_pulse_pid)
+static int pipewire_pulse_pid = 0;
+static int pipewire_pw_reserve_pid = 0;
+
+static void pipewire_reserve_wait(void)
 {
 	char xdg_dir[PATH_MAX];
 	const char *homedir;
@@ -1532,12 +1535,10 @@ static void pipewire_reserve_wait(int pipewire_pulse_pid)
 	}
 }
 
-static int pipewire_pw_reserve_pid = 0;
-
 /* Maximum time waiting for pw-reserve to start running */
 #define PIPEWIRE_RESERVE_MAX_TIME 1000 /* milisseconds */
 
-int pipewire_pulse_start_reserve(int pipewire_pulse_pid)
+int pipewire_pulse_start_reserve(void)
 {
 	bool is_pw_reserve_running = false;
 	proc_t *proc_info;
@@ -1547,7 +1548,7 @@ int pipewire_pulse_start_reserve(int pipewire_pulse_pid)
 	if (!pipewire_pulse_pid)
 		return 0;
 
-	pipewire_reserve_wait(pipewire_pulse_pid);
+	pipewire_reserve_wait();
 
 	/*
 	 * Note: using pw-reserve to stop using audio only works with
@@ -1586,7 +1587,7 @@ int pipewire_pulse_start_reserve(int pipewire_pulse_pid)
 	return 0;
 }
 
-void pipewire_pulse_stop_reserve(int pipewire_pulse_pid)
+void pipewire_pulse_stop_reserve(void)
 {
 	if (!pipewire_pulse_pid)
 		return;
@@ -1615,8 +1616,7 @@ void pipewire_pulse_stop_reserve(int pipewire_pulse_pid)
  * If the check fails, it means that the process can simply be killed.
  */
 static int
-__igt_lsof_audio_and_kill_proc(proc_t *proc_info, char *proc_path,
-			       int *pipewire_pulse_pid)
+__igt_lsof_audio_and_kill_proc(proc_t *proc_info, char *proc_path)
 {
 	const char *audio_dev = "/dev/snd/";
 	char path[PATH_MAX * 2];
@@ -1644,7 +1644,7 @@ __igt_lsof_audio_and_kill_proc(proc_t *proc_info, char *proc_path,
 	if (!strcmp(proc_info->cmd, "pipewire-pulse")) {
 		igt_info("process %d (%s) is using audio device. Should be requested to stop using them.\n",
 			 proc_info->tid, proc_info->cmd);
-		*pipewire_pulse_pid = proc_info->tid;
+		pipewire_pulse_pid = proc_info->tid;
 		return 0;
 	}
 	/*
@@ -1726,7 +1726,7 @@ __igt_lsof_audio_and_kill_proc(proc_t *proc_info, char *proc_path,
  * daemons are respanned if they got killed.
  */
 int
-igt_lsof_kill_audio_processes(int *pipewire_pulse_pid)
+igt_lsof_kill_audio_processes(void)
 {
 	char path[PATH_MAX];
 	proc_t *proc_info;
@@ -1735,13 +1735,13 @@ igt_lsof_kill_audio_processes(int *pipewire_pulse_pid)
 
 	proc = openproc(PROC_FILLCOM | PROC_FILLSTAT | PROC_FILLARG);
 	igt_assert(proc != NULL);
-	*pipewire_pulse_pid = 0;
+	pipewire_pulse_pid = 0;
 
 	while ((proc_info = readproc(proc, NULL))) {
 		if (snprintf(path, sizeof(path), "/proc/%d/fd", proc_info->tid) < 1)
 			fail++;
 		else
-			fail += __igt_lsof_audio_and_kill_proc(proc_info, path, pipewire_pulse_pid);
+			fail += __igt_lsof_audio_and_kill_proc(proc_info, path);
 
 		freeproc(proc_info);
 	}
