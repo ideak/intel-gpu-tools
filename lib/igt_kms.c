@@ -751,6 +751,52 @@ igt_fill_pipe_props(igt_display_t *display, igt_pipe_t *pipe,
 	drmModeFreeObjectProperties(props);
 }
 
+static igt_plane_t *igt_get_assigned_primary(igt_output_t *output, igt_pipe_t *pipe)
+{
+	int drm_fd = output->display->drm_fd;
+	drmModeModeInfo *mode;
+	struct igt_fb fb;
+	igt_plane_t *plane = NULL;
+	uint32_t crtc_id;
+	int i;
+
+	mode = igt_output_get_mode(output);
+
+	igt_create_color_fb(drm_fd, mode->hdisplay, mode->vdisplay,
+						DRM_FORMAT_XRGB8888,
+						DRM_FORMAT_MOD_LINEAR,
+						1.0, 1.0, 1.0, &fb);
+
+	crtc_id = pipe->crtc_id;
+
+	/*
+	 * Do a legacy SETCRTC to start things off, so that we know that
+	 * the kernel will pick the correct primary plane and attach it
+	 * to the CRTC. This lets us handle the case that there are
+	 * multiple primary planes (one per CRTC), but which can *also*
+	 * be attached to other CRTCs
+	 */
+	igt_assert(drmModeSetCrtc(output->display->drm_fd, crtc_id, fb.fb_id,
+							  0, 0, &output->id, 1, mode) == 0);
+
+	for(i = 0; i < pipe->n_planes; i++) {
+		if (pipe->planes[i].type != DRM_PLANE_TYPE_PRIMARY)
+			continue;
+
+		if (igt_plane_get_prop(&pipe->planes[i], IGT_PLANE_CRTC_ID) != crtc_id)
+			continue;
+
+		plane = &pipe->planes[i];
+		break;
+	}
+
+	/* Removing the FB will also shut down the display for us: */
+	igt_remove_fb(drm_fd, &fb);
+	igt_assert_f(plane, "Valid assigned primary plane for CRTC_ID %d not found.\n", crtc_id);
+
+	return plane;
+}
+
 /**
  * kmstest_pipe_name:
  * @pipe: display pipe
@@ -2150,6 +2196,18 @@ __get_crtc_mask_for_pipe(drmModeRes *resources, igt_pipe_t *pipe)
 	return (1 << offset);
 }
 
+static bool igt_pipe_has_valid_output(igt_display_t *display, enum pipe pipe)
+{
+	igt_output_t *output;
+
+	igt_require_pipe(display, pipe);
+
+	for_each_valid_output_on_pipe(display, pipe, output)
+		return true;
+
+	return false;
+}
+
 /**
  * igt_display_require:
  * @display: a pointer to an #igt_display_t structure
@@ -2272,6 +2330,7 @@ void igt_display_require(igt_display_t *display, int drm_fd)
 		pipe->plane_cursor = -1;
 		pipe->plane_primary = -1;
 		pipe->planes = NULL;
+		pipe->num_primary_planes = 0;
 
 		igt_fill_pipe_props(display, pipe, IGT_NUM_CRTC_PROPS, igt_crtc_prop_names);
 
@@ -2306,12 +2365,20 @@ void igt_display_require(igt_display_t *display, int drm_fd)
 				plane = &pipe->planes[0];
 				plane->index = 0;
 				pipe->plane_primary = 0;
+				pipe->num_primary_planes++;
 			} else if (type == DRM_PLANE_TYPE_CURSOR && pipe->plane_cursor == -1) {
 				plane = &pipe->planes[last_plane];
 				plane->index = last_plane;
 				pipe->plane_cursor = last_plane;
 				display->has_cursor_plane = true;
 			} else {
+				/*
+				 * Increment num_primary_planes for any extra
+				 * primary plane found.
+				 */
+				if (type == DRM_PLANE_TYPE_PRIMARY)
+					pipe->num_primary_planes++;
+
 				plane = &pipe->planes[p];
 				plane->index = p++;
 			}
@@ -2392,6 +2459,39 @@ void igt_display_require(igt_display_t *display, int drm_fd)
 out:
 	LOG_UNINDENT(display);
 
+	for_each_pipe(display, i) {
+		igt_pipe_t *pipe = &display->pipes[i];
+
+		if (!igt_pipe_has_valid_output(display, i))
+			continue;
+
+		igt_output_t *output = igt_get_single_output_for_pipe(display, i);
+
+		if (pipe->num_primary_planes > 1) {
+			igt_plane_t *primary = &pipe->planes[pipe->plane_primary];
+			igt_plane_t *assigned_primary = igt_get_assigned_primary(output, pipe);
+			int assigned_primary_index = assigned_primary->index;
+
+			/*
+			 * If the driver-assigned primary plane isn't at the
+			 * pipe->plane_primary index, swap it with the plane
+			 * that's currently at the plane_primary index and
+			 * update plane->index accordingly.
+			 *
+			 * This way, we can preserve pipe->plane_primary as 0
+			 * so that tests that assume pipe->plane_primary is always 0
+			 * won't break.
+			 */
+			if (assigned_primary_index != pipe->plane_primary) {
+				assigned_primary->index = pipe->plane_primary;
+				primary->index = assigned_primary_index;
+
+				igt_swap(pipe->planes[assigned_primary_index],
+						pipe->planes[pipe->plane_primary]);
+			}
+		}
+	}
+
 	if (display->n_pipes && display->n_outputs)
 		igt_enable_connectors(drm_fd);
 	else
@@ -2438,14 +2538,8 @@ void igt_display_require_output(igt_display_t *display)
  */
 void igt_display_require_output_on_pipe(igt_display_t *display, enum pipe pipe)
 {
-	igt_output_t *output;
-
-	igt_require_pipe(display, pipe);
-
-	for_each_valid_output_on_pipe(display, pipe, output)
-		return;
-
-	igt_skip("No valid connector found on pipe %s\n", kmstest_pipe_name(pipe));
+	if (!igt_pipe_has_valid_output(display, pipe))
+		igt_skip("No valid connector found on pipe %s\n", kmstest_pipe_name(pipe));
 }
 
 /**
