@@ -257,3 +257,31 @@ struct pci_device *igt_device_get_pci_device(int fd)
 
 	return pci_dev;
 }
+
+/**
+ * igt_device_get_pci_root_port:
+ * @fd: the device.
+ *
+ * Looks up the graphics pci device root port using libpciaccess.
+ *
+ * Returns:
+ * The root port pci_device.
+ */
+struct pci_device *
+igt_device_get_pci_root_port(int fd)
+{
+	struct pci_device *pci_dev, *prev;
+
+	pci_dev = __igt_device_get_pci_device(fd, 0);
+	igt_require(pci_dev);
+
+	while (pci_dev) {
+		prev = pci_dev;
+		pci_dev = pci_device_get_parent_bridge(pci_dev);
+	}
+
+	igt_debug("Root Port PCI device %04x:%02x:%02x.%01x\n",
+		  prev->domain, prev->bus, prev->dev, prev->func);
+
+	return prev;
+}
