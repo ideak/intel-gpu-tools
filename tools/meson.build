@@ -28,6 +28,7 @@ tools_progs = [
 	'intel_lid',
 	'intel_opregion_decode',
 	'intel_panel_fitter',
+	'intel_pm_rpm',
 	'intel_reg_checker',
 	'intel_residency',
 	'intel_stepping',
