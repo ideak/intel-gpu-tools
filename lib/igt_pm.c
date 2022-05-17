@@ -988,11 +988,25 @@ static void igt_pm_write_power_attr(int fd, const char *val, int len)
 	igt_assert(strncmp(buf, val, len) == 0);
 }
 
+static int igt_pm_get_autosuspend_delay(struct pci_device *pci_dev)
+{
+	char delay_str[64];
+	int delay, delay_fd;
+
+	delay_fd = igt_pm_get_power_attr_fd(pci_dev, "autosuspend_delay_ms");
+	if (igt_pm_read_power_attr(delay_fd, delay_str, 64, true))
+		igt_assert(sscanf(delay_str, "%d", &delay) > 0);
+
+	return delay;
+}
+
 static void
-igt_pm_setup_pci_dev_power_attrs(struct pci_device *pci_dev, struct igt_pm_pci_dev_pwrattr *pwrattr)
+igt_pm_setup_pci_dev_power_attrs(struct pci_device *pci_dev,
+				 struct igt_pm_pci_dev_pwrattr *pwrattr, int delay_ms)
 {
 	int control_fd, delay_fd, control_size, delay_size;
 	char *control, *delay;
+	char buff[64];
 
 	delay_fd = igt_pm_get_power_attr_fd(pci_dev, "autosuspend_delay_ms");
 	control_fd = igt_pm_get_power_attr_fd(pci_dev, "control");
@@ -1022,7 +1036,12 @@ igt_pm_setup_pci_dev_power_attrs(struct pci_device *pci_dev, struct igt_pm_pci_d
 
 write_power_attr:
 
-	igt_pm_write_power_attr(delay_fd, "0\n", 2);
+	if (delay_ms >= 0) {
+		int wc;
+		wc = snprintf(buff, 64, "%d\n", delay_ms);
+		igt_pm_write_power_attr(delay_fd, buff, wc);
+	}
+
 	igt_pm_write_power_attr(control_fd, "auto\n", 5);
 
 	close(delay_fd);
@@ -1030,7 +1049,7 @@ write_power_attr:
 }
 
 static void
-igt_pm_setup_pci_card_power_attrs(struct pci_device *pci_dev, bool save_attrs)
+igt_pm_setup_pci_card_power_attrs(struct pci_device *pci_dev, bool save_attrs, int delay)
 {
 	int primary, secondary, subordinate, ret;
 	struct pci_device_iterator *iter;
@@ -1052,11 +1071,15 @@ igt_pm_setup_pci_card_power_attrs(struct pci_device *pci_dev, bool save_attrs)
 	igt_assert(iter);
 
 	/* Setup power attrs for PCI root port */
-	igt_pm_setup_pci_dev_power_attrs(pci_dev, save_attrs ? &__pci_dev_pwrattr[i++] : NULL);
+	igt_pm_setup_pci_dev_power_attrs(pci_dev,
+					 save_attrs ? &__pci_dev_pwrattr[i++] : NULL,
+					 delay);
+
 	while ((dev = pci_device_next(iter)) != NULL) {
 		if (dev->bus >= secondary && dev->bus <= subordinate) {
 			igt_pm_setup_pci_dev_power_attrs(dev,
-							 save_attrs ? &__pci_dev_pwrattr[i++] : NULL);
+							 save_attrs ? &__pci_dev_pwrattr[i++] : NULL,
+							 delay);
 			if (save_attrs)
 				igt_assert(i <  MAX_PCI_DEVICES);
 		}
@@ -1067,14 +1090,21 @@ igt_pm_setup_pci_card_power_attrs(struct pci_device *pci_dev, bool save_attrs)
 
 /**
  * igt_pm_enable_pci_card_runtime_pm:
- * @pci_dev: root port pci_dev.
+ * @root: root port pci_dev.
+ * @i915: i915 pci_dev.
  * Enable runtime PM for all PCI endpoints devices for a given root port by
  * setting power/control attr to "auto" and setting autosuspend_delay_ms
  * to zero.
  */
-void igt_pm_enable_pci_card_runtime_pm(struct pci_device *pci_dev)
+void igt_pm_enable_pci_card_runtime_pm(struct pci_device *root,
+				       struct pci_device *i915)
 {
-	igt_pm_setup_pci_card_power_attrs(pci_dev, false);
+	int delay = -1;
+
+	if (i915)
+		delay = igt_pm_get_autosuspend_delay(i915);
+
+	igt_pm_setup_pci_card_power_attrs(root, false, delay);
 	pci_system_cleanup();
 }
 
@@ -1089,7 +1119,7 @@ void igt_pm_enable_pci_card_runtime_pm(struct pci_device *pci_dev)
 void igt_pm_setup_pci_card_runtime_pm(struct pci_device *pci_dev)
 {
 	memset(__pci_dev_pwrattr, 0, sizeof(__pci_dev_pwrattr));
-	igt_pm_setup_pci_card_power_attrs(pci_dev, true);
+	igt_pm_setup_pci_card_power_attrs(pci_dev, true, 0);
 }
 
 static void

@@ -74,7 +74,8 @@ bool i915_output_is_lpsp_capable(int drm_fd, igt_output_t *output);
 bool igt_pm_acpi_d3cold_supported(struct pci_device *pci_dev);
 enum igt_acpi_d_state
 igt_pm_get_acpi_real_d_state(struct pci_device *pci_dev);
-void igt_pm_enable_pci_card_runtime_pm(struct pci_device *pci_dev);
+void igt_pm_enable_pci_card_runtime_pm(struct pci_device *root,
+				       struct pci_device *i915);
 void igt_pm_setup_pci_card_runtime_pm(struct pci_device *pci_dev);
 void igt_pm_restore_pci_card_runtime_pm(void);
 void igt_pm_print_pci_card_runtime_status(void);
