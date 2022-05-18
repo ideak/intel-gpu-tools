@@ -53,8 +53,11 @@ enum plane_move_postion {
 	POS_TOP_RIGHT,
 	POS_BOTTOM_LEFT,
 	POS_BOTTOM_RIGHT,
-	POS_BOTTOM_LEFT_NEGATIVE,
-	POS_TOP_RIGHT_NEGATIVE,
+	POS_CENTER,
+	POS_TOP,
+	POS_BOTTOM,
+	POS_LEFT,
+	POS_RIGHT,
 };
 
 typedef struct {
@@ -411,11 +414,11 @@ static void plane_move_expected_output(enum plane_move_postion pos)
 	manual(expected);
 }
 
-static void plane_move_continuous_expected_output(enum plane_move_postion pos)
+static void plane_move_continuous_expected_output(data_t *data)
 {
 	char expected[128] = {};
 
-	switch (pos) {
+	switch (data->pos) {
 	case POS_TOP_LEFT:
 		sprintf(expected,
 			"screen Green with Blue box on top left corner");
@@ -432,13 +435,20 @@ static void plane_move_continuous_expected_output(enum plane_move_postion pos)
 		sprintf(expected,
 			"screen Green with Blue box on bottom right corner");
 		break;
-	case POS_BOTTOM_LEFT_NEGATIVE:
-		sprintf(expected,
-			"screen Green with Blue box on bottom left corner (partly exceeding area)");
+	case POS_CENTER:
+		sprintf(expected, "screen Green with Blue box on center");
 		break;
-	case POS_TOP_RIGHT_NEGATIVE:
-		sprintf(expected,
-			"screen Green with Blue box on top right corner (partly exceeding area)");
+	case POS_TOP:
+		sprintf(expected, "screen Green with Blue box on top");
+		break;
+	case POS_BOTTOM:
+		sprintf(expected, "screen Green with Blue box on bottom");
+		break;
+	case POS_LEFT:
+		sprintf(expected, "screen Green with Blue box on left");
+		break;
+	case POS_RIGHT:
+		sprintf(expected, "screen Green with Blue box on right");
 		break;
 	default:
 		igt_assert(false);
@@ -466,7 +476,7 @@ static void expected_output(data_t *data)
 		plane_move_expected_output(data->pos);
 		break;
 	case PLANE_MOVE_CONTINUOUS:
-		plane_move_continuous_expected_output(data->pos);
+		plane_move_continuous_expected_output(data);
 		break;
 	case PLANE_UPDATE:
 		plane_update_expected_output(data->test_plane_id,
@@ -530,8 +540,7 @@ static void damaged_plane_move(data_t *data)
 
 	expected_output(data);
 }
-
-static void plane_move_continuous(data_t *data)
+static void get_target_coords(data_t *data, int *x, int *y)
 {
 	int target_x, target_y;
 
@@ -544,27 +553,49 @@ static void plane_move_continuous(data_t *data)
 		target_x = data->mode->hdisplay - data->fb_test.width;
 		target_y = 0;
 		break;
-	case POS_TOP_RIGHT_NEGATIVE:
-		target_x = data->mode->hdisplay - data->fb_test.width;
-		target_y = -data->fb_test.width / 2;
-		break;
 	case POS_BOTTOM_LEFT:
 		target_x = 0;
-		target_y = data->mode->vdisplay - data->fb_test.height;
-		break;
-	case POS_BOTTOM_LEFT_NEGATIVE:
-		target_x = -data->fb_test.width / 2;
 		target_y = data->mode->vdisplay - data->fb_test.height;
 		break;
 	case POS_BOTTOM_RIGHT:
 		target_x = data->mode->hdisplay - data->fb_test.width;
 		target_y = data->mode->vdisplay - data->fb_test.height;
 		break;
+	case POS_CENTER:
+		target_x = data->mode->hdisplay / 2;
+		target_y = data->mode->vdisplay / 2;
+		break;
+	case POS_BOTTOM:
+		target_x = data->mode->hdisplay / 2;
+		target_y = data->mode->vdisplay - data->fb_test.height;
+		break;
+	case POS_TOP:
+		target_x = data->mode->hdisplay / 2;
+		target_y = 0;
+		break;
+	case POS_RIGHT:
+		target_x = data->mode->hdisplay - data->fb_test.width;
+		target_y = data->mode->vdisplay / 2;
+		break;
+	case POS_LEFT:
+		target_x = 0;
+		target_y = data->mode->vdisplay / 2;
+		break;
 	default:
 		igt_assert(false);
 	}
 
+	*x = target_x;
+	*y = target_y;
+}
+
+static void plane_move_continuous(data_t *data)
+{
+	int target_x, target_y;
+
 	igt_assert(psr_wait_entry(data->debugfs_fd, PSR_MODE_2));
+
+	get_target_coords(data, &target_x, &target_y);
 
 	while (data->cur_x != target_x || data->cur_y != target_y) {
 		if (data->cur_x < target_x)
@@ -650,7 +681,7 @@ static void run(data_t *data)
 		 * over iterations.
 		 */
 		data->cur_x = data->cur_y = 0;
-		for (i = POS_TOP_LEFT; i <= POS_TOP_RIGHT_NEGATIVE; i++) {
+		for (i = POS_TOP_LEFT; i <= POS_RIGHT; i++) {
 			data->pos = i;
 			plane_move_continuous(data);
 		}
