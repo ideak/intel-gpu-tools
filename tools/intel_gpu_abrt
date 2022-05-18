@@ -69,10 +69,9 @@ rm $tmpdir -Rf
 
 if [ -f intel_gpu_abrt.tar ] ; then
 	cat <<EOF
-intel_gpu_abrt.tar has been created.
-
-Please attach it to https://bugs.freedesktop.org
-with a good bug description as suggested in this template:
+intel_gpu_abrt.tar has been created. Attach it to a bug report on
+https://gitlab.freedesktop.org/drm/igt-gpu-tools/-/issues with a
+good bug description as suggested in this template:
 
 System environment:
 -- chipset:

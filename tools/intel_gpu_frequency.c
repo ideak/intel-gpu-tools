@@ -138,7 +138,7 @@ usage(const char *prog)
 	printf("   intel_gpu_frequency --set 400\tLock frequency to 400Mhz\n");
 	printf("   intel_gpu_frequency --custom max=750\tSet the max frequency to 750MHz\n");
 	printf("\n");
-	printf("Report bugs to <bugs.freedesktop.org>\n");
+	printf("Report bugs to https://gitlab.freedesktop.org/drm/igt-gpu-tools/-/issues\n");
 	exit(EXIT_FAILURE);
 }
 

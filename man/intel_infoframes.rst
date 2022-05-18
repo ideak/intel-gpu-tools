@@ -43,7 +43,7 @@ hardware is supported yet.
 REPORTING BUGS
 ==============
 
-Report bugs to https://bugs.freedesktop.org.
+Report bugs on fd.o GitLab: https://gitlab.freedesktop.org/drm/igt-gpu-tools/-/issues
 
 SEE ALSO
 ========
