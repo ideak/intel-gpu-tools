@@ -236,9 +236,12 @@ igt_main
 		intel_allocator_multiprocess_start();
 	}
 
+	igt_describe("Checks if it can handle enough batches to fill gtt");
 	igt_subtest("basic") /* just enough to run a single pass */
 		fillgtt(i915, ctx, ALL_ENGINES, 1);
 
+	igt_describe("Checks the correctness of handling enough batches "
+		     "to fill gtt for each engine");
 	igt_subtest_with_dynamic("engines") {
 		for_each_ctx_engine(i915, ctx, e) {
 			if (!gem_class_can_store_dword(i915, e->class))
@@ -249,6 +252,8 @@ igt_main
 		}
 	}
 
+	igt_describe("Stress test check behaviour/correctness of handling"
+		     " batches to fill gtt");
 	igt_subtest("all")
 		fillgtt(i915, ctx, ALL_ENGINES, 20);
 
