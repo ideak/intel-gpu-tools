@@ -183,9 +183,11 @@ igt_main
 		igt_skip_on(devid == PCI_CHIP_I965_G); /* has totally broken pipe control */
 	}
 
+	igt_describe("Checks tlb consistency of the pipe_control with fresh buffer.");
 	igt_subtest("fresh-buffer")
 		store_pipe_control_loop(false, 2);
 
+	igt_describe("Checks tlb consistency of the pipe_control with reused buffer.");
 	igt_subtest("reused-buffer")
 		store_pipe_control_loop(true, 2);
 
