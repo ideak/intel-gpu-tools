@@ -406,9 +406,9 @@ static void init_mode_set_data(struct mode_set_data *data)
 		}
 
 		kmstest_set_vt_graphics_mode();
+		igt_display_require(&data->display, drm_fd);
 	}
 
-	igt_display_require(&data->display, drm_fd);
 	init_modeset_cached_params(&ms_data);
 }
 
@@ -420,9 +420,8 @@ static void fini_mode_set_data(struct mode_set_data *data)
 			drmModeFreePropertyBlob(data->edids[i]);
 		}
 		drmModeFreeResources(data->res);
+		igt_display_fini(&data->display);
 	}
-
-	igt_display_fini(&data->display);
 }
 
 static void get_drm_info(struct compare_data *data)
