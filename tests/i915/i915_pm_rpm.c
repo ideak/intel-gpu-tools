@@ -409,7 +409,6 @@ static void init_mode_set_data(struct mode_set_data *data)
 	}
 
 	igt_display_require(&data->display, drm_fd);
-	data->devid = intel_get_drm_devid(drm_fd);
 	init_modeset_cached_params(&ms_data);
 }
 
@@ -796,6 +795,8 @@ static bool setup_environment(bool display_disabled)
 
 	debugfs = igt_debugfs_dir(drm_fd);
 	igt_require(debugfs != -1);
+
+	ms_data.devid = intel_get_drm_devid(drm_fd);
 
 	if (!display_disabled)
 		init_mode_set_data(&ms_data);
