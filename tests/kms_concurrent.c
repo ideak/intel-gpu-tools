@@ -378,6 +378,8 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 		kmstest_set_vt_graphics_mode();
 		igt_display_require(&data.display, data.drm_fd);
 		igt_require(data.display.is_atomic);
+		if (is_i915_device(data.drm_fd))
+			intel_allocator_multiprocess_start();
 	}
 
 	for_each_pipe_static(pipe) {
@@ -386,6 +388,8 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 	}
 
 	igt_fixture {
+		if (is_i915_device(data.drm_fd))
+			intel_allocator_multiprocess_stop();
 		igt_display_fini(&data.display);
 		close(data.drm_fd);
 	}
