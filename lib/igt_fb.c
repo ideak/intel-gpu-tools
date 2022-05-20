@@ -1466,6 +1466,26 @@ void igt_paint_color(cairo_t *cr, int x, int y, int w, int h,
 }
 
 /**
+ * igt_paint_color_rand:
+ * @cr: cairo drawing context
+ * @x: pixel x-coordination of the fill rectangle
+ * @y: pixel y-coordination of the fill rectangle
+ * @w: width of the fill rectangle
+ * @h: height of the fill rectangle
+ *
+ * This functions draws a solid rectangle with random colors using the drawing
+ * context @cr.
+ */
+void igt_paint_color_rand(cairo_t *cr, int x, int y, int w, int h)
+{
+	double r = rand() / (double)RAND_MAX;
+	double g = rand() / (double)RAND_MAX;
+	double b = rand() / (double)RAND_MAX;
+
+	igt_paint_color(cr, x, y, w, h, r, g, b);
+}
+
+/**
  *
  * igt_fill_cts_color_square_framebuffer:
  * @pixmap: handle to mapped buffer

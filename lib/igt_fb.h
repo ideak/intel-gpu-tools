@@ -191,6 +191,7 @@ cairo_t *igt_get_cairo_ctx(int fd, struct igt_fb *fb);
 void igt_put_cairo_ctx(cairo_t *cr);
 void igt_paint_color(cairo_t *cr, int x, int y, int w, int h,
 			 double r, double g, double b);
+void igt_paint_color_rand(cairo_t *cr, int x, int y, int w, int h);
 void igt_paint_color_alpha(cairo_t *cr, int x, int y, int w, int h,
 			       double r, double g, double b, double a);
 void igt_paint_color_gradient(cairo_t *cr, int x, int y, int w, int h,
