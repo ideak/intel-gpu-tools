@@ -26,6 +26,7 @@
 
 #include "config.h"
 
+#include <stdbool.h>
 #include <string.h>
 #include <errno.h>
 #include <math.h>
@@ -103,6 +104,7 @@ struct chamelium_port {
 	int id;
 	int connector_id;
 	char *name;
+	bool adapter_allowed;
 };
 
 struct chamelium_frame_dump {
@@ -2324,6 +2326,9 @@ static bool chamelium_read_port_mappings(struct chamelium *chamelium,
 			goto out;
 		}
 
+		port->adapter_allowed = g_key_file_get_boolean(igt_key_file, group,
+		                                               "AdapterAllowed", &error);
+
 		for (j = 0;
 		     j < res->count_connectors && !port->connector_id;
 		     j++) {
@@ -2557,6 +2562,7 @@ static bool chamelium_autodiscover(struct chamelium *chamelium, int drm_fd)
 		port->id = port_id;
 		port->type = chamelium_get_port_type(chamelium, port);
 		port->connector_id = conn_id;
+		port->adapter_allowed = false;
 
 		connector = drmModeGetConnectorCurrent(drm_fd, conn_id);
 		snprintf(conn_name, sizeof(conn_name), "%s-%u",
@@ -2703,6 +2709,7 @@ error:
 struct chamelium *chamelium_init(int drm_fd)
 {
 	struct chamelium *chamelium = chamelium_init_rpc_only();
+	bool mismatching_ports_found = false;
 
 	if (chamelium == NULL)
 		return NULL;
@@ -2734,8 +2741,36 @@ struct chamelium *chamelium_init(int drm_fd)
 		}
 	}
 
+	for (int i = 0; i < chamelium->port_count; i++) {
+		bool type_mismatch = false;
+		struct chamelium_port * port = &chamelium->ports[i];
+		drmModeConnectorPtr connector =
+			drmModeGetConnectorCurrent(drm_fd, port->connector_id);
+
+		igt_assert(connector != NULL);
+
+		type_mismatch = port->type != connector->connector_type;
+
+		if (type_mismatch)
+			igt_info("Chamelium port %d is %s, but the DRM connector is %s\n",
+				 port->id, kmstest_connector_type_str(port->type),
+				 kmstest_connector_type_str(connector->connector_type));
+
+		if (type_mismatch && !port->adapter_allowed)
+			mismatching_ports_found = true;
+
+		drmModeFreeConnector(connector);
+	}
+
 	cleanup_instance = chamelium;
 	igt_install_exit_handler(chamelium_exit_handler);
+
+	igt_abort_on_f(mismatching_ports_found,
+		       "Chamelium port(s) with mismatching connector type on the "
+		       "DRM side found - this will most likely cause test failures. "
+		       "If you want to proceed with this this configuration, set the "
+		       "port mapping manually in .igtrc with AdapterAllowed=1. See "
+		       "docs/chamelium.txt for more information.\n");
 
 	return chamelium;
 error:

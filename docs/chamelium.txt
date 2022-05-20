@@ -94,7 +94,8 @@ example (only Chamelium.URL is mandatory):
     URL=http://192.168.1.2:9992
 
     # The rest of the sections are used for defining connector mappings. This
-    # is optional, the mappings will be discovered automatically.
+    # is optional if the same connector type (ex. DP-DP) is used on both sides,
+    # the mappings will be discovered automatically.
 
     # The name of the DRM connector
     # The DP-1 of [Chamelium:DP-1] and the HDMI-A-1 of [Chamelium:HDMI-A-1] indicate
@@ -102,12 +103,21 @@ example (only Chamelium.URL is mandatory):
     [Chamelium:DP-1]
     # The ChameliumPortID indicates physical port (device) id of a Chamelium Board.
     # A Chamelium daemon program defines these port ids as
-    # DP1 (located next to the HDMI port) = 1
-    # DP2 (located next to the VGA connector) = 2
-    # HDMI = 3 and VGA = 4
+    # - DP1 (located next to the HDMI port) = 1
+    # - DP2 (located next to the VGA connector) = 2
+    # - HDMI = 3
+    # - VGA = 4
     # The port ids are defined at:
     # https://chromium.googlesource.com/chromiumos/platform/chameleon/+/master/chameleond/utils/ids.py
     ChameliumPortID=1
+
+    [Chamelium:HDMI-A-1]
+    # Notice that the DRM side has HDMI, but Chamelium has DP on port 2.
+    # This is possible via an HDMI-DP adapter, but such scenarios often cause
+    # issues, so by default we fail if mismatching connector types are found.
+    # If AdapterAllowed is set to 1, the tests will proceed with a warning.
+    ChameliumPortID=2
+    AdapterAllowed=1
 
     [Chamelium:HDMI-A-2]
     ChameliumPortID=3
