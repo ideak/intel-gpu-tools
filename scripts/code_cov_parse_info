@@ -538,8 +538,9 @@ my $html_prolog;
 my $html_epilog;
 my %report;
 
-sub generate_report()
+sub generate_report($)
 {
+	my $filter_str = shift;
 	my $percent;
 	my $prolog = "";
 	my $epilog = "";
@@ -714,6 +715,12 @@ sub generate_report()
 
 	}
 	print OUT "  </tr>\n</table><p/>\n\n";
+
+	if ($filter_str ne "") {
+		printf OUT "<p>Filters: %s.</p>\n", $filter_str;
+	} else {
+		print OUT "<p>(unfiltered results)</p>";
+	}
 
 	if ($total > 1) {
 		print OUT "<h2>Tests coverage</h2>\n";
@@ -904,8 +911,10 @@ foreach my $f (@ARGV) {
 	}
 }
 
+$filter_str =~ s/(.*),/$1 and/ if ($filter_str ne "");
+
 if ($gen_report) {
-	generate_report();
+	generate_report($filter_str);
 	exit 0;
 }
 
@@ -920,7 +929,6 @@ print_summary() if ($stat);
 if ($has_filter) {
 	my $percent = 100. * $stats{"used_files"} / $stats{"all_files"};
 
-	$filter_str =~ s/(.*),/$1 and/;
 	printf "Filters......:%s.\n", $filter_str;
 	printf "Source files.: %.2f%% (%d of %d total)",
 		$percent, $stats{"used_files"}, $stats{"all_files"};
