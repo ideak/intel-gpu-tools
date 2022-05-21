@@ -596,8 +596,8 @@ static void test_bb_large(int i915)
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(sizes); i++) {
-		if (!__intel_check_memory(2, sizes[i], CHECK_RAM,
-					  &required, &total))
+		if (!__igt_check_memory(2, sizes[i], CHECK_RAM,
+					&required, &total))
 			break;
 
 		igt_debug("Using object size %#x\n", sizes[i]);
@@ -632,7 +632,7 @@ static void test_bb_oversize(int i915)
 		.flags = I915_EXEC_BLT,
 	};
 
-	intel_require_memory(2, 8ull << 30, CHECK_RAM);
+	igt_require_memory(2, 8ull << 30, CHECK_RAM);
 	gem_write(i915, obj.handle, (4ull << 30) - sizeof(bbe),
 		  &bbe, sizeof(bbe));
 

@@ -176,7 +176,7 @@ igt_main
 
 	igt_subtest("aperture-thrash") {
 		count = 3 * gem_aperture_size(fd) / SIZE / 2;
-		intel_require_memory(count, SIZE, CHECK_RAM);
+		igt_require_memory(count, SIZE, CHECK_RAM);
 		run_test(fd, count);
 	}
 
@@ -184,17 +184,17 @@ igt_main
 		igt_fork_shrink_helper(fd);
 
 		count = 3 * gem_aperture_size(fd) / SIZE / 2;
-		intel_require_memory(count, SIZE, CHECK_RAM);
+		igt_require_memory(count, SIZE, CHECK_RAM);
 		run_test(fd, count);
 
 		igt_stop_shrink_helper();
 	}
 
 	igt_subtest("swap-thrash") {
-		uint64_t swap_mb = intel_get_total_swap_mb();
+		uint64_t swap_mb = igt_get_total_swap_mb();
 		igt_require(swap_mb > 0);
-		count = ((intel_get_avail_ram_mb() + (swap_mb / 2)) * 1024*1024) / SIZE;
-		intel_require_memory(count, SIZE, CHECK_RAM | CHECK_SWAP);
+		count = ((igt_get_avail_ram_mb() + (swap_mb / 2)) * 1024*1024) / SIZE;
+		igt_require_memory(count, SIZE, CHECK_RAM | CHECK_SWAP);
 		run_test(fd, count);
 	}
 }

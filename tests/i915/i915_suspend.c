@@ -175,12 +175,12 @@ test_shrink(int fd, unsigned int mode)
 	void *mem;
 
 	gem_quiescent_gpu(fd);
-	intel_purge_vm_caches(fd);
+	igt_purge_vm_caches(fd);
 
-	mem = intel_get_total_pinnable_mem(&size);
+	mem = igt_get_total_pinnable_mem(&size);
 	igt_assert(mem != MAP_FAILED);
 
-	intel_purge_vm_caches(fd);
+	igt_purge_vm_caches(fd);
 	igt_system_suspend_autoresume(mode, SUSPEND_TEST_NONE);
 
 	munmap(mem, size);

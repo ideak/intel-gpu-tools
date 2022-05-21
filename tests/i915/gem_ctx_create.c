@@ -283,9 +283,9 @@ static unsigned context_size(int fd)
 
 static uint64_t total_avail_mem(unsigned mode)
 {
-	uint64_t total = intel_get_avail_ram_mb();
+	uint64_t total = igt_get_avail_ram_mb();
 	if (mode & CHECK_SWAP)
-		total += intel_get_total_swap_mb();
+		total += igt_get_total_swap_mb();
 	return total << 20;
 }
 

@@ -993,7 +993,7 @@ static void test_allocator_evict(int fd, const intel_ctx_t *ctx,
 					 INTEL_ALLOCATOR_RELOC,
 					 ALLOC_STRATEGY_NONE, 0);
 
-	intel_require_memory(count, BATCH_SIZE, CHECK_RAM);
+	igt_require_memory(count, BATCH_SIZE, CHECK_RAM);
 	intel_detect_and_clear_missed_interrupts(fd);
 
 	igt_nsec_elapsed(&tv);
@@ -1116,7 +1116,7 @@ static void evict_single_offset(int fd, const intel_ctx_t *ctx, int timeout)
 		  "%d engines (timeout: %d)\n", count, BATCH_SIZE >> 20,
 		  (long long)size >> 20, nengine, timeout);
 
-	intel_require_memory(count, BATCH_SIZE, CHECK_RAM);
+	igt_require_memory(count, BATCH_SIZE, CHECK_RAM);
 	intel_detect_and_clear_missed_interrupts(fd);
 
 	memset(&execbuf, 0, sizeof(execbuf));

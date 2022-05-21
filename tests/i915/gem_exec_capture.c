@@ -597,14 +597,14 @@ static void many(int fd, int dir, uint64_t size, unsigned int flags)
 	find_first_available_engine(fd, ctx, e, saved_engine);
 
 	gtt = gem_aperture_size(fd) / size;
-	ram = (intel_get_avail_ram_mb() << 20) / size;
+	ram = (igt_get_avail_ram_mb() << 20) / size;
 	igt_debug("Available objects in GTT:%"PRIu64", RAM:%"PRIu64"\n",
 		  gtt, ram);
 
 	count = min(gtt, ram) / 4;
 	igt_require(count > 1);
 
-	intel_require_memory(count, size, CHECK_RAM);
+	igt_require_memory(count, size, CHECK_RAM);
 	ahnd = get_reloc_ahnd(fd, ctx->id);
 
 	offsets = __captureN(fd, dir, ahnd, ctx, e, size, count, flags, NULL);
@@ -646,7 +646,7 @@ static void prioinv(int fd, int dir, const intel_ctx_t *ctx,
 	igt_require(gem_gpu_reset_type(fd) > 1);
 
 	gtt = gem_aperture_size(fd) / size;
-	ram = (intel_get_avail_ram_mb() << 20) / size;
+	ram = (igt_get_avail_ram_mb() << 20) / size;
 	igt_debug("Available objects in GTT:%"PRIu64", RAM:%"PRIu64"\n",
 		  gtt, ram);
 
@@ -654,7 +654,7 @@ static void prioinv(int fd, int dir, const intel_ctx_t *ctx,
 	count = min(count, 256ul); /* Keep the duration within reason */
 	igt_require(count > 1);
 
-	intel_require_memory(count, size, CHECK_RAM);
+	igt_require_memory(count, size, CHECK_RAM);
 
 	saved_engine = configure_hangs(fd, e, ctx->id);
 

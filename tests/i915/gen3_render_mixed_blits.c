@@ -349,7 +349,7 @@ igt_simple_main
 	igt_require_gem(fd);
 
 	count = 3 + gem_aperture_size(fd) / (1024 * 1024);
-	intel_require_memory(count, 1024*1024, CHECK_RAM);
+	igt_require_memory(count, 1024*1024, CHECK_RAM);
 
 	handle = malloc(sizeof(uint32_t)*count*3);
 	tiling = handle + count;

@@ -1541,7 +1541,7 @@ static int test_coherency(int fd, int count)
 	int i, ret;
 
 	igt_info("Using 2x%d 1MiB buffers\n", count);
-	intel_require_memory(2*count, sizeof(linear), CHECK_RAM);
+	igt_require_memory(2*count, sizeof(linear), CHECK_RAM);
 
 	ret = posix_memalign((void **)&memory, PAGE_SIZE, count*sizeof(linear));
 	igt_assert(ret == 0 && memory);
@@ -1641,7 +1641,7 @@ static int can_swap(void)
 	else
 		as = 256 * 1024; /* Just a big number */
 
-	ram = intel_get_total_ram_mb();
+	ram = igt_get_total_ram_mb();
 
 	if ((as - 128) < (ram - 256))
 		return 0;
@@ -1688,7 +1688,7 @@ static void test_forking_evictions(int fd, int size, int count,
 
 	igt_require(forked_userptr(fd));
 
-	trash_count = intel_get_total_ram_mb() * 11 / 10;
+	trash_count = igt_get_total_ram_mb() * 11 / 10;
 	/* Use the fact test will spawn a number of child
 	 * processes meaning swapping will be triggered system
 	 * wide even if one process on it's own can't do it.
@@ -1716,7 +1716,7 @@ static void test_swapping_evictions(int fd, int size, int count)
 	igt_skip_on_f(!can_swap(),
 		"Not enough process address space for swapping tests.\n");
 
-	trash_count = intel_get_total_ram_mb() * 11 / 10;
+	trash_count = igt_get_total_ram_mb() * 11 / 10;
 
 	swapping_evictions(fd, &fault_ops, size, count, trash_count);
 	reset_handle_ptr();
@@ -1934,7 +1934,7 @@ static void test_stress_purge(int fd, int timeout)
 
 		gem_set_domain(fd, handle,
 			       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
-		intel_purge_vm_caches(fd);
+		igt_purge_vm_caches(fd);
 
 		gem_close(fd, handle);
 	}
@@ -2341,11 +2341,11 @@ igt_main_args("c:", NULL, help_str, opt_handler, NULL)
 		if (count == 0)
 			count = 2 * aperture_size / (1024*1024) / 3;
 
-		total_ram = intel_get_total_ram_mb();
+		total_ram = igt_get_total_ram_mb();
 		igt_info("Total RAM is %'llu MiB\n", (long long)total_ram);
 
 		if (count > total_ram * 3 / 4) {
-			count = intel_get_total_ram_mb() * 3 / 4;
+			count = igt_get_total_ram_mb() * 3 / 4;
 			igt_info("Not enough RAM to run test, reducing buffer count.\n");
 		}
 	}
@@ -2463,7 +2463,7 @@ igt_main_args("c:", NULL, help_str, opt_handler, NULL)
 			size = sizeof(linear);
 			count = 2 * gem_aperture_size(fd) / (1024*1024) / 3;
 			if (count > total_ram * 3 / 4)
-				count = intel_get_total_ram_mb() * 3 / 4;
+				count = igt_get_total_ram_mb() * 3 / 4;
 		}
 
 		igt_fork_signal_helper();
@@ -2494,7 +2494,7 @@ igt_main_args("c:", NULL, help_str, opt_handler, NULL)
 			size = sizeof(linear);
 			count = 2 * gem_aperture_size(fd) / (1024*1024) / 3;
 			if (count > total_ram * 3 / 4)
-				count = intel_get_total_ram_mb() * 3 / 4;
+				count = igt_get_total_ram_mb() * 3 / 4;
 		}
 
 		igt_subtest("process-exit")
@@ -2589,7 +2589,7 @@ igt_main_args("c:", NULL, help_str, opt_handler, NULL)
 			size = 1024 * 1024;
 			count = 2 * gem_aperture_size(fd) / (1024*1024) / 3;
 			if (count > total_ram * 3 / 4)
-				count = intel_get_total_ram_mb() * 3 / 4;
+				count = igt_get_total_ram_mb() * 3 / 4;
 		}
 
 		igt_fork_signal_helper();

@@ -47,20 +47,20 @@
 #endif
 #include <sys/resource.h>
 
-#include "intel_io.h"
 #include "drmtest.h"
 #include "igt_aux.h"
 #include "igt_debugfs.h"
+#include "igt_os.h"
 #include "igt_sysfs.h"
 
 /**
- * intel_get_total_ram_mb:
+ * igt_get_total_ram_mb:
  *
  * Returns:
  * The total amount of system RAM available in MB.
  */
 uint64_t
-intel_get_total_ram_mb(void)
+igt_get_total_ram_mb(void)
 {
 	uint64_t retval;
 
@@ -74,7 +74,7 @@ intel_get_total_ram_mb(void)
 	long pagesize, npages;
 
 	pagesize = sysconf(_SC_PAGESIZE);
-        npages = sysconf(_SC_PHYS_PAGES);
+	npages = sysconf(_SC_PHYS_PAGES);
 
 	retval = (uint64_t) pagesize * npages;
 #else
@@ -98,13 +98,13 @@ static uint64_t get_meminfo(const char *info, const char *tag)
 }
 
 /**
- * intel_get_avail_ram_mb:
+ * igt_get_avail_ram_mb:
  *
  * Returns:
  * The amount of unused system RAM available in MB.
  */
 uint64_t
-intel_get_avail_ram_mb(void)
+igt_get_avail_ram_mb(void)
 {
 	uint64_t retval;
 
@@ -112,8 +112,8 @@ intel_get_avail_ram_mb(void)
 	char *info;
 	int fd;
 
-	fd = drm_open_driver(DRIVER_INTEL);
-	intel_purge_vm_caches(fd);
+	fd = drm_open_driver(DRIVER_ANY);
+	igt_purge_vm_caches(fd);
 	close(fd);
 
 	fd = open("/proc", O_RDONLY);
@@ -145,7 +145,7 @@ intel_get_avail_ram_mb(void)
 	long pagesize, npages;
 
 	pagesize = sysconf(_SC_PAGESIZE);
-        npages = sysconf(_SC_AVPHYS_PAGES);
+	npages = sysconf(_SC_AVPHYS_PAGES);
 
 	retval = (uint64_t) pagesize * npages;
 #else
@@ -156,13 +156,13 @@ intel_get_avail_ram_mb(void)
 }
 
 /**
- * intel_get_total_swap_mb:
+ * igt_get_total_swap_mb:
  *
  * Returns:
  * The total amount of swap space available in MB.
  */
 uint64_t
-intel_get_total_swap_mb(void)
+igt_get_total_swap_mb(void)
 {
 	uint64_t retval;
 
@@ -180,31 +180,31 @@ intel_get_total_swap_mb(void)
 	int n, i;
 
 	if ((n = swapctl(SC_GETNSWP, NULL)) == -1) {
-	    igt_warn("swapctl: GETNSWP");
-	    return 0;
+		igt_warn("swapctl: GETNSWP");
+		return 0;
 	}
 	if (n == 0) {
-	    /* no error, but no swap devices either */
-	    return 0;
+		/* no error, but no swap devices either */
+		return 0;
 	}
 
 	swt = malloc(sizeof(struct swaptable) + (n * sizeof(swapent_t)));
 	buf = malloc(n * MAXPATHLEN);
 	if (!swt || !buf) {
-	    igt_warn("malloc");
+		igt_warn("malloc");
 	} else {
-	    swt->swt_n = n;
-	    for (i = 0 ; i < n; i++) {
-		swt->swt_ent[i].ste_path = buf + (i * MAXPATHLEN);
-	    }
-
-	    if ((n = swapctl(SC_LIST, swt)) == -1) {
-		igt_warn("swapctl: LIST");
-	    } else {
-		for (i = 0; i < swt->swt_n; i++) {
-		    totalpages += swt->swt_ent[i].ste_pages;
+		swt->swt_n = n;
+		for (i = 0 ; i < n; i++) {
+			swt->swt_ent[i].ste_path = buf + (i * MAXPATHLEN);
 		}
-	    }
+
+		if ((n = swapctl(SC_LIST, swt)) == -1) {
+			igt_warn("swapctl: LIST");
+		} else {
+			for (i = 0; i < swt->swt_n; i++) {
+				totalpages += swt->swt_ent[i].ste_pages;
+			}
+		}
 	}
 	free(swt);
 	free(buf);
@@ -219,7 +219,7 @@ intel_get_total_swap_mb(void)
 }
 
 /**
- * intel_get_total_pinnable_mem:
+ * igt_get_total_pinnable_mem:
  *
  * Compute the amount of memory that we're able to safely lock.
  * Note that in order to achieve this, we're attempting to repeatedly lock more
@@ -227,12 +227,12 @@ intel_get_total_swap_mb(void)
  *
  * Returns: Amount of memory that can be safely pinned, in bytes.
  */
-void *intel_get_total_pinnable_mem(size_t *total)
+void *igt_get_total_pinnable_mem(size_t *total)
 {
 	uint64_t *can_mlock, pin, avail;
 
-	pin = (intel_get_total_ram_mb() + 1) << 20;
-	avail = (intel_get_avail_ram_mb() + 1) << 20;
+	pin = (igt_get_total_ram_mb() + 1) << 20;
+	avail = (igt_get_avail_ram_mb() + 1) << 20;
 
 	can_mlock = mmap(NULL, pin, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 	igt_require(can_mlock != MAP_FAILED);
@@ -290,20 +290,20 @@ static unsigned max_open_files(void)
 }
 
 /**
- * intel_require_files:
+ * igt_require_files:
  * @count: number of files that will be created
  *
  * Does the system support enough file descriptors for the test?
  */
-void intel_require_files(uint64_t count)
+void igt_require_files(uint64_t count)
 {
 	igt_require_f(count < max_open_files(),
 		      "Estimated that we need %'llu files, but the process maximum is only %'llu\n",
 		      (long long)count, (long long)max_open_files());
 }
 
-int __intel_check_memory(uint64_t count, uint64_t size, unsigned mode,
-			 uint64_t *out_required, uint64_t *out_total)
+int __igt_check_memory(uint64_t count, uint64_t size, unsigned mode,
+		       uint64_t *out_required, uint64_t *out_total)
 {
 /* rough estimate of how many bytes the kernel requires to track each object */
 #define KERNEL_BO_OVERHEAD 8192 /* 2k for an object, 2k for an inode, etc */
@@ -320,9 +320,9 @@ int __intel_check_memory(uint64_t count, uint64_t size, unsigned mode,
 
 	total = 0;
 	if (mode & (CHECK_RAM | CHECK_SWAP))
-		total += intel_get_avail_ram_mb();
+		total += igt_get_avail_ram_mb();
 	if (mode & CHECK_SWAP)
-		total += intel_get_total_swap_mb();
+		total += igt_get_total_swap_mb();
 	total *= 1024 * 1024;
 
 	if (out_required)
@@ -338,7 +338,7 @@ int __intel_check_memory(uint64_t count, uint64_t size, unsigned mode,
 }
 
 /**
- * intel_require_memory:
+ * igt_require_memory:
  * @count: number of surfaces that will be created
  * @size: the size in bytes of each surface
  * @mode: a bit field declaring whether the test will be run in RAM or in SWAP
@@ -360,13 +360,13 @@ int __intel_check_memory(uint64_t count, uint64_t size, unsigned mode,
  * assumption that any test that needs to check for memory requirements is a
  * thrashing test unsuitable for slow simulated systems.
  */
-void intel_require_memory(uint64_t count, uint64_t size, unsigned mode)
+void igt_require_memory(uint64_t count, uint64_t size, unsigned mode)
 {
 	uint64_t required, total;
 	bool sufficient_memory;
 
-	sufficient_memory = __intel_check_memory(count, size, mode,
-						 &required, &total);
+	sufficient_memory = __igt_check_memory(count, size, mode,
+					       &required, &total);
 	if (!sufficient_memory) {
 		int dir = open("/proc", O_RDONLY);
 		char *info;
@@ -398,7 +398,14 @@ void intel_require_memory(uint64_t count, uint64_t size, unsigned mode)
 		      (long long)vfs_file_max());
 }
 
-void intel_purge_vm_caches(int drm_fd)
+/**
+ * igt_purge_vm_caches:
+ * @drm_fd: the drm device fd
+ *
+ * Trigger the drm driver to shrink and drop idle buffers, and then
+ * trigger VM subsystem to drop caches.
+ */
+void igt_purge_vm_caches(int drm_fd)
 {
 	int fd;
 
@@ -434,7 +441,7 @@ void intel_purge_vm_caches(int drm_fd)
 /*
  * When testing a port to a new platform, create a standalone test binary
  * by running:
- * cc -o porttest intel_drm.c -I.. -DSTANDALONE_TEST `pkg-config --cflags libdrm`
+ * cc -o porttest igt_os.c -I.. -DSTANDALONE_TEST `pkg-config --cflags libdrm`
  * and then running the resulting porttest program.
  */
 #ifdef STANDALONE_TEST
@@ -442,8 +449,8 @@ void *mmio;
 
 int main(int argc, char **argv)
 {
-    igt_info("Total RAM:  %"PRIu64" Mb\n", intel_get_total_ram_mb());
-    igt_info("Total Swap: %"PRIu64" Mb\n", intel_get_total_swap_mb());
+    igt_info("Total RAM:  %"PRIu64" Mb\n", igt_get_total_ram_mb());
+    igt_info("Total Swap: %"PRIu64" Mb\n", igt_get_total_swap_mb());
 
     return 0;
 }

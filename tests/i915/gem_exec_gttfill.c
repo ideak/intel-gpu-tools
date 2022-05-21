@@ -158,7 +158,7 @@ static void fillgtt(int fd, const intel_ctx_t *ctx, unsigned ring, int timeout)
 	count = size / BATCH_SIZE + 1;
 	igt_debug("Using %'d batches to fill %'llu aperture on %d engines\n",
 		  count, (long long)size, nengine);
-	intel_require_memory(count, BATCH_SIZE, CHECK_RAM);
+	igt_require_memory(count, BATCH_SIZE, CHECK_RAM);
 	intel_detect_and_clear_missed_interrupts(fd);
 
 	igt_nsec_elapsed(&tv);

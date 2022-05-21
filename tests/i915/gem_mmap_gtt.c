@@ -946,7 +946,7 @@ test_huge_bo(int fd, int huge, int tiling)
 		size = gem_global_aperture_size(fd) + PAGE_SIZE;
 		break;
 	}
-	intel_require_memory(1, size, CHECK_RAM);
+	igt_require_memory(1, size, CHECK_RAM);
 
 	last_offset = size - PAGE_SIZE;
 
@@ -1033,11 +1033,11 @@ test_huge_copy(int fd, int huge, int tiling_a, int tiling_b, int ncpus)
 		huge_object_size = gem_global_aperture_size(fd) + PAGE_SIZE;
 		break;
 	default:
-		huge_object_size = (intel_get_total_ram_mb() << 19) + PAGE_SIZE;
+		huge_object_size = (igt_get_total_ram_mb() << 19) + PAGE_SIZE;
 		mode |= CHECK_SWAP;
 		break;
 	}
-	intel_require_memory(2*ncpus, huge_object_size, mode);
+	igt_require_memory(2*ncpus, huge_object_size, mode);
 
 	igt_fork(child, ncpus) {
 		uint64_t valid_size = huge_object_size;

@@ -955,7 +955,7 @@ struct gem_memory_region *__gem_get_memory_regions(int i915)
 		r->ci = info->regions[i].region;
 		r->size = info->regions[i].probed_size;
 		if (r->size == -1ull)
-			r->size = intel_get_avail_ram_mb() << 20;
+			r->size = igt_get_avail_ram_mb() << 20;
 
 		asprintf(&r->name, "%s%d",
 			 region_repr(&r->ci), r->ci.memory_instance);

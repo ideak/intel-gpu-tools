@@ -134,7 +134,7 @@ static void from_mmap(int fd, uint64_t size, enum mode mode)
 	/* Worst case is that the kernel has to copy the entire incoming
 	 * reloc[], so double the memory requirements.
 	 */
-	intel_require_memory(2, size, CHECK_RAM);
+	igt_require_memory(2, size, CHECK_RAM);
 
 	memset(&obj, 0, sizeof(obj));
 	obj.handle = gem_create(fd, 4096);

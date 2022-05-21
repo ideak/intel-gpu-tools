@@ -375,7 +375,7 @@ static void create_dmabuf_require(const struct create *create, unsigned count)
 		close(args.fd);
 	}
 	igt_require(has_dmabuf);
-	intel_require_files(2*count);
+	igt_require_files(2*count);
 }
 
 struct dmabuf {
@@ -1765,7 +1765,7 @@ num_buffers(uint64_t max,
 	if (c->require)
 		c->require(c, n);
 
-	intel_require_memory(2*n, size, allow_mem);
+	igt_require_memory(2*n, size, allow_mem);
 
 	return n;
 }
@@ -1986,8 +1986,8 @@ igt_main
 				 c->name, s->name, "swap");
 			igt_subtest_group {
 				igt_fixture {
-					if (intel_get_avail_ram_mb() > gem_mappable_aperture_size(fd)/(1024*1024)) {
-						pin_sz = intel_get_avail_ram_mb() - gem_mappable_aperture_size(fd)/(1024*1024);
+					if (igt_get_avail_ram_mb() > gem_mappable_aperture_size(fd)/(1024*1024)) {
+						pin_sz = igt_get_avail_ram_mb() - gem_mappable_aperture_size(fd)/(1024*1024);
 
 						igt_debug("Pinning %lld MiB\n", (long long)pin_sz);
 						pin_sz *= 1024 * 1024;

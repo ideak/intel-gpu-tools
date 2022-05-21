@@ -253,7 +253,7 @@ static void close_race(int fd, const intel_ctx_t *ctx)
 	int i;
 
 	igt_require(ncpus > 1);
-	intel_require_memory(nhandles, 4096, CHECK_RAM);
+	igt_require_memory(nhandles, 4096, CHECK_RAM);
 
 	/*
 	 * One thread spawning work and randomly closing handles.

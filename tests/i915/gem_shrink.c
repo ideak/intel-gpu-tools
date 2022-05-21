@@ -436,7 +436,7 @@ igt_main
 
 	igt_fixture {
 		const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
-		uint64_t mem_size = intel_get_total_ram_mb();
+		uint64_t mem_size = igt_get_total_ram_mb();
 		int fd;
 
 		fd = drm_open_driver(DRIVER_INTEL);
@@ -455,8 +455,8 @@ igt_main
 		igt_info("Using %d processes and %'"PRIu64"MiB per process\n",
 			 num_processes, alloc_size);
 
-		intel_require_memory(num_processes, alloc_size,
-				     CHECK_SWAP | CHECK_RAM);
+		igt_require_memory(num_processes, alloc_size,
+				   CHECK_SWAP | CHECK_RAM);
 
 		close(fd);
 	}

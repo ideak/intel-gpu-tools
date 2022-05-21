@@ -284,7 +284,7 @@ igt_main
 		uint64_t mem_per_test;
 
 		mem_per_test = SIZE;
-		intel_require_memory(nchild + 1, mem_per_test, CHECK_RAM);
+		igt_require_memory(nchild + 1, mem_per_test, CHECK_RAM);
 
 		rcs = calloc(sizeof(*rcs), nchild);
 		igt_assert(rcs);
@@ -311,7 +311,7 @@ igt_main
 		igt_require(has_contexts());
 
 		mem_per_test = SIZE + mem_per_ctx;
-		intel_require_memory(1 + nchild, mem_per_test, CHECK_RAM);
+		igt_require_memory(1 + nchild, mem_per_test, CHECK_RAM);
 
 		rcs = calloc(sizeof(*rcs), nchild);
 		igt_assert(rcs);

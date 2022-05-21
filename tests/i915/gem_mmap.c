@@ -66,13 +66,13 @@ test_huge_bo(int huge)
 		huge_object_size = gem_aperture_size(fd) + PAGE_SIZE;
 		break;
 	case 2:
-		huge_object_size = (intel_get_total_ram_mb() + 1) << 20;
+		huge_object_size = (igt_get_total_ram_mb() + 1) << 20;
 		check |= CHECK_SWAP;
 		break;
 	default:
 		return;
 	}
-	intel_require_memory(1, huge_object_size, check);
+	igt_require_memory(1, huge_object_size, check);
 
 	last_offset = huge_object_size - PAGE_SIZE;
 

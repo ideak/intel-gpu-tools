@@ -177,27 +177,27 @@ igt_main
 		fd = drm_open_driver(DRIVER_INTEL);
 		gem_require_mappable_ggtt(fd);
 
-		intel_purge_vm_caches(fd);
+		igt_purge_vm_caches(fd);
 		check_memory_layout(fd);
 
 		/* lock RAM, leaving only 512MB available */
-		count = intel_get_total_ram_mb() - intel_get_avail_ram_mb();
+		count = igt_get_total_ram_mb() - igt_get_avail_ram_mb();
 		count = max(count + 64, AVAIL_RAM);
-		count = intel_get_total_ram_mb() - count;
+		count = igt_get_total_ram_mb() - count;
 		lock_size = max_t(long, 0, count);
 		igt_info("Mlocking %zdMiB of %ld/%ldMiB\n",
 			 lock_size,
-			 (long)intel_get_avail_ram_mb(),
-			 (long)intel_get_total_ram_mb());
+			 (long)igt_get_avail_ram_mb(),
+			 (long)igt_get_total_ram_mb());
 		igt_lock_mem(lock_size);
 
 		/* need slightly more than available memory */
-		count = intel_get_avail_ram_mb() + 128;
+		count = igt_get_avail_ram_mb() + 128;
 		igt_info("Using %lu 1MiB objects (available RAM: %ld/%ld, swap: %ld)\n",
 			 count,
-			 (long)intel_get_avail_ram_mb(),
-			 (long)intel_get_total_ram_mb(),
-			 (long)intel_get_total_swap_mb());
+			 (long)igt_get_avail_ram_mb(),
+			 (long)igt_get_total_ram_mb(),
+			 (long)igt_get_total_swap_mb());
 		bo_handles = calloc(count, sizeof(uint32_t));
 		igt_assert(bo_handles);
 
@@ -206,7 +206,7 @@ igt_main
 		threads = calloc(num_threads, sizeof(struct thread));
 		igt_assert(threads);
 
-		intel_require_memory(count, 1024*1024, CHECK_RAM | CHECK_SWAP);
+		igt_require_memory(count, 1024*1024, CHECK_RAM | CHECK_SWAP);
 
 		for (n = 0; n < count; n++) {
 			bo_handles[n] = create_bo(fd);

@@ -72,7 +72,7 @@ static int minor_evictions(int fd, struct igt_eviction_test_ops *ops,
 
 	total_surfaces = gem_aperture_size(fd) / surface_size + 1;
 	igt_require(nr_surfaces < total_surfaces);
-	intel_require_memory(total_surfaces, surface_size, CHECK_RAM);
+	igt_require_memory(total_surfaces, surface_size, CHECK_RAM);
 
 	bo = malloc((nr_surfaces + total_surfaces)*sizeof(*bo));
 	igt_assert(bo);
@@ -107,7 +107,7 @@ static int major_evictions(int fd, struct igt_eviction_test_ops *ops,
 	uint32_t *bo;
 	int ret, loop;
 
-	intel_require_memory(nr_surfaces, surface_size, CHECK_RAM);
+	igt_require_memory(nr_surfaces, surface_size, CHECK_RAM);
 
 	bo = malloc(nr_surfaces*sizeof(*bo));
 	igt_assert(bo);
@@ -136,9 +136,9 @@ static void mlocked_evictions(int fd, struct igt_eviction_test_ops *ops,
 	size_t total;
 	void *mem;
 
-	intel_require_memory(surface_count, surface_size, CHECK_RAM);
+	igt_require_memory(surface_count, surface_size, CHECK_RAM);
 
-	mem = intel_get_total_pinnable_mem(&total);
+	mem = igt_get_total_pinnable_mem(&total);
 	igt_assert(mem != MAP_FAILED);
 	pin = *(uint64_t *)mem;
 	igt_assert(!munlock(mem, pin));
@@ -199,12 +199,12 @@ static int swapping_evictions(int fd, struct igt_eviction_test_ops *ops,
 	uint64_t i, n;
 	int pass, ret;
 
-	intel_require_memory(working_surfaces, surface_size, CHECK_RAM);
+	igt_require_memory(working_surfaces, surface_size, CHECK_RAM);
 
 	if (trash_surfaces < working_surfaces)
 		trash_surfaces = working_surfaces;
 
-	intel_require_memory(trash_surfaces, surface_size, CHECK_RAM | CHECK_SWAP);
+	igt_require_memory(trash_surfaces, surface_size, CHECK_RAM | CHECK_SWAP);
 
 	bo = malloc(trash_surfaces*sizeof(*bo));
 	igt_assert(bo);
@@ -239,7 +239,7 @@ static int forking_evictions(int fd, struct igt_eviction_test_ops *ops,
 	uint32_t *bo;
 	int pass, ret;
 
-	intel_require_memory(working_surfaces, surface_size, CHECK_RAM);
+	igt_require_memory(working_surfaces, surface_size, CHECK_RAM);
 
 	if (flags & FORKING_EVICTIONS_SWAPPING) {
 		bo_count = trash_surfaces;
@@ -250,7 +250,7 @@ static int forking_evictions(int fd, struct igt_eviction_test_ops *ops,
 		bo_count = working_surfaces;
 
 	igt_assert_lte(working_surfaces, bo_count);
-	intel_require_memory(bo_count, surface_size, CHECK_RAM | CHECK_SWAP);
+	igt_require_memory(bo_count, surface_size, CHECK_RAM | CHECK_SWAP);
 
 	bo = malloc(bo_count*sizeof(*bo));
 	igt_assert(bo);

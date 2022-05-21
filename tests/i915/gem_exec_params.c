@@ -346,7 +346,7 @@ static void test_larger_than_life_batch(int fd)
 	 * checking to that subset of machines.
 	 */
 	igt_require(size < gem_aperture_size(fd));
-	intel_require_memory(2, size, CHECK_RAM); /* batch + shadow */
+	igt_require_memory(2, size, CHECK_RAM); /* batch + shadow */
 
 	exec.handle = batch_create_size(fd, size);
 

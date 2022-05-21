@@ -139,7 +139,7 @@ static void test_big_cpu(int fd, int scale, unsigned flags)
 		size = gem_aperture_size(fd) + 4096;
 		break;
 	}
-	intel_require_memory(1, size, CHECK_RAM);
+	igt_require_memory(1, size, CHECK_RAM);
 
 	handle = gem_create(fd, size);
 	gem_set_domain(fd, handle, I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
@@ -201,7 +201,7 @@ static void test_big_gtt(int fd, int scale, unsigned flags)
 		size = gem_aperture_size(fd) + 4096;
 		break;
 	}
-	intel_require_memory(1, size, CHECK_RAM);
+	igt_require_memory(1, size, CHECK_RAM);
 
 	handle = gem_create(fd, size);
 	gem_set_domain(fd, handle, I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
@@ -256,9 +256,9 @@ static void test_random(int fd)
 
 	gem_require_mmap_wc(fd);
 
-	size = min(intel_get_total_ram_mb() / 2,
+	size = min(igt_get_total_ram_mb() / 2,
 		    gem_mappable_aperture_size(fd) + 4096);
-	intel_require_memory(1, size, CHECK_RAM);
+	igt_require_memory(1, size, CHECK_RAM);
 
 	handle = gem_create(fd, size);
 	map = gem_mmap__wc(fd, handle, 0, size, PROT_WRITE);

@@ -88,7 +88,7 @@ static void wide(int fd, const intel_ctx_t *ctx, int ring_size,
 	exec = calloc(nengine, sizeof(*exec));
 	igt_assert(exec);
 
-	intel_require_memory(nengine*(2 + ring_size), 4096, CHECK_RAM);
+	igt_require_memory(nengine*(2 + ring_size), 4096, CHECK_RAM);
 	obj = calloc(nengine*ring_size + 1, sizeof(*obj));
 	igt_assert(obj);
 

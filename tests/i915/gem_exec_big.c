@@ -221,7 +221,7 @@ static void exhaustive(int fd)
 
 	max = 3 * gem_aperture_size(fd) / 4;
 	ggtt_max = 3 * gem_global_aperture_size(fd) / 4;
-	intel_require_memory(1, max, CHECK_RAM);
+	igt_require_memory(1, max, CHECK_RAM);
 
 	for (batch_size = 4096; batch_size <= max; ) {
 		uint32_t handle;
@@ -278,7 +278,7 @@ static void single(int i915)
 	uint32_t handle;
 	void *ptr;
 
-	batch_size = (intel_get_avail_ram_mb() / 2) << 20; /* XXX CI slack? */
+	batch_size = (igt_get_avail_ram_mb() / 2) << 20; /* XXX CI slack? */
 	limit = gem_aperture_size(i915) - (256 << 10); /* low pages reserved */
 	if (!gem_uses_full_ppgtt(i915))
 		limit = 3 * limit / 4;
@@ -289,7 +289,7 @@ static void single(int i915)
 		 batch_size >> 20,
 		 gem_uses_full_ppgtt(i915) ? "" : "shared ",
 		 gem_aperture_size(i915) >> 20);
-	intel_require_memory(1, batch_size, CHECK_RAM);
+	igt_require_memory(1, batch_size, CHECK_RAM);
 
 	handle = gem_create(i915, batch_size);
 	gem_write(i915, handle, 0, &bbe, sizeof(bbe));

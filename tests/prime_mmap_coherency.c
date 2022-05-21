@@ -265,16 +265,16 @@ static void test_ioctl_errors(void)
 	int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
 
 	/* Ensure we can do at least one child */
-	intel_require_memory(2, width*height*4, CHECK_RAM);
+	igt_require_memory(2, width*height*4, CHECK_RAM);
 
 	for (int num_children = 1; num_children <= 8 *ncpus; num_children <<= 1) {
 		uint64_t required, total;
 
 		igt_info("Spawing %d interruptible children\n", num_children);
-		if (!__intel_check_memory(2*num_children,
-					  width*height*4,
-					  CHECK_RAM,
-					  &required, &total)) {
+		if (!__igt_check_memory(2*num_children,
+					width*height*4,
+					CHECK_RAM,
+					&required, &total)) {
 			igt_debug("Estimated that we need %'lluMiB for test, but only have %'lluMiB\n",
 				  (long long)(required >> 20),
 				  (long long)(total >> 20));

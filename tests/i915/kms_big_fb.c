@@ -841,7 +841,7 @@ igt_main
 		igt_info("Max driver framebuffer size %dx%d\n",
 			 data.max_fb_width, data.max_fb_height);
 
-		data.ram_size = intel_get_total_ram_mb() << 20;
+		data.ram_size = igt_get_total_ram_mb() << 20;
 		data.aper_size = gem_aperture_size(data.drm_fd);
 		data.mappable_size = gem_mappable_aperture_size(data.drm_fd);
 

@@ -224,7 +224,7 @@ static void always_clear(int i915, int timeout)
 	struct thread_clear arg = {
 		.i915 = i915,
 		.timeout = timeout,
-		.max = intel_get_avail_ram_mb() << (20 - 12), /* in pages */
+		.max = igt_get_avail_ram_mb() << (20 - 12), /* in pages */
 	};
 	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
 	unsigned long checked;

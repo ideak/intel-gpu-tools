@@ -337,7 +337,7 @@ static void test_allocations(int fd)
 	struct drm_i915_gem_exec_object2 obj[17];
 	unsigned long count;
 
-	intel_require_memory(2, 1ull<<(12 + ARRAY_SIZE(obj)), CHECK_RAM);
+	igt_require_memory(2, 1ull<<(12 + ARRAY_SIZE(obj)), CHECK_RAM);
 
 	memset(obj, 0, sizeof(obj));
 	for (int i = 0; i < ARRAY_SIZE(obj); i++) {

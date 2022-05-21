@@ -476,7 +476,7 @@ static void fill_params(int i915, struct params *params,
 			bool do_oom_test)
 {
 	const int swap_mb = /* For lmem, swap is total of smem + swap. */
-		intel_get_total_ram_mb() + intel_get_total_swap_mb();
+		igt_get_total_ram_mb() + igt_get_total_swap_mb();
 	const unsigned int size = 1 << 20;
 	const int max_swap_pct = 75;
 	/*
@@ -631,8 +631,8 @@ static void test_smem_oom(int i915,
 			  const intel_ctx_t *ctx,
 			  struct drm_i915_memory_region_info *region)
 {
-	const uint64_t smem_size = intel_get_total_ram_mb() +
-		intel_get_total_swap_mb();
+	const uint64_t smem_size = igt_get_total_ram_mb() +
+		igt_get_total_swap_mb();
 	const unsigned int alloc = 256 * 1024 * 1024;
 	const unsigned int num_alloc = 1 + smem_size / (alloc >> 20);
 	struct igt_helper_process smem_proc = {};

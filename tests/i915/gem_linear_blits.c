@@ -252,7 +252,7 @@ igt_main
 
 		count = 3 + count / (1024*1024);
 		igt_require(count > 1);
-		intel_require_memory(count, sizeof(linear), CHECK_RAM);
+		igt_require_memory(count, sizeof(linear), CHECK_RAM);
 
 		igt_debug("Using %'"PRIu64" 1MiB buffers\n", count);
 		count = (count + ncpus - 1) / ncpus;
