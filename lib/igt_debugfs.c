@@ -1139,8 +1139,20 @@ void igt_drop_caches_set(int drm_fd, uint64_t val)
 	int dir;
 
 	dir = igt_debugfs_dir(drm_fd);
-	igt_assert(igt_sysfs_printf(dir, "i915_gem_drop_caches",
-				    "0x%" PRIx64, val) > 0);
+	if (is_i915_device(drm_fd)) {
+		igt_assert(igt_sysfs_printf(dir, "i915_gem_drop_caches",
+					    "0x%" PRIx64, val) > 0);
+	} else if (is_msm_device(drm_fd)) {
+		/*
+		 * msm doesn't currently have debugs that supports fine grained
+		 * control of *what* to drop, just # of objects to scan (equiv
+		 * to shrink_control::nr_to_scan).  To meet that limit it will
+		 * first try shrinking, and then dropping idle.  So just tell
+		 * it to try and drop as many objects as possible:
+		 */
+		igt_assert(igt_sysfs_printf(dir, "shrink", "0x%" PRIx64,
+					    ~(uint64_t)0) > 0);
+	}
 	close(dir);
 }
 
