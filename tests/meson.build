@@ -244,6 +244,7 @@ i915_progs = [
 msm_progs = [
 	'msm_mapping',
 	'msm_recovery',
+	'msm_shrink',
 	'msm_submit'
 ]
 

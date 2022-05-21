@@ -268,7 +268,7 @@ igt_msm_cmd_submit(struct msm_cmd *cmd)
 		},
 	};
 	struct drm_msm_gem_submit req = {
-			.flags   = cmd->pipe->pipe | MSM_SUBMIT_FENCE_FD_OUT,
+			.flags   = cmd->pipe->pipe | MSM_SUBMIT_FENCE_FD_OUT | MSM_SUBMIT_NO_IMPLICIT,
 			.queueid = cmd->pipe->submitqueue_id,
 			.nr_cmds = ARRAY_SIZE(cmds),
 			.cmds    = VOID2U64(cmds),

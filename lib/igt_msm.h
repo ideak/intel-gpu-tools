@@ -97,10 +97,14 @@ enum adreno_pm4_packet_type {
 
 enum adreno_pm4_type3_packets {
 	CP_NOP = 16,
+	CP_WAIT_MEM_WRITES = 18,
+	CP_WAIT_FOR_ME = 19,
 	CP_WAIT_MEM_GTE = 20,
+	CP_WAIT_FOR_IDLE = 38,
 	CP_WAIT_REG_MEM = 60,
 	CP_MEM_WRITE = 61,
 	CP_MEM_TO_MEM = 115,
+	CP_MEMCPY = 117,
 };
 
 static inline unsigned
@@ -157,7 +161,7 @@ struct msm_cmd {
 	struct msm_bo *cmdstream_bo;
 	uint32_t *cur;
 	uint32_t nr_bos;
-	struct msm_bo *bos[8];
+	struct msm_bo *bos[128];
 };
 
 struct msm_cmd *igt_msm_cmd_new(struct msm_pipe *pipe, size_t size);
