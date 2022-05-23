@@ -2389,6 +2389,23 @@ static void process_stdin(unsigned int timeout_us)
 		process_normal_stdin();
 }
 
+static bool has_drm_fdinfo(const struct igt_device_card *card)
+{
+	struct drm_client_fdinfo info;
+	unsigned int cnt;
+	int fd;
+
+	fd = open(card->render, O_RDWR);
+	if (fd < 0)
+		return false;
+
+	cnt = igt_parse_drm_fdinfo(fd, &info);
+
+	close(fd);
+
+	return cnt > 0;
+}
+
 static void show_help_screen(void)
 {
 	printf(
@@ -2545,8 +2562,9 @@ int main(int argc, char **argv)
 
 	ret = EXIT_SUCCESS;
 
-	clients = init_clients(card.pci_slot_name[0] ?
-			       card.pci_slot_name : IGPU_PCI);
+	if (has_drm_fdinfo(&card))
+		clients = init_clients(card.pci_slot_name[0] ?
+				       card.pci_slot_name : IGPU_PCI);
 	init_engine_classes(engines);
 	if (clients) {
 		clients->num_classes = engines->num_classes;
