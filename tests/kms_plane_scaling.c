@@ -279,13 +279,13 @@ static void test_scaler_with_modifier_pipe(data_t *d,
 		for (int i = 0; i < ARRAY_SIZE(modifiers); i++) {
 			uint64_t modifier = modifiers[i];
 
-				if (igt_plane_has_format_mod(plane, format, modifier))
-					check_scaling_pipe_plane_rot(d, plane,
-								     format, modifier,
-								     width, height,
-								     is_upscale,
-								     pipe, output,
-								     IGT_ROTATION_0);
+			if (igt_plane_has_format_mod(plane, format, modifier))
+				check_scaling_pipe_plane_rot(d, plane,
+							     format, modifier,
+							     width, height,
+							     is_upscale,
+							     pipe, output,
+							     IGT_ROTATION_0);
 		}
 	}
 }
@@ -312,13 +312,13 @@ static void test_scaler_with_rotation_pipe(data_t *d,
 		for (int i = 0; i < ARRAY_SIZE(rotations); i++) {
 			igt_rotation_t rot = rotations[i];
 
-				if (igt_plane_has_rotation(plane, rot))
-					check_scaling_pipe_plane_rot(d, plane,
-								     format, modifier,
-								     width, height,
-								     is_upscale,
-								     pipe, output,
-								     rot);
+			if (igt_plane_has_rotation(plane, rot))
+				check_scaling_pipe_plane_rot(d, plane,
+							     format, modifier,
+							     width, height,
+							     is_upscale,
+							     pipe, output,
+							     rot);
 		}
 	}
 }
