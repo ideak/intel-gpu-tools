@@ -89,6 +89,7 @@
 #define TILE_Y      TILE_DEF(I915_TILING_Y)
 #define TILE_Yf     TILE_DEF(I915_TILING_Yf)
 #define TILE_Ys     TILE_DEF(I915_TILING_Ys)
+#define TILE_4      TILE_DEF(I915_TILING_4)
 
 #define CCS_OFFSET(buf) (buf->ccs[0].offset)
 #define CCS_SIZE(gen, buf) \
@@ -105,16 +106,19 @@ struct buf_ops {
 	uint32_t supported_hw_tiles;
 	uint32_t swizzle_x;
 	uint32_t swizzle_y;
+	uint32_t swizzle_tile4;
 	bo_copy linear_to;
 	bo_copy linear_to_x;
 	bo_copy linear_to_y;
 	bo_copy linear_to_yf;
 	bo_copy linear_to_ys;
+	bo_copy linear_to_tile4;
 	bo_copy to_linear;
 	bo_copy x_to_linear;
 	bo_copy y_to_linear;
 	bo_copy yf_to_linear;
 	bo_copy ys_to_linear;
+	bo_copy tile4_to_linear;
 };
 
 static const char *tiling_str(uint32_t tiling)
@@ -125,6 +129,7 @@ static const char *tiling_str(uint32_t tiling)
 	case I915_TILING_Y:    return "Y";
 	case I915_TILING_Yf:   return "Yf";
 	case I915_TILING_Ys:   return "Ys";
+	case I915_TILING_4:    return "4";
 	default:               return "UNKNOWN";
 	}
 }
@@ -222,7 +227,8 @@ static void set_hw_tiled(struct buf_ops *bops, struct intel_buf *buf)
 {
 	uint32_t ret_tiling, ret_swizzle;
 
-	if (buf->tiling != I915_TILING_X && buf->tiling != I915_TILING_Y)
+	if (buf->tiling != I915_TILING_X && buf->tiling != I915_TILING_Y &&
+	    buf->tiling != I915_TILING_4)
 		return;
 
 	if (!buf_ops_has_hw_fence(bops, buf->tiling)) {
@@ -320,6 +326,50 @@ static void *y_ptr(void *ptr,
 	return ptr + pos;
 }
 
+/*
+ * (x,y) to memory location in tiled-4 surface
+ *
+ * coverted those divisions and multiplications to shifts and masks
+ * in hope this wouldn't be so slow.
+ */
+static void *tile4_ptr(void *ptr,
+			unsigned int x, unsigned int y,
+			unsigned int stride, unsigned int cpp)
+{
+	const int tile_width = 128;
+	const int tile_height = 32;
+	const int subtile_size = 64;
+	const int owords = 16;
+	int base, _x, _y, subtile, tile_x, tile_y;
+	int x_loc = x << __builtin_ctz(cpp);
+	int pos;
+
+	/* Pixel in tile via masks */
+	tile_x = x_loc & (tile_width - 1);
+	tile_y = y & (tile_height - 1);
+
+	/* subtile in 4k tile */
+	_x = tile_x >> __builtin_ctz(owords);
+	_y = tile_y >> 2;
+
+	/* tile-4 swizzle */
+	subtile = ((_y >> 1) << 4) + ((_y & 1) << 2) + (_x & 3) + ((_x & 4) << 1);
+
+	/* memory location */
+	base = (y >> __builtin_ctz(tile_height)) *
+		(stride << __builtin_ctz(tile_height)) +
+		(((x_loc >> __builtin_ctz(tile_width)) << __builtin_ctz(4096)));
+
+	pos = base + (subtile << __builtin_ctz(subtile_size)) +
+		((tile_y & 3) << __builtin_ctz(owords)) +
+		(tile_x & (owords - 1));
+	igt_assert((pos & (cpp - 1)) == 0);
+	pos = pos >> __builtin_ctz(cpp);
+
+	return ptr + pos;
+}
+
+
 static void *yf_ptr(void *ptr,
 		    unsigned int x, unsigned int y,
 		    unsigned int stride, unsigned int cpp)
@@ -365,6 +415,8 @@ static tile_fn __get_tile_fn_ptr(int tiling)
 	case I915_TILING_Yf:
 		fn = yf_ptr;
 		break;
+	case I915_TILING_4:
+		fn = tile4_ptr;
 	case I915_TILING_Ys:
 		/* To be implemented */
 		break;
@@ -391,7 +443,7 @@ static void __copy_ccs(struct buf_ops *bops, struct intel_buf *buf,
 	void *map;
 	int gen;
 
-	if (!buf->compression)
+	if (!buf->compression || HAS_FLATCCS(intel_get_drm_devid(bops->fd)))
 		return;
 
 	gen = bops->intel_gen;
@@ -551,6 +603,13 @@ static void copy_linear_to_ys(struct buf_ops *bops, struct intel_buf *buf,
 	__copy_linear_to(bops->fd, buf, linear, I915_TILING_Ys, 0);
 }
 
+static void copy_linear_to_tile4(struct buf_ops *bops, struct intel_buf *buf,
+				 uint32_t *linear)
+{
+	DEBUGFN();
+	__copy_linear_to(bops->fd, buf, linear, I915_TILING_4, bops->swizzle_tile4);
+}
+
 static void __copy_to_linear(int fd, struct intel_buf *buf,
 			     uint32_t *linear, int tiling, uint32_t swizzle)
 {
@@ -599,6 +658,13 @@ static void copy_ys_to_linear(struct buf_ops *bops, struct intel_buf *buf,
 {
 	DEBUGFN();
 	__copy_to_linear(bops->fd, buf, linear, I915_TILING_Ys, 0);
+}
+
+static void copy_tile4_to_linear(struct buf_ops *bops, struct intel_buf *buf,
+				 uint32_t *linear)
+{
+	DEBUGFN();
+	__copy_to_linear(bops->fd, buf, linear, I915_TILING_4, 0);
 }
 
 static void copy_linear_to_gtt(struct buf_ops *bops, struct intel_buf *buf,
@@ -752,11 +818,10 @@ static void __intel_buf_init(struct buf_ops *bops,
 	IGT_INIT_LIST_HEAD(&buf->link);
 
 	if (compression) {
-		int aux_width, aux_height;
-
 		igt_require(bops->intel_gen >= 9);
 		igt_assert(req_tiling == I915_TILING_Y ||
-			   req_tiling == I915_TILING_Yf);
+			   req_tiling == I915_TILING_Yf ||
+			   req_tiling == I915_TILING_4);
 		/*
 		 * On GEN12+ we align the main surface to 4 * 4 main surface
 		 * tiles, which is 64kB. These 16 tiles are mapped by 4 AUX
@@ -778,13 +843,18 @@ static void __intel_buf_init(struct buf_ops *bops,
 		buf->bpp = bpp;
 		buf->compression = compression;
 
-		aux_width = intel_buf_ccs_width(bops->intel_gen, buf);
-		aux_height = intel_buf_ccs_height(bops->intel_gen, buf);
+		if (!HAS_FLATCCS(intel_get_drm_devid(bops->fd))) {
+			int aux_width, aux_height;
 
-		buf->ccs[0].offset = buf->surface[0].stride * ALIGN(height, 32);
-		buf->ccs[0].stride = aux_width;
+			aux_width = intel_buf_ccs_width(bops->intel_gen, buf);
+			aux_height = intel_buf_ccs_height(bops->intel_gen, buf);
 
-		size = buf->ccs[0].offset + aux_width * aux_height;
+			buf->ccs[0].offset = buf->surface[0].stride * ALIGN(height, 32);
+			buf->ccs[0].stride = aux_width;
+			size = buf->ccs[0].offset + aux_width * aux_height;
+		} else {
+			size = buf->ccs[0].offset;
+		}
 	} else {
 		if (tiling) {
 			devid =  intel_get_drm_devid(bops->fd);
@@ -1176,17 +1246,19 @@ void intel_buf_write_aux_to_png(struct intel_buf *buf, const char *filename)
 #define DEFAULT_BUFOPS(__gen_start, __gen_end) \
 	.gen_start          = __gen_start, \
 	.gen_end            = __gen_end, \
-	.supported_hw_tiles = TILE_X | TILE_Y, \
+	.supported_hw_tiles = TILE_X | TILE_Y | TILE_4, \
 	.linear_to          = copy_linear_to_wc, \
 	.linear_to_x        = copy_linear_to_gtt, \
 	.linear_to_y        = copy_linear_to_gtt, \
 	.linear_to_yf       = copy_linear_to_yf, \
 	.linear_to_ys       = copy_linear_to_ys, \
+	.linear_to_tile4    = copy_linear_to_tile4, \
 	.to_linear          = copy_wc_to_linear, \
 	.x_to_linear        = copy_gtt_to_linear, \
 	.y_to_linear        = copy_gtt_to_linear, \
 	.yf_to_linear       = copy_yf_to_linear, \
-	.ys_to_linear       = copy_ys_to_linear
+	.ys_to_linear       = copy_ys_to_linear, \
+	.tile4_to_linear    = copy_tile4_to_linear
 
 struct buf_ops buf_ops_arr[] = {
 	{
@@ -1201,7 +1273,7 @@ struct buf_ops buf_ops_arr[] = {
 
 	{
 		DEFAULT_BUFOPS(12, 12),
-		.supported_tiles   = TILE_NONE | TILE_X | TILE_Y | TILE_Yf | TILE_Ys,
+		.supported_tiles   = TILE_NONE | TILE_X | TILE_Y | TILE_Yf | TILE_Ys | TILE_4,
 	},
 };
 
@@ -1230,6 +1302,8 @@ static bool probe_hw_tiling(struct buf_ops *bops, uint32_t tiling,
 			bops->swizzle_x = buf_swizzle;
 		else if (tiling == I915_TILING_Y)
 			bops->swizzle_y = buf_swizzle;
+		else if (tiling == I915_TILING_4)
+			bops->swizzle_tile4 = buf_swizzle;
 
 		*swizzling_supported = buf_swizzle == phys_swizzle;
 	}
@@ -1387,6 +1461,24 @@ static struct buf_ops *__buf_ops_create(int fd, bool check_idempotency)
 			bops->supported_hw_tiles &= ~TILE_Y;
 			bops->linear_to_y = copy_linear_to_y;
 			bops->y_to_linear = copy_y_to_linear;
+		}
+	}
+
+	if (is_hw_tiling_supported(bops, I915_TILING_4)) {
+		bool swizzling_supported;
+		bool supported = probe_hw_tiling(bops, I915_TILING_4,
+						 &swizzling_supported);
+
+		if (!swizzling_supported) {
+			igt_debug("Swizzling for 4 is not supported\n");
+			bops->supported_tiles &= ~TILE_4;
+		}
+
+		igt_debug("4 fence support: %s\n", bool_str(supported));
+		if (!supported) {
+			bops->supported_hw_tiles &= ~TILE_4;
+			bops->linear_to_tile4 = copy_linear_to_tile4;
+			bops->tile4_to_linear = copy_tile4_to_linear;
 		}
 	}
 

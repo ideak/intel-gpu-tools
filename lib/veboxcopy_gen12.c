@@ -53,19 +53,25 @@ struct vebox_surface_state {
 		uint32_t width:14;
 		uint32_t height:14;
 	} ss2;
-	struct {
+	union {
+		struct {
 #define VEBOX_TILE_WALK_XMAJOR 0
 #define VEBOX_TILE_WALK_YMAJOR 1
-		uint32_t tile_walk:1;
-		uint32_t tiled_surface:1;
-		uint32_t chroma_half_pitch:1;
-		uint32_t surface_pitch:17;
-		uint32_t chroma_interleave:1;
-		uint32_t lsb_packed_enable:1;
-		uint32_t bayer_input_alignment:2;
-		uint32_t bayer_pattern_format:1;
-		uint32_t bayer_pattern_offset:2;
-		uint32_t surface_format:5;
+			uint32_t tile_walk:1;
+			uint32_t tiled_surface:1;
+			uint32_t chroma_half_pitch:1;
+			uint32_t surface_pitch:17;
+			uint32_t chroma_interleave:1;
+			uint32_t lsb_packed_enable:1;
+			uint32_t bayer_input_alignment:2;
+			uint32_t bayer_pattern_format:1;
+			uint32_t bayer_pattern_offset:2;
+			uint32_t surface_format:5;
+		} tgl;
+		struct {
+			uint32_t tile_mode:2;
+			uint32_t pad0:30;
+		} dg2;
 	} ss3;
 	struct {
 		uint32_t u_y_offset:15;
@@ -82,9 +88,15 @@ struct vebox_surface_state {
 		uint32_t frame_x_offset:15;
 		uint32_t pad:2;
 	} ss6;
-	struct {
-		uint32_t derived_surface_pitch:17;
-		uint32_t pad:15;
+	union {
+		struct {
+			uint32_t derived_surface_pitch:17;
+			uint32_t pad:15;
+		} skl;
+		struct {
+			uint32_t pad:27;
+			uint32_t compression_format:5;
+		} dg2;
 	} ss7;
 	struct {
 		uint32_t skin_score_output_surface_pitch:17;
@@ -166,17 +178,46 @@ static void emit_surface_state_cmd(struct intel_bb *ibb,
 	ss->ss2.height = height - 1;
 	ss->ss2.width = width - 1;
 
-	ss->ss3.surface_format = format;
+	ss->ss3.tgl.surface_format = format;
 	if (format_is_interleaved_yuv(format))
-		ss->ss3.chroma_interleave = 1;
-	ss->ss3.surface_pitch = pitch - 1;
-	ss->ss3.tile_walk = (tiling == I915_TILING_Y) ||
-			    (tiling == I915_TILING_Yf);
-	ss->ss3.tiled_surface = tiling != I915_TILING_NONE;
+		ss->ss3.tgl.chroma_interleave = 1;
+	ss->ss3.tgl.surface_pitch = pitch - 1;
 
 	ss->ss4.u_y_offset = uv_offset / pitch;
 
-	ss->ss7.derived_surface_pitch = pitch - 1;
+	if (HAS_FLATCCS(ibb->devid)) {
+		/*
+		 * f-tile = 3 (Tile F)
+		 */
+		ss->ss3.dg2.tile_mode = (tiling != I915_TILING_NONE) ? 3 : 0;
+
+		switch (format) {
+		case R8G8B8A8_UNORM:
+			ss->ss7.dg2.compression_format = 0xa;
+			break;
+		case PLANAR_420_8:
+			ss->ss7.dg2.compression_format = 0xf;
+			break;
+		case PLANAR_420_16:
+			ss->ss7.dg2.compression_format = 8;
+			break;
+		case YCRCB_NORMAL:
+			ss->ss7.dg2.compression_format = 3;
+			break;
+		case PACKED_444A_8:
+			ss->ss7.dg2.compression_format = 0x9;
+			break;
+		default:
+			igt_assert(0);
+		}
+	} else {
+		ss->ss3.tgl.tile_walk = (tiling == I915_TILING_Y) ||
+			(tiling == I915_TILING_Yf) ||
+			(tiling == I915_TILING_4);
+		ss->ss3.tgl.tiled_surface = tiling != I915_TILING_NONE;
+	}
+
+	ss->ss7.skl.derived_surface_pitch = pitch - 1;
 
 	intel_bb_ptr_add(ibb, sizeof(*ss));
 }
@@ -203,7 +244,11 @@ static void emit_tiling_convert_cmd(struct intel_bb *ibb,
 		tc->tc1_2.input_compression_type =
 			src->compression == I915_COMPRESSION_RENDER;
 	}
-	tc->tc1_2.input_tiled_resource_mode = src->tiling == I915_TILING_Yf;
+
+	if (HAS_4TILE(ibb->devid))
+		tc->tc1_2.input_mocs_idx = 3;
+	else
+		tc->tc1_2.input_tiled_resource_mode = src->tiling == I915_TILING_Yf;
 	reloc_delta = tc->tc1_2_l;
 
 	igt_assert(src->addr.offset == ALIGN(src->addr.offset, 0x1000));
@@ -220,7 +265,12 @@ static void emit_tiling_convert_cmd(struct intel_bb *ibb,
 		tc->tc3_4.output_compression_type =
 			dst->compression == I915_COMPRESSION_RENDER;
 	}
-	tc->tc3_4.output_tiled_resource_mode = dst->tiling == I915_TILING_Yf;
+
+	if (HAS_4TILE(ibb->devid))
+		tc->tc3_4.output_mocs_idx = 3;
+	else
+		tc->tc3_4.output_tiled_resource_mode = dst->tiling == I915_TILING_Yf;
+
 	reloc_delta = tc->tc3_4_l;
 
 	igt_assert(dst->addr.offset == ALIGN(dst->addr.offset, 0x1000));
@@ -255,10 +305,12 @@ void gen12_vebox_copyfunc(struct intel_bb *ibb,
 	intel_bb_add_intel_buf(ibb, dst, true);
 	intel_bb_add_intel_buf(ibb, src, false);
 
-	intel_bb_ptr_set(ibb, BATCH_STATE_SPLIT);
-	gen12_aux_pgtable_init(&aux_pgtable_info, ibb, src, dst);
-	aux_pgtable_state = gen12_create_aux_pgtable_state(ibb,
-							   aux_pgtable_info.pgtable_buf);
+	if (!HAS_FLATCCS(ibb->devid)) {
+		intel_bb_ptr_set(ibb, BATCH_STATE_SPLIT);
+		gen12_aux_pgtable_init(&aux_pgtable_info, ibb, src, dst);
+		aux_pgtable_state = gen12_create_aux_pgtable_state(ibb,
+								   aux_pgtable_info.pgtable_buf);
+	}
 
 	intel_bb_ptr_set(ibb, 0);
 	gen12_emit_aux_pgtable_state(ibb, aux_pgtable_state, false);
@@ -311,5 +363,6 @@ void gen12_vebox_copyfunc(struct intel_bb *ibb,
 
 	intel_bb_reset(ibb, false);
 
-	gen12_aux_pgtable_cleanup(ibb, &aux_pgtable_info);
+	if (!HAS_FLATCCS(ibb->devid))
+		gen12_aux_pgtable_cleanup(ibb, &aux_pgtable_info);
 }

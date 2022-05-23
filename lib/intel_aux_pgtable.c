@@ -263,7 +263,8 @@ static uint64_t pgt_get_l1_flags(const struct intel_buf *buf, int surface_idx)
 	} entry = {
 		.e = {
 			.valid = 1,
-			.tile_mode = buf->tiling == I915_TILING_Y ? 1 : 0,
+			.tile_mode = buf->tiling == I915_TILING_Y ? 1 :
+				(buf->tiling == I915_TILING_4 ? 2 : 0),
 		}
 	};
 
@@ -274,7 +275,8 @@ static uint64_t pgt_get_l1_flags(const struct intel_buf *buf, int surface_idx)
 	 */
 	igt_assert(buf->tiling == I915_TILING_Y ||
 		   buf->tiling == I915_TILING_Yf ||
-		   buf->tiling == I915_TILING_Ys);
+		   buf->tiling == I915_TILING_Ys ||
+		   buf->tiling == I915_TILING_4);
 
 	entry.e.ycr = surface_idx > 0;
 

@@ -457,6 +457,9 @@ void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 	case I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC:
 	case I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS:
 	case I915_FORMAT_MOD_4_TILED:
+	case I915_FORMAT_MOD_4_TILED_DG2_RC_CCS:
+	case I915_FORMAT_MOD_4_TILED_DG2_MC_CCS:
+	case I915_FORMAT_MOD_4_TILED_DG2_RC_CCS_CC:
 		igt_require_intel(fd);
 		if (intel_display_ver(intel_get_drm_devid(fd)) == 2) {
 			*width_ret = 128;
@@ -565,14 +568,17 @@ void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 
 static bool is_gen12_mc_ccs_modifier(uint64_t modifier)
 {
-	return modifier == I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS;
+	return modifier == I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS ||
+		modifier == I915_FORMAT_MOD_4_TILED_DG2_MC_CCS;
 }
 
 static bool is_gen12_ccs_modifier(uint64_t modifier)
 {
 	return is_gen12_mc_ccs_modifier(modifier) ||
 		modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS ||
-		modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC;
+		modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC ||
+		modifier == I915_FORMAT_MOD_4_TILED_DG2_RC_CCS ||
+		modifier == I915_FORMAT_MOD_4_TILED_DG2_RC_CCS_CC;
 }
 
 static bool is_ccs_modifier(uint64_t modifier)
@@ -584,7 +590,7 @@ static bool is_ccs_modifier(uint64_t modifier)
 
 static bool is_ccs_plane(const struct igt_fb *fb, int plane)
 {
-	if (!is_ccs_modifier(fb->modifier))
+	if (!is_ccs_modifier(fb->modifier) || HAS_FLATCCS(intel_get_drm_devid(fb->fd)))
 		return false;
 
 	return plane >= fb->num_planes / 2;
@@ -602,8 +608,15 @@ static bool is_gen12_ccs_plane(const struct igt_fb *fb, int plane)
 
 static bool is_gen12_ccs_cc_plane(const struct igt_fb *fb, int plane)
 {
-	return fb->modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC &&
-	       plane == 2;
+	if (fb->modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC &&
+	    plane == 2)
+		return true;
+
+	if (fb->modifier == I915_FORMAT_MOD_4_TILED_DG2_RC_CCS_CC &&
+	    plane == 1)
+		return true;
+
+	return false;
 }
 
 bool igt_fb_is_gen12_ccs_cc_plane(const struct igt_fb *fb, int plane)
@@ -686,10 +699,11 @@ static int fb_num_planes(const struct igt_fb *fb)
 {
 	int num_planes = lookup_drm_format(fb->drm_format)->num_planes;
 
-	if (is_ccs_modifier(fb->modifier))
+	if (is_ccs_modifier(fb->modifier) && !HAS_FLATCCS(intel_get_drm_devid(fb->fd)))
 		num_planes *= 2;
 
-	if (fb->modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC)
+	if (fb->modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC ||
+	    fb->modifier == I915_FORMAT_MOD_4_TILED_DG2_RC_CCS_CC)
 		num_planes++;
 
 	return num_planes;
@@ -763,7 +777,7 @@ static uint32_t calc_plane_stride(struct igt_fb *fb, int plane)
 		return ALIGN(min_stride, tile_width);
 	} else if (is_gen12_ccs_cc_plane(fb, plane)) {
 		/* clear color always fixed to 64 bytes */
-		return 64;
+		return HAS_FLATCCS(intel_get_drm_devid(fb->fd)) ? 512 : 64;
 	} else if (is_gen12_ccs_plane(fb, plane)) {
 		/*
 		 * The CCS surface stride is
@@ -966,6 +980,9 @@ uint64_t igt_fb_mod_to_tiling(uint64_t modifier)
 	case I915_FORMAT_MOD_Y_TILED_GEN12_MC_CCS:
 		return I915_TILING_Y;
 	case I915_FORMAT_MOD_4_TILED:
+	case I915_FORMAT_MOD_4_TILED_DG2_RC_CCS:
+	case I915_FORMAT_MOD_4_TILED_DG2_MC_CCS:
+	case I915_FORMAT_MOD_4_TILED_DG2_RC_CCS_CC:
 		return I915_TILING_4;
 	case I915_FORMAT_MOD_Yf_TILED:
 	case I915_FORMAT_MOD_Yf_TILED_CCS:
@@ -2524,9 +2541,10 @@ igt_fb_create_intel_buf(int fd, struct buf_ops *bops,
 	if (is_ccs_modifier(fb->modifier)) {
 		igt_assert_eq(fb->strides[0] & 127, 0);
 
-		if (is_gen12_ccs_modifier(fb->modifier))
-			igt_assert_eq(fb->strides[1] & 63, 0);
-		else
+		if (is_gen12_ccs_modifier(fb->modifier)) {
+			if (!HAS_FLATCCS(intel_get_drm_devid(fb->fd)))
+				igt_assert_eq(fb->strides[1] & 63, 0);
+		} else
 			igt_assert_eq(fb->strides[1] & 127, 0);
 
 		if (is_gen12_mc_ccs_modifier(fb->modifier))
@@ -2559,7 +2577,7 @@ igt_fb_create_intel_buf(int fd, struct buf_ops *bops,
 		buf->yuv_semiplanar_bpp = yuv_semiplanar_bpp(fb->drm_format);
 
 	if (is_ccs_modifier(fb->modifier)) {
-		num_surfaces = fb->num_planes / 2;
+		num_surfaces = fb->num_planes / (HAS_FLATCCS(intel_get_drm_devid(fb->fd)) ? 1 : 2);
 		for (i = 0; i < num_surfaces; i++)
 			init_buf_ccs(buf, i,
 				     fb->offsets[num_surfaces + i],
@@ -2579,6 +2597,9 @@ igt_fb_create_intel_buf(int fd, struct buf_ops *bops,
 
 	if (fb->modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC)
 		buf->cc.offset = fb->offsets[2];
+
+	if (fb->modifier == I915_FORMAT_MOD_4_TILED_DG2_RC_CCS_CC)
+		buf->cc.offset = fb->offsets[1];
 
 	return buf;
 }
@@ -4590,6 +4611,12 @@ const char *igt_fb_modifier_name(uint64_t modifier)
 		return "Y-MC_CCS";
 	case I915_FORMAT_MOD_4_TILED:
 		return "4";
+	case I915_FORMAT_MOD_4_TILED_DG2_RC_CCS:
+		return "4-RC_CCS";
+	case I915_FORMAT_MOD_4_TILED_DG2_MC_CCS:
+		return "4-MC_CCS";
+	case I915_FORMAT_MOD_4_TILED_DG2_RC_CCS_CC:
+		return "4-RC_CCS-CC";
 	default:
 		return "?";
 	}

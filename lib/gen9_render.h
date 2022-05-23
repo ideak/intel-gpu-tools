@@ -59,9 +59,15 @@ struct gen9_surface_state {
 		uint32_t depth:11;
 	} ss3;
 
-	struct {
-		uint32_t minimum_array_element:27;
-		uint32_t pad0:5;
+	union {
+		struct {
+			uint32_t minimum_array_element:27;
+			uint32_t pad0:5;
+		} skl;
+		struct {
+			uint32_t decompress_in_l3:1;
+			uint32_t pad0:31;
+		} dg2;
 	} ss4;
 
 	struct {
@@ -116,6 +122,15 @@ struct gen9_surface_state {
 			uint32_t media_compression:1;
 			uint32_t pad2:1;
 		} tgl;
+
+		struct {
+			uint32_t pad0:14;
+			uint32_t disable_support_for_multi_gpu_partial_writes:1;
+			uint32_t disable_support_for_multi_gpu_atomics:1;
+			uint32_t pad1:14;
+			uint32_t memory_compression_enable:1;
+			uint32_t memory_compression_type:1;
+		} dg2;
 	} ss7;
 
 	struct {
@@ -138,15 +153,22 @@ struct gen9_surface_state {
 		uint32_t aux_base_addr_hi;
 	} ss11;
 
-	/* register can be used for either
-	 * clear value or depth clear value
-	 */
 	struct {
-		uint32_t clear_address;
+		/*
+		 * compression_format is used only dg2 onward.
+		 * prior to dg2 full ss12 is used for the address
+		 * but due to alignments bits 0..6 will be zero
+		 * and asserted in code to be so
+		 */
+		uint32_t compression_format:5;
+		uint32_t pad0:1;
+		uint32_t clear_address:26;
 	} ss12;
 
 	struct {
-		uint32_t clear_address_hi;
+		uint32_t clear_address_hi:16;
+		uint32_t pad0:16;
+
 	} ss13;
 
 	struct {

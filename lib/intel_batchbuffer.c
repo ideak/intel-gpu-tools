@@ -1146,7 +1146,7 @@ igt_render_copyfunc_t igt_get_render_copyfunc(int devid)
 		copy = gen9_render_copyfunc;
 	else if (IS_GEN11(devid))
 		copy = gen11_render_copyfunc;
-	else if (IS_DG2(devid))
+	else if (HAS_4TILE(devid))
 		copy = gen12p71_render_copyfunc;
 	else if (IS_GEN12(devid))
 		copy = gen12_render_copyfunc;

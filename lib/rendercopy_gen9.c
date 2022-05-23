@@ -165,7 +165,8 @@ intel_get_uc_mocs(int fd) {
 
 /* Mostly copy+paste from gen6, except height, width, pitch moved */
 static uint32_t
-gen8_bind_buf(struct intel_bb *ibb, const struct intel_buf *buf, int is_dst) {
+gen8_bind_buf(struct intel_bb *ibb, const struct intel_buf *buf, int is_dst,
+	      bool fast_clear) {
 	struct gen9_surface_state *ss;
 	uint32_t write_domain, read_domain;
 	uint64_t address;
@@ -192,15 +193,26 @@ gen8_bind_buf(struct intel_bb *ibb, const struct intel_buf *buf, int is_dst) {
 		case 64: ss->ss0.surface_format = SURFACEFORMAT_R16G16B16A16_FLOAT; break;
 		default: igt_assert(0);
 	}
-	ss->ss0.render_cache_read_write = 1;
 	ss->ss0.vertical_alignment = 1; /* align 4 */
-	ss->ss0.horizontal_alignment = 1; /* align 4 */
+	ss->ss0.horizontal_alignment = 1; /* align 4 or HALIGN_32 on display ver >= 13*/
+
+	if (HAS_4TILE(ibb->devid)) {
+		/*
+		 * mocs table version 1 index 3 groub wb use l3
+		 */
+		ss->ss1.memory_object_control = 3 << 1;
+		ss->ss5.mip_tail_start_lod = 0;
+	} else {
+		ss->ss0.render_cache_read_write = 1;
+		ss->ss1.memory_object_control = intel_get_uc_mocs(i915);
+		ss->ss5.mip_tail_start_lod = 1; /* needed with trmode */
+	}
+
 	if (buf->tiling == I915_TILING_X)
 		ss->ss0.tiled_mode = 2;
 	else if (buf->tiling != I915_TILING_NONE)
 		ss->ss0.tiled_mode = 3;
 
-	ss->ss1.memory_object_control = intel_get_uc_mocs(i915);
 	if (intel_buf_pxp(buf))
 		ss->ss1.memory_object_control |= 1;
 
@@ -208,7 +220,6 @@ gen8_bind_buf(struct intel_bb *ibb, const struct intel_buf *buf, int is_dst) {
 		ss->ss5.trmode = 1;
 	else if (buf->tiling == I915_TILING_Ys)
 		ss->ss5.trmode = 2;
-	ss->ss5.mip_tail_start_lod = 1; /* needed with trmode */
 
 	address = intel_bb_offset_reloc(ibb, buf->handle,
 					read_domain, write_domain,
@@ -229,20 +240,23 @@ gen8_bind_buf(struct intel_bb *ibb, const struct intel_buf *buf, int is_dst) {
 	if (buf->compression == I915_COMPRESSION_MEDIA)
 		ss->ss7.tgl.media_compression = 1;
 	else if (buf->compression == I915_COMPRESSION_RENDER) {
-		igt_assert(buf->ccs[0].stride);
-
 		ss->ss6.aux_mode = 0x5; /* AUX_CCS_E */
-		ss->ss6.aux_pitch = (buf->ccs[0].stride / 128) - 1;
 
-		address = intel_bb_offset_reloc_with_delta(ibb, buf->handle,
-							   read_domain, write_domain,
-							   (buf->cc.offset ? (1 << 10) : 0) | buf->ccs[0].offset,
-							   intel_bb_offset(ibb) + 4 * 10,
-							   buf->addr.offset);
-		ss->ss10.aux_base_addr = (address + buf->ccs[0].offset) >> 12;
-		ss->ss11.aux_base_addr_hi = (address + buf->ccs[0].offset) >> 32;
+		if (buf->ccs[0].stride) {
 
-		if (buf->cc.offset) {
+			ss->ss6.aux_pitch = (buf->ccs[0].stride / 128) - 1;
+
+			address = intel_bb_offset_reloc_with_delta(ibb, buf->handle,
+								   read_domain, write_domain,
+								   (buf->cc.offset ? (1 << 10) : 0)
+								   | buf->ccs[0].offset,
+								   intel_bb_offset(ibb) + 4 * 10,
+								   buf->addr.offset);
+			ss->ss10.aux_base_addr = (address + buf->ccs[0].offset) >> 12;
+			ss->ss11.aux_base_addr_hi = (address + buf->ccs[0].offset) >> 32;
+		}
+
+		if (fast_clear || (buf->cc.offset && !HAS_FLATCCS(ibb->devid))) {
 			igt_assert(buf->compression == I915_COMPRESSION_RENDER);
 
 			ss->ss10.clearvalue_addr_enable = 1;
@@ -252,8 +266,30 @@ gen8_bind_buf(struct intel_bb *ibb, const struct intel_buf *buf, int is_dst) {
 								   buf->cc.offset,
 								   intel_bb_offset(ibb) + 4 * 12,
 								   buf->addr.offset);
-			ss->ss12.clear_address = address + buf->cc.offset;
+
+			/*
+			 * If this assert doesn't hold below clear address will be
+			 * written wrong.
+			 */
+
+			igt_assert(__builtin_ctzl(address + buf->cc.offset) >= 6 &&
+				   (__builtin_clzl(address + buf->cc.offset) >= 16));
+
+			ss->ss12.clear_address = (address + buf->cc.offset) >> 6;
 			ss->ss13.clear_address_hi = (address + buf->cc.offset) >> 32;
+		} else if (HAS_FLATCCS(ibb->devid)) {
+			ss->ss7.dg2.memory_compression_type = 0;
+			ss->ss7.dg2.memory_compression_enable = 0;
+			ss->ss7.dg2.disable_support_for_multi_gpu_partial_writes = 1;
+			ss->ss7.dg2.disable_support_for_multi_gpu_atomics = 1;
+
+			/*
+			 * For now here is coming only 32bpp rgb format
+			 * which is marked below as B8G8R8X8_UNORM = '8'
+			 * If here ever arrive other formats below need to be
+			 * fixed to take that into account.
+			 */
+			ss->ss12.compression_format = 8;
 		}
 	}
 
@@ -266,14 +302,15 @@ gen8_bind_surfaces(struct intel_bb *ibb,
 		   const struct intel_buf *dst)
 {
 	uint32_t *binding_table, binding_table_offset;
+	bool fast_clear = !src;
 
 	binding_table = intel_bb_ptr_align(ibb, 32);
 	binding_table_offset = intel_bb_ptr_add_return_prev_offset(ibb, 32);
 
-	binding_table[0] = gen8_bind_buf(ibb, dst, 1);
+	binding_table[0] = gen8_bind_buf(ibb, dst, 1, fast_clear);
 
 	if (src != NULL)
-		binding_table[1] = gen8_bind_buf(ibb, src, 0);
+		binding_table[1] = gen8_bind_buf(ibb, src, 0, false);
 
 	return binding_table_offset;
 }
@@ -856,12 +893,14 @@ gen8_emit_ps(struct intel_bb *ibb, uint32_t kernel, bool fast_clear) {
 static void
 gen9_emit_depth(struct intel_bb *ibb)
 {
+	bool need_10dw = HAS_4TILE(ibb->devid);
+
 	intel_bb_out(ibb, GEN8_3DSTATE_WM_DEPTH_STENCIL | (4 - 2));
 	intel_bb_out(ibb, 0);
 	intel_bb_out(ibb, 0);
 	intel_bb_out(ibb, 0);
 
-	intel_bb_out(ibb, GEN7_3DSTATE_DEPTH_BUFFER | (8-2));
+	intel_bb_out(ibb, GEN7_3DSTATE_DEPTH_BUFFER | (need_10dw ? (10-2) : (8-2)));
 	intel_bb_out(ibb, 0);
 	intel_bb_out(ibb, 0);
 	intel_bb_out(ibb, 0);
@@ -869,6 +908,10 @@ gen9_emit_depth(struct intel_bb *ibb)
 	intel_bb_out(ibb, 0);
 	intel_bb_out(ibb, 0);
 	intel_bb_out(ibb, 0);
+	if (need_10dw) {
+		intel_bb_out(ibb, 0);
+		intel_bb_out(ibb, 0);
+	}
 
 	intel_bb_out(ibb, GEN8_3DSTATE_HIER_DEPTH_BUFFER | (5-2));
 	intel_bb_out(ibb, 0);
@@ -1080,7 +1123,7 @@ void _gen9_render_op(struct intel_bb *ibb,
 
 	gen9_emit_state_base_address(ibb);
 
-	if (IS_DG2(ibb->devid) || intel_gen(ibb->devid) > 12) {
+	if (HAS_4TILE(ibb->devid) || intel_gen(ibb->devid) > 12) {
 		intel_bb_out(ibb, GEN4_3DSTATE_BINDING_TABLE_POOL_ALLOC | 2);
 		intel_bb_emit_reloc(ibb, ibb->handle,
 				    I915_GEM_DOMAIN_RENDER | I915_GEM_DOMAIN_INSTRUCTION, 0,
@@ -1197,18 +1240,12 @@ void gen12p71_render_copyfunc(struct intel_bb *ibb,
 			      struct intel_buf *dst,
 			      unsigned int dst_x, unsigned int dst_y)
 {
-	struct aux_pgtable_info pgtable_info = { };
-
-	gen12_aux_pgtable_init(&pgtable_info, ibb, src, dst);
-
 	_gen9_render_op(ibb, src, src_x, src_y,
 			width, height, dst, dst_x, dst_y,
-			pgtable_info.pgtable_buf,
+			NULL,
 			NULL,
 			gen12p71_render_copy,
 			sizeof(gen12p71_render_copy));
-
-	gen12_aux_pgtable_cleanup(ibb, &pgtable_info);
 }
 
 void gen12_render_clearfunc(struct intel_bb *ibb,
@@ -1217,16 +1254,24 @@ void gen12_render_clearfunc(struct intel_bb *ibb,
 			    unsigned int width, unsigned int height,
 			    const float clear_color[4])
 {
-	struct aux_pgtable_info pgtable_info = { };
+	if (!HAS_4TILE(ibb->devid)) {
+		struct aux_pgtable_info pgtable_info = { };
 
-	gen12_aux_pgtable_init(&pgtable_info, ibb, NULL, dst);
+		gen12_aux_pgtable_init(&pgtable_info, ibb, NULL, dst);
 
-	_gen9_render_op(ibb, NULL, 0, 0,
-		        width, height, dst, dst_x, dst_y,
-		        pgtable_info.pgtable_buf,
-		        clear_color,
-		        gen12_render_copy,
-		        sizeof(gen12_render_copy));
-
-	gen12_aux_pgtable_cleanup(ibb, &pgtable_info);
+		_gen9_render_op(ibb, NULL, 0, 0,
+				width, height, dst, dst_x, dst_y,
+				pgtable_info.pgtable_buf,
+				clear_color,
+				gen12_render_copy,
+				sizeof(gen12_render_copy));
+		gen12_aux_pgtable_cleanup(ibb, &pgtable_info);
+	} else {
+			_gen9_render_op(ibb, NULL, 0, 0,
+					width, height, dst, dst_x, dst_y,
+					NULL,
+					clear_color,
+					gen12p71_render_copy,
+					sizeof(gen12p71_render_copy));
+	}
 }

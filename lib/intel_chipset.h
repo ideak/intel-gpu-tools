@@ -219,6 +219,7 @@ void intel_check_pch(void);
 
 #define HAS_4TILE(devid)	(intel_get_device_info(devid)->has_4tile)
 
-#define HAS_FLATCCS(devid)	(intel_get_device_info(devid)->has_flatccs)
+/* use HAS_4TILE here as all devices with 4-tile have flat ccs. */
+#define HAS_FLATCCS(devid)	HAS_4TILE(devid)
 
 #endif /* _INTEL_CHIPSET_H */
