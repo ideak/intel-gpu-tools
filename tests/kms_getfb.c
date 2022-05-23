@@ -88,11 +88,18 @@ static void get_ccs_fb(int fd, struct drm_mode_fb_cmd2 *ret)
 		.flags = DRM_MODE_FB_MODIFIERS,
 	};
 	int size;
+	uint32_t devid;
 
 	igt_require(has_addfb2_iface(fd));
 	igt_require_intel(fd);
+	devid = intel_get_drm_devid(fd);
 
-	if ((intel_display_ver(intel_get_drm_devid(fd))) >= 12) {
+	if (HAS_FLATCCS(devid)) {
+		add.modifier[0] = I915_FORMAT_MOD_4_TILED_DG2_RC_CCS;
+		add.pitches[0] = ALIGN(add.width * 4, 4 * 512);
+		size = add.pitches[0] * ALIGN(add.height, 8);
+		size = ALIGN(size, 4096);
+	} else if ((intel_display_ver(devid)) >= 12) {
 		add.modifier[0] = I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS;
 		add.modifier[1] = I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS;
 
@@ -130,7 +137,9 @@ static void get_ccs_fb(int fd, struct drm_mode_fb_cmd2 *ret)
 
 	add.handles[0] = gem_buffer_create_fb_obj(fd, size);
 	igt_require(add.handles[0] != 0);
-	add.handles[1] = add.handles[0];
+
+	if (!HAS_FLATCCS(intel_get_drm_devid(fd)))
+		add.handles[1] = add.handles[0];
 
 	if (drmIoctl(fd, DRM_IOCTL_MODE_ADDFB2, &add) == 0)
 		*ret = add;
@@ -256,6 +265,9 @@ static void test_duplicate_handles(int fd)
 		struct drm_mode_fb_cmd2 add_ccs = { };
 		struct drm_mode_fb_cmd get = { };
 
+		igt_require_f(!HAS_FLATCCS(intel_get_drm_devid(fd)),
+			      "skip because flat ccs has only one buffer.\n");
+
 		get_ccs_fb(fd, &add_ccs);
 		igt_require(add_ccs.handles[0] != 0);
 		get.fb_id = add_ccs.fb_id;
@@ -350,7 +362,9 @@ static void test_getfb2(int fd)
 				igt_assert_eq_u64(get.modifier[i], 0);
 			}
 		}
-		igt_assert_eq_u32(get.handles[0], get.handles[1]);
+
+		if (!HAS_FLATCCS(intel_get_drm_devid(fd)))
+			igt_assert_eq_u32(get.handles[0], get.handles[1]);
 
 		do_ioctl(fd, DRM_IOCTL_MODE_RMFB, &get.fb_id);
 		gem_close(fd, add_ccs.handles[0]);
