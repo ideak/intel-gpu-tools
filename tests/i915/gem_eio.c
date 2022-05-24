@@ -146,6 +146,7 @@ static void test_create_ext(int fd)
 		igt_assert_eq(__gem_create_in_memory_region_list(fd,
 								 &handle,
 								 &size,
+								 0,
 								 &r->ci, 1),
 			      0);
 
