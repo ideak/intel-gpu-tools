@@ -909,7 +909,7 @@ static uint64_t __intel_allocator_open_full(int fd, uint32_t ctx,
 	struct alloc_resp resp;
 	uint64_t gtt_size;
 
-	if (!start && !end) {
+	if (!end) {
 		igt_assert_f(can_report_gtt_size(fd), "Invalid fd\n");
 		gtt_size = gem_aperture_size(fd);
 		if (!gem_uses_full_ppgtt(fd))

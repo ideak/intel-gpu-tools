@@ -1359,6 +1359,9 @@ __intel_bb_create(int i915, uint32_t ctx, uint32_t size, bool do_relocs,
 	if (!ibb->uses_full_ppgtt)
 		do_relocs = true;
 
+	/* Use safe start offset instead assuming 0x0 is safe */
+	start = max_t(uint64_t, start, gem_detect_safe_start_offset(i915));
+
 	/* if relocs are set we won't use an allocator */
 	if (do_relocs)
 		allocator_type = INTEL_ALLOCATOR_NONE;
