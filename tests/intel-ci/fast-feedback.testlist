@@ -1,5 +1,7 @@
-# Keep alphabetically sorted by default
+# Try to load the driver if it's not available yet.
+igt@i915_module_load@load
 
+# Keep alphabetically sorted by default
 igt@core_auth@basic-auth
 igt@debugfs_test@read_all_entries
 igt@fbdev@eof
