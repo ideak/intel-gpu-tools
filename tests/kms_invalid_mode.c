@@ -50,7 +50,6 @@ static bool has_scaling_mode_prop(data_t *data)
 static bool
 can_bigjoiner(data_t *data)
 {
-	drmModeConnector *connector = data->output->config.connector;
 	uint32_t devid = intel_get_drm_devid(data->drm_fd);
 
 	/*
@@ -61,7 +60,7 @@ can_bigjoiner(data_t *data)
 		igt_debug("Platform supports uncompressed bigjoiner\n");
 		return true;
 	} else if (intel_display_ver(devid) >= 11) {
-		return igt_is_dsc_supported(data->drm_fd, connector);
+		return igt_is_dsc_supported(data->drm_fd, data->output->name);
 	}
 
 	return false;

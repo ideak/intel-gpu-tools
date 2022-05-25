@@ -979,19 +979,6 @@ static void run_modeset_transition(data_t *data, int requested_outputs, bool non
 	run_modeset_tests(data, requested_outputs, nonblocking, fencing);
 }
 
-static bool output_is_internal_panel(igt_output_t *output)
-{
-	switch (output->config.connector->connector_type) {
-	case DRM_MODE_CONNECTOR_LVDS:
-	case DRM_MODE_CONNECTOR_eDP:
-	case DRM_MODE_CONNECTOR_DSI:
-	case DRM_MODE_CONNECTOR_DPI:
-		return true;
-	default:
-		return false;
-	}
-}
-
 static int opt_handler(int opt, int opt_index, void *_data)
 {
 	data_t *data = _data;

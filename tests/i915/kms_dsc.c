@@ -65,7 +65,6 @@ typedef struct {
 	int compression_bpp;
 	int n_pipes;
 	enum pipe pipe;
-	char conn_name[128];
 } data_t;
 
 bool force_dsc_en_orig;
@@ -80,9 +79,9 @@ static void force_dsc_enable(data_t *data)
 {
 	int ret;
 
-	igt_debug ("Forcing DSC enable on %s\n", data->conn_name);
+	igt_debug ("Forcing DSC enable on %s\n", data->output->name);
 	ret = igt_force_dsc_enable(data->drm_fd,
-				      data->output->config.connector);
+				   data->output->name);
 	igt_assert_f(ret > 0, "debugfs_write failed");
 }
 
@@ -91,10 +90,10 @@ static void force_dsc_enable_bpp(data_t *data)
 	int ret;
 
 	igt_debug("Forcing DSC BPP to %d on %s\n",
-		  data->compression_bpp, data->conn_name);
+		  data->compression_bpp, data->output->name);
 	ret = igt_force_dsc_enable_bpp(data->drm_fd,
-					  data->output->config.connector,
-					  data->compression_bpp);
+				       data->output->name,
+				       data->compression_bpp);
 	igt_assert_f(ret > 0, "debugfs_write failed");
 }
 
@@ -102,10 +101,10 @@ static void save_force_dsc_en(data_t *data)
 {
 	force_dsc_en_orig =
 		igt_is_force_dsc_enabled(data->drm_fd,
-					 data->output->config.connector);
+					 data->output->name);
 	force_dsc_restore_fd =
 		igt_get_dsc_debugfs_fd(data->drm_fd,
-					  data->output->config.connector);
+				       data->output->name);
 	igt_assert(force_dsc_restore_fd >= 0);
 }
 
@@ -139,19 +138,6 @@ static void kms_dsc_exit_handler(int sig)
 	restore_force_dsc_en();
 }
 
-static bool is_external_panel(drmModeConnector *connector)
-{
-	switch (connector->connector_type) {
-		case DRM_MODE_CONNECTOR_LVDS:
-		case DRM_MODE_CONNECTOR_eDP:
-		case DRM_MODE_CONNECTOR_DSI:
-		case DRM_MODE_CONNECTOR_DPI:
-			return false;
-		default:
-			return true;
-	}
-}
-
 static int sort_drm_modes(const void *a, const void *b)
 {
 	const drmModeModeInfo *mode1 = a, *mode2 = b;
@@ -183,21 +169,19 @@ static bool check_dsc_on_connector(data_t *data, uint32_t drmConnector)
 	    output->config.connector->modes[0].hdisplay < 5120)
 		return NULL;
 
-	sprintf(data->conn_name, "%s-%d",
-		kmstest_connector_type_str(connector->connector_type),
-		connector->connector_type_id);
-
-	if (!igt_is_dsc_supported(data->drm_fd, connector)) {
+	if (!igt_is_dsc_supported(data->drm_fd, data->output->name)) {
 		igt_debug("DSC not supported on connector %s\n",
-			  data->conn_name);
+			  data->output->name);
 		return false;
 	}
-	if (is_external_panel(connector) &&
-	    !igt_is_fec_supported(data->drm_fd, connector)) {
+
+	if (!output_is_internal_panel(output) &&
+	    !igt_is_fec_supported(data->drm_fd, output->name)) {
 		igt_debug("DSC cannot be enabled without FEC on %s\n",
-			  data->conn_name);
+			  data->output->name);
 		return false;
 	}
+
 	data->output = output;
 	return true;
 }
@@ -215,7 +199,7 @@ static void update_display(data_t *data, enum dsc_test_type test_type)
 	igt_output_set_pipe(data->output, PIPE_NONE);
 	igt_display_commit(&data->display);
 
-	igt_debug("DSC is supported on %s\n", data->conn_name);
+	igt_debug("DSC is supported on %s\n", data->output->name);
 	save_force_dsc_en(data);
 	force_dsc_enable(data);
 	if (test_type == test_dsc_compression_bpp) {
@@ -243,7 +227,7 @@ static void update_display(data_t *data, enum dsc_test_type test_type)
 	manual("RGB test pattern without corruption");
 
 	enabled = igt_is_dsc_enabled(data->drm_fd,
-					data->output->config.connector);
+				     data->output->name);
 	restore_force_dsc_en();
 	igt_debug("Reset compression BPP\n");
 	data->compression_bpp = 0;
@@ -251,7 +235,7 @@ static void update_display(data_t *data, enum dsc_test_type test_type)
 
 	igt_assert_f(enabled,
 		     "Default DSC enable failed on Connector: %s Pipe: %s\n",
-		     data->conn_name,
+		     data->output->name,
 		     kmstest_pipe_name(data->pipe));
 }
 
