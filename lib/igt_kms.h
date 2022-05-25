@@ -479,6 +479,7 @@ igt_plane_t *igt_pipe_get_plane_type(igt_pipe_t *pipe, int plane_type);
 int igt_pipe_count_plane_type(igt_pipe_t *pipe, int plane_type);
 igt_plane_t *igt_pipe_get_plane_type_index(igt_pipe_t *pipe, int plane_type,
 					   int index);
+bool output_is_internal_panel(igt_output_t *output);
 igt_output_t *igt_get_single_output_for_pipe(igt_display_t *display, enum pipe pipe);
 
 void igt_pipe_request_out_fence(igt_pipe_t *pipe);
@@ -939,14 +940,14 @@ void igt_dump_connectors_fd(int drmfd);
 void igt_dump_crtcs_fd(int drmfd);
 bool igt_override_all_active_output_modes_to_fit_bw(igt_display_t *display);
 
-bool igt_is_dsc_supported(int drmfd, drmModeConnector *connector);
-bool igt_is_fec_supported(int drmfd, drmModeConnector *connector);
-bool igt_is_dsc_enabled(int drmfd, drmModeConnector *connector);
-bool igt_is_force_dsc_enabled(int drmfd, drmModeConnector *connector);
-int igt_force_dsc_enable(int drmfd, drmModeConnector *connector);
-int igt_force_dsc_enable_bpp(int drmfd, drmModeConnector *connector,
-				int bpp);
-int igt_get_dsc_debugfs_fd(int drmfd, drmModeConnector *connector);
+bool igt_is_dsc_supported(int drmfd, char *connector_name);
+bool igt_is_fec_supported(int drmfd, char *connector_name);
+bool igt_is_dsc_enabled(int drmfd, char *connector_name);
+bool igt_is_force_dsc_enabled(int drmfd, char *connector_name);
+int igt_force_dsc_enable(int drmfd, char *connector_name);
+int igt_force_dsc_enable_bpp(int drmfd, char *connector_name,
+			     int bpp);
+int igt_get_dsc_debugfs_fd(int drmfd, char *connector_name);
 
 unsigned int igt_get_output_max_bpc(int drmfd, char *connector_name);
 unsigned int igt_get_pipe_current_bpc(int drmfd, enum pipe pipe);
