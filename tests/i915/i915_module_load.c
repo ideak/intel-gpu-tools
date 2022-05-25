@@ -30,6 +30,7 @@
 #include <sys/ioctl.h>
 #include <fcntl.h>
 
+#include "i915/gem.h"
 #include "i915/gem_create.h"
 #include "igt_debugfs.h"
 #include "igt_aux.h"
@@ -236,21 +237,54 @@ hda_dynamic_debug(bool enable)
 	fclose(fp);
 }
 
+static void load_and_check_i915(void)
+{
+	int error;
+	int drm_fd;
+
+	hda_dynamic_debug(true);
+	error = igt_i915_driver_load(NULL);
+	hda_dynamic_debug(false);
+
+	igt_assert_eq(error, 0);
+
+	/* driver is ready, check if it's bound */
+	drm_fd = __drm_open_driver(DRIVER_INTEL);
+	igt_fail_on_f(drm_fd < 0, "Cannot open the i915 DRM driver after modprobing i915.\n");
+
+	/* make sure the GPU is idle */
+	gem_quiescent_gpu(drm_fd);
+	close(drm_fd);
+
+	/* make sure we can do basic memory ops */
+	gem_sanitycheck();
+}
+
 igt_main
 {
+	igt_describe("Check if i915 and friends are not yet loaded, then load them.");
+	igt_subtest("load") {
+		const char * unwanted_drivers[] = {
+			"i915",
+			"intel-gtt",
+			"snd_hda_intel",
+			"snd_hdmi_lpe_audio",
+			NULL
+		};
+
+		for (int i = 0; unwanted_drivers[i] != NULL; i++) {
+			igt_skip_on_f(igt_kmod_is_loaded(unwanted_drivers[i]),
+			              "%s is already loaded\n", unwanted_drivers[i]);
+		}
+
+		load_and_check_i915();
+	}
+
 	igt_describe("Verify the basic functionality of i915 driver after it's reloaded.");
 	igt_subtest("reload") {
-		int load_error;
-
 		igt_i915_driver_unload();
 
-		hda_dynamic_debug(true);
-		load_error = igt_i915_driver_load(NULL);
-		hda_dynamic_debug(false);
-
-		igt_assert_eq(load_error, 0);
-
-		gem_sanitycheck();
+		load_and_check_i915();
 
 		/* only default modparams, can leave module loaded */
 	}
