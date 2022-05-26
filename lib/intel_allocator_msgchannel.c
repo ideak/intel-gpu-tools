@@ -75,6 +75,7 @@ static void msgqueue_init(struct msg_channel *channel)
 	msgdata->key = key;
 	msgdata->queue = queue;
 	channel->priv = msgdata;
+	channel->ready = true;
 }
 
 static void msgqueue_deinit(struct msg_channel *channel)
@@ -84,6 +85,7 @@ static void msgqueue_deinit(struct msg_channel *channel)
 	igt_debug("Deinit msgqueue\n");
 	msgctl(msgdata->queue, IPC_RMID, NULL);
 	free(channel->priv);
+	channel->ready = false;
 }
 
 static int msgqueue_send_req(struct msg_channel *channel,

@@ -737,6 +737,10 @@ static int handle_request(struct alloc_req *req, struct alloc_resp *resp)
 		return 0;
 	}
 
+	igt_assert_f(channel->ready,
+		     "Allocator must be called in multiprocess mode, "
+		     "use intel_allocator_multiprocess_(start|stop)()\n");
+
 	ret = send_req_recv_resp(channel, req, resp);
 
 	if (ret < 0)

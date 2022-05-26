@@ -140,6 +140,7 @@ struct alloc_resp {
 };
 
 struct msg_channel {
+	bool ready;
 	void *priv;
 	void (*init)(struct msg_channel *channel);
 	void (*deinit)(struct msg_channel *channel);
