@@ -367,7 +367,7 @@ static void prepare(data_t *data)
 
 	igt_plane_set_fb(primary, &data->fb_primary);
 	igt_fb_set_position(&data->fb_primary, primary, x, y);
-	igt_fb_set_size(&data->fb_overlay, primary, view_w,
+	igt_fb_set_size(&data->fb_primary, primary, view_w,
 			view_h);
 	igt_plane_set_size(primary, view_w, view_h);
 	igt_plane_set_position(primary, 0, 0);
