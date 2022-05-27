@@ -864,6 +864,7 @@ igt_main
 		data.op = PLANE_UPDATE;
 		data.test_plane_id = DRM_PLANE_TYPE_PRIMARY;
 		data.primary_format = DRM_FORMAT_XRGB8888;
+		data.big_fb_test = 0;
 
 		res = drmModeGetResources(data.drm_fd);
 		data.big_fb_width = res->max_width;
