@@ -437,6 +437,36 @@ static struct engines *discover_engines(char *device)
 	return engines;
 }
 
+static void free_engines(struct engines *engines)
+{
+	struct pmu_counter **pmu, *free_list[] = {
+		&engines->r_gpu,
+		&engines->r_pkg,
+		&engines->imc_reads,
+		&engines->imc_writes,
+		NULL
+	};
+	unsigned int i;
+
+	for (pmu = &free_list[0]; *pmu; pmu++) {
+		if ((*pmu)->present)
+			free((char *)(*pmu)->units);
+	}
+
+	for (i = 0; i < engines->num_engines; i++) {
+		struct engine *engine = engine_ptr(engines, i);
+
+		free((char *)engine->name);
+		free((char *)engine->short_name);
+		free((char *)engine->display_name);
+	}
+
+	closedir(engines->root);
+
+	free(engines->class);
+	free(engines);
+}
+
 #define _open_pmu(type, cnt, pmu, fd) \
 ({ \
 	int fd__; \
@@ -1073,7 +1103,7 @@ static size_t freadat2buf(char *buf, const size_t sz, DIR *at, const char *name)
 	return count;
 }
 
-static struct clients *scan_clients(struct clients *clients)
+static struct clients *scan_clients(struct clients *clients, bool display)
 {
 	struct dirent *proc_dent;
 	struct client *c;
@@ -1181,7 +1211,7 @@ next:
 			break;
 	}
 
-	return display_clients(clients);
+	return display ? display_clients(clients) : clients;
 }
 
 static const char *bars[] = { " ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█" };
@@ -2391,7 +2421,7 @@ static void process_stdin(unsigned int timeout_us)
 
 static bool has_drm_fdinfo(const struct igt_device_card *card)
 {
-	struct drm_client_fdinfo info;
+	struct drm_client_fdinfo info = { };
 	unsigned int cnt;
 	int fd;
 
@@ -2572,7 +2602,7 @@ int main(int argc, char **argv)
 	}
 
 	pmu_sample(engines);
-	scan_clients(clients);
+	scan_clients(clients, false);
 	codename = igt_device_get_pretty_name(&card, false);
 
 	while (!stop_top) {
@@ -2599,7 +2629,7 @@ int main(int argc, char **argv)
 		pmu_sample(engines);
 		t = (double)(engines->ts.cur - engines->ts.prev) / 1e9;
 
-		disp_clients = scan_clients(clients);
+		disp_clients = scan_clients(clients, true);
 
 		if (stop_top)
 			break;
@@ -2649,11 +2679,11 @@ int main(int argc, char **argv)
 			pops->close_struct();
 		}
 
-		if (stop_top)
-			break;
-
 		if (disp_clients != clients)
 			free_clients(disp_clients);
+
+		if (stop_top)
+			break;
 
 		if (output_mode == INTERACTIVE)
 			process_stdin(period_us);
@@ -2661,9 +2691,12 @@ int main(int argc, char **argv)
 			usleep(period_us);
 	}
 
+	if (clients)
+		free_clients(clients);
+
 	free(codename);
 err:
-	free(engines);
+	free_engines(engines);
 	free(pmu_device);
 exit:
 	igt_devices_free();
