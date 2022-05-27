@@ -44,12 +44,12 @@ static size_t read_fdinfo(char *buf, const size_t sz, int at, const char *name)
 	if (fd < 0)
 		return 0;
 
-	buf[sz - 1] = 0;
-	count = read(fd, buf, sz);
-	buf[sz - 1] = 0;
+	count = read(fd, buf, sz - 1);
+	if (count > 0)
+		buf[count - 1] = 0;
 	close(fd);
 
-	return count;
+	return count > 0 ? count : 0;
 }
 
 static int parse_engine(char *line, struct drm_client_fdinfo *info,

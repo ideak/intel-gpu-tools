@@ -46,7 +46,7 @@ struct drm_client_fdinfo {
  * igt_parse_drm_fdinfo: Parses the drm fdinfo file
  *
  * @drm_fd: DRM file descriptor
- * @info: Structure to populate with read data
+ * @info: Structure to populate with read data. Must be zeroed.
  *
  * Returns the number of valid drm fdinfo keys found or zero if not all
  * mandatory keys were present or no engines found.
@@ -58,7 +58,7 @@ unsigned int igt_parse_drm_fdinfo(int drm_fd, struct drm_client_fdinfo *info);
  *
  * @dir: File descriptor pointing to /proc/pid/fdinfo directory
  * @fd: String representation of the file descriptor number to parse.
- * @info: Structure to populate with read data
+ * @info: Structure to populate with read data. Must be zeroed.
  *
  * Returns the number of valid drm fdinfo keys found or zero if not all
  * mandatory keys were present or no engines found.
