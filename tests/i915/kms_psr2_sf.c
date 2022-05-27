@@ -710,8 +710,7 @@ static void plane_move_continuous(data_t *data)
 static void damaged_plane_update(data_t *data)
 {
 	igt_plane_t *test_plane = data->test_plane;
-	uint32_t h = data->mode->hdisplay;
-	uint32_t v = data->mode->vdisplay;
+	uint32_t h, v;
 	int x, y;
 
 	if (data->big_fb_test) {
@@ -721,9 +720,20 @@ static void damaged_plane_update(data_t *data)
 		x = y = 0;
 	}
 
-	if (data->test_plane_id == DRM_PLANE_TYPE_OVERLAY) {
-		h = h/2;
-		v = v/2;
+	switch (data->test_plane_id) {
+	case DRM_PLANE_TYPE_OVERLAY:
+		h = data->mode->hdisplay / 2;
+		v = data->mode->vdisplay / 2;
+		break;
+	case DRM_PLANE_TYPE_PRIMARY:
+		h = data->mode->hdisplay;
+		v = data->mode->vdisplay;
+		break;
+	case DRM_PLANE_TYPE_CURSOR:
+		h = v = CUR_SIZE;
+		break;
+	default:
+		igt_assert(false);
 	}
 
 	if (data->screen_changes & 1) {
