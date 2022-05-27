@@ -810,6 +810,11 @@ void igt_devices_free(void)
 {
 	struct igt_device *dev, *tmp;
 
+	igt_list_for_each_entry_safe(dev, tmp, &igt_devs.filtered, link) {
+		igt_list_del(&dev->link);
+		free(dev);
+	}
+
 	igt_list_for_each_entry_safe(dev, tmp, &igt_devs.all, link) {
 		igt_device_free(dev);
 		free(dev);
