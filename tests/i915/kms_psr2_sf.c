@@ -710,6 +710,7 @@ static void plane_move_continuous(data_t *data)
 static void damaged_plane_update(data_t *data)
 {
 	igt_plane_t *test_plane = data->test_plane;
+	struct igt_fb *fb_test;
 	uint32_t h, v;
 	int x, y;
 
@@ -736,26 +737,27 @@ static void damaged_plane_update(data_t *data)
 		igt_assert(false);
 	}
 
-	if (data->screen_changes & 1) {
-		igt_plane_set_fb(test_plane, data->fb_continuous);
-	} else {
-		igt_plane_set_fb(test_plane, &data->fb_test);
+	if (data->screen_changes & 1)
+		fb_test = data->fb_continuous;
+	else
+		fb_test = &data->fb_test;
 
-		if (data->test_plane_id == DRM_PLANE_TYPE_CURSOR)
-			igt_plane_replace_prop_blob(test_plane,
-						    IGT_PLANE_FB_DAMAGE_CLIPS,
-						    &data->cursor_clip,
-						    sizeof(struct drm_mode_rect));
-		else
-			igt_plane_replace_prop_blob(test_plane,
-						    IGT_PLANE_FB_DAMAGE_CLIPS,
-						    &data->plane_update_clip,
-						    sizeof(struct drm_mode_rect)*
-						    data->damage_area_count);
-	}
+	igt_plane_set_fb(test_plane, fb_test);
 
-	igt_fb_set_position(data->fb_continuous, test_plane, x, y);
-	igt_fb_set_size(data->fb_continuous, test_plane, h, v);
+	if (data->test_plane_id == DRM_PLANE_TYPE_CURSOR)
+		igt_plane_replace_prop_blob(test_plane,
+					    IGT_PLANE_FB_DAMAGE_CLIPS,
+					    &data->cursor_clip,
+					    sizeof(struct drm_mode_rect));
+	else
+		igt_plane_replace_prop_blob(test_plane,
+					    IGT_PLANE_FB_DAMAGE_CLIPS,
+					    &data->plane_update_clip,
+					    sizeof(struct drm_mode_rect)*
+					    data->damage_area_count);
+
+	igt_fb_set_position(fb_test, test_plane, x, y);
+	igt_fb_set_size(fb_test, test_plane, h, v);
 	igt_plane_set_size(test_plane, h, v);
 	igt_plane_set_position(data->test_plane, 0, 0);
 	igt_display_commit2(&data->display, COMMIT_ATOMIC);
