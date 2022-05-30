@@ -2461,11 +2461,12 @@ out:
 
 	for_each_pipe(display, i) {
 		igt_pipe_t *pipe = &display->pipes[i];
+		igt_output_t *output;
 
 		if (!igt_pipe_has_valid_output(display, i))
 			continue;
 
-		igt_output_t *output = igt_get_single_output_for_pipe(display, i);
+		output = igt_get_single_output_for_pipe(display, i);
 
 		if (pipe->num_primary_planes > 1) {
 			igt_plane_t *primary = &pipe->planes[pipe->plane_primary];
