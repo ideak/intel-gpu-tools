@@ -192,9 +192,11 @@ igt_main
 		count = (count + ncpus - 1) / ncpus;
 	}
 
+	igt_describe("Check basic functionality.");
 	igt_subtest("basic")
 		run_test(fd, 2);
 
+	igt_describe("Check with parallel execution.");
 	igt_subtest("normal") {
 		intel_allocator_multiprocess_start();
 		igt_fork(child, ncpus)
@@ -203,6 +205,7 @@ igt_main
 		intel_allocator_multiprocess_stop();
 	}
 
+	igt_describe("Check with interrupts in parallel execution.");
 	igt_subtest("interruptible") {
 		intel_allocator_multiprocess_start();
 		igt_fork_signal_helper();
