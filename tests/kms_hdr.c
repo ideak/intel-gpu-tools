@@ -144,8 +144,6 @@ static void test_bpc_switch_on_output(data_t *data, enum pipe pipe,
 	igt_fb_t afb;
 	int afb_id, ret;
 
-	prepare_test(data, output, pipe);
-
 	/* 10-bit formats are slow, so limit the size. */
 	afb_id = igt_create_fb(data->fd, 512, 512, DRM_FORMAT_XRGB2101010, 0, &afb);
 	igt_assert(afb_id);
@@ -206,6 +204,33 @@ static bool has_max_bpc(igt_output_t *output)
 	       igt_output_get_prop(output, IGT_CONNECTOR_MAX_BPC);
 }
 
+static bool i915_clock_constraint(data_t *data, int bpc)
+{
+	igt_output_t *output = data->output;
+	drmModeConnector *connector = output->config.connector;
+
+	igt_output_set_prop_value(data->output, IGT_CONNECTOR_MAX_BPC, bpc);
+	igt_sort_connector_modes(connector, sort_drm_modes_by_clk_dsc);
+
+	for_each_connector_mode(output) {
+		igt_output_override_mode(output, &connector->modes[j__]);
+		igt_display_commit_atomic(&data->display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
+
+		if (!igt_check_output_bpc_equal(data->fd, data->pipe_id,
+						data->output->name, bpc))
+			continue;
+
+		data->mode = igt_output_get_mode(output);
+		data->w = data->mode->hdisplay;
+		data->h = data->mode->vdisplay;
+
+		return true;
+	}
+
+	test_fini(data);
+	return false;
+}
+
 static void test_bpc_switch(data_t *data, uint32_t flags)
 {
 	igt_display_t *display = &data->display;
@@ -217,8 +242,17 @@ static void test_bpc_switch(data_t *data, uint32_t flags)
 		if (!has_max_bpc(output))
 			continue;
 
+		if (igt_get_output_max_bpc(data->fd, output->name) < 10)
+			continue;
+
 		for_each_pipe(display, pipe) {
 			if (igt_pipe_connector_valid(pipe, output)) {
+				prepare_test(data, output, pipe);
+
+				if (is_i915_device(data->fd) &&
+				    !i915_clock_constraint(data, 10))
+					break;
+
 				igt_dynamic_f("pipe-%s-%s",
 					      kmstest_pipe_name(pipe), output->name)
 					test_bpc_switch_on_output(data, pipe, output, flags);
@@ -367,8 +401,6 @@ static void test_static_toggle(data_t *data, enum pipe pipe,
 	igt_fb_t afb;
 	int afb_id;
 
-	prepare_test(data, output, pipe);
-
 	/* 10-bit formats are slow, so limit the size. */
 	afb_id = igt_create_fb(data->fd, 512, 512, DRM_FORMAT_XRGB2101010, 0, &afb);
 	igt_assert(afb_id);
@@ -445,8 +477,6 @@ static void test_static_swap(data_t *data, enum pipe pipe, igt_output_t *output)
 	igt_fb_t afb;
 	int afb_id;
 	struct hdr_output_metadata hdr;
-
-	prepare_test(data, output, pipe);
 
 	/* 10-bit formats are slow, so limit the size. */
 	afb_id = igt_create_fb(data->fd, 512, 512, DRM_FORMAT_XRGB2101010, 0, &afb);
@@ -532,8 +562,17 @@ static void test_hdr(data_t *data, uint32_t flags)
 		if (!is_panel_hdr(data, output))
 			continue;
 
+		if (igt_get_output_max_bpc(data->fd, output->name) < 10)
+			continue;
+
 		for_each_pipe(display, pipe) {
 			if (igt_pipe_connector_valid(pipe, output)) {
+				prepare_test(data, output, pipe);
+
+				if (is_i915_device(data->fd) &&
+				    !i915_clock_constraint(data, 10))
+					break;
+
 				igt_dynamic_f("pipe-%s-%s",
 					      kmstest_pipe_name(pipe), output->name) {
 					if (flags & TEST_NONE || flags & TEST_DPMS || flags & TEST_SUSPEND)
