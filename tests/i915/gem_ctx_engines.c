@@ -437,7 +437,7 @@ static uint32_t read_result(int timeline, uint32_t *map, int idx)
 	return map[idx];
 }
 
-static bool has_cs_timestamp(const struct intel_execution_engine2 *e, int gen)
+static bool has_cs_timestamp(const struct intel_execution_engine2 *e, unsigned int gen)
 {
 	if (gen >= 7)
 		return true;

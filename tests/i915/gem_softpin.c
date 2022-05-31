@@ -898,7 +898,7 @@ static void xchg_batch(void *array, unsigned int i, unsigned int j)
 	batches[j] = tmp;
 }
 
-static void submit(int fd, int gen,
+static void submit(int fd, unsigned int gen,
 		   struct drm_i915_gem_execbuffer2 *eb,
 		   struct batch *batches, unsigned int count,
 		   uint64_t ahnd)
