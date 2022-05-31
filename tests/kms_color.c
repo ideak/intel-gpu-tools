@@ -635,6 +635,28 @@ static void test_pipe_limited_range_ctm(data_t *data,
 }
 #endif
 
+static bool i915_clock_constraint(data_t *data, enum pipe pipe, int bpc)
+{
+	igt_output_t *output = data->output;
+	drmModeConnector *connector = output->config.connector;
+
+	igt_sort_connector_modes(connector, sort_drm_modes_by_clk_dsc);
+
+	for_each_connector_mode(output) {
+		igt_output_override_mode(output, &connector->modes[j__]);
+		igt_display_commit_atomic(&data->display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
+
+		if (!igt_check_output_bpc_equal(data->drm_fd, pipe,
+						data->output->name, bpc))
+			continue;
+
+		return true;
+	}
+
+	igt_output_override_mode(output, NULL);
+	return false;
+}
+
 static void
 prep_pipe(data_t *data, enum pipe p)
 {
@@ -866,6 +888,9 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 	igt_subtest_f("pipe-%s-legacy-gamma-reset", kmstest_pipe_name(p))
 		test_pipe_legacy_gamma_reset(data, primary);
 
+	igt_fixture
+		igt_require(data->display.is_atomic);
+
 	igt_describe("Verify that deep color works correctly");
 	igt_subtest_with_dynamic_f("pipe-%s-deep-color", kmstest_pipe_name(p)) {
 		igt_output_t *output;
@@ -896,12 +921,12 @@ run_tests_for_pipe(data_t *data, enum pipe p)
 			data->drm_format = DRM_FORMAT_XRGB2101010;
 			data->output = output;
 			igt_output_set_prop_value(output, IGT_CONNECTOR_MAX_BPC, 10);
-			igt_display_commit(&data->display);
+			igt_output_set_pipe(output, p);
+			igt_display_commit_atomic(&data->display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
 
-			if (!igt_check_output_bpc_equal(data->drm_fd, p, output->name, 10)) {
-				igt_output_set_prop_value(output, IGT_CONNECTOR_MAX_BPC, max_bpc);
-				igt_fail_on_f(true, "Failed to set max_bpc as: 10\n");
-			}
+			if (is_i915_device(data->drm_fd) &&
+			    !i915_clock_constraint(data, p, 10))
+				continue;
 
 			igt_dynamic_f("gamma-%s", output->name) {
 				ret = test_pipe_gamma(data, primary);
