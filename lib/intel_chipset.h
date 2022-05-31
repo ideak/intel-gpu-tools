@@ -84,6 +84,7 @@ struct intel_device_info {
 	bool is_raptorlake_s : 1;
 	bool is_alderlake_p : 1;
 	bool is_alderlake_n : 1;
+	bool is_ats_m : 1;
 	const char *codename;
 };
 
@@ -190,6 +191,7 @@ void intel_check_pch(void);
 #define IS_RAPTORLAKE_S(devid)	(intel_get_device_info(devid)->is_raptorlake_s)
 #define IS_ALDERLAKE_P(devid)	(intel_get_device_info(devid)->is_alderlake_p)
 #define IS_ALDERLAKE_N(devid)	(intel_get_device_info(devid)->is_alderlake_n)
+#define IS_ATS_M(devid)	(intel_get_device_info(devid)->is_ats_m)
 
 #define IS_GEN(devid, x)	(intel_get_device_info(devid)->graphics_ver == x)
 #define AT_LEAST_GEN(devid, x)	(intel_get_device_info(devid)->graphics_ver >= x)

@@ -427,6 +427,15 @@ static const struct intel_device_info intel_alderlake_n_info = {
 	.codename = "alderlake_n"
 };
 
+static const struct intel_device_info intel_ats_m_info = {
+	.graphics_ver = 12,
+	.display_ver = 0, /* no display support */
+	.is_ats_m = true,
+	.has_4tile = true,
+	.codename = "ats_m",
+	.has_flatccs = true,
+};
+
 static const struct pci_id_match intel_device_match[] = {
 	INTEL_I810_IDS(&intel_i810_info),
 	INTEL_I815_IDS(&intel_i815_info),
@@ -523,6 +532,8 @@ static const struct pci_id_match intel_device_match[] = {
 	INTEL_ADLP_IDS(&intel_alderlake_p_info),
 	INTEL_RPLP_IDS(&intel_alderlake_p_info),
 	INTEL_ADLN_IDS(&intel_alderlake_n_info),
+
+	INTEL_ATS_M_IDS(&intel_ats_m_info),
 
 	INTEL_VGA_DEVICE(PCI_MATCH_ANY, &intel_generic_info),
 };
