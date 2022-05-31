@@ -637,6 +637,9 @@ igt_output_t **__igt_pipe_populate_outputs(igt_display_t *display,
 	for (int j__ = 0; assert(igt_can_fail()), (plane) = &(display)->pipes[(pipe)].planes[j__], \
 		     j__ < (display)->pipes[(pipe)].n_planes; j__++)
 
+#define for_each_connector_mode(output)		\
+	for (int j__ = 0;  j__ < output->config.connector->count_modes; j__++)
+
 #define IGT_FIXED(i,f)	((i) << 16 | (f))
 
 /**
@@ -956,5 +959,12 @@ void igt_assert_output_bpc_equal(int drmfd, enum pipe pipe,
 				char *output_name, unsigned int bpc);
 bool igt_check_output_bpc_equal(int drmfd, enum pipe pipe,
 				char *output_name, unsigned int bpc);
+
+int sort_drm_modes_by_clk_dsc(const void *a, const void *b);
+int sort_drm_modes_by_clk_asc(const void *a, const void *b);
+int sort_drm_modes_by_res_dsc(const void *a, const void *b);
+int sort_drm_modes_by_res_asc(const void *a, const void *b);
+void igt_sort_connector_modes(drmModeConnector *connector,
+		int (*comparator)(const void *, const void*));
 
 #endif /* __IGT_KMS_H__ */

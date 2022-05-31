@@ -1478,6 +1478,78 @@ void kmstest_force_edid(int drm_fd, drmModeConnector *connector,
 }
 
 /**
+ * sort_drm_modes_by_clk_dsc:
+ * @a: first element
+ * @b: second element
+ *
+ * Comparator function for sorting DRM modes in descending order by clock.
+ */
+int sort_drm_modes_by_clk_dsc(const void *a, const void *b)
+{
+	const drmModeModeInfo *mode1 = a, *mode2 = b;
+
+	return (mode1->clock < mode2->clock) - (mode2->clock < mode1->clock);
+}
+
+/**
+ * sort_drm_modes_by_clk_asc:
+ * @a: first element
+ * @b: second element
+ *
+ * Comparator function for sorting DRM modes in ascending order by clock.
+ */
+int sort_drm_modes_by_clk_asc(const void *a, const void *b)
+{
+	const drmModeModeInfo *mode1 = a, *mode2 = b;
+
+	return (mode1->clock > mode2->clock) - (mode2->clock > mode1->clock);
+}
+
+/**
+ * sort_drm_modes_by_res_dsc:
+ * @a: first element
+ * @b: second element
+ *
+ * Comparator function for sorting DRM modes in descending order by resolution.
+ */
+int sort_drm_modes_by_res_dsc(const void *a, const void *b)
+{
+	const drmModeModeInfo *mode1 = a, *mode2 = b;
+
+	return (mode1->hdisplay < mode2->hdisplay) - (mode2->hdisplay < mode1->hdisplay);
+}
+
+/**
+ * sort_drm_modes_by_res_asc:
+ * @a: first element
+ * @b: second element
+ *
+ * Comparator function for sorting DRM modes in ascending order by resolution.
+ */
+int sort_drm_modes_by_res_asc(const void *a, const void *b)
+{
+	const drmModeModeInfo *mode1 = a, *mode2 = b;
+
+	return (mode1->hdisplay > mode2->hdisplay) - (mode2->hdisplay > mode1->hdisplay);
+}
+
+/**
+ * igt_sort_connector_modes:
+ * @connector: libdrm connector
+ * @comparator: comparison function to compare two elements
+ *
+ * Sorts connector modes based on the @comparator.
+ */
+void igt_sort_connector_modes(drmModeConnector *connector,
+			      int (*comparator)(const void *, const void*))
+{
+	qsort(connector->modes,
+	      connector->count_modes,
+	      sizeof(drmModeModeInfo),
+	      comparator);
+}
+
+/**
  * kmstest_get_connector_default_mode:
  * @drm_fd: DRM fd
  * @connector: libdrm connector
@@ -4204,16 +4276,6 @@ void igt_output_set_pipe(igt_output_t *output, enum pipe pipe)
 	}
 }
 
-#define for_each_connector_mode(output)		\
-	for (int i__ = 0;  i__ < output->config.connector->count_modes; i__++)
-
-static int sort_drm_modes(const void *a, const void *b)
-{
-	const drmModeModeInfo *mode1 = a, *mode2 = b;
-
-	return (mode1->clock < mode2->clock) - (mode2->clock < mode1->clock);
-}
-
 static
 bool __override_all_active_output_modes_to_fit_bw(igt_display_t *display,
 						  igt_output_t *outputs[IGT_MAX_PIPES],
@@ -4230,7 +4292,7 @@ bool __override_all_active_output_modes_to_fit_bw(igt_display_t *display,
 	for_each_connector_mode(output) {
 		int ret;
 
-		igt_output_override_mode(output, &output->config.connector->modes[i__]);
+		igt_output_override_mode(output, &output->config.connector->modes[j__]);
 
 		if (__override_all_active_output_modes_to_fit_bw(display, outputs, n_outputs, base + 1))
 			return true;
@@ -4271,10 +4333,8 @@ bool igt_override_all_active_output_modes_to_fit_bw(igt_display_t *display)
 			continue;
 
 		/* Sort the modes in descending order by clock freq. */
-		qsort(output->config.connector->modes,
-		      output->config.connector->count_modes,
-		      sizeof(drmModeModeInfo),
-		      sort_drm_modes);
+		igt_sort_connector_modes(output->config.connector,
+					 sort_drm_modes_by_clk_dsc);
 
 		outputs[n_outputs++] = output;
 	}
