@@ -949,10 +949,21 @@ static void dump_edp(struct context *context,
 
 		printf("\t\tFast link params:\n");
 		printf("\t\t\trate: ");
-		if (edp->fast_link_params[i].rate == EDP_RATE_1_62)
-			printf("1.62G\n");
-		else if (edp->fast_link_params[i].rate == EDP_RATE_2_7)
-			printf("2.7G\n");
+		switch (edp->fast_link_params[i].rate) {
+		case EDP_RATE_1_62:
+			printf("1.62Gbps\n");
+			break;
+		case EDP_RATE_2_7:
+			printf("2.7Gbpc\n");
+			break;
+		case EDP_RATE_5_4:
+			printf("5.4Gbps\n");
+			break;
+		default:
+			printf("(unknonn value %d)\n",
+			       edp->fast_link_params[i].rate);
+			break;
+		}
 		printf("\t\t\tlanes: ");
 		switch (edp->fast_link_params[i].lanes) {
 		case EDP_LANE_1:
