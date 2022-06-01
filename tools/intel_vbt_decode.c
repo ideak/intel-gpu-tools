@@ -460,7 +460,7 @@ static void dump_child_device(struct context *context,
 		printf("\t\tOffset to DTD buffer for edidless CHILD: 0x%02x\n", child->dtd_buf_ptr);
 		printf("\t\tEdidless EFP: %s\n", YESNO(child->edidless_efp));
 		printf("\t\tCompression enable: %s\n", YESNO(child->compression_enable));
-		printf("\t\tCompression method CPS: %s\n", YESNO(child->compression_method));
+		printf("\t\tCompression method CPS: %s\n", YESNO(child->compression_method_cps));
 		printf("\t\tDual pipe ganged eDP: %s\n", YESNO(child->ganged_edp));
 		printf("\t\tCompression structure index: 0x%02x)\n", child->compression_structure_index);
 		printf("\t\tSlave DDI port: 0x%02x (%s)\n", child->slave_port, dvo_port(child->slave_port));
@@ -634,9 +634,9 @@ static void dump_lvds_data(struct context *context,
 	ptrs = ptrs_block->data;
 
 	lfp_data_size =
-	    ptrs->ptr[1].fp_timing_offset - ptrs->ptr[0].fp_timing_offset;
+	    ptrs->ptr[1].fp_timing.offset - ptrs->ptr[0].fp_timing.offset;
 	dvo_offset =
-	    ptrs->ptr[0].dvo_timing_offset - ptrs->ptr[0].fp_timing_offset;
+	    ptrs->ptr[0].dvo_timing.offset - ptrs->ptr[0].fp_timing.offset;
 
 	num_entries = block->size / lfp_data_size;
 
