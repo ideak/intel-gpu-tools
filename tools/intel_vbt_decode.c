@@ -1115,6 +1115,13 @@ static void dump_edp(struct context *context,
 			printf("\t\teDP fast link training data rate: %g Gbps (0x%02x)\n",
 			       rate / 5000.0f, rate);
 		}
+
+		if (context->bdb->version >= 244) {
+			u16 rate = edp->edp_max_port_link_rate[i];
+
+			printf("\t\teDP max port link rate: %g Gbps (0x%02x)\n",
+			       rate / 5000.0f, rate);
+		}
 	}
 }
 
