@@ -264,12 +264,6 @@ static void prep_fb(data_t *data)
 	generate_pattern(data, &data->big_fb, 640, 480);
 }
 
-static void cleanup_fb(data_t *data)
-{
-	igt_remove_fb(data->drm_fd, &data->big_fb);
-	data->big_fb.fb_id = 0;
-}
-
 static void set_c8_lut(data_t *data)
 {
 	igt_pipe_t *pipe = &data->display.pipes[data->pipe];
@@ -463,14 +457,6 @@ static bool test_pipe(data_t *data)
 	if (data->format == DRM_FORMAT_C8)
 		unset_lut(data);
 
-	igt_pipe_crc_free(data->pipe_crc);
-
-	igt_output_set_pipe(data->output, PIPE_ANY);
-
-	igt_remove_fb(data->drm_fd, &data->small_fb);
-
-	intel_bb_destroy(data->ibb);
-
 	return ret;
 }
 
@@ -562,14 +548,6 @@ max_hw_stride_async_flip_test(data_t *data)
 			     i?"should":"shouldn't");
 	}
 	igt_reset_timeout();
-
-	igt_pipe_crc_free(data->pipe_crc);
-	igt_output_set_pipe(data->output, PIPE_NONE);
-	igt_remove_fb(data->drm_fd, &data->big_fb);
-	igt_remove_fb(data->drm_fd, &data->big_fb_flip[0]);
-	igt_remove_fb(data->drm_fd, &data->big_fb_flip[1]);
-
-	intel_bb_destroy(data->ibb);
 
 	return true;
 }
@@ -773,6 +751,22 @@ set_max_hw_stride(data_t *data)
 	}
 }
 
+static void test_cleanup(data_t *data)
+{
+	if (!data->output)
+		return;
+
+	igt_pipe_crc_free(data->pipe_crc);
+	igt_output_set_pipe(data->output, PIPE_NONE);
+	igt_remove_fb(data->drm_fd, &data->big_fb);
+	igt_remove_fb(data->drm_fd, &data->big_fb_flip[0]);
+	igt_remove_fb(data->drm_fd, &data->big_fb_flip[1]);
+	igt_remove_fb(data->drm_fd, &data->small_fb);
+
+	intel_bb_destroy(data->ibb);
+	data->output = NULL;
+}
+
 static data_t data = {};
 
 static const struct {
@@ -918,7 +912,7 @@ igt_main
 			}
 
 			igt_fixture
-				cleanup_fb(&data);
+				test_cleanup(&data);
 		}
 	}
 
@@ -972,10 +966,10 @@ igt_main
 							test_scanout(&data);
 					}
 					data.async_flip_test = false;
-				}
 
-				igt_fixture
-					cleanup_fb(&data);
+					igt_fixture
+						test_cleanup(&data);
+				}
 			}
 		}
 	}
