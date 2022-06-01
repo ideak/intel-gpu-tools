@@ -122,6 +122,17 @@ if libdrm_nouveau.found()
 	]
 endif
 
+if libdrm_amdgpu.found()
+	lib_deps += libdrm_amdgpu
+	lib_sources += [
+		'amdgpu/amd_memory.c',
+		'amdgpu/amd_command_submission.c',
+		'amdgpu/amd_compute.c',
+		'amdgpu/amd_gfx.c',
+		'amdgpu/amd_ip_blocks.c',
+	]
+endif
+
 if libunwind.found()
 	lib_deps += libunwind
 else
