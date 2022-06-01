@@ -33,6 +33,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <arpa/inet.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -880,6 +881,18 @@ static void dump_lvds_ptr_data(struct context *context,
 	printf("\tNumber of entries: %d\n", ptrs->lvds_entries);
 }
 
+static char *decode_pnp_id(u16 mfg_name, char str[4])
+{
+	mfg_name = ntohs(mfg_name);
+
+	str[0] = '@' + ((mfg_name >> 10) & 0x1f);
+	str[1] = '@' + ((mfg_name >> 5) & 0x1f);
+	str[2] = '@' + ((mfg_name >> 0) & 0x1f);
+	str[3] = '\0';
+
+	return str;
+}
+
 static void dump_lvds_data(struct context *context,
 			   const struct bdb_block *block)
 {
@@ -901,6 +914,9 @@ static void dump_lvds_data(struct context *context,
 			block_data(block) + ptrs->ptr[i].fp_timing.offset;
 		const uint8_t *timing_data =
 			block_data(block) + ptrs->ptr[i].dvo_timing.offset;
+		const struct lvds_pnp_id *pnp_id =
+			block_data(block) + ptrs->ptr[i].panel_pnp_id.offset;
+		char mfg[4];
 
 		if (i != context->panel_type && !context->dump_all_panel_types)
 			continue;
@@ -936,6 +952,14 @@ static void dump_lvds_data(struct context *context,
 		       vdisplay, vsyncstart, vsyncend, vtotal, clock,
 		       (hsyncend > htotal || vsyncend > vtotal) ?
 		       "BAD!" : "good");
+
+		printf("\t\tPnP ID:\n");
+		printf("\t\t  Mfg name: %s (0x%x)\n",
+		       decode_pnp_id(pnp_id->mfg_name, mfg), pnp_id->mfg_name);
+		printf("\t\t  Product code: %u\n", pnp_id->product_code);
+		printf("\t\t  Serial: %u\n", pnp_id->serial);
+		printf("\t\t  Mfg week: %d\n", pnp_id->mfg_week);
+		printf("\t\t  Mfg year: %d\n", 1990 + pnp_id->mfg_year);
 	}
 
 	free(ptrs_block);
