@@ -719,8 +719,14 @@ pipe_crc_new(int fd, enum pipe pipe, const char *source, int flags)
 	igt_pipe_crc_t *pipe_crc;
 	char buf[128];
 	int debugfs;
+	const char *env_source;
 
 	igt_assert(source);
+
+	env_source = getenv("IGT_CRC_SOURCE");
+
+	if (!env_source)
+		env_source = source;
 
 	debugfs = igt_debugfs_dir(fd);
 	igt_assert(debugfs != -1);
@@ -736,7 +742,7 @@ pipe_crc_new(int fd, enum pipe pipe, const char *source, int flags)
 	pipe_crc->fd = fd;
 	pipe_crc->dir = debugfs;
 	pipe_crc->pipe = pipe;
-	pipe_crc->source = strdup(source);
+	pipe_crc->source = strdup(env_source);
 	igt_assert(pipe_crc->source);
 	pipe_crc->flags = flags;
 
