@@ -256,30 +256,58 @@ test_planes_on_pipe(data_t *data, uint64_t modifier)
 	igt_plane_t *plane;
 	unsigned tested = 0;
 
-	igt_require_pipe(&data->display, data->pipe);
-	igt_display_require_output_on_pipe(&data->display, data->pipe);
-	igt_skip_on(!igt_display_has_format_mod(&data->display,
-						DRM_FORMAT_XRGB8888, modifier));
-
-	data->output = igt_get_single_output_for_pipe(&data->display, data->pipe);
-	igt_require(data->output);
-
-	igt_info("Testing connector %s using pipe %s\n",
-		 igt_output_name(data->output), kmstest_pipe_name(data->pipe));
-
 	for_each_plane_on_pipe(&data->display, data->pipe, plane)
 		tested += test_planes_on_pipe_with_output(data, plane, modifier);
-
-	igt_output_set_pipe(data->output, PIPE_NONE);
-	igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
 	igt_assert(tested > 0);
 }
 
+static void run_test(data_t *data, uint64_t modifier)
+{
+	enum pipe pipe;
+	igt_output_t *output;
+
+	igt_skip_on(!igt_display_has_format_mod(&data->display,
+						DRM_FORMAT_XRGB8888, modifier));
+
+	for_each_pipe(&data->display, pipe) {
+		for_each_valid_output_on_pipe(&data->display, pipe, output) {
+			data->pipe = pipe;
+			data->output = output;
+
+			igt_display_reset(&data->display);
+			igt_output_set_pipe(data->output, data->pipe);
+
+			igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(pipe), data->output->name)
+				test_planes_on_pipe(data, modifier);
+		}
+	}
+}
+
+static const struct {
+	const char *name;
+	uint64_t modifier;
+} subtests[] = {
+	{ .name = "tiling-none",
+	  .modifier = DRM_FORMAT_MOD_LINEAR,
+	},
+	{ .name = "tiling-x",
+	  .modifier = I915_FORMAT_MOD_X_TILED,
+	},
+	{ .name = "tiling-y",
+	  .modifier = I915_FORMAT_MOD_Y_TILED,
+	},
+	{ .name = "tiling-yf",
+	  .modifier = I915_FORMAT_MOD_Yf_TILED,
+	},
+	{ .name = "tiling-4",
+	  .modifier = I915_FORMAT_MOD_4_TILED,
+	},
+};
+
 igt_main
 {
 	data_t data = {};
-	enum pipe pipe;
 
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
@@ -293,33 +321,14 @@ igt_main
 		igt_require(data.display.is_atomic);
 	}
 
-	for_each_pipe_static(pipe) {
-		data.pipe = pipe;
-		igt_describe("Tests the visibility of the planes when switching between "
-			     "high and low resolution with tiling as none.");
-		igt_subtest_f("pipe-%s-tiling-none", kmstest_pipe_name(pipe))
-			test_planes_on_pipe(&data, DRM_FORMAT_MOD_LINEAR);
+	for (int i = 0; i < ARRAY_SIZE(subtests); i++) {
+		igt_describe_f("Tests the visibility of the planes when switching between "
+			       "high and low resolution with %s\n", subtests[i].name);
 
-		igt_describe("Tests the visibility of the planes when switching between "
-			     "high and low resolution with x-tiling.");
-		igt_subtest_f("pipe-%s-tiling-x", kmstest_pipe_name(pipe))
-			test_planes_on_pipe(&data, I915_FORMAT_MOD_X_TILED);
-
-		igt_describe("Tests the visibility of the planes when switching between "
-			     "high and low resolution with y-tiling.");
-		igt_subtest_f("pipe-%s-tiling-y", kmstest_pipe_name(pipe))
-			test_planes_on_pipe(&data, I915_FORMAT_MOD_Y_TILED);
-
-		igt_describe("Tests the visibility of the planes when switching between "
-			     "high and low resolution with yf-tiling.");
-		igt_subtest_f("pipe-%s-tiling-yf", kmstest_pipe_name(pipe))
-			test_planes_on_pipe(&data, I915_FORMAT_MOD_Yf_TILED);
-
-		igt_subtest_f("pipe-%s-tiling-4", kmstest_pipe_name(pipe))
-			test_planes_on_pipe(&data, I915_FORMAT_MOD_4_TILED);
+		igt_subtest_with_dynamic(subtests[i].name)
+			run_test(&data, subtests[i].modifier);
 	}
 
-	igt_fixture {
+	igt_fixture
 		igt_display_fini(&data.display);
-	}
 }
