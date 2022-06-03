@@ -2528,9 +2528,6 @@ void igt_display_require(igt_display_t *display, int drm_fd)
 	/* Set reasonable default values for every object in the display. */
 	igt_display_reset(display);
 
-out:
-	LOG_UNINDENT(display);
-
 	for_each_pipe(display, i) {
 		igt_pipe_t *pipe = &display->pipes[i];
 		igt_output_t *output;
@@ -2564,6 +2561,9 @@ out:
 			}
 		}
 	}
+
+out:
+	LOG_UNINDENT(display);
 
 	if (display->n_pipes && display->n_outputs)
 		igt_enable_connectors(drm_fd);
