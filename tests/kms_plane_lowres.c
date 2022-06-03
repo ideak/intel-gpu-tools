@@ -52,6 +52,7 @@ typedef struct {
 		igt_crc_t crc;
 	} ref_hires;
 	int x, y;
+	igt_pipe_crc_t *pipe_crc;
 } data_t;
 
 static drmModeModeInfo
@@ -71,7 +72,8 @@ get_lowres_mode(int drmfd, igt_output_t *output,
 	}
 
 	igt_require_f(mode_default->vdisplay - min->vdisplay > 2 * SIZE,
-		      "Current mode not tall enough; plane would still be onscreen after switching to lowest mode.\n");
+		      "Current mode for output %s not tall enough; "
+		      "plane would still be onscreen after switching to lowest mode.\n", output->name);
 
 	return *min;
 }
@@ -161,12 +163,9 @@ test_planes_on_pipe_with_output(data_t *data, igt_plane_t *plane, uint64_t modif
 {
 	const drmModeModeInfo *mode;
 	drmModeModeInfo mode_lowres;
-	igt_pipe_crc_t *pipe_crc;
 	unsigned tested = 0;
 	igt_plane_t *primary;
 	igt_crc_t crc_lowres, crc_hires1, crc_hires2;
-
-	igt_output_set_pipe(data->output, data->pipe);
 
 	primary = compatible_main_plane(plane, data->output, data->devid);
 	mode = igt_output_get_mode(data->output);
@@ -191,18 +190,15 @@ test_planes_on_pipe_with_output(data_t *data, igt_plane_t *plane, uint64_t modif
 	create_ref_fb(data, modifier, mode, &data->ref_hires.fb);
 	create_ref_fb(data, modifier, &mode_lowres, &data->ref_lowres.fb);
 
-	pipe_crc = igt_pipe_crc_new(data->drm_fd, data->pipe,
-				    INTEL_PIPE_CRC_SOURCE_AUTO);
-
 	igt_output_override_mode(data->output, &mode_lowres);
 	igt_plane_set_fb(primary, &data->ref_lowres.fb);
 	igt_display_commit2(&data->display, COMMIT_ATOMIC);
-	igt_pipe_crc_collect_crc(pipe_crc, &data->ref_lowres.crc);
+	igt_pipe_crc_collect_crc(data->pipe_crc, &data->ref_lowres.crc);
 
 	igt_output_override_mode(data->output, NULL);
 	igt_plane_set_fb(primary, &data->ref_hires.fb);
 	igt_display_commit2(&data->display, COMMIT_ATOMIC);
-	igt_pipe_crc_collect_crc(pipe_crc, &data->ref_hires.crc);
+	igt_pipe_crc_collect_crc(data->pipe_crc, &data->ref_hires.crc);
 
 	igt_plane_set_fb(primary, &data->fb_primary);
 	igt_display_commit2(&data->display, COMMIT_ATOMIC);
@@ -213,19 +209,19 @@ test_planes_on_pipe_with_output(data_t *data, igt_plane_t *plane, uint64_t modif
 
 	igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
-	igt_pipe_crc_collect_crc(pipe_crc, &crc_hires1);
+	igt_pipe_crc_collect_crc(data->pipe_crc, &crc_hires1);
 
 	/* switch to lower resolution */
 	igt_output_override_mode(data->output, &mode_lowres);
 	igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
-	igt_pipe_crc_collect_crc(pipe_crc, &crc_lowres);
+	igt_pipe_crc_collect_crc(data->pipe_crc, &crc_lowres);
 
 	/* switch back to higher resolution */
 	igt_output_override_mode(data->output, NULL);
 	igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
-	igt_pipe_crc_collect_crc(pipe_crc, &crc_hires2);
+	igt_pipe_crc_collect_crc(data->pipe_crc, &crc_hires2);
 
 	igt_assert_crc_equal(&data->ref_hires.crc, &crc_hires1);
 	igt_assert_crc_equal(&data->ref_hires.crc, &crc_hires2);
@@ -234,18 +230,13 @@ test_planes_on_pipe_with_output(data_t *data, igt_plane_t *plane, uint64_t modif
 	igt_plane_set_fb(plane, NULL);
 	tested++;
 
-	igt_pipe_crc_free(pipe_crc);
-
 	igt_plane_set_fb(primary, NULL);
-	igt_output_set_pipe(data->output, PIPE_NONE);
 
 	igt_remove_fb(data->drm_fd, &data->fb_plane[1]);
 	igt_remove_fb(data->drm_fd, &data->fb_plane[0]);
 	igt_remove_fb(data->drm_fd, &data->fb_primary);
 	igt_remove_fb(data->drm_fd, &data->ref_hires.fb);
 	igt_remove_fb(data->drm_fd, &data->ref_lowres.fb);
-
-	igt_display_reset(&data->display);
 
 	return tested;
 }
@@ -260,6 +251,14 @@ test_planes_on_pipe(data_t *data, uint64_t modifier)
 		tested += test_planes_on_pipe_with_output(data, plane, modifier);
 
 	igt_assert(tested > 0);
+}
+
+static void test_cleanup(data_t *data)
+{
+	igt_pipe_crc_free(data->pipe_crc);
+
+	igt_output_set_pipe(data->output, PIPE_NONE);
+	igt_display_commit2(&data->display, COMMIT_ATOMIC);
 }
 
 static void run_test(data_t *data, uint64_t modifier)
@@ -278,8 +277,13 @@ static void run_test(data_t *data, uint64_t modifier)
 			igt_display_reset(&data->display);
 			igt_output_set_pipe(data->output, data->pipe);
 
+			data->pipe_crc = igt_pipe_crc_new(data->drm_fd, data->pipe,
+							  INTEL_PIPE_CRC_SOURCE_AUTO);
+
 			igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(pipe), data->output->name)
 				test_planes_on_pipe(data, modifier);
+
+			test_cleanup(data);
 		}
 	}
 }
@@ -318,6 +322,7 @@ igt_main
 
 		igt_require_pipe_crc(data.drm_fd);
 		igt_display_require(&data.display, data.drm_fd);
+		igt_display_require_output(&data.display);
 		igt_require(data.display.is_atomic);
 	}
 
