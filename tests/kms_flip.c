@@ -950,8 +950,7 @@ static void get_compatible_modes(drmModeModeInfo *a, drmModeModeInfo *b,
 			}
 		}
 
-		/* hope for the best! */
-		*a = *b = c1->modes[0];
+		igt_skip("Compatible mode not found.\n");
 	}
 
 	return;
