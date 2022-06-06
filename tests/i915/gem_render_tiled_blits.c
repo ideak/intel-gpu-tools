@@ -25,7 +25,7 @@
  *
  */
 
-/** @file gem_linear_render_blits.c
+/** @file gem_render_tiled_blits.c
  *
  * This is a test of doing many blits, with a working set
  * larger than the aperture size.
@@ -48,6 +48,10 @@
 
 #include "i915/gem.h"
 #include "igt.h"
+
+IGT_TEST_DESCRIPTION("Tests performs cyclic forward, backward and random blits on tiled buffer "
+		      "objects using render engine with various working set sizes and compares "
+		      "outputs with expected ones.");
 
 #define WIDTH 512
 #define STRIDE (WIDTH*4)
@@ -205,16 +209,20 @@ igt_main
 		igt_require(gem_available_fences(fd) > 0);
 	}
 
+	igt_describe("Check basic functionality.");
 	igt_subtest("basic") {
 		run_test(fd, 2);
 	}
 
+	igt_describe("Check with working set size larger than aperture size.");
 	igt_subtest("aperture-thrash") {
 		count = 3 * gem_aperture_size(fd) / SIZE / 2;
 		igt_require_memory(count, SIZE, CHECK_RAM);
 		run_test(fd, count);
 	}
 
+	igt_describe("Check with working set size larger than aperture size and "
+		     "a helper process to shrink buffer object caches.");
 	igt_subtest("aperture-shrink") {
 		igt_fork_shrink_helper(fd);
 
@@ -225,6 +233,8 @@ igt_main
 		igt_stop_shrink_helper();
 	}
 
+	igt_describe("Check with working set size larger than system memory size "
+		     "resulting in usage and thrashing of swap space.");
 	igt_subtest("swap-thrash") {
 		uint64_t swap_mb = igt_get_total_swap_mb();
 		igt_require(swap_mb > 0);
