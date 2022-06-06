@@ -46,6 +46,10 @@
 #include "igt.h"
 #include "igt_x86.h"
 
+IGT_TEST_DESCRIPTION("Tests fence management problems related to tiled blits by performing "
+		     "many blits on tiled buffer objects with fences enabled and with working "
+		     "set larger than the aperture size.");
+
 enum { width = 512, height = 512 };
 static uint32_t linear[width * height];
 static const int bo_size = sizeof(linear);
@@ -266,9 +270,11 @@ igt_main
 		count = (count + ncpus - 1) / ncpus;
 	}
 
+	igt_describe("Check basic functionality.");
 	igt_subtest("basic")
 		run_test(fd, 2, end);
 
+	igt_describe("Check with parallel execution.");
 	igt_subtest("normal") {
 		intel_allocator_multiprocess_start();
 		igt_fork(child, ncpus)
