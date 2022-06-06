@@ -41,7 +41,7 @@ struct intel_device_info {
 	unsigned display_ver;
 	unsigned gt; /* 0 if unknown */
 	bool has_4tile : 1;
-	bool has_flatccs;
+	bool has_flatccs : 1;
 	bool is_mobile : 1;
 	bool is_whitney : 1;
 	bool is_almador : 1;
@@ -221,7 +221,6 @@ void intel_check_pch(void);
 
 #define HAS_4TILE(devid)	(intel_get_device_info(devid)->has_4tile)
 
-/* use HAS_4TILE here as all devices with 4-tile have flat ccs. */
-#define HAS_FLATCCS(devid)	HAS_4TILE(devid)
+#define HAS_FLATCCS(devid)	(intel_get_device_info(devid)->has_flatccs)
 
 #endif /* _INTEL_CHIPSET_H */
