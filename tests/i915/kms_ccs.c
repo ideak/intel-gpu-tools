@@ -161,7 +161,7 @@ create_fb_prepare_add(int drm_fd, int width, int height,
 static bool is_ccs_cc_modifier(uint64_t modifier)
 {
 	return modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC ||
-		modifier == I915_FORMAT_MOD_4_TILED_DG2_RC_CCS;
+		modifier == I915_FORMAT_MOD_4_TILED_DG2_RC_CCS_CC;
 }
 
 /*
