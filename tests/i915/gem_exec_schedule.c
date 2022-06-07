@@ -123,13 +123,13 @@ static uint32_t __store_dword(int fd, uint64_t ahnd, const intel_ctx_t *ctx,
 	obj[2].handle = gem_create(fd, 4096);
 	if (ahnd) {
 		obj[0].offset = cork_offset;
-		obj[0].flags |= EXEC_OBJECT_PINNED;
+		obj[0].flags |= EXEC_OBJECT_PINNED | EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 		obj[1].offset = target_offset;
-		obj[1].flags |= EXEC_OBJECT_PINNED;
+		obj[1].flags |= EXEC_OBJECT_PINNED | EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 		if (write_domain)
 			obj[1].flags |= EXEC_OBJECT_WRITE;
 		obj[2].offset = get_offset(ahnd, obj[2].handle, 4096, 0);
-		obj[2].flags |= EXEC_OBJECT_PINNED;
+		obj[2].flags |= EXEC_OBJECT_PINNED | EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 	} else {
 		obj[0].offset = cork << 20;
 		obj[1].offset = target << 20;
