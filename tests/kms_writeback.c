@@ -110,21 +110,21 @@ static bool check_writeback_config(igt_display_t *display, igt_output_t *output)
 static igt_output_t *kms_writeback_get_output(igt_display_t *display)
 {
 	int i;
+	enum pipe pipe;
 
 	for (i = 0; i < display->n_outputs; i++) {
 		igt_output_t *output = &display->outputs[i];
-		int j;
 
 		if (output->config.connector->connector_type != DRM_MODE_CONNECTOR_WRITEBACK)
 			continue;
 
-		for (j = 0; j < igt_display_get_n_pipes(display); j++) {
-			igt_output_set_pipe(output, j);
+		for_each_pipe(display, pipe) {
+			igt_output_set_pipe(output, pipe);
 
 			if (check_writeback_config(display, output)) {
 				igt_debug("Using connector %u:%s on pipe %d\n",
 					  output->config.connector->connector_id,
-					  output->name, j);
+					  output->name, pipe);
 				return output;
 			}
 		}
