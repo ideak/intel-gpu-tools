@@ -2703,6 +2703,7 @@ static void test_pi_iova(int i915, const intel_ctx_cfg_t *cfg,
 			 unsigned int engine, unsigned int flags)
 {
 	intel_ctx_cfg_t ufd_cfg = *cfg;
+	const intel_ctx_t *spinctx;
 	struct uffdio_api api = { .api = UFFD_API };
 	struct uffdio_register reg;
 	struct uffdio_copy copy;
@@ -2712,7 +2713,7 @@ static void test_pi_iova(int i915, const intel_ctx_cfg_t *cfg,
 	pthread_t hi, lo;
 	char poison[4096];
 	int ufd;
-	uint64_t ahnd = get_reloc_ahnd(i915, 0);
+	uint64_t ahnd;
 
 	/*
 	 * In this scenario, we have a pair of contending contexts that
@@ -2740,6 +2741,8 @@ static void test_pi_iova(int i915, const intel_ctx_cfg_t *cfg,
 	if ((flags & SHARED) && gem_uses_full_ppgtt(i915))
 		ufd_cfg.vm = gem_vm_create(i915);
 
+	spinctx = intel_ctx_create(i915, cfg);
+	ahnd = get_reloc_ahnd(i915, spinctx->id);
 	t.i915 = i915;
 	t.cfg = &ufd_cfg;
 	t.engine = engine;
@@ -2782,7 +2785,7 @@ static void test_pi_iova(int i915, const intel_ctx_cfg_t *cfg,
 	 * the local tasklet will not run until after all signals have been
 	 * delivered... but another tasklet might).
 	 */
-	spin = igt_spin_new(i915, .ahnd = ahnd, .engine = engine);
+	spin = igt_spin_new(i915, .ahnd = ahnd, .ctx = spinctx, .engine = engine);
 	for (int i = 0; i < MAX_ELSP_QLEN; i++) {
 		const intel_ctx_t *ctx = create_highest_priority(i915, cfg);
 		spin->execbuf.rsvd1 = ctx->id;
@@ -2815,6 +2818,7 @@ static void test_pi_iova(int i915, const intel_ctx_cfg_t *cfg,
 	pthread_mutex_unlock(&t.mutex);
 	igt_debugfs_dump(i915, "i915_engine_info");
 	igt_spin_free(i915, spin);
+	intel_ctx_destroy(i915, spinctx);
 	put_offset(ahnd, t.scratch);
 	put_offset(ahnd, t.batch);
 	put_ahnd(ahnd);
