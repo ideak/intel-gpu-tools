@@ -22,6 +22,7 @@
  */
 
 #include "igt.h"
+#include "intel_hwconfig_types.h"
 
 #include <limits.h>
 
@@ -912,6 +913,181 @@ static void test_query_geometry_subslices(int fd)
 	}
 }
 
+static const char * const hwconfig_keys[] = {
+	[INTEL_HWCONFIG_MAX_SLICES_SUPPORTED] = "Maximum number of Slices",
+	[INTEL_HWCONFIG_MAX_DUAL_SUBSLICES_SUPPORTED] = "Maximum number of DSS",
+	[INTEL_HWCONFIG_MAX_NUM_EU_PER_DSS] = "Maximum number of EUs per DSS",
+	[INTEL_HWCONFIG_NUM_PIXEL_PIPES] = "Pixel Pipes",
+	[INTEL_HWCONFIG_DEPRECATED_MAX_NUM_GEOMETRY_PIPES] = "[DEPRECATED] Geometry Pipes",
+	[INTEL_HWCONFIG_DEPRECATED_L3_CACHE_SIZE_IN_KB] = "[DEPRECATED] L3 Size (in KB)",
+	[INTEL_HWCONFIG_DEPRECATED_L3_BANK_COUNT] = "[DEPRECATED] L3 Bank Count",
+	[INTEL_HWCONFIG_L3_CACHE_WAYS_SIZE_IN_BYTES] = "L3 Cache Ways Size (in bytes)",
+	[INTEL_HWCONFIG_L3_CACHE_WAYS_PER_SECTOR] = "L3 Cache Ways Per Sector",
+	[INTEL_HWCONFIG_MAX_MEMORY_CHANNELS] = "Memory Channels",
+	[INTEL_HWCONFIG_MEMORY_TYPE] = "Memory type",
+	[INTEL_HWCONFIG_CACHE_TYPES] = "Cache types",
+	[INTEL_HWCONFIG_LOCAL_MEMORY_PAGE_SIZES_SUPPORTED] = "Local memory page size",
+	[INTEL_HWCONFIG_DEPRECATED_SLM_SIZE_IN_KB] = "[DEPRECATED] SLM Size (in KB)",
+	[INTEL_HWCONFIG_NUM_THREADS_PER_EU] = "Num thread per EU",
+	[INTEL_HWCONFIG_TOTAL_VS_THREADS] = "Maximum Vertex Shader threads",
+	[INTEL_HWCONFIG_TOTAL_GS_THREADS] = "Maximum Geometry Shader threads",
+	[INTEL_HWCONFIG_TOTAL_HS_THREADS] = "Maximum Hull Shader threads",
+	[INTEL_HWCONFIG_TOTAL_DS_THREADS] = "Maximum Domain Shader threads",
+	[INTEL_HWCONFIG_TOTAL_VS_THREADS_POCS] = "Maximum Vertex Shader Threads for POCS",
+	[INTEL_HWCONFIG_TOTAL_PS_THREADS] = "Maximum Pixel Shader Threads",
+	[INTEL_HWCONFIG_DEPRECATED_MAX_FILL_RATE] = "[DEPRECATED] Maximum pixel rate for Fill",
+	[INTEL_HWCONFIG_MAX_RCS] = "MaxRCS",
+	[INTEL_HWCONFIG_MAX_CCS] = "MaxCCS",
+	[INTEL_HWCONFIG_MAX_VCS] = "MaxVCS",
+	[INTEL_HWCONFIG_MAX_VECS] = "MaxVECS",
+	[INTEL_HWCONFIG_MAX_COPY_CS] = "MaxCopyCS",
+	[INTEL_HWCONFIG_DEPRECATED_URB_SIZE_IN_KB] = "[DEPRECATED] URB Size (in KB)",
+	[INTEL_HWCONFIG_MIN_VS_URB_ENTRIES] = "The minimum number of VS URB entries.",
+	[INTEL_HWCONFIG_MAX_VS_URB_ENTRIES] = "The maximum number of VS URB entries.",
+	[INTEL_HWCONFIG_MIN_PCS_URB_ENTRIES] = "The minimum number of PCS URB entries",
+	[INTEL_HWCONFIG_MAX_PCS_URB_ENTRIES] = "The maximum number of PCS URB entries",
+	[INTEL_HWCONFIG_MIN_HS_URB_ENTRIES] = "The minimum number of HS URB entries",
+	[INTEL_HWCONFIG_MAX_HS_URB_ENTRIES] = "The maximum number of HS URB entries",
+	[INTEL_HWCONFIG_MIN_GS_URB_ENTRIES] = "The minimum number of GS URB entries",
+	[INTEL_HWCONFIG_MAX_GS_URB_ENTRIES] = "The maximum number of GS URB entries",
+	[INTEL_HWCONFIG_MIN_DS_URB_ENTRIES] = "The minimum number of DS URB Entries",
+	[INTEL_HWCONFIG_MAX_DS_URB_ENTRIES] = "The maximum number of DS URB Entries",
+	[INTEL_HWCONFIG_PUSH_CONSTANT_URB_RESERVED_SIZE] = "Push Constant URB Reserved Size (in bytes)",
+	[INTEL_HWCONFIG_POCS_PUSH_CONSTANT_URB_RESERVED_SIZE] = "POCS Push Constant URB Reserved Size (in bytes)",
+	[INTEL_HWCONFIG_URB_REGION_ALIGNMENT_SIZE_IN_BYTES] = "URB Region Alignment Size (in bytes)",
+	[INTEL_HWCONFIG_URB_ALLOCATION_SIZE_UNITS_IN_BYTES] = "URB Allocation Size Units (in bytes)",
+	[INTEL_HWCONFIG_MAX_URB_SIZE_CCS_IN_BYTES] = "Max URB Size CCS (in bytes)",
+	[INTEL_HWCONFIG_VS_MIN_DEREF_BLOCK_SIZE_HANDLE_COUNT] = "VS Min Deref BlockSize Handle Count",
+	[INTEL_HWCONFIG_DS_MIN_DEREF_BLOCK_SIZE_HANDLE_COUNT] = "DS Min Deref Block Size Handle Count",
+	[INTEL_HWCONFIG_NUM_RT_STACKS_PER_DSS] = "Num RT Stacks Per DSS",
+	[INTEL_HWCONFIG_MAX_URB_STARTING_ADDRESS] = "Max URB Starting Address",
+	[INTEL_HWCONFIG_MIN_CS_URB_ENTRIES] = "Min CS URB Entries",
+	[INTEL_HWCONFIG_MAX_CS_URB_ENTRIES] = "Max CS URB Entries",
+	[INTEL_HWCONFIG_L3_ALLOC_PER_BANK_URB] = "L3 Alloc Per Bank - URB",
+	[INTEL_HWCONFIG_L3_ALLOC_PER_BANK_REST] = "L3 Alloc Per Bank - Rest",
+	[INTEL_HWCONFIG_L3_ALLOC_PER_BANK_DC] = "L3 Alloc Per Bank - DC",
+	[INTEL_HWCONFIG_L3_ALLOC_PER_BANK_RO] = "L3 Alloc Per Bank - RO",
+	[INTEL_HWCONFIG_L3_ALLOC_PER_BANK_Z] = "L3 Alloc Per Bank - Z",
+	[INTEL_HWCONFIG_L3_ALLOC_PER_BANK_COLOR] = "L3 Alloc Per Bank - Color",
+	[INTEL_HWCONFIG_L3_ALLOC_PER_BANK_UNIFIED_TILE_CACHE] = "L3 Alloc Per Bank - Unified Tile Cache",
+	[INTEL_HWCONFIG_L3_ALLOC_PER_BANK_COMMAND_BUFFER] = "L3 Alloc Per Bank - Command Buffer",
+	[INTEL_HWCONFIG_L3_ALLOC_PER_BANK_RW] = "L3 Alloc Per Bank - RW",
+	[INTEL_HWCONFIG_MAX_NUM_L3_CONFIGS] = "Num L3 Configs",
+	[INTEL_HWCONFIG_BINDLESS_SURFACE_OFFSET_BIT_COUNT] = "Bindless Surface Offset Bit Count",
+	[INTEL_HWCONFIG_RESERVED_CCS_WAYS] = "Reserved CCS ways",
+	[INTEL_HWCONFIG_CSR_SIZE_IN_MB] = "CSR Size (in MB)",
+	[INTEL_HWCONFIG_GEOMETRY_PIPES_PER_SLICE] = "Geometry pipes per slice",
+	[INTEL_HWCONFIG_L3_BANK_SIZE_IN_KB] = "L3 bank size (in KB)",
+	[INTEL_HWCONFIG_SLM_SIZE_PER_DSS] = "SLM size per DSS",
+	[INTEL_HWCONFIG_MAX_PIXEL_FILL_RATE_PER_SLICE] = "Max pixel fill rate per slice",
+	[INTEL_HWCONFIG_MAX_PIXEL_FILL_RATE_PER_DSS] = "Max pixel fill rate per DSS",
+	[INTEL_HWCONFIG_URB_SIZE_PER_SLICE_IN_KB] = "URB size per slice (in KB)",
+	[INTEL_HWCONFIG_URB_SIZE_PER_L3_BANK_COUNT_IN_KB] = "URB size per L3 bank count (in KB)",
+	[INTEL_HWCONFIG_MAX_SUBSLICE] = "Max subslices",
+	[INTEL_HWCONFIG_MAX_EU_PER_SUBSLICE] = "Max EUs per subslice",
+	[INTEL_HWCONFIG_RAMBO_L3_BANK_SIZE_IN_KB] = "RAMBO L3 bank size (in KB)",
+	[INTEL_HWCONFIG_SLM_SIZE_PER_SS_IN_KB] = "SLM size per SS (in KB)",
+	[INTEL_HWCONFIG_NUM_HBM_STACKS_PER_TILE] = "Num HBM Stacks Per Tile",
+	[INTEL_HWCONFIG_NUM_CHANNELS_PER_HBM_STACK] = "Num Channels Per HBM Stack",
+	[INTEL_HWCONFIG_HBM_CHANNEL_WIDTH_IN_BYTES] = "HBM Channel Width (in bytes)",
+	[INTEL_HWCONFIG_MIN_TASK_URB_ENTRIES] = "Min Task URB Entries",
+	[INTEL_HWCONFIG_MAX_TASK_URB_ENTRIES] = "Max Task URB Entries",
+	[INTEL_HWCONFIG_MIN_MESH_URB_ENTRIES] = "Min Mesh URB Entries",
+	[INTEL_HWCONFIG_MAX_MESH_URB_ENTRIES] = "Max Mesh URB Entries",
+};
+
+static const char * const hwconfig_memtypes[] = {
+	[INTEL_HWCONFIG_MEMORY_TYPE_LPDDR4] = "LPDDR4",
+	[INTEL_HWCONFIG_MEMORY_TYPE_LPDDR5] = "LPDDR5",
+	[INTEL_HWCONFIG_MEMORY_TYPE_HBM2] = "HBM2",
+	[INTEL_HWCONFIG_MEMORY_TYPE_HBM2e] = "HBM2e",
+	[INTEL_HWCONFIG_MEMORY_TYPE_GDDR6] = "GDDR6",
+};
+
+static const char * const hwconfig_cachetypes[] = {
+	[INTEL_HWCONFIG_CACHE_TYPE_L3] = "L3",
+	[INTEL_HWCONFIG_CACHE_TYPE_LLC] = "LLC",
+	[INTEL_HWCONFIG_CACHE_TYPE_EDRAM] = "EDRAM",
+};
+
+static void query_parse_and_validate_hwconfig_table(int i915)
+{
+	struct drm_i915_query_item item = {
+		.query_id = DRM_I915_QUERY_HWCONFIG_BLOB,
+	};
+	uint32_t *data, value;
+	int i = 0;
+	int len, j, max_words, table_size;
+
+	igt_assert(ARRAY_SIZE(hwconfig_keys) == __INTEL_HWCONFIG_KEY_LIMIT);
+	igt_assert(ARRAY_SIZE(hwconfig_memtypes) == __INTEL_HWCONFIG_MEMORY_TYPE_LIMIT);
+	igt_assert(ARRAY_SIZE(hwconfig_cachetypes) == __INTEL_HWCONFIG_CACHE_TYPE_LIMIT);
+
+	i915_query_items(i915, &item, 1);
+	table_size = item.length;
+	igt_require(table_size > 0);
+
+	data = malloc(table_size);
+	igt_assert(data);
+	memset(data, 0, table_size);
+	item.data_ptr = to_user_pointer(data);
+
+	i915_query_items(i915, &item, 1);
+	igt_assert(item.length == table_size);
+	igt_info("Table size = %d bytes\n", table_size);
+	igt_assert(table_size > 0);
+
+	/* HWConfig table is a list of KLV sets */
+	max_words = table_size / sizeof(uint32_t);
+	igt_assert(max_words * sizeof(uint32_t) == table_size);
+	while (i < max_words) {
+		/* Attribute ID zero is invalid */
+		igt_assert(data[i] > 0);
+		igt_assert(data[i] < __INTEL_HWCONFIG_KEY_LIMIT);
+
+		len = data[i + 1];
+		igt_assert(len > 0);
+		igt_assert((i + 2 + len) <= max_words);
+
+		igt_info("[%2d] %s: ", data[i], hwconfig_keys[data[i]]);
+
+		value = data[i + 2];
+		switch (data[i]) {
+		case INTEL_HWCONFIG_MEMORY_TYPE:
+			igt_assert(len == 1);
+			igt_assert(value < __INTEL_HWCONFIG_MEMORY_TYPE_LIMIT);
+			igt_info("%s\n", hwconfig_memtypes[value]);
+			break;
+
+		case INTEL_HWCONFIG_CACHE_TYPES:
+			igt_assert(len == 1);
+
+			if (!value)
+				igt_info("-\n");
+
+			j = 0;
+			while (value) {
+				if (value & BIT(j)) {
+					value &= ~BIT(j);
+					igt_assert(j < __INTEL_HWCONFIG_CACHE_TYPE_LIMIT);
+					igt_info("%s%s", hwconfig_cachetypes[j], value ? ", " : "\n");
+				}
+			}
+			break;
+
+		default:
+			for (j = i + 2; j < i + 1 + len; j++)
+				igt_info("%d, ", data[j]);
+			igt_info("%d\n", data[j]);
+		}
+
+		/* Advance to next key */
+		i += 2 + len;
+	}
+
+	free(data);
+}
+
 igt_main
 {
 	int fd = -1;
@@ -997,6 +1173,10 @@ igt_main
 		igt_subtest("engine-info")
 			engines(fd);
 	}
+
+	igt_describe("Test DRM_I915_QUERY_HWCONFIG_BLOB query");
+	igt_subtest("hwconfig_table")
+		query_parse_and_validate_hwconfig_table(fd);
 
 	igt_fixture {
 		close(fd);
