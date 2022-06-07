@@ -2895,12 +2895,10 @@ static void parallel_thread(int i915, unsigned int flags,
 	ctx = intel_ctx_create(i915, &cfg);
 
 	i = 0;
-	batch[i] = MI_ATOMIC | MI_ATOMIC_INLINE_DATA |
-		MI_ATOMIC_ADD;
+	batch[i] = MI_ATOMIC | MI_ATOMIC_INC;
 #define TARGET_BO_OFFSET	(0x1 << 16)
 	batch[++i] = TARGET_BO_OFFSET;
 	batch[++i] = 0;
-	batch[++i] = 1;
 	batch[++i] = MI_BATCH_BUFFER_END;
 
 	memset(obj, 0, sizeof(obj));
@@ -2978,7 +2976,9 @@ static void parallel(int i915, unsigned int flags)
 
 	for (class = 0; class < 32; class++) {
 		struct i915_engine_class_instance *siblings;
-		unsigned int count, bb_per_execbuf;
+		const intel_ctx_t *ctx;
+		intel_ctx_cfg_t cfg;
+		unsigned int count;
 
 		siblings = list_engines(i915, 1u << class, &count);
 		if (!siblings)
@@ -2990,10 +2990,19 @@ static void parallel(int i915, unsigned int flags)
 		}
 
 		logical_sort_siblings(i915, siblings, count);
-		bb_per_execbuf = count;
 
-		parallel_thread(i915, flags, siblings,
-				count, bb_per_execbuf);
+		memset(&cfg, 0, sizeof(cfg));
+		cfg.parallel = true;
+		cfg.num_engines = 1;
+		cfg.width = 2;
+		memcpy(cfg.engines, siblings, sizeof(*siblings) * 2);
+		if (__intel_ctx_create(i915, &cfg, &ctx)) {
+			free(siblings);
+			continue;
+		}
+		intel_ctx_destroy(i915, ctx);
+
+		parallel_thread(i915, flags, siblings, count, count);
 
 		free(siblings);
 	}
@@ -3005,7 +3014,8 @@ static void parallel_balancer(int i915, unsigned int flags)
 
 	for (class = 0; class < 32; class++) {
 		struct i915_engine_class_instance *siblings;
-		unsigned int bb_per_execbuf;
+		const intel_ctx_t *ctx;
+		intel_ctx_cfg_t cfg;
 		unsigned int count;
 
 		siblings = list_engines(i915, 1u << class, &count);
@@ -3019,7 +3029,19 @@ static void parallel_balancer(int i915, unsigned int flags)
 
 		logical_sort_siblings(i915, siblings, count);
 
-		for (bb_per_execbuf = 2; count / bb_per_execbuf > 1;
+		memset(&cfg, 0, sizeof(cfg));
+		cfg.parallel = true;
+		cfg.num_engines = 1;
+		cfg.width = 2;
+		memcpy(cfg.engines, siblings, sizeof(*siblings) * 2);
+		if (__intel_ctx_create(i915, &cfg, &ctx)) {
+			free(siblings);
+			continue;
+		}
+		intel_ctx_destroy(i915, ctx);
+
+		for (unsigned int bb_per_execbuf = 2;
+		     count / bb_per_execbuf > 1;
 		     ++bb_per_execbuf) {
 			igt_fork(child, count / bb_per_execbuf)
 				parallel_thread(i915,
@@ -3108,13 +3130,14 @@ static void parallel_ordering(int i915, unsigned int flags)
 		cfg.width = count;
 		memcpy(cfg.engines, siblings, sizeof(*siblings) * count);
 
-		ctx = intel_ctx_create(i915, &cfg);
+		if (__intel_ctx_create(i915, &cfg, &ctx)) {
+			free(siblings);
+			continue;
+		}
 
-		batch[i] = MI_ATOMIC | MI_ATOMIC_INLINE_DATA |
-			MI_ATOMIC_ADD;
+		batch[i] = MI_ATOMIC | MI_ATOMIC_INC;
 		batch[++i] = TARGET_BO_OFFSET;
 		batch[++i] = 0;
-		batch[++i] = 1;
 		batch[++i] = MI_BATCH_BUFFER_END;
 
 		memset(obj, 0, sizeof(obj));
