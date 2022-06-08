@@ -68,7 +68,7 @@ store_pipe_control_loop(bool preuse_buffer, int timeout)
 	struct intel_buf *target_buf;
 	static struct intel_bb *ibb;
 
-	ibb = intel_bb_create_with_relocs(buf_ops_get_fd(bops), 4096);
+	ibb = intel_bb_create(buf_ops_get_fd(bops), 4096);
 
 	igt_until_timeout(timeout) {
 		/* we want to check tlb consistency of the pipe_control target,
