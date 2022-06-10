@@ -15,6 +15,7 @@ lib_sources = [
 	'i915/i915_blt.c',
 	'igt_collection.c',
 	'igt_color_encoding.c',
+	'igt_crc.c',
 	'igt_debugfs.c',
 	'igt_device.c',
 	'igt_device_scan.c',
