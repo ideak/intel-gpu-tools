@@ -210,7 +210,8 @@ run_dither_test(data_t *data, int fb_bpc, int fb_format, int output_bpc)
 
 		for_each_pipe(display, pipe) {
 			if (igt_pipe_connector_valid(pipe, output)) {
-				igt_dynamic_f("%s-pipe-%s", output->name, kmstest_pipe_name(pipe))
+				igt_dynamic_f("pipe-%s-%s",
+					      kmstest_pipe_name(pipe), output->name)
 					test_dithering(data, pipe, output, fb_bpc,
 							fb_format, output_bpc);
 
