@@ -2708,6 +2708,9 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define   MI_MATH_REG_ZF                0x32
 #define   MI_MATH_REG_CF                0x33
 
+/* DG2+ */
+#define MI_SET_PREDICATE                MI_INSTR(0x1, 0)
+
 #define MAX_DISPLAY_PIPES	2
 
 typedef enum {
