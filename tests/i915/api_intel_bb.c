@@ -22,6 +22,7 @@
  */
 
 #include "igt.h"
+#include "igt_crc.h"
 #include "i915/gem.h"
 #include "i915/gem_create.h"
 #include <unistd.h>
@@ -38,6 +39,7 @@
 #include <zlib.h>
 #include "intel_bufops.h"
 #include "i915/gem_vm.h"
+#include "i915/i915_crc.h"
 
 #define PAGE_SIZE 4096
 
@@ -64,6 +66,7 @@ static bool debug_bb = false;
 static bool write_png = false;
 static bool buf_info = false;
 static bool print_base64 = false;
+static int crc_n = 19;
 
 static void *alloc_aligned(uint64_t size)
 {
@@ -1395,6 +1398,51 @@ static void render_ccs(struct buf_ops *bops)
 	igt_assert_f(fails == 0, "render-ccs fails: %d\n", fails);
 }
 
+static void test_crc32(int i915, const intel_ctx_t *ctx,
+		       const struct intel_execution_engine2 *e,
+		       struct drm_i915_gem_memory_class_instance *r)
+{
+	uint64_t ahnd = get_reloc_ahnd(i915, ctx->id);
+	uint32_t data, *ptr;
+
+	uint32_t region = INTEL_MEMORY_REGION_ID(r->memory_class,
+						 r->memory_instance);
+
+	igt_debug("[engine: %s, region: %s]\n", e->name,
+		  region == REGION_SMEM ? "smem" : "lmem");
+	for (int i = 2; i < crc_n; i += 2) {
+		struct timespec start, end;
+		uint64_t size = 1 << i;
+		uint32_t cpu_crc, gpu_crc;
+
+		double cpu_time, gpu_time;
+
+		data = gem_create_in_memory_regions(i915, size, region);
+		ptr = gem_mmap__device_coherent(i915, data, 0, size, PROT_WRITE);
+		for (int j = 0; j < size / sizeof(*ptr); j++)
+			ptr[j] = j;
+
+		igt_assert_eq(igt_gettime(&start), 0);
+		cpu_crc = igt_cpu_crc32(ptr, size);
+		igt_assert_eq(igt_gettime(&end), 0);
+		cpu_time = igt_time_elapsed(&start, &end);
+		munmap(ptr, size);
+
+		igt_assert_eq(igt_gettime(&start), 0);
+		gpu_crc = i915_crc32(i915, ahnd, ctx, e, data, size);
+		igt_assert_eq(igt_gettime(&end), 0);
+		gpu_time = igt_time_elapsed(&start, &end);
+		igt_debug("size: %10lld, cpu crc: 0x%08x (time: %.3f), "
+			  "gpu crc: 0x%08x (time: %.3f) [ %s ]\n",
+			  (long long) size, cpu_crc, cpu_time, gpu_crc, gpu_time,
+			  cpu_crc == gpu_crc ? "EQUAL" : "DIFFERENT");
+		gem_close(i915, data);
+		igt_assert(cpu_crc == gpu_crc);
+	}
+
+	put_ahnd(ahnd);
+}
+
 static int opt_handler(int opt, int opt_index, void *data)
 {
 	switch (opt) {
@@ -1410,6 +1458,9 @@ static int opt_handler(int opt, int opt_index, void *data)
 	case 'b':
 		print_base64 = true;
 		break;
+	case 'c':
+		crc_n = max_t(int, atoi(optarg), 31);
+		break;
 	default:
 		return IGT_OPT_HANDLER_ERROR;
 	}
@@ -1422,9 +1473,10 @@ const char *help_str =
 	"  -p\tWrite surfaces to png\n"
 	"  -i\tPrint buffer info\n"
 	"  -b\tDump to base64 (bb and images)\n"
+	"  -c n\tCalculate crc up to (1 << n)\n"
 	;
 
-igt_main_args("dpib", NULL, help_str, opt_handler, NULL)
+igt_main_args("dpibc:", NULL, help_str, opt_handler, NULL)
 {
 	int i915, i, gen;
 	struct buf_ops *bops;
@@ -1551,6 +1603,22 @@ igt_main_args("dpib", NULL, help_str, opt_handler, NULL)
 
 	igt_subtest("render-ccs")
 		render_ccs(bops);
+
+	igt_describe("Compare cpu and gpu crc32 sums on input object");
+	igt_subtest_with_dynamic_f("crc32") {
+		const intel_ctx_t *ctx;
+		const struct intel_execution_engine2 *e;
+
+		igt_require(supports_i915_crc32(i915));
+
+		ctx = intel_ctx_create_all_physical(i915);
+		for_each_ctx_engine(i915, ctx, e) {
+			for_each_memory_region(r, i915) {
+				igt_dynamic_f("%s-%s", e->name, r->name)
+					test_crc32(i915, ctx, e, &r->ci);
+			}
+		}
+	}
 
 	igt_fixture {
 		buf_ops_destroy(bops);
