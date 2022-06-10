@@ -3108,6 +3108,7 @@ static void parallel_ordering(int i915, unsigned int flags)
 		unsigned int count;
 		int i = 0, fence = 0;
 		uint32_t batch[16];
+		uint64_t ahnd;
 		struct drm_i915_gem_execbuffer2 execbuf;
 		struct drm_i915_gem_exec_object2 obj[32];
 		igt_spin_t *spin;
@@ -3162,7 +3163,9 @@ static void parallel_ordering(int i915, unsigned int flags)
 
 		/* Block parallel submission */
 		spin_ctx = ctx_create_engines(i915, siblings, count);
+		ahnd = get_simple_ahnd(i915, spin_ctx->id);
 		spin = __igt_spin_new(i915,
+				      .ahnd = ahnd,
 				      .ctx = spin_ctx,
 				      .engine = 0,
 				      .flags = IGT_SPIN_FENCE_OUT |
@@ -3204,6 +3207,7 @@ static void parallel_ordering(int i915, unsigned int flags)
 			gem_close(i915, obj[i].handle);
 		free(siblings);
 		igt_spin_free(i915, spin);
+		put_ahnd(ahnd);
 	}
 }
 
