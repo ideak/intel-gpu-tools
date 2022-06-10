@@ -109,6 +109,7 @@ const char *kmstest_connector_status_str(int status);
 const char *kmstest_connector_type_str(int type);
 
 void kmstest_dump_mode(drmModeModeInfo *mode);
+#define MAX_HDISPLAY_PER_PIPE 5120
 
 int kmstest_get_pipe_from_crtc_id(int fd, int crtc_id);
 void kmstest_set_vt_graphics_mode(void);
@@ -966,5 +967,7 @@ int sort_drm_modes_by_res_dsc(const void *a, const void *b);
 int sort_drm_modes_by_res_asc(const void *a, const void *b);
 void igt_sort_connector_modes(drmModeConnector *connector,
 		int (*comparator)(const void *, const void*));
+
+bool igt_check_bigjoiner_support(igt_display_t *display);
 
 #endif /* __IGT_KMS_H__ */

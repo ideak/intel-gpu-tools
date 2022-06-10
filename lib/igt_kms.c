@@ -5636,3 +5636,76 @@ bool igt_check_output_bpc_equal(int drmfd, enum pipe pipe,
 
 	return (current == bpc);
 }
+
+/*
+ * igt_check_bigjoiner_support:
+ * @display: a pointer to an #igt_display_t structure
+ *
+ * Get all active pipes from connected outputs (i.e. pending_pipe != PIPE_NONE)
+ * and check those pipes supports the selected mode(s).
+ *
+ * Example:
+ *  * Pipe-D can't support mode > 5K
+ *  * To use 8K mode on a pipe then consecutive pipe must be free.
+ *
+ * Returns: true if a valid crtc/connector mode combo found, else false
+ */
+bool igt_check_bigjoiner_support(igt_display_t *display)
+{
+	uint8_t i, total_pipes = 0, pipes_in_use = 0;
+	enum pipe p;
+	struct {
+		enum pipe idx;
+		drmModeModeInfo *mode;
+	} pipes[IGT_MAX_PIPES];
+
+	/* Get total enabled pipes. */
+	for_each_pipe(display, p)
+		total_pipes++;
+
+	/*
+	 * Get list of pipes in use those were set by igt_output_set_pipe()
+	 * just before calling this function.
+	 */
+	for (i = 0 ; i < display->n_outputs; i++) {
+		igt_output_t *output = &display->outputs[i];
+
+		if (output->pending_pipe == PIPE_NONE)
+			continue;
+
+		pipes[pipes_in_use].idx = output->pending_pipe;
+		pipes[pipes_in_use].mode = igt_output_get_mode(output);
+		pipes_in_use++;
+	}
+
+	if (!pipes_in_use) {
+		igt_debug("We must set at least one output to pipe.\n");
+		return true;
+	}
+
+	/*
+	 * if mode.hdisplay > 5120, then ignore
+	 *  - if the consecutive pipe is not available
+	 *  - last crtc in single/multi-connector config
+	 *  - consecutive crtcs in multi-connector config
+	 *
+	 * in multi-connector config ignore if
+	 *  - previous crtc mode.hdisplay > 5120 and
+	 *  - current & previous crtcs are consecutive
+	 */
+	for (i = 0; i < pipes_in_use; i++) {
+		if (((pipes[i].mode->hdisplay > MAX_HDISPLAY_PER_PIPE) &&
+		     ((pipes[i].idx >= (total_pipes - 1)) ||
+		      (!display->pipes[pipes[i].idx + 1].enabled) ||
+		      ((i < (pipes_in_use - 1)) && (abs(pipes[i + 1].idx - pipes[i].idx) <= 1)))) ||
+		    ((i > 0) && (pipes[i - 1].mode->hdisplay > MAX_HDISPLAY_PER_PIPE) &&
+		     ((!display->pipes[pipes[i - 1].idx + 1].enabled) ||
+		      (abs(pipes[i].idx - pipes[i - 1].idx) <= 1)))) {
+			igt_debug("Pipe/Output combo is not possible with selected mode(s).\n");
+
+			return false;
+		}
+	}
+
+	return true;
+}
