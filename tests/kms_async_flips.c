@@ -211,11 +211,14 @@ static void test_async_flip(data_t *data)
 			 * In older platforms (<= Gen10), async address update bit is double buffered.
 			 * So flip timestamp can be verified only from the second flip.
 			 * The first async flip just enables the async address update.
+			 * In platforms greater than DISPLAY13 the first async flip will be discarded
+			 * in order to change the watermark levels as per the optimization. Hence the
+			 * subsequent async flips will actually do the asynchronous flips.
 			 */
 			if (is_i915_device(data->drm_fd)) {
 				uint32_t devid = intel_get_drm_devid(data->drm_fd);
 
-				if (IS_GEN9(devid) || IS_GEN10(devid)) {
+				if (IS_GEN9(devid) || IS_GEN10(devid) || AT_LEAST_GEN(devid, 12)) {
 					ret = drmModePageFlip(data->drm_fd, data->crtc_id,
 							      data->bufs[frame % 4].fb_id,
 							      flags, data);
