@@ -448,22 +448,23 @@ static void cleanup_crtc(data_t *data)
 	cairo_surface_destroy(data->surface);
 	data->surface = NULL;
 
+	igt_output_set_pipe(data->output, PIPE_NONE);
 	igt_plane_set_fb(data->primary, NULL);
 	igt_display_commit(display);
 
 	igt_remove_fb(data->drm_fd, &data->primary_fb[HWCURSORBUFFER]);
 	igt_remove_fb(data->drm_fd, &data->primary_fb[SWCOMPARISONBUFFER1]);
 	igt_remove_fb(data->drm_fd, &data->primary_fb[SWCOMPARISONBUFFER2]);
-
-	igt_display_reset(display);
 }
 
-static void prepare_crtc(data_t *data, igt_output_t *output,
-			 int cursor_w, int cursor_h)
+static void prepare_crtc(data_t *data, int cursor_w, int cursor_h)
 {
 	drmModeModeInfo *mode;
 	igt_display_t *display = &data->display;
 	cairo_t *cr;
+	igt_output_t *output = data->output;
+
+	igt_display_reset(display);
 
 	/* select the pipe we want to use */
 	igt_output_set_pipe(output, data->pipe);
@@ -587,6 +588,7 @@ static void require_cursor_size(data_t *data, int w, int h)
 	igt_require(w <= data->cursor_max_w &&
 		    h <= data->cursor_max_h);
 
+	igt_display_reset(display);
 	igt_output_set_pipe(output, data->pipe);
 
 	mode = igt_output_get_mode(output);
@@ -624,7 +626,7 @@ static void run_test(data_t *data, void (*testfunc)(data_t *), int cursor_w, int
 	if (data->fb.fb_id != 0)
 		require_cursor_size(data, cursor_w, cursor_h);
 
-	prepare_crtc(data, data->output, cursor_w, cursor_h);
+	prepare_crtc(data, cursor_w, cursor_h);
 	testfunc(data);
 	cleanup_crtc(data);
 }
@@ -883,9 +885,6 @@ igt_main
 
 		igt_display_require(&data.display, data.drm_fd);
 		igt_display_require_output(&data.display);
-		igt_display_reset(&data.display);
-		igt_display_commit2(&data.display, data.display.is_atomic ?
-				    COMMIT_ATOMIC : COMMIT_LEGACY);
 	}
 
 	data.cursor_max_w = cursor_width;
