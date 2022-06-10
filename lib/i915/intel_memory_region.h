@@ -20,6 +20,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  */
+#include "i915_drm.h"
 #include "igt_collection.h"
 
 #ifndef INTEL_MEMORY_REGION_H
@@ -61,8 +62,6 @@ struct drm_i915_query_memory_regions *gem_get_query_memory_regions(int fd);
 unsigned int gem_get_lmem_region_count(int fd);
 
 bool gem_has_lmem(int fd);
-
-struct drm_i915_gem_memory_class_instance;
 
 int __gem_create_in_memory_region_list(int fd, uint32_t *handle, uint64_t *size,
 				       struct drm_i915_gem_memory_class_instance *mem_regions,
