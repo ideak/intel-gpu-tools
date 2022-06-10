@@ -2366,37 +2366,6 @@ static void test_syncobj_timeline_multiple_ext_nodes(int fd)
 		syncobj_destroy(fd, syncobjs[i]);
 }
 
-#define MI_INSTR(opcode, flags) (((opcode) << 23) | (flags))
-
-/* #define MI_LOAD_REGISTER_MEM	   (MI_INSTR(0x29, 1) */
-/* #define MI_LOAD_REGISTER_MEM_GEN8  MI_INSTR(0x29, 2) */
-
-#define MI_LOAD_REGISTER_REG       MI_INSTR(0x2A, 1)
-
-#define MI_STORE_REGISTER_MEM      MI_INSTR(0x24, 1)
-#define MI_STORE_REGISTER_MEM_GEN8 MI_INSTR(0x24, 2)
-
-#define MI_MATH(x)                 MI_INSTR(0x1a, (x) - 1)
-#define MI_MATH_INSTR(opcode, op1, op2) ((opcode) << 20 | (op1) << 10 | (op2))
-/* Opcodes for MI_MATH_INSTR */
-#define   MI_MATH_NOOP			MI_MATH_INSTR(0x00,  0x0, 0x0)
-#define   MI_MATH_LOAD(op1, op2)	MI_MATH_INSTR(0x80,  op1, op2)
-#define   MI_MATH_LOADINV(op1, op2)	MI_MATH_INSTR(0x480, op1, op2)
-#define   MI_MATH_ADD			MI_MATH_INSTR(0x100, 0x0, 0x0)
-#define   MI_MATH_SUB			MI_MATH_INSTR(0x101, 0x0, 0x0)
-#define   MI_MATH_AND			MI_MATH_INSTR(0x102, 0x0, 0x0)
-#define   MI_MATH_OR			MI_MATH_INSTR(0x103, 0x0, 0x0)
-#define   MI_MATH_XOR			MI_MATH_INSTR(0x104, 0x0, 0x0)
-#define   MI_MATH_STORE(op1, op2)	MI_MATH_INSTR(0x180, op1, op2)
-#define   MI_MATH_STOREINV(op1, op2)	MI_MATH_INSTR(0x580, op1, op2)
-/* Registers used as operands in MI_MATH_INSTR */
-#define   MI_MATH_REG(x)		(x)
-#define   MI_MATH_REG_SRCA		0x20
-#define   MI_MATH_REG_SRCB		0x21
-#define   MI_MATH_REG_ACCU		0x31
-#define   MI_MATH_REG_ZF		0x32
-#define   MI_MATH_REG_CF		0x33
-
 #define HSW_CS_GPR(n)                   (0x600 + 8*(n))
 #define RING_TIMESTAMP                  (0x358)
 #define MI_PREDICATE_RESULT_1           (0x41c)
@@ -2610,23 +2579,23 @@ static void build_increment_engine_bb(struct inter_engine_batches *batch,
 {
 	uint32_t *bb = batch->increment_bb = calloc(1, 4096);
 
-	*bb++ = MI_LOAD_REGISTER_MEM_GEN8;
+	*bb++ = MI_LOAD_REGISTER_MEM | 2;
 	*bb++ = mmio_base + HSW_CS_GPR(0);
 	batch->read0_ptrs[0] = bb;
 	*bb++ = 0;
 	*bb++ = 0;
-	*bb++ = MI_LOAD_REGISTER_MEM_GEN8;
+	*bb++ = MI_LOAD_REGISTER_MEM | 2;
 	*bb++ = mmio_base + HSW_CS_GPR(0) + 4;
 	batch->read0_ptrs[1] = bb;
 	*bb++ = 0;
 	*bb++ = 0;
 
-	*bb++ = MI_LOAD_REGISTER_MEM_GEN8;
+	*bb++ = MI_LOAD_REGISTER_MEM | 2;
 	*bb++ = mmio_base + HSW_CS_GPR(1);
 	batch->read1_ptrs[0] = bb;
 	*bb++ = 0;
 	*bb++ = 0;
-	*bb++ = MI_LOAD_REGISTER_MEM_GEN8;
+	*bb++ = MI_LOAD_REGISTER_MEM | 2;
 	*bb++ = mmio_base + HSW_CS_GPR(1) + 4;
 	batch->read1_ptrs[1] = bb;
 	*bb++ = 0;
@@ -2638,12 +2607,12 @@ static void build_increment_engine_bb(struct inter_engine_batches *batch,
 	*bb++ = MI_MATH_ADD;
 	*bb++ = MI_MATH_STORE(MI_MATH_REG(0), MI_MATH_REG_ACCU);
 
-	*bb++ = MI_STORE_REGISTER_MEM_GEN8;
+	*bb++ = MI_STORE_REGISTER_MEM | 2;
 	*bb++ = mmio_base + HSW_CS_GPR(0);
 	batch->write_ptrs[0] = bb;
 	*bb++ = 0;
 	*bb++ = 0;
-	*bb++ = MI_STORE_REGISTER_MEM_GEN8;
+	*bb++ = MI_STORE_REGISTER_MEM | 2;
 	*bb++ = mmio_base + HSW_CS_GPR(0) + 4;
 	batch->write_ptrs[1] = bb;
 	*bb++ = 0;

@@ -83,8 +83,6 @@ static bool write_only(const uint32_t addr)
 	return false;
 }
 
-#define MI_STORE_REGISTER_MEM (0x24 << 23)
-
 static int workaround_fail_count(int i915, const intel_ctx_t *ctx)
 {
 	struct drm_i915_gem_exec_object2 obj[2];
@@ -122,7 +120,7 @@ static int workaround_fail_count(int i915, const intel_ctx_t *ctx)
 	out = base =
 		gem_mmap__cpu(i915, obj[1].handle, 0, batch_sz, PROT_WRITE);
 	for (int i = 0; i < num_wa_regs; i++) {
-		*out++ = MI_STORE_REGISTER_MEM | ((gen >= 8 ? 4 : 2) - 2);
+		*out++ = MI_STORE_REGISTER_MEM | (1 + (gen >= 8));
 		*out++ = wa_regs[i].addr;
 		reloc[i].target_handle = obj[0].handle;
 		reloc[i].offset = (out - base) * sizeof(*out);

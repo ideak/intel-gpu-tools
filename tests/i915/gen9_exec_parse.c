@@ -38,12 +38,9 @@
 #define INSTR_CLIENT_SHIFT	29
 #define   INSTR_INVALID_CLIENT  0x7
 
-#define MI_LOAD_REGISTER_REG (0x2a << 23)
-#define MI_STORE_REGISTER_MEM (0x24 << 23)
 #define MI_ARB_ON_OFF (0x8 << 23)
 #define MI_USER_INTERRUPT (0x02 << 23)
 #define MI_FLUSH_DW (0x26 << 23)
-#define MI_ARB_CHECK (0x05 << 23)
 #define MI_REPORT_HEAD (0x07 << 23)
 #define MI_SUSPEND_FLUSH (0x0b << 23)
 #define MI_LOAD_SCAN_LINES_EXCL (0x13 << 23)
@@ -689,7 +686,7 @@ static void test_cmd_crossing_page(const int i915, const uint32_t handle)
 		MI_BATCH_BUFFER_END,
 	};
 	const uint32_t store_reg[] = {
-		MI_STORE_REGISTER_MEM | (4 - 2),
+		MI_STORE_REGISTER_MEM | 2,
 		BCS_GPR(0),
 		0, /* reloc */
 		0, /* reloc */
@@ -728,7 +725,7 @@ static void test_invalid_length(const int i915, const uint32_t handle)
 	};
 
 	const uint32_t store_reg[] = {
-		MI_STORE_REGISTER_MEM | (4 - 2),
+		MI_STORE_REGISTER_MEM | 2,
 		BCS_GPR(0),
 		0, /* reloc */
 		0, /* reloc */
@@ -841,7 +838,7 @@ static void test_register(const int i915, const uint32_t handle,
 	};
 
 	const uint32_t store_reg[] = {
-		MI_STORE_REGISTER_MEM | (4 - 2),
+		MI_STORE_REGISTER_MEM | 2,
 		r->addr,
 		0, /* reloc */
 		0, /* reloc */
@@ -880,7 +877,7 @@ static long int read_reg(const int i915, const uint32_t handle,
 			 const uint32_t addr)
 {
 	const uint32_t store_reg[] = {
-		MI_STORE_REGISTER_MEM | (4 - 2),
+		MI_STORE_REGISTER_MEM | 2,
 		addr,
 		0, /* reloc */
 		0, /* reloc */

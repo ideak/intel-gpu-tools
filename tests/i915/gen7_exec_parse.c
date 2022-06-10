@@ -48,8 +48,6 @@
 #define INSTR_CLIENT_SHIFT	29
 #define   INSTR_INVALID_CLIENT  0x7
 
-#define MI_LOAD_REGISTER_REG (0x2a << 23)
-#define MI_STORE_REGISTER_MEM (0x24 << 23)
 #define MI_ARB_ON_OFF (0x8 << 23)
 #define MI_DISPLAY_FLIP ((0x14 << 23) | 1)
 
@@ -374,7 +372,7 @@ static void test_allocations(int fd)
 static void hsw_load_register_reg(void)
 {
 	uint32_t init_gpr0[16] = {
-		MI_LOAD_REGISTER_IMM | (3 - 2),
+		MI_LOAD_REGISTER_IMM,
 		HSW_CS_GPR0,
 		0xabcdabc0, /* leave [1:0] zero */
 		MI_BATCH_BUFFER_END,
@@ -386,7 +384,7 @@ static void hsw_load_register_reg(void)
 		MI_BATCH_BUFFER_END,
 	};
 	uint32_t do_lrr[16] = {
-		MI_LOAD_REGISTER_REG | (3 - 2),
+		MI_LOAD_REGISTER_REG,
 		0, /* [1] = src */
 		HSW_CS_GPR0, /* dst */
 		MI_BATCH_BUFFER_END,

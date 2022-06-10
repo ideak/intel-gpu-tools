@@ -112,33 +112,6 @@ static uint64_t ticks_to_ns(int i915, uint64_t ticks)
 				  read_timestamp_frequency(i915));
 }
 
-#define MI_INSTR(opcode, flags) (((opcode) << 23) | (flags))
-
-#define MI_MATH(x)                      MI_INSTR(0x1a, (x) - 1)
-#define MI_MATH_INSTR(opcode, op1, op2) ((opcode) << 20 | (op1) << 10 | (op2))
-/* Opcodes for MI_MATH_INSTR */
-#define   MI_MATH_NOOP                  MI_MATH_INSTR(0x000, 0x0, 0x0)
-#define   MI_MATH_LOAD(op1, op2)        MI_MATH_INSTR(0x080, op1, op2)
-#define   MI_MATH_LOADINV(op1, op2)     MI_MATH_INSTR(0x480, op1, op2)
-#define   MI_MATH_LOAD0(op1)            MI_MATH_INSTR(0x081, op1)
-#define   MI_MATH_LOAD1(op1)            MI_MATH_INSTR(0x481, op1)
-#define   MI_MATH_ADD                   MI_MATH_INSTR(0x100, 0x0, 0x0)
-#define   MI_MATH_SUB                   MI_MATH_INSTR(0x101, 0x0, 0x0)
-#define   MI_MATH_AND                   MI_MATH_INSTR(0x102, 0x0, 0x0)
-#define   MI_MATH_OR                    MI_MATH_INSTR(0x103, 0x0, 0x0)
-#define   MI_MATH_XOR                   MI_MATH_INSTR(0x104, 0x0, 0x0)
-#define   MI_MATH_STORE(op1, op2)       MI_MATH_INSTR(0x180, op1, op2)
-#define   MI_MATH_STOREINV(op1, op2)    MI_MATH_INSTR(0x580, op1, op2)
-/* Registers used as operands in MI_MATH_INSTR */
-#define   MI_MATH_REG(x)                (x)
-#define   MI_MATH_REG_SRCA              0x20
-#define   MI_MATH_REG_SRCB              0x21
-#define   MI_MATH_REG_ACCU              0x31
-#define   MI_MATH_REG_ZF                0x32
-#define   MI_MATH_REG_CF                0x33
-
-#define MI_LOAD_REGISTER_REG    MI_INSTR(0x2A, 1)
-
 static void delay(int i915,
 		  const struct intel_execution_engine2 *e,
 		  uint32_t handle,
