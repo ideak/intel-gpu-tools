@@ -2430,12 +2430,16 @@ struct fb_blit_upload {
 
 static bool fast_blit_ok(const struct igt_fb *fb)
 {
-	int ver = intel_display_ver(intel_get_drm_devid(fb->fd));
+	int dev_id = intel_get_drm_devid(fb->fd);
+	int ver = intel_display_ver(dev_id);
 
 	if (ver < 9)
 		return false;
 
 	if (ver < 12)
+		return true;
+
+	if (ver >= 13 && !IS_ALDERLAKE_P(dev_id))
 		return true;
 
 	return fb->modifier != I915_FORMAT_MOD_X_TILED;
