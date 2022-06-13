@@ -364,8 +364,6 @@ static void __test_mixed(int i915, int engine,
 	 * terminate the hog leaving the good client to run.
 	 */
 
-	intel_allocator_multiprocess_start();
-
 	igt_assert(igt_sysfs_scanf(engine, ATTR, "%u", &saved) == 1);
 	igt_debug("Initial %s:%u\n", ATTR, saved);
 	gem_quiescent_gpu(i915);
@@ -375,22 +373,25 @@ static void __test_mixed(int i915, int engine,
 
 	set_heartbeat(engine, heartbeat);
 
-	igt_fork(child, 1) /* good client */
+	igt_fork(child, 1) /* good client */ {
+		intel_allocator_init();
 		client(i915, engine, shared, good, 1);
-	igt_fork(child, 1) /* bad client */
+	}
+	igt_fork(child, 1) /* bad client */ {
+		intel_allocator_init();
 		client(i915, engine, shared, bad, -EIO);
+	}
 
 	old = signal(SIGALRM, sighandler);
 	sleep(duration);
-	signal(SIGALRM, old);
 
 	*shared = true;
 	igt_waitchildren();
 	munmap(shared, 4096);
+	signal(SIGALRM, old);
 
 	gem_quiescent_gpu(i915);
 	set_heartbeat(engine, saved);
-	intel_allocator_multiprocess_stop();
 }
 
 static void test_mixed(int i915, int engine)
