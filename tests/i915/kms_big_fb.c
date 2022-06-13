@@ -457,6 +457,8 @@ static bool test_pipe(data_t *data)
 	if (data->format == DRM_FORMAT_C8)
 		unset_lut(data);
 
+	intel_bb_destroy(data->ibb);
+
 	return ret;
 }
 
@@ -548,6 +550,8 @@ max_hw_stride_async_flip_test(data_t *data)
 			     i?"should":"shouldn't");
 	}
 	igt_reset_timeout();
+
+	intel_bb_destroy(data->ibb);
 
 	return true;
 }
@@ -763,7 +767,6 @@ static void test_cleanup(data_t *data)
 	igt_remove_fb(data->drm_fd, &data->big_fb_flip[1]);
 	igt_remove_fb(data->drm_fd, &data->small_fb);
 
-	intel_bb_destroy(data->ibb);
 	data->output = NULL;
 }
 
