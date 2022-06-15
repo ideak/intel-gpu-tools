@@ -26,16 +26,14 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
-#define THRESHOLD_PER_CONNECTOR	50
-#define THRESHOLD_TOTAL		150
-#define CHECK_TIMES		15
+#define THRESHOLD_PER_CONNECTOR		150
+#define THRESHOLD_PER_CONNECTOR_MEAN	140
+#define CHECK_TIMES			15
 
-IGT_TEST_DESCRIPTION("This check the time we take to read the content of all "
-		     "the possible connectors. Without the edid -ENXIO patch "
-		     "(http://permalink.gmane.org/gmane.comp.video.dri.devel/62083), "
-		     "we sometimes take a *really* long time. "
-		     "So let's just check for some reasonable timing here");
-
+IGT_TEST_DESCRIPTION("This test checks the time it takes to reprobe each "
+		     "connector and fails if either the time it takes for "
+		     "one reprobe is too long or if the mean time it takes "
+		     "to reprobe one connector is too long.");
 
 igt_simple_main
 {
@@ -82,13 +80,13 @@ igt_simple_main
 			  mean.mean, mean.mean / 1e3, mean.mean / 1e6);
 
 		igt_assert_f(mean.max < THRESHOLD_PER_CONNECTOR * 1e6,
-			     "%s: probe time exceed %dms, max=%.2fms, avg=%.2fms\n",
+			     "%s: single probe time exceeded %dms, max=%.2fms, avg=%.2fms\n",
 			     de->d_name, THRESHOLD_PER_CONNECTOR,
 			     mean.max / 1e6, mean.mean / 1e6);
 
-		igt_assert_f(mean.mean < (THRESHOLD_TOTAL * 1e6),
-			     "%s: average probe time exceeded %dms, max=%.2fms, avg=%.2fms\n",
-			     de->d_name, THRESHOLD_TOTAL,
+		igt_assert_f(mean.mean < (THRESHOLD_PER_CONNECTOR_MEAN * 1e6),
+			     "%s: mean probe time exceeded %dms, max=%.2fms, avg=%.2fms\n",
+			     de->d_name, THRESHOLD_PER_CONNECTOR_MEAN,
 			     mean.max / 1e6, mean.mean / 1e6);
 	}
 	closedir(dirp);
