@@ -46,10 +46,6 @@ IGT_TEST_DESCRIPTION("Test Dithering block status");
 typedef struct data {
 	igt_display_t display;
 	igt_plane_t *primary;
-	igt_output_t *output;
-	igt_pipe_t *pipe;
-	drmModeModeInfo *mode;
-	enum pipe pipe_id;
 	int drm_fd;
 	igt_fb_t fb;
 } data_t;
@@ -60,30 +56,23 @@ typedef struct {
 } dither_status_t;
 
 /* Prepare test data. */
-static void prepare_test(data_t *data, igt_output_t *output, enum pipe pipe)
+static void prepare_test(data_t *data, igt_output_t *output, enum pipe p)
 {
 	igt_display_t *display = &data->display;
+	igt_pipe_t *pipe = &data->display.pipes[p];
 
-	data->pipe_id = pipe;
-	data->pipe = &data->display.pipes[data->pipe_id];
-	igt_assert(data->pipe);
+	igt_assert(pipe);
 
 	igt_display_reset(display);
 
-	data->output = output;
-	igt_assert(data->output);
-
-	data->mode = igt_output_get_mode(data->output);
-	igt_assert(data->mode);
-
 	data->primary =
-		igt_pipe_get_plane_type(data->pipe, DRM_PLANE_TYPE_PRIMARY);
+		igt_pipe_get_plane_type(pipe, DRM_PLANE_TYPE_PRIMARY);
 
-	igt_output_set_pipe(data->output, data->pipe_id);
+	igt_output_set_pipe(output, p);
 }
 
 /* Returns the current state of dithering from the crtc debugfs. */
-static dither_status_t get_dither_state(data_t *data)
+static dither_status_t get_dither_state(data_t *data, enum pipe pipe)
 {
 	char buf[512], tmp[5];
 	char *start_loc;
@@ -103,9 +92,32 @@ static dither_status_t get_dither_state(data_t *data)
 	igt_assert_eq(sscanf(start_loc, ", dither=%s", tmp), 1);
 	status.dither = !strcmp(tmp, "yes,");
 
-	status.bpc = igt_get_pipe_current_bpc(data->drm_fd, data->pipe_id);
+	status.bpc = igt_get_pipe_current_bpc(data->drm_fd, pipe);
 
 	return status;
+}
+
+static bool i915_clock_constraint(data_t *data, enum pipe pipe,
+				  igt_output_t *output, int bpc)
+{
+	drmModeConnector *connector = output->config.connector;
+	igt_display_t *display = &data->display;
+
+	igt_sort_connector_modes(connector, sort_drm_modes_by_clk_dsc);
+
+	for_each_connector_mode(output) {
+		igt_output_override_mode(output, &connector->modes[j__]);
+		igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
+
+		if (!igt_check_output_bpc_equal(data->drm_fd, pipe,
+						output->name, bpc))
+			continue;
+
+		return true;
+	}
+
+	igt_output_override_mode(output, NULL);
+	return false;
 }
 
 static void test_dithering(data_t *data, enum pipe pipe,
@@ -121,14 +133,12 @@ static void test_dithering(data_t *data, enum pipe pipe,
 			output->name, kmstest_pipe_name(pipe));
 	prepare_test(data, output, pipe);
 
-	igt_assert(igt_create_fb(data->drm_fd, data->mode->hdisplay,
-				 data->mode->vdisplay, fb_format,
+	igt_assert(igt_create_fb(data->drm_fd, 512, 512, fb_format,
 				 DRM_FORMAT_MOD_LINEAR, &data->fb));
 	igt_plane_set_fb(data->primary, &data->fb);
-	igt_plane_set_size(data->primary, data->mode->hdisplay, data->mode->vdisplay);
 
 	bpc = igt_output_get_prop(output, IGT_CONNECTOR_MAX_BPC);
-	igt_output_set_prop_value(data->output, IGT_CONNECTOR_MAX_BPC, output_bpc);
+	igt_output_set_prop_value(output, IGT_CONNECTOR_MAX_BPC, output_bpc);
 
 	if (display->is_atomic)
 		ret = igt_display_try_commit_atomic(display,
@@ -141,12 +151,9 @@ static void test_dithering(data_t *data, enum pipe pipe,
 	igt_require_f(!ret, "%s don't support %d-bpc\n",
 				output->name, output_bpc);
 
-	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
-
-	if (!igt_check_output_bpc_equal(data->drm_fd, pipe, output->name, output_bpc)) {
-		igt_output_set_prop_value(output, IGT_CONNECTOR_MAX_BPC, bpc);
-		igt_fail_on_f(true, "Failed to set max_bpc as: %d\n", output_bpc);
-	}
+	igt_require_f(i915_clock_constraint(data, pipe, output, output_bpc),
+			"No supported mode found to use %d-bpc on %s\n",
+			output_bpc, output->name);
 
 	/*
 	 * Check the status of Dithering block:
@@ -155,7 +162,7 @@ static void test_dithering(data_t *data, enum pipe pipe,
 	 * If fb_bpc is greater than output_bpc, Dithering should be enabled
 	 * Else disabled
 	 */
-	status = get_dither_state(data);
+	status = get_dither_state(data, pipe);
 
 	igt_info("FB BPC:%d, Panel BPC:%d, Pipe BPC:%d, Expected Dither:%s, Actual result:%s\n",
 		  fb_bpc, output_bpc, status.bpc,
@@ -167,16 +174,11 @@ static void test_dithering(data_t *data, enum pipe pipe,
 	* Otherwise, previously updated value will stay forever and
 	* may cause the failures for next/other subtests.
 	*/
-	igt_output_set_prop_value(data->output, IGT_CONNECTOR_MAX_BPC, bpc);
+	igt_output_set_prop_value(output, IGT_CONNECTOR_MAX_BPC, bpc);
 	igt_plane_set_fb(data->primary, NULL);
 	igt_output_set_pipe(output, PIPE_NONE);
 	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 	igt_remove_fb(data->drm_fd, &data->fb);
-
-	/* Check if crtc bpc is updated with requested one. */
-	igt_require_f((status.bpc == output_bpc),
-			"%s can support max %u-bpc, but requested %d-bpc\n",
-				output->name, status.bpc, output_bpc);
 
 	/* Compute the result. */
 	if (fb_bpc > output_bpc)
