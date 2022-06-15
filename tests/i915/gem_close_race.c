@@ -53,6 +53,8 @@
 #define BLT_WRITE_ALPHA		(1<<21)
 #define BLT_WRITE_RGB		(1<<20)
 
+IGT_TEST_DESCRIPTION("Test try to race gem_close against workload submission.");
+
 static uint32_t devid;
 static bool has_64bit_relocations;
 static bool has_softpin;
@@ -289,6 +291,7 @@ igt_main
 		close(fd);
 	}
 
+	igt_describe("Basic workload submission.");
 	igt_subtest("basic-process") {
 		int fd = drm_open_driver(DRIVER_INTEL);
 
@@ -300,9 +303,13 @@ igt_main
 		close(fd);
 	}
 
+	igt_describe("Share buffer handle across different drm fd's and trying to race "
+		     " gem_close against continuous workload with minimum timeout.");
 	igt_subtest("basic-threads")
 		threads(1, 0);
 
+	igt_describe("Test try to race gem_close against submission of continuous"
+		     " workload.");
 	igt_subtest("process-exit") {
 		int fd = drm_open_driver(DRIVER_INTEL);
 
@@ -314,9 +321,13 @@ igt_main
 		close(fd);
 	}
 
+	igt_describe("Share buffer handle across different drm fd's and trying to race"
+		     " gem_close against continuous workload in other contexts.");
 	igt_subtest("contexts")
 		threads(30, CONTEXTS);
 
+	igt_describe("Share buffer handle across different drm fd's and trying to race of"
+		     " gem_close against continuous workload.");
 	igt_subtest("gem-close-race")
 		threads(150, 0);
 
