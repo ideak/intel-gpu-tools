@@ -81,11 +81,11 @@ igt_simple_main
 			  mean.max, mean.max / 1e3, mean.max / 1e6,
 			  mean.mean, mean.mean / 1e3, mean.mean / 1e6);
 
-		if (mean.max > (THRESHOLD_PER_CONNECTOR * 1e6)) {
-			igt_warn("%s: probe time exceed %dms, max=%.2fms, avg=%.2fms\n",
-				 de->d_name, THRESHOLD_PER_CONNECTOR,
-				 mean.max / 1e6, mean.mean / 1e6);
-		}
+		igt_assert_f(mean.max < THRESHOLD_PER_CONNECTOR * 1e6,
+			     "%s: probe time exceed %dms, max=%.2fms, avg=%.2fms\n",
+			     de->d_name, THRESHOLD_PER_CONNECTOR,
+			     mean.max / 1e6, mean.mean / 1e6);
+
 		igt_assert_f(mean.mean < (THRESHOLD_TOTAL * 1e6),
 			     "%s: average probe time exceeded %dms, max=%.2fms, avg=%.2fms\n",
 			     de->d_name, THRESHOLD_TOTAL,
