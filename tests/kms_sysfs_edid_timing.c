@@ -28,20 +28,26 @@
 
 #define THRESHOLD_PER_CONNECTOR		150
 #define THRESHOLD_PER_CONNECTOR_MEAN	140
+#define THRESHOLD_ALL_CONNECTORS_MEAN	100
 #define CHECK_TIMES			15
 
 IGT_TEST_DESCRIPTION("This test checks the time it takes to reprobe each "
 		     "connector and fails if either the time it takes for "
 		     "one reprobe is too long or if the mean time it takes "
-		     "to reprobe one connector is too long.");
+		     "to reprobe one connector is too long.  Additionally, "
+		     "make sure that the mean time for all connectors is "
+		     "not too long.");
 
 igt_simple_main
 {
 	DIR *dirp;
 	struct dirent *de;
+	struct igt_mean all_mean;
 
 	dirp = opendir("/sys/class/drm");
 	igt_assert(dirp != NULL);
+
+	igt_mean_init(&all_mean);
 
 	while ((de = readdir(dirp))) {
 		struct igt_mean mean = {};
@@ -88,7 +94,14 @@ igt_simple_main
 			     "%s: mean probe time exceeded %dms, max=%.2fms, avg=%.2fms\n",
 			     de->d_name, THRESHOLD_PER_CONNECTOR_MEAN,
 			     mean.max / 1e6, mean.mean / 1e6);
-	}
-	closedir(dirp);
 
+		igt_mean_add(&all_mean, mean.mean);
+	}
+
+	igt_assert_f(all_mean.mean < THRESHOLD_ALL_CONNECTORS_MEAN * 1e6,
+		     "Mean of all connector means exceeds %dms, max=%.2fms, mean=%.2fms\n",
+		     THRESHOLD_ALL_CONNECTORS_MEAN, all_mean.max / 1e6,
+		     all_mean.mean / 1e6);
+
+	closedir(dirp);
 }
