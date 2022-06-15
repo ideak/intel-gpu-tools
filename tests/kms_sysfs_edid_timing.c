@@ -26,8 +26,8 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
-#define THRESHOLD_PER_CONNECTOR	10
-#define THRESHOLD_TOTAL		50
+#define THRESHOLD_PER_CONNECTOR	50
+#define THRESHOLD_TOTAL		150
 #define CHECK_TIMES		15
 
 IGT_TEST_DESCRIPTION("This check the time we take to read the content of all "
@@ -82,15 +82,14 @@ igt_simple_main
 			  mean.mean, mean.mean / 1e3, mean.mean / 1e6);
 
 		if (mean.max > (THRESHOLD_PER_CONNECTOR * 1e6)) {
-			igt_warn("%s: probe time exceed 10ms, "
-				 "max=%.2fms, avg=%.2fms\n", de->d_name,
+			igt_warn("%s: probe time exceed %dms, max=%.2fms, avg=%.2fms\n",
+				 de->d_name, THRESHOLD_PER_CONNECTOR,
 				 mean.max / 1e6, mean.mean / 1e6);
 		}
 		igt_assert_f(mean.mean < (THRESHOLD_TOTAL * 1e6),
-			     "%s: average probe time exceeded 50ms, "
-			     "max=%.2fms, avg=%.2fms\n", de->d_name,
+			     "%s: average probe time exceeded %dms, max=%.2fms, avg=%.2fms\n",
+			     de->d_name, THRESHOLD_TOTAL,
 			     mean.max / 1e6, mean.mean / 1e6);
-
 	}
 	closedir(dirp);
 
