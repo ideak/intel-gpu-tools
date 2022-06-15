@@ -486,7 +486,7 @@ void init_settings(struct settings *settings)
 	memset(settings, 0, sizeof(*settings));
 }
 
-void free_settings(struct settings *settings)
+void clear_settings(struct settings *settings)
 {
 	free(settings->test_list);
 	free(settings->name);
@@ -536,7 +536,7 @@ bool parse_options(int argc, char **argv,
 		{ 0, 0, 0, 0},
 	};
 
-	free_settings(settings);
+	clear_settings(settings);
 
 	optind = 1;
 
@@ -705,7 +705,7 @@ bool parse_options(int argc, char **argv,
 	return true;
 
  error:
-	free_settings(settings);
+	clear_settings(settings);
 	return false;
 }
 
@@ -939,7 +939,7 @@ bool read_settings_from_dir(struct settings *settings, int dirfd)
 	int fd;
 	FILE *f;
 
-	free_settings(settings);
+	clear_settings(settings);
 
 	if ((fd = openat(dirfd, settings_filename, O_RDONLY)) < 0)
 		return false;

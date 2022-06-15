@@ -139,7 +139,7 @@ static void job_list_filter_test(const char *name, const char *filterarg1, const
 	}
 
 	igt_fixture {
-		free_settings(settings);
+		clear_settings(settings);
 		free(settings);
 	}
 }
@@ -953,7 +953,7 @@ igt_main
 			close(fd);
 			close(dirfd);
 			clear_directory(dirname);
-			free_settings(cmp_settings);
+			clear_settings(cmp_settings);
 			free(cmp_settings);
 		}
 	}
@@ -1176,7 +1176,7 @@ igt_main
 			igt_assert(write(fd, journaltext, strlen(journaltext)) == strlen(journaltext));
 
 			free_job_list(list);
-			free_settings(settings);
+			clear_settings(settings);
 			igt_assert(initialize_execute_state_from_resume(dirfd, &state, settings, list));
 
 			igt_assert_eq(state.next, 0);
@@ -1233,7 +1233,7 @@ igt_main
 			igt_assert(write(fd, journaltext, strlen(journaltext)) == strlen(journaltext));
 
 			free_job_list(list);
-			free_settings(settings);
+			clear_settings(settings);
 			igt_assert(initialize_execute_state_from_resume(dirfd, &state, settings, list));
 
 			/* All subtests are in journal, the entry should be considered completed */
@@ -1294,7 +1294,7 @@ igt_main
 			igt_assert_eq(write(fd, journaltext, sizeof(journaltext)), sizeof(journaltext));
 
 			free_job_list(list);
-			free_settings(settings);
+			clear_settings(settings);
 			igt_assert(initialize_execute_state_from_resume(dirfd, &state, settings, list));
 
 			igt_assert_eq(state.next, 1);
@@ -1942,7 +1942,7 @@ igt_main
 	}
 
 	igt_fixture {
-		free_settings(settings);
+		clear_settings(settings);
 		free(settings);
 	}
 }

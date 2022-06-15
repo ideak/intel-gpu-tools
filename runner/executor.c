@@ -1547,7 +1547,7 @@ bool initialize_execute_state_from_resume(int dirfd,
 	struct job_list_entry *entry;
 	int resdirfd, fd, i;
 
-	free_settings(settings);
+	clear_settings(settings);
 	free_job_list(list);
 	memset(state, 0, sizeof(*state));
 	state->resuming = true;

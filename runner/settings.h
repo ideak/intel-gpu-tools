@@ -76,14 +76,14 @@ struct settings {
 void init_settings(struct settings *settings);
 
 /**
- * free_settings:
+ * clear_settings:
  *
  * Releases all allocated resources for a settings object and
  * initializes it to an empty state (see #init_settings).
  *
- * @settings: Object to release and initialize.
+ * @settings: Object to release and reinitialize.
  */
-void free_settings(struct settings *settings);
+void clear_settings(struct settings *settings);
 
 /**
  * parse_options:

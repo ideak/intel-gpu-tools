@@ -1701,7 +1701,7 @@ struct json_object *generate_results_json(int dirfd)
 		close(fd);
 	}
 
-	free_settings(&settings);
+	clear_settings(&settings);
 	free_job_list(&job_list);
 
 	return obj;
