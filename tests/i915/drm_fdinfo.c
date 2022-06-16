@@ -27,6 +27,7 @@
 #include "igt_device.h"
 #include "igt_drm_fdinfo.h"
 #include "i915/gem.h"
+#include "i915/gem_vm.h"
 #include "intel_ctx.h"
 
 IGT_TEST_DESCRIPTION("Test the i915 drm fdinfo data");
@@ -90,10 +91,10 @@ static igt_spin_t *__spin_poll(int fd, uint64_t ahnd, const intel_ctx_t *ctx,
 	struct igt_spin_factory opts = {
 		.ahnd = ahnd,
 		.ctx = ctx,
-		.engine = e->flags,
+		.engine = e ? e->flags : 0,
 	};
 
-	if (gem_class_can_store_dword(fd, e->class))
+	if (!e || gem_class_can_store_dword(fd, e->class))
 		opts.flags |= IGT_SPIN_POLL_RUN;
 
 	return __igt_spin_factory(fd, &opts);
@@ -440,6 +441,274 @@ all_busy_check_all(int gem_fd, const intel_ctx_t *ctx,
 	gem_quiescent_gpu(gem_fd);
 }
 
+static struct i915_engine_class_instance *
+list_engines(const intel_ctx_cfg_t *cfg,
+	     unsigned int class, unsigned int *out)
+{
+	struct i915_engine_class_instance *ci;
+	unsigned int count = 0, i;
+
+	ci = malloc(cfg->num_engines * sizeof(*ci));
+	igt_assert(ci);
+
+	for (i = 0; i < cfg->num_engines; i++) {
+		if (class == cfg->engines[i].engine_class)
+			ci[count++] = cfg->engines[i];
+	}
+
+	if (!count) {
+		free(ci);
+		ci = NULL;
+	}
+
+	*out = count;
+	return ci;
+}
+
+static size_t sizeof_load_balance(int count)
+{
+	return offsetof(struct i915_context_engines_load_balance,
+			engines[count]);
+}
+
+static size_t sizeof_param_engines(int count)
+{
+	return offsetof(struct i915_context_param_engines,
+			engines[count]);
+}
+
+#define alloca0(sz) ({ size_t sz__ = (sz); memset(alloca(sz__), 0, sz__); })
+
+static int __set_load_balancer(int i915, uint32_t ctx,
+			       const struct i915_engine_class_instance *ci,
+			       unsigned int count,
+			       void *ext)
+{
+	struct i915_context_engines_load_balance *balancer =
+		alloca0(sizeof_load_balance(count));
+	struct i915_context_param_engines *engines =
+		alloca0(sizeof_param_engines(count + 1));
+	struct drm_i915_gem_context_param p = {
+		.ctx_id = ctx,
+		.param = I915_CONTEXT_PARAM_ENGINES,
+		.size = sizeof_param_engines(count + 1),
+		.value = to_user_pointer(engines)
+	};
+
+	balancer->base.name = I915_CONTEXT_ENGINES_EXT_LOAD_BALANCE;
+	balancer->base.next_extension = to_user_pointer(ext);
+
+	igt_assert(count);
+	balancer->num_siblings = count;
+	memcpy(balancer->engines, ci, count * sizeof(*ci));
+
+	engines->extensions = to_user_pointer(balancer);
+	engines->engines[0].engine_class =
+		I915_ENGINE_CLASS_INVALID;
+	engines->engines[0].engine_instance =
+		I915_ENGINE_CLASS_INVALID_NONE;
+	memcpy(engines->engines + 1, ci, count * sizeof(*ci));
+
+	return __gem_context_set_param(i915, &p);
+}
+
+static void set_load_balancer(int i915, uint32_t ctx,
+			      const struct i915_engine_class_instance *ci,
+			      unsigned int count,
+			      void *ext)
+{
+	igt_assert_eq(__set_load_balancer(i915, ctx, ci, count, ext), 0);
+}
+
+static void
+virtual(int i915, const intel_ctx_cfg_t *base_cfg, unsigned int flags)
+{
+	intel_ctx_cfg_t cfg = {};
+
+	cfg.vm = gem_vm_create(i915);
+
+	for (int class = 0; class < 32; class++) {
+		struct i915_engine_class_instance *ci;
+		unsigned int count;
+
+		if (!gem_class_can_store_dword(i915, class))
+			continue;
+
+		ci = list_engines(base_cfg, class, &count);
+		if (!ci)
+			continue;
+
+		for (unsigned int pass = 0; pass < count; pass++) {
+			const intel_ctx_t *ctx;
+			unsigned long slept;
+			uint64_t ahnd, val;
+			igt_spin_t *spin;
+			igt_hang_t hang;
+
+			igt_assert(sizeof(*ci) == sizeof(int));
+			igt_permute_array(ci, count, igt_exchange_int);
+
+			igt_debug("class %u, pass %u/%u...\n", class, pass, count);
+
+			ctx = intel_ctx_create(i915, &cfg);
+			set_load_balancer(i915, ctx->id, ci, count, NULL);
+			if (flags & FLAG_HANG)
+				hang = igt_allow_hang(i915, ctx->id, 0);
+			ahnd = get_reloc_ahnd(i915, ctx->id);
+
+			if (flags & TEST_BUSY)
+				spin = spin_sync(i915, ahnd, ctx, NULL);
+			else
+				spin = NULL;
+
+			val = read_busy(i915, class);
+			slept = measured_usleep(batch_duration_ns / 1000);
+			if (flags & TEST_TRAILING_IDLE)
+				end_spin(i915, spin, flags);
+			val = read_busy(i915, class) - val;
+
+			if (flags & FLAG_HANG)
+				igt_force_gpu_reset(i915);
+			else
+				end_spin(i915, spin, FLAG_SYNC);
+
+			assert_within_epsilon(val,
+					      flags & TEST_BUSY ?
+					      slept : 0.0f,
+					      tolerance);
+
+			/* Check for idle after hang. */
+			if (flags & FLAG_HANG) {
+				gem_quiescent_gpu(i915);
+				igt_assert(!gem_bo_busy(i915, spin->handle));
+
+				val = read_busy(i915, class);
+				slept = measured_usleep(batch_duration_ns /
+							1000);
+				val = read_busy(i915, class) - val;
+
+				assert_within_epsilon(val, 0, tolerance);
+			}
+
+			igt_spin_free(i915, spin);
+			put_ahnd(ahnd);
+			if (flags & FLAG_HANG)
+				igt_disallow_hang(i915, hang);
+			intel_ctx_destroy(i915, ctx);
+
+			gem_quiescent_gpu(i915);
+		}
+
+		free(ci);
+	}
+}
+
+static void
+__virt_submit_spin(int i915, igt_spin_t *spin,
+		   const intel_ctx_t *ctx,
+		   int offset)
+{
+	struct drm_i915_gem_execbuffer2 eb = spin->execbuf;
+
+	eb.flags &= ~(0x3f | I915_EXEC_BSD_MASK);
+	eb.flags |= I915_EXEC_NO_RELOC;
+	eb.batch_start_offset += offset;
+	eb.rsvd1 = ctx->id;
+
+	gem_execbuf(i915, &eb);
+}
+
+static void
+virtual_all(int i915, const intel_ctx_cfg_t *base_cfg, unsigned int flags)
+{
+	const unsigned int num_engines = base_cfg->num_engines;
+	intel_ctx_cfg_t cfg = {};
+
+	cfg.vm = gem_vm_create(i915);
+
+	for (int class = 0; class < 32; class++) {
+		struct i915_engine_class_instance *ci;
+		const intel_ctx_t *ctx[num_engines];
+		igt_hang_t hang[num_engines];
+		igt_spin_t *spin = NULL;
+		unsigned int count;
+		unsigned long slept;
+		uint64_t val;
+
+		if (!gem_class_can_store_dword(i915, class))
+			continue;
+
+		ci = list_engines(base_cfg, class, &count);
+		if (!ci)
+			continue;
+		igt_assert(count <= num_engines);
+
+		if (count < 2)
+			continue;
+
+		igt_debug("class %u, %u engines...\n", class, count);
+
+		for (unsigned int i = 0; i < count; i++) {
+			uint64_t ahnd;
+
+			igt_assert(sizeof(*ci) == sizeof(int));
+			igt_permute_array(ci, count, igt_exchange_int);
+
+			ctx[i] = intel_ctx_create(i915, &cfg);
+			set_load_balancer(i915, ctx[i]->id, ci, count, NULL);
+			if (flags & FLAG_HANG)
+				hang[i] = igt_allow_hang(i915, ctx[i]->id, 0);
+			ahnd = get_reloc_ahnd(i915, ctx[i]->id);
+
+			if (spin)
+				__virt_submit_spin(i915, spin, ctx[i], 64);
+			else
+				spin = __spin_poll(i915, ahnd, ctx[i], NULL);
+		}
+
+		/* Small delay to allow engines to start. */
+		usleep(__spin_wait(i915, spin) * count / 1e3);
+
+		val = read_busy(i915, class);
+		slept = measured_usleep(batch_duration_ns / 1000);
+		if (flags & TEST_TRAILING_IDLE)
+			end_spin(i915, spin, flags);
+		val = read_busy(i915, class) - val;
+
+		if (flags & FLAG_HANG)
+			igt_force_gpu_reset(i915);
+		else
+			end_spin(i915, spin, FLAG_SYNC);
+
+		assert_within_epsilon(val, slept * count, tolerance);
+
+		/* Check for idle after hang. */
+		if (flags & FLAG_HANG) {
+			gem_quiescent_gpu(i915);
+			igt_assert(!gem_bo_busy(i915, spin->handle));
+
+			val = read_busy(i915, class);
+			slept = measured_usleep(batch_duration_ns /
+						1000);
+			val = read_busy(i915, class) - val;
+
+			assert_within_epsilon(val, 0, tolerance);
+		}
+
+		igt_spin_free(i915, spin);
+		put_ahnd(spin->opts.ahnd);
+		for (unsigned int i = 0; i < count; i++) {
+			if (flags & FLAG_HANG)
+				igt_disallow_hang(i915, hang[i]);
+			intel_ctx_destroy(i915, ctx[i]);
+		}
+
+		gem_quiescent_gpu(i915);
+
+		free(ci);
+	}
+}
+
 #define test_each_engine(T, i915, ctx, e) \
 	igt_subtest_with_dynamic(T) for_each_ctx_engine(i915, ctx, e) \
 		igt_dynamic_f("%s", e->name)
@@ -489,14 +758,23 @@ igt_main
 	test_each_engine("idle", i915, ctx, e)
 		single(i915, ctx, e, 0);
 
+	igt_subtest("virtual-idle")
+		virtual(i915, &ctx->cfg, 0);
+
 	/**
 	 * Test that a single engine reports load correctly.
 	 */
 	test_each_engine("busy", i915, ctx, e)
 		single(i915, ctx, e, TEST_BUSY);
 
+	igt_subtest("virtual-busy")
+		virtual(i915, &ctx->cfg, TEST_BUSY);
+
 	test_each_engine("busy-idle", i915, ctx, e)
 		single(i915, ctx, e, TEST_BUSY | TEST_TRAILING_IDLE);
+
+	igt_subtest("virtual-busy-idle")
+		virtual(i915, &ctx->cfg, TEST_BUSY | TEST_TRAILING_IDLE);
 
 	test_each_engine("busy-hang", i915, ctx, e) {
 		igt_hang_t hang = igt_allow_hang(i915, ctx->id, 0);
@@ -505,6 +783,9 @@ igt_main
 
 		igt_disallow_hang(i915, hang);
 	}
+
+	igt_subtest("virtual-busy-hang")
+		virtual(i915, &ctx->cfg, TEST_BUSY | FLAG_HANG);
 
 	/**
 	 * Test that when one engine is loaded other report no
@@ -544,6 +825,14 @@ igt_main
 		all_busy_check_all(i915, ctx, num_engines, classes, num_classes,
 				   TEST_BUSY | TEST_TRAILING_IDLE);
 
+	igt_subtest("virtual-busy-all")
+		virtual_all(i915, &ctx->cfg, TEST_BUSY);
+
+	igt_subtest("virtual-busy-idle-all")
+		virtual_all(i915, &ctx->cfg, TEST_BUSY | TEST_TRAILING_IDLE);
+
+	igt_subtest("virtual-busy-hang-all")
+		virtual_all(i915, &ctx->cfg, TEST_BUSY | FLAG_HANG);
 	/**
 	 * Test for no cross-client contamination.
 	 */
