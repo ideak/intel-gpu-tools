@@ -535,13 +535,6 @@ static void check_timings(int crtc_idx, const drmModeModeInfo *kmode)
 		     fabs(mean - expected) / line_time(kmode));
 }
 
-static int sort_drm_modes(const void *a, const void *b)
-{
-	const drmModeModeInfo *mode1 = a, *mode2 = b;
-
-	return (mode2->clock < mode1->clock) - (mode1->clock < mode2->clock);
-}
-
 static void test_crtc_config(const struct test_config *tconf,
 			     struct crtc_config *crtcs, int crtc_count)
 {
@@ -567,10 +560,8 @@ retry:
 
 		for (i = 0; i < crtc_count; i++) {
 			/* Sort the modes in asending order by clock freq. */
-			qsort(crtcs[i].cconfs->connector->modes,
-			      crtcs[i].cconfs->connector->count_modes,
-			      sizeof(drmModeModeInfo),
-			      sort_drm_modes);
+			igt_sort_connector_modes(crtcs[i].cconfs->connector,
+						 sort_drm_modes_by_clk_asc);
 
 			crtcs[i].mode = crtcs[i].cconfs->connector->modes[0];
 		}

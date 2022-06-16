@@ -1311,24 +1311,14 @@ static void discard_any_stale_events(void) {
 	}
 }
 
-static int sort_drm_modes(const void *a, const void *b)
-{
-	const drmModeModeInfo *mode1 = a, *mode2 = b;
-
-	return (mode2->clock < mode1->clock) - (mode1->clock < mode2->clock);
-}
-
 static void get_suitable_modes(struct test_output *o)
 {
 	drmModeModeInfo mode[2];
 	int i;
 
-	for (i = 0; i < RUN_PAIR; i++) {
-		qsort(o->kconnector[i]->modes,
-		      o->kconnector[i]->count_modes,
-		      sizeof(drmModeModeInfo),
-		      sort_drm_modes);
-	}
+	for (i = 0; i < RUN_PAIR; i++)
+		igt_sort_connector_modes(o->kconnector[i],
+					 sort_drm_modes_by_clk_asc);
 
 	get_compatible_modes(&mode[0], &mode[1],
 			     o->kconnector[0], o->kconnector[1]);

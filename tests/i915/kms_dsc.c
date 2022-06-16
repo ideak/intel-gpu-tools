@@ -133,22 +133,12 @@ static void kms_dsc_exit_handler(int sig)
 	restore_force_dsc_en();
 }
 
-static int sort_drm_modes(const void *a, const void *b)
-{
-	const drmModeModeInfo *mode1 = a, *mode2 = b;
-
-	return (mode1->clock < mode2->clock) - (mode2->clock < mode1->clock);
-}
-
 static drmModeModeInfo *get_highres_mode(igt_output_t *output)
 {
 	drmModeConnector *connector = output->config.connector;
 	drmModeModeInfo *highest_mode = NULL;
 
-	qsort(connector->modes,
-	      connector->count_modes,
-	      sizeof(drmModeModeInfo),
-	      sort_drm_modes);
+	igt_sort_connector_modes(connector, sort_drm_modes_by_clk_dsc);
 
 	highest_mode = &connector->modes[0];
 
