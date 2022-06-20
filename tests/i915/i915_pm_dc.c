@@ -274,7 +274,8 @@ static void check_dc3co_with_videoplayback_like_load(data_t *data)
 		usleep(delay);
 	}
 
-	check_dc_counter(data, CHECK_DC3CO, dc3co_prev_cnt);
+	igt_require_f(dc_state_wait_entry(data->debugfs_fd,
+		      CHECK_DC3CO, dc3co_prev_cnt), "dc3co-vpb-simulation not enabled\n");
 }
 
 static void require_dc_counter(int debugfs_fd, int dc_flag)
