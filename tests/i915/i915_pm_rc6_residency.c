@@ -449,13 +449,12 @@ static void rc6_idle(int i915)
 	}
 }
 
-static void rc6_fence(int i915)
+static void rc6_fence(int i915, const intel_ctx_t *ctx)
 {
 	const int64_t duration_ns = SLEEP_DURATION * (int64_t)NSEC_PER_SEC;
 	const int tolerance = 20; /* Some RC6 is better than none! */
 	const unsigned int gen = intel_gen(intel_get_drm_devid(i915));
 	const struct intel_execution_engine2 *e;
-	const intel_ctx_t *ctx;
 	struct power_sample sample[2];
 	unsigned long slept;
 	uint64_t rc6, ts[2], ahnd;
@@ -485,7 +484,6 @@ static void rc6_fence(int i915)
 	assert_within_epsilon(rc6, ts[1] - ts[0], 5);
 
 	/* Submit but delay execution, we should be idle and conserving power */
-	ctx = intel_ctx_create_all_physical(i915);
 	ahnd = get_reloc_ahnd(i915, ctx->id);
 	for_each_ctx_engine(i915, ctx, e) {
 		igt_spin_t *spin;
@@ -524,7 +522,6 @@ static void rc6_fence(int i915)
 		assert_within_epsilon(rc6, ts[1] - ts[0], tolerance);
 		gem_quiescent_gpu(i915);
 	}
-	intel_ctx_destroy(i915, ctx);
 	put_ahnd(ahnd);
 
 	rapl_close(&rapl);
@@ -534,10 +531,12 @@ static void rc6_fence(int i915)
 igt_main
 {
 	int i915 = -1;
+	const intel_ctx_t *ctx;
 
 	/* Use drm_open_driver to verify device existence */
 	igt_fixture {
 		i915 = drm_open_driver(DRIVER_INTEL);
+		ctx = intel_ctx_create_all_physical(i915);
 	}
 
 	igt_subtest("rc6-idle") {
@@ -551,7 +550,7 @@ igt_main
 		igt_require_gem(i915);
 		gem_quiescent_gpu(i915);
 
-		rc6_fence(i915);
+		rc6_fence(i915, ctx);
 	}
 
 	igt_subtest_group {
@@ -592,7 +591,8 @@ igt_main
 			close(sysfs);
 	}
 
-	igt_fixture
+	igt_fixture {
+		intel_ctx_destroy(i915, ctx);
 		close(i915);
-
+	}
 }
