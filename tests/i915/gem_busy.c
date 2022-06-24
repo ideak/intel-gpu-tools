@@ -447,6 +447,7 @@ igt_main
 			igt_fork_hang_detector(fd);
 		}
 
+		igt_describe("Basic test to check busyness of each engine.");
 		igt_subtest_with_dynamic("busy") {
 			igt_dynamic("all") {
 				gem_quiescent_gpu(fd);
@@ -461,6 +462,8 @@ igt_main
 			}
 		}
 
+		igt_describe("Test to check race condition by randomly closing "
+			     "the handle using gem_close.");
 		igt_subtest("close-race")
 			close_race(fd, ctx);
 
@@ -482,12 +485,17 @@ igt_main
 				gem_require_mmap_device_coherent(fd);
 			}
 
+			igt_describe("Extended test to check busyness of "
+				     "dwstore-capable engines.");
 			test_each_engine_store("extended", fd, ctx, e) {
 				gem_quiescent_gpu(fd);
 				one(fd, ctx, e, 0);
 				gem_quiescent_gpu(fd);
 			}
 
+			igt_describe("Extended test to check busyness of "
+				     "dwstore-capable engines while doing "
+				     "parallel execution.");
 			test_each_engine_store("parallel", fd, ctx, e) {
 				gem_quiescent_gpu(fd);
 				one(fd, ctx, e, PARALLEL);
@@ -501,6 +509,9 @@ igt_main
 				igt_require(has_semaphores(fd));
 			}
 
+		igt_describe("Test to check busyness of engine on submitting "
+			     "a new batch while engine is busy in executing "
+			     "previous batch.");
 			test_each_engine("semaphore", fd, ctx, e) {
 				gem_quiescent_gpu(fd);
 				semaphore(fd, ctx, e);
@@ -520,6 +531,8 @@ igt_main
 			hang = igt_allow_hang(fd, ctx->id, 0);
 		}
 
+		igt_describe("Basic test to check hang state behaviour of "
+			     "engines with increased timeout.");
 		test_each_engine("hang", fd, ctx, e) {
 			gem_quiescent_gpu(fd);
 			basic(fd, ctx, e, HANG);
@@ -532,6 +545,9 @@ igt_main
 				gem_require_mmap_device_coherent(fd);
 			}
 
+			igt_describe("Extended test to check hang state "
+				     "behaviour of dwstore-capable engines "
+				     " with increased timeout.");
 			test_each_engine_store("hang-extended", fd, ctx, e) {
 				gem_quiescent_gpu(fd);
 				one(fd, ctx, e, HANG);
