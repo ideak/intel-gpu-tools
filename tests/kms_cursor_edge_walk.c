@@ -347,11 +347,12 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 		for (i = 0; i < ARRAY_SIZE(tests); i++) {
 			igt_subtest_with_dynamic(tests[i].name) {
 				for_each_pipe(&data.display, data.pipe) {
-					igt_require(data.curw <= max_curw && data.curh <= max_curh);
 					data.output = igt_get_single_output_for_pipe(&data.display, data.pipe);
 
 					for (data.curw = 64; data.curw <= 256; data.curw *= 2) {
 						data.curh = data.curw;
+						igt_require(data.curw <= max_curw && data.curh <= max_curh);
+
 						igt_dynamic_f("pipe-%s-%s-%dx%d",
 							      kmstest_pipe_name(data.pipe),
 							      data.output->name,
