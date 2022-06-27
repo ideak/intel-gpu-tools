@@ -78,7 +78,6 @@ static void test(data_t *data)
 	drmModeModeInfo *mode;
 	cairo_t *cr;
 	char *ptr;
-	uint32_t caching;
 	void *buf;
 	igt_crc_t crc;
 
@@ -102,9 +101,13 @@ static void test(data_t *data)
 	igt_plane_set_fb(data->primary, &data->fb[0]);
 	igt_display_commit(display);
 
-	/* make sure caching mode has become UC/WT */
-	caching = gem_get_caching(data->drm_fd, fb->gem_handle);
-	igt_assert(caching == I915_CACHING_NONE || caching == I915_CACHING_DISPLAY);
+	if (!gem_has_lmem(data->drm_fd)) {
+		uint32_t caching;
+
+		/* make sure caching mode has become UC/WT */
+		caching = gem_get_caching(data->drm_fd, fb->gem_handle);
+		igt_assert(caching == I915_CACHING_NONE || caching == I915_CACHING_DISPLAY);
+	}
 
 	/*
 	 * firstly demonstrate the need for DMA_BUF_SYNC_START ("begin_cpu_access")
