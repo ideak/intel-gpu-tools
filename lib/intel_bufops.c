@@ -451,11 +451,16 @@ static void __copy_ccs(struct buf_ops *bops, struct intel_buf *buf,
 	ccs_size = CCS_SIZE(gen, buf);
 	size = offset + ccs_size;
 
-	map = __gem_mmap_offset__wc(bops->fd, buf->handle, 0, size,
-				    PROT_READ | PROT_WRITE);
-	if (!map)
-		map = gem_mmap__wc(bops->fd, buf->handle, 0, size,
-				   PROT_READ | PROT_WRITE);
+	if (gem_has_lmem(bops->fd)) {
+		map = gem_mmap__device_coherent(bops->fd, buf->handle, 0, size,
+						PROT_READ | PROT_WRITE);
+	} else {
+		map = __gem_mmap_offset__wc(bops->fd, buf->handle, 0, size,
+					    PROT_READ | PROT_WRITE);
+		if (!map)
+			map = gem_mmap__wc(bops->fd, buf->handle, 0, size,
+					   PROT_READ | PROT_WRITE);
+	}
 
 	switch (dir) {
 	case CCS_LINEAR_TO_BUF:
