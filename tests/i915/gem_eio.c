@@ -270,11 +270,11 @@ static void hang_handler(union sigval arg)
 		  igt_nsec_elapsed(&ctx->delay) / 1000.0);
 
 	igt_assert_eq(timer_delete(ctx->timer), 0);
-	free(ctx);
 
 	/* flush any excess work before we start timing our reset */
 	igt_assert(igt_sysfs_printf(ctx->debugfs, "i915_drop_caches",
 				    "%d", DROP_RCU));
+	free(ctx);
 
 	igt_nsec_elapsed(ts);
 	igt_assert(igt_sysfs_printf(dir, "i915_wedged", "%llu", -1ull));
