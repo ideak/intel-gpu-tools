@@ -211,10 +211,10 @@ do_mapping_test(struct msm_pipe *pipe, const char *buffername, bool write)
 	/* Make sure the devcore is from iova fault: */
 	igt_fail_on(!strstr(devcore, "fault-info"));
 
-	s = strstr(devcore, "  - far: ");
+	s = strstr(devcore, "  - iova=");
 	igt_fail_on(!s);
 
-	ret = sscanf(s, "  - far: %"PRIx64, &fault_addr);
+	ret = sscanf(s, "  - iova=%"PRIx64, &fault_addr);
 	igt_fail_on(ret != 1);
 	igt_fail_on(addr != fault_addr);
 }
