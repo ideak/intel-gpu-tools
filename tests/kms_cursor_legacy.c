@@ -440,6 +440,12 @@ static void flip(igt_display_t *display,
 	if (mode >= flip_test_atomic)
 		igt_require(display->is_atomic);
 
+	if (mode == flip_test_atomic_transitions ||
+		mode == flip_test_atomic_transitions_varying_size) {
+		igt_require(igt_pipe_get_plane_type(&display->pipes[flip_pipe],
+					DRM_PLANE_TYPE_OVERLAY));
+	}
+
 	igt_require((output = set_fb_on_crtc(display, flip_pipe, &fb_info)));
 	if (flip_pipe != cursor_pipe) {
 		igt_require((output2 = set_fb_on_crtc(display, cursor_pipe, &fb_info2)));
