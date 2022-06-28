@@ -276,6 +276,7 @@ data_t data = {0, };
 igt_main
 {
 	enum pipe pipe;
+	igt_output_t *output;
 	struct {
 		const char *name;
 		unsigned flags;
@@ -317,10 +318,7 @@ igt_main
 	for (i = 0; i < ARRAY_SIZE(tests); i++) {
 		igt_describe(tests[i].desc);
 		igt_subtest_with_dynamic(tests[i].name) {
-			for_each_pipe(&data.display, pipe) {
-				igt_output_t *output = igt_get_single_output_for_pipe(&data.display, pipe);
-
-				igt_require(output);
+			for_each_pipe_with_single_output(&data.display, pipe, output) {
 				igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(pipe), output->name) {
 					if (tests[i].flags & TEST_SUSPEND) {
 						test_read_crc(&data, pipe, output, 0);
@@ -348,10 +346,7 @@ igt_main
 	igt_describe("Check that disabling CRCs on a CRTC after having disabled the CRTC "
 		     "does not cause issues.");
 	igt_subtest_with_dynamic("disable-crc-after-crtc") {
-		for_each_pipe(&data.display, pipe) {
-			igt_output_t *output = igt_get_single_output_for_pipe(&data.display, pipe);
-
-			igt_require(output);
+		for_each_pipe_with_single_output(&data.display, pipe, output) {
 			igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(pipe), output->name)
 				test_disable_crc_after_crtc(&data, pipe, output);
 		}
@@ -359,10 +354,7 @@ igt_main
 
 	igt_describe("Basic sanity check for CRC mismatches");
 	igt_subtest_with_dynamic("compare-crc-sanitycheck") {
-		for_each_pipe(&data.display, pipe) {
-			igt_output_t *output = igt_get_single_output_for_pipe(&data.display, pipe);
-
-			igt_require(output);
+		for_each_pipe_with_single_output(&data.display, pipe, output) {
 			igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(pipe), output->name)
 				test_compare_crc(&data, pipe, output);
 		}
