@@ -1208,32 +1208,60 @@ igt_main
 			     int num_children, int timeout);
 		int num_children;
 		int timeout;
+		const char *describe;
 	} all[] = {
-		{ "basic-each", sync_ring, 1, 2 },
-		{ "basic-store-each", store_ring, 1, 2 },
-		{ "basic-many-each", store_many, 0, 2 },
-		{ "switch-each", switch_ring, 1, 20 },
-		{ "forked-switch-each", switch_ring, ncpus, 20 },
-		{ "forked-each", sync_ring, ncpus, 20 },
-		{ "forked-store-each", store_ring, ncpus, 20 },
-		{ "active-each", active_ring, 0, 20 },
-		{ "wakeup-each", wakeup_ring, 20, 1 },
-		{ "active-wakeup-each", active_wakeup_ring, 20, 1 },
-		{ "double-wakeup-each", wakeup_ring, 20, 2 },
+		{ "basic-each", sync_ring, 1, 2,
+			"Check synchronisation of ring" },
+		{ "basic-store-each", store_ring, 1, 2,
+			"Check that store synchronisation works" },
+		{ "basic-many-each", store_many, 0, 2,
+			"Create race condition and see if we can"
+			" catch interrupts" },
+		{ "switch-each", switch_ring, 1, 20,
+			"Check sync after context switch" },
+		{ "forked-switch-each", switch_ring, ncpus, 20,
+			"Check sync after context switch parallelly" },
+		{ "forked-each", sync_ring, ncpus, 20,
+			"Forked variant of sync_ring, which checks synchronisation"
+			" of ring with parallel executions" },
+		{ "forked-store-each", store_ring, ncpus, 20,
+			"Forked variant of store_ring, check if parallel store"
+			" synchronisation works" },
+		{ "active-each", active_ring, 0, 20,
+			"Exercise waiting while keeping the GPU busy" },
+		{ "wakeup-each", wakeup_ring, 20, 1,
+			"Stress test for nop + sync" },
+		{ "active-wakeup-each", active_wakeup_ring, 20, 1,
+			"Measure wakeup latency while also scheduling the next batch" },
+		{ "double-wakeup-each", wakeup_ring, 20, 2,
+			"Double stress test for nop + sync" },
 		{}
 	}, individual[] = {
-		{ "default", sync_ring, 1, 20 },
-		{ "idle", idle_ring, 0, 20 },
-		{ "active", active_ring, 0, 20 },
-		{ "wakeup", wakeup_ring, 20, 1 },
-		{ "active-wakeup", active_wakeup_ring, 20, 1 },
-		{ "double-wakeup", wakeup_ring, 20, 2 },
-		{ "store", store_ring, 1, 20 },
-		{ "switch", switch_ring, 1, 20 },
-		{ "forked-switch", switch_ring, ncpus, 20 },
-		{ "many", store_many, 0, 20 },
-		{ "forked", sync_ring, ncpus, 20 },
-		{ "forked-store", store_ring, ncpus, 20 },
+		{ "default", sync_ring, 1, 20,
+			"Check synchronisation of rings" },
+		{ "idle", idle_ring, 0, 20,
+			"Exercise and measure idle requests" },
+		{ "active", active_ring, 0, 20,
+			"Exercise waiting while keeping the GPU busy" },
+		{ "wakeup", wakeup_ring, 20, 1,
+			"Stress for nop + sync" },
+		{ "active-wakeup", active_wakeup_ring, 20, 1,
+			"Measure wakeup latency while also scheduling the next batch" },
+		{ "double-wakeup", wakeup_ring, 20, 2,
+			"Double stress test for nop + sync" },
+		{ "store", store_ring, 1, 20,
+			"Check that store synchronisation works" },
+		{ "switch", switch_ring, 1, 20,
+			"Check sync after context switch" },
+		{ "forked-switch", switch_ring, ncpus, 20,
+			"Check sync after context switch parallelly" },
+		{ "many", store_many, 0, 20,
+			"Create race condition and see if we can catch interrupts" },
+		{ "forked", sync_ring, ncpus, 20,
+			"Check synchronisation of ring with parallel executions" },
+		{ "forked-store", store_ring, ncpus, 20,
+			"Check store synchronisation works with parallel multiple"
+			" executions" },
 		{}
 	};
 #define for_each_test(t, T) for(typeof(*T) *t = T; t->name; t++)
@@ -1255,6 +1283,7 @@ igt_main
 
 	/* Legacy for selecting rings. */
 	for_each_test(t, individual) {
+		igt_describe_f("%s for each legacy engine.", t->describe);
 		igt_subtest_with_dynamic_f("legacy-%s", t->name) {
 			for (const struct intel_execution_ring *l = intel_execution_rings; l->name; l++) {
 				igt_dynamic_f("%s", l->name) {
@@ -1265,27 +1294,38 @@ igt_main
 		}
 	}
 
+	igt_describe("Basic test to wait upon a batch on all rings.");
 	igt_subtest("basic-all")
 		sync_all(fd, ctx, 1, 2);
+
+	igt_describe("Basic version of store synchronisation test.");
 	igt_subtest("basic-store-all")
 		store_all(fd, ctx, 1, 2);
 
+	igt_describe("Extended version of existing basic-all test.");
 	igt_subtest("all")
 		sync_all(fd, ctx, 1, 20);
+	igt_describe("Extended version of existing basic-store-all test.");
 	igt_subtest("store-all")
 		store_all(fd, ctx, 1, 20);
+
+	igt_describe("Parallel execution of batch on all rings and then wait.");
 	igt_subtest("forked-all")
 		sync_all(fd, ctx, ncpus, 20);
+
+	igt_describe("Parallel execution of store synchronisation.");
 	igt_subtest("forked-store-all")
 		store_all(fd, ctx, ncpus, 20);
 
 	for_each_test(t, all) {
+		igt_describe_f("%s.", t->describe);
 		igt_subtest_f("%s", t->name)
 			t->func(fd, ctx, ALL_ENGINES, t->num_children, t->timeout);
 	}
 
 	/* New way of selecting engines. */
 	for_each_test(t, individual) {
+		igt_describe_f("%s on each engine.", t->describe);
 		igt_subtest_with_dynamic_f("%s", t->name) {
 			for_each_ctx_engine(fd, ctx, e) {
 				igt_dynamic_f("%s", e->name) {
@@ -1303,8 +1343,14 @@ igt_main
 			igt_require(gem_scheduler_has_preemption(fd));
 		}
 
+		igt_describe("Check and measure how well we can submit a second"
+			     " high priority task when the engine is already"
+			     " busy with a low priority task on all engines.");
 		igt_subtest("preempt-all")
 			preempt(fd, ctx, ALL_ENGINES, 1, 20);
+
+		igt_describe("For each context engine check how priority of task are"
+			     " submitted when engine is already busy.");
 		igt_subtest_with_dynamic("preempt") {
 			for_each_ctx_engine(fd, ctx, e) {
 				igt_dynamic_f("%s", e->name)
