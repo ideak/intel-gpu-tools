@@ -932,7 +932,7 @@ static bool mode_compatible(const drmModeModeInfo *a, const drmModeModeInfo *b)
 	return true;
 }
 
-static void get_compatible_modes(drmModeModeInfo *a, drmModeModeInfo *b,
+static bool get_compatible_modes(drmModeModeInfo *a, drmModeModeInfo *b,
 				 drmModeConnector *c1, drmModeConnector *c2)
 {
 	int n, m;
@@ -946,14 +946,14 @@ static void get_compatible_modes(drmModeModeInfo *a, drmModeModeInfo *b,
 			for (m = 0; m < c2->count_modes; m++) {
 				*b = c2->modes[m];
 				if (mode_compatible(a, b))
-					return;
+					return true;
 			}
 		}
 
-		igt_skip("Compatible mode not found.\n");
+		return false;
 	}
 
-	return;
+	return true;
 }
 
 static void connector_find_compatible_mode(int crtc_idx0, int crtc_idx1,
@@ -972,13 +972,12 @@ static void connector_find_compatible_mode(int crtc_idx0, int crtc_idx1,
 		return;
 	}
 
-	get_compatible_modes(&mode[0], &mode[1],
-			     config[0].connector, config[1].connector);
+	o->mode_valid = get_compatible_modes(&mode[0], &mode[1],
+					     config[0].connector, config[1].connector);
 
 	o->pipe = config[0].pipe;
 	o->fb_width = mode[0].hdisplay;
 	o->fb_height = mode[0].vdisplay;
-	o->mode_valid = 1;
 
 	o->kconnector[0] = config[0].connector;
 	o->kencoder[0] = config[0].encoder;
@@ -1320,8 +1319,8 @@ static void get_suitable_modes(struct test_output *o)
 		igt_sort_connector_modes(o->kconnector[i],
 					 sort_drm_modes_by_clk_asc);
 
-	get_compatible_modes(&mode[0], &mode[1],
-			     o->kconnector[0], o->kconnector[1]);
+	o->mode_valid = get_compatible_modes(&mode[0], &mode[1],
+					     o->kconnector[0], o->kconnector[1]);
 
 	o->fb_width = mode[0].hdisplay;
 	o->fb_height = mode[0].vdisplay;
@@ -1406,12 +1405,16 @@ retry:
 
 		get_suitable_modes(o);
 
-		igt_remove_fb(drm_fd, &o->fb_info[2]);
-		igt_remove_fb(drm_fd, &o->fb_info[1]);
-		igt_remove_fb(drm_fd, &o->fb_info[0]);
+		if (o->mode_valid) {
+			igt_remove_fb(drm_fd, &o->fb_info[2]);
+			igt_remove_fb(drm_fd, &o->fb_info[1]);
+			igt_remove_fb(drm_fd, &o->fb_info[0]);
 
-		restart = true;
-		goto restart;
+			restart = true;
+			goto restart;
+		}
+
+		goto out;
 	}
 
 	igt_assert(!ret);
