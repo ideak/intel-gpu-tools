@@ -47,6 +47,10 @@
 #include "i915_drm.h"
 #include "i915/intel_memory_region.h"
 
+IGT_TEST_DESCRIPTION("This test overloads the driver with transient active objects"
+		     " and checks if we don't kill the system under the memory pressure"
+		     " some of the symptoms this test look for include mysterious hangs.");
+
 #define ENGINE_FLAGS  (I915_EXEC_RING_MASK | I915_EXEC_BSD_MASK)
 
 static double elapsed(const struct timespec *start, const struct timespec *end)
@@ -166,6 +170,8 @@ igt_main
 					    I915_DEVICE_MEMORY);
 	}
 
+	igt_describe("Check if we kill the system by overloading it with active objects"
+		     " iterating over legacy engines.");
 	igt_subtest_with_dynamic("legacy")
 		for_each_combination(regions, 1, set) {
 			char *sub_name = memregion_dynamic_subtest_name(regions);
@@ -177,6 +183,8 @@ igt_main
 			free(sub_name);
 		}
 
+	igt_describe("Check if we kill system by overloading it with active objects"
+		     " iterating over all engines.");
 	igt_subtest_with_dynamic("basic")
 		for_each_combination(regions, 1, set) {
 			char *sub_name = memregion_dynamic_subtest_name(regions);
@@ -188,6 +196,8 @@ igt_main
 			free(sub_name);
 		}
 
+	igt_describe("Concurrently overloads system with active objects and checks"
+		     " if we kill system.");
 	igt_subtest_with_dynamic("forked")
 		for_each_combination(regions, 1, set) {
 			char *sub_name = memregion_dynamic_subtest_name(regions);
@@ -199,6 +209,9 @@ igt_main
 			free(sub_name);
 		}
 
+
+	igt_describe("This test does a forced reclaim, behaving like a bad application"
+		     " leaking its bo cache.");
 	igt_subtest_with_dynamic("madvise")
 		for_each_combination(regions, 1, set) {
 			char *sub_name = memregion_dynamic_subtest_name(regions);
