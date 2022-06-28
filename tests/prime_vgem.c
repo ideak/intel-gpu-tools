@@ -1128,33 +1128,39 @@ igt_main
 		gem_require_mmap_device_coherent(i915);
 	}
 
+	igt_describe("Examine read access path.");
 	igt_subtest("basic-read")
 		test_read(vgem, i915);
 
+	igt_describe("Examine write access path.");
 	igt_subtest("basic-write")
 		test_write(vgem, i915);
 
+	igt_describe("Check that we wrap the vgem mmap with userptr.");
 	igt_subtest("basic-userptr")
 		test_userptr(vgem, i915);
 
+	igt_describe("Examine access path through GTT.");
 	igt_subtest("basic-gtt") {
 		gem_require_mappable_ggtt(i915);
 		test_gtt(vgem, i915);
 	}
 
-	igt_describe("Examine blitter access path");
+	igt_describe("Examine blitter access path.");
 	igt_subtest("basic-blt")
 		test_blt(vgem, i915);
 
+	igt_describe("Examine link establishment between shrinker and vgem bo.");
 	igt_subtest("shrink")
 		test_shrink(vgem, i915);
 
+	igt_describe("Examine concurrent access of vgem bo.");
 	igt_subtest("coherency-gtt") {
 		gem_require_mappable_ggtt(i915);
 		test_gtt_interleaved(vgem, i915);
 	}
 
-	igt_describe("Examine blitter access path WC coherency");
+	igt_describe("Examine blitter access path WC coherency.");
 	igt_subtest("coherency-blt")
 		test_blt_interleaved(vgem, i915);
 
@@ -1163,15 +1169,18 @@ igt_main
 			const char *name;
 			void (*fn)(int i915, int vgem, const intel_ctx_t *ctx,
 				   unsigned int engine);
+			const char *describe;
 		} tests[] = {
-			{ "sync", test_sync },
-			{ "busy", test_busy },
-			{ "wait", test_wait },
+			{ "sync", test_sync, "Examine sync on vgem fence." },
+			{ "busy", test_busy, "Examine busy check of polling for vgem fence." },
+			{ "wait", test_wait, "Examine wait on vgem fence." },
 			{ }
 		};
 
-		for(const typeof(*tests) *t = tests; t->name; t++)
+		for (const typeof(*tests) *t = tests; t->name; t++) {
+			igt_describe(t->describe);
 			test_each_engine(t->name, vgem, i915, t->fn);
+		}
 	}
 
 	/* Fence testing */
@@ -1180,17 +1189,21 @@ igt_main
 			igt_require(vgem_has_fences(vgem));
 		}
 
+		igt_describe("Examine read access path fencing.");
 		igt_subtest("basic-fence-read")
 			test_fence_read(i915, vgem);
+
+		igt_describe("Examine GTT access path fencing.");
 		igt_subtest("basic-fence-mmap") {
 			gem_require_mappable_ggtt(i915);
 			test_fence_mmap(i915, vgem);
 		}
 
-		igt_describe("Examine blitter access path fencing");
+		igt_describe("Examine blitter access path fencing.");
 		igt_subtest("basic-fence-blt")
 			test_fence_blt(i915, vgem);
 
+		igt_describe("Examine vgem bo front/back flip fencing.");
 		igt_subtest("basic-fence-flip")
 			test_flip(i915, vgem, 0);
 
@@ -1199,11 +1212,16 @@ igt_main
 				igt_require(vgem_fence_has_flag(vgem, WIP_VGEM_FENCE_NOTIMEOUT));
 			}
 
+			igt_describe("Examine read access path fencing with a pending gpu hang.");
 			igt_subtest("fence-read-hang")
 				test_fence_hang(i915, vgem, 0);
+
+			igt_describe("Examine write access path fencing with a pending gpu hang.");
 			igt_subtest("fence-write-hang")
 				test_fence_hang(i915, vgem, VGEM_FENCE_WRITE);
 
+			igt_describe("Examine vgem bo front/back flip fencing with a pending gpu"
+				     " hang.");
 			igt_subtest("fence-flip-hang")
 				test_flip(i915, vgem, WIP_VGEM_FENCE_NOTIMEOUT);
 		}
@@ -1216,6 +1234,7 @@ igt_main
 			intel_allocator_multiprocess_start();
 		}
 
+		igt_describe("Examine basic dma-buf fence interop.");
 		test_each_engine("fence-wait", vgem, i915, test_fence_wait);
 
 		igt_fixture {
