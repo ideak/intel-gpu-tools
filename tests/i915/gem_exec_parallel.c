@@ -34,6 +34,8 @@
 #include "igt.h"
 #include "igt_gt.h"
 
+IGT_TEST_DESCRIPTION("Exercise filling buffers by many clients working in parallel.");
+
 #define ENGINE_MASK  (I915_EXEC_RING_MASK | I915_EXEC_BSD_MASK)
 
 #define VERIFY 0
@@ -309,11 +311,12 @@ igt_main
 	const struct mode {
 		const char *name;
 		unsigned flags;
+		const char *describe;
 	} modes[] = {
-		{ "basic", 0 },
-		{ "contexts", CONTEXTS },
-		{ "fds", FDS },
-		{ "userptr", USERPTR },
+		{ "basic", 0, "Check basic functionality per engine." },
+		{ "contexts", CONTEXTS, "Check with many contexts." },
+		{ "fds", FDS, "Check with many fds." },
+		{ "userptr", USERPTR, "Check basic userptr thrashing." },
 		{ NULL }
 	};
 	const intel_ctx_t *ctx;
@@ -327,6 +330,7 @@ igt_main
 		igt_fork_hang_detector(fd);
 	}
 
+	igt_describe("Check with engines working in parallel.");
 	igt_subtest_with_dynamic("engines") {
 		for (const struct mode *m = modes; m->name; m++)
 			igt_dynamic(m->name)
@@ -335,6 +339,7 @@ igt_main
 	}
 
 	for (const struct mode *m = modes; m->name; m++) {
+		igt_describe(m->describe);
 		igt_subtest_with_dynamic(m->name) {
 			for_each_ctx_engine(fd, ctx, e) {
 				if (gem_class_can_store_dword(fd, e->class))
