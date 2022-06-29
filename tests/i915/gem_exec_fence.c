@@ -3012,8 +3012,12 @@ igt_main
 			igt_fork_hang_detector(i915);
 		}
 
+		igt_describe("Basic check for composite fence on all busy engines.");
 		igt_subtest("basic-busy-all")
 			test_fence_busy_all(i915, ctx, 0);
+
+		igt_describe("Basic check for composite fence with additional wait on all busy"
+			     " engines.");
 		igt_subtest("basic-wait-all")
 			test_fence_busy_all(i915, ctx, WAIT);
 
@@ -3022,8 +3026,13 @@ igt_main
 			hang = igt_allow_hang(i915, ctx->id, 0);
 		}
 
+		igt_describe("Check for composite fence on all busy engines with a pending gpu"
+			     " hang.");
 		igt_subtest("busy-hang-all")
 			test_fence_busy_all(i915, ctx, HANG);
+
+		igt_describe("Check for composite fence with additional wait on all busy engines"
+			     " and with a pending gpu hang.");
 		igt_subtest("wait-hang-all")
 			test_fence_busy_all(i915, ctx, WAIT | HANG);
 
@@ -3044,24 +3053,34 @@ igt_main
 				intel_allocator_multiprocess_start();
 			}
 
+			igt_describe("Basic check for explicit fence on each busy engine.");
 			igt_subtest_with_dynamic("basic-busy") {
 				for_each_ctx_engine(i915, ctx, e) {
 					igt_dynamic_f("%s", e->name)
 						test_fence_busy(i915, ctx, e, 0);
 				}
 			}
+
+			igt_describe("Basic check for explicit fence with additinal wait time on"
+				     " each busy engine.");
 			igt_subtest_with_dynamic("basic-wait") {
 				for_each_ctx_engine(i915, ctx, e) {
 					igt_dynamic_f("%s", e->name)
 						test_fence_busy(i915, ctx, e, WAIT);
 				}
 			}
+
+			igt_describe("Basic check for explicit fence with async wait on each"
+				     " engine.");
 			igt_subtest_with_dynamic("basic-await") {
 				for_each_ctx_engine(i915, ctx, e) {
 					igt_dynamic_f("%s", e->name)
 						test_fence_await(i915, ctx, e, 0);
 				}
 			}
+
+			igt_describe("Check for explicit fence with non-blocking wait on each"
+				     " engine.");
 			igt_subtest_with_dynamic("nb-await") {
 				for_each_ctx_engine(i915, ctx, e) {
 					igt_dynamic_f("%s", e->name)
