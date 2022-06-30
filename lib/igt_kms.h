@@ -107,6 +107,7 @@ enum igt_custom_edid_type {
 const char *kmstest_encoder_type_str(int type);
 const char *kmstest_connector_status_str(int status);
 const char *kmstest_connector_type_str(int type);
+const char *kmstest_scaling_filter_str(int filter);
 
 void kmstest_dump_mode(drmModeModeInfo *mode);
 #define MAX_HDISPLAY_PER_PIPE 5120
@@ -126,6 +127,7 @@ enum igt_atomic_crtc_properties {
        IGT_CRTC_ACTIVE,
        IGT_CRTC_OUT_FENCE_PTR,
        IGT_CRTC_VRR_ENABLED,
+       IGT_CRTC_SCALING_FILTER,
        IGT_NUM_CRTC_PROPS
 };
 
@@ -302,6 +304,7 @@ enum igt_atomic_plane_properties {
        IGT_PLANE_ALPHA,
        IGT_PLANE_ZPOS,
        IGT_PLANE_FB_DAMAGE_CLIPS,
+       IGT_PLANE_SCALING_FILTER,
        IGT_NUM_PLANE_PROPS
 };
 
