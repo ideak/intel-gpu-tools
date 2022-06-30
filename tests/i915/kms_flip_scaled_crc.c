@@ -37,6 +37,7 @@ typedef struct {
 	igt_pipe_crc_t *pipe_crc;
 	uint32_t attemptmodewidth;
 	uint32_t attemptmodeheight;
+	drmModeModeInfo mode;
 } data_t;
 
 const struct {
@@ -476,7 +477,7 @@ static void clear_lut(data_t *data, enum pipe pipe)
 
 static void test_flip_to_scaled(data_t *data, uint32_t index,
 				enum pipe pipe, igt_output_t *output,
-				drmModeModeInfoPtr modetoset)
+				drmModeModeInfoPtr modetoset, int flags)
 {
 	igt_plane_t *primary;
 	igt_crc_t small_crc, big_crc;
@@ -510,14 +511,20 @@ static void test_flip_to_scaled(data_t *data, uint32_t index,
 
 	if (modetoset)
 		igt_output_override_mode(output, modetoset);
-	/*
-	 * Setting a pipe invalidates the modetoset pointer.
-	 * So, mode is overriden first and then pipe is set.
-	 * Don't change this sequence.
-	 */
+
 	igt_output_set_pipe(output, pipe);
 
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+
+	if (data->gen >= 11) {
+		igt_assert_f(igt_plane_has_prop(primary, IGT_PLANE_SCALING_FILTER),
+			     "Plane scaling filter prop not supported!\n");
+		igt_plane_set_prop_enum(primary, IGT_PLANE_SCALING_FILTER,
+					kmstest_scaling_filter_str(flags));
+	} else {
+		igt_debug("Plane scaling filter prop not supported on gen < 11, running with default\n");
+	}
+
 	igt_skip_on_f(!igt_plane_has_format_mod(primary, data->small_fb.drm_format, data->small_fb.modifier) ||
 		      !igt_plane_has_format_mod(primary, data->big_fb.drm_format,
 		      data->big_fb.modifier), "No requested format/modifier on pipe %s\n", kmstest_pipe_name(pipe));
@@ -539,7 +546,8 @@ static void test_flip_to_scaled(data_t *data, uint32_t index,
 	ret = igt_display_try_commit_atomic(&data->display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
 
 	igt_skip_on_f(ret == -ERANGE, "Platform scaling limits exceeded, skipping.\n");
-	igt_skip_on_f((ret == -EINVAL) && (!modetoset || modetoset->vrefresh > 90), "Valid/default mode too big, cdclk limits exceeded. Check next connector\n");
+	igt_skip_on_f((ret == -EINVAL) && (!modetoset || modetoset->vrefresh > 90),
+		      "Valid/default mode too big, cdclk limits exceeded. Check next connector\n");
 	igt_assert_eq(ret, 0);
 
 	igt_pipe_crc_start(data->pipe_crc);
@@ -553,7 +561,8 @@ static void test_flip_to_scaled(data_t *data, uint32_t index,
 					    DRM_MODE_PAGE_FLIP_EVENT, NULL);
 
 	igt_skip_on_f(ret == -ERANGE, "Platform scaling limits exceeded, skipping.\n");
-	igt_skip_on_f((ret == -EINVAL) && (!modetoset || modetoset->vrefresh > 90), "Valid/default mode too big, cdclk limits exceeded. Check next connector\n");
+	igt_skip_on_f((ret == -EINVAL) && (!modetoset || modetoset->vrefresh > 90),
+		      "Valid/default mode too big, cdclk limits exceeded. Check next connector\n");
 	igt_assert_eq(ret, 0);
 
 	igt_assert(read(data->drm_fd, &ev, sizeof(ev)) == sizeof(ev));
@@ -584,11 +593,26 @@ static drmModeModeInfoPtr find_mode(data_t *data, igt_output_t *output)
 			    modetoset->vrefresh < output->config.connector->modes[i].vrefresh)
 				continue;
 
-			modetoset = &output->config.connector->modes[i];
+			data->mode = output->config.connector->modes[i];
+			modetoset = &data->mode;
 		}
 	}
 
 	return modetoset;
+}
+
+static void run_tests(data_t *data, uint32_t index, enum pipe pipe,
+		      igt_output_t * output, drmModeModeInfoPtr modetoset)
+{
+	test_flip_to_scaled(data, index, pipe, output, modetoset, 0);
+
+	/*
+	 * test Nearest Neighbor filter. For scaler indexes see
+	 * scaling_filter_names structure in igt_kms.c
+	 * Platform scaling filter property is supported only gen >= 11.
+	 */
+	if (data->gen >= 11)
+		test_flip_to_scaled(data, index, pipe, output, modetoset, 1);
 }
 
 igt_main
@@ -616,6 +640,7 @@ igt_main
 		}
 	}
 
+	igt_describe("Tests scaler using default and nearest neighbor plane scaling filters");
 	for (int index = 0; index < ARRAY_SIZE(flip_scenario_test); index++) {
 		igt_describe(flip_scenario_test[index].describe);
 		igt_subtest_with_dynamic(flip_scenario_test[index].name) {
@@ -627,14 +652,14 @@ igt_main
 					if (modetoset) {
 						found = true;
 						igt_dynamic_f("pipe-%s-valid-mode", kmstest_pipe_name(pipe))
-							test_flip_to_scaled(&data, index, pipe, output, modetoset);
+							run_tests(&data, index, pipe, output, modetoset);
 						break;
 					}
 				}
 				if (!found) {
 					for_each_valid_output_on_pipe(&data.display, pipe, output) {
 						igt_dynamic_f("pipe-%s-default-mode", kmstest_pipe_name(pipe))
-							test_flip_to_scaled(&data, index, pipe, output, NULL);
+							run_tests(&data, index, pipe, output, modetoset);
 					}
 				}
 				break;
