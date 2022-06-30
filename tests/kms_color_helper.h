@@ -50,6 +50,7 @@ typedef struct {
 	igt_display_t display;
 	igt_pipe_crc_t *pipe_crc;
 	igt_output_t *output;
+	igt_plane_t *primary;
 
 	uint32_t drm_format;
 	uint32_t color_depth;
