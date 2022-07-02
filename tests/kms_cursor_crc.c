@@ -693,7 +693,7 @@ static void test_rapid_movement(data_t *data)
 static void run_size_tests(data_t *data, void (*testfunc)(data_t *),
 			   int w, int h)
 {
-	char name[16];
+	char name[32];
 	enum pipe pipe;
 
 	if (w == 0 && h == 0)
