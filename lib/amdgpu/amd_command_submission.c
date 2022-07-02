@@ -196,10 +196,10 @@ void amdgpu_command_submission_write_linear_helper(amdgpu_device_handle device,
 	}
 	/* clean resources */
 	free(ring_context->pm4);
-	free(ring_context);
 	/* end of test */
 	r = amdgpu_cs_ctx_free(ring_context->context_handle);
 	igt_assert_eq(r, 0);
+	free(ring_context);
 }
 
 
