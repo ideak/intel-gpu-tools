@@ -337,6 +337,7 @@ static void igt_device_add_prop(struct igt_device *dev,
 static void igt_device_add_attr(struct igt_device *dev,
 				const char *key, const char *value)
 {
+	char linkto[PATH_MAX];
 	const char *v = value;
 
 	if (!key)
@@ -348,7 +349,6 @@ static void igt_device_add_attr(struct igt_device *dev,
 	if (!v) {
 		struct stat st;
 		char path[PATH_MAX];
-		char linkto[PATH_MAX];
 		int len;
 
 		snprintf(path, sizeof(path), "%s/%s", dev->syspath, key);
