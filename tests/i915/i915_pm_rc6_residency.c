@@ -292,7 +292,7 @@ static void sighandler(int sig)
 {
 }
 
-static void bg_load(int i915, uint64_t engine_flags, unsigned int flags, unsigned long *ctl)
+static void bg_load(int i915, uint32_t ctx_id, uint64_t engine_flags, unsigned int flags, unsigned long *ctl)
 {
 	const bool has_execlists = intel_gen(intel_get_drm_devid(i915)) >= 8;
 	struct drm_i915_gem_exec_object2 obj = {
@@ -302,6 +302,7 @@ static void bg_load(int i915, uint64_t engine_flags, unsigned int flags, unsigne
 		.buffers_ptr = to_user_pointer(&obj),
 		.buffer_count = 1,
 		.flags = engine_flags,
+		.rsvd1 = ctx_id,
 	};
 	struct sigaction act = {
 		.sa_handler = sighandler
@@ -359,7 +360,7 @@ static void kill_children(int sig)
 	signal(sig, old);
 }
 
-static void rc6_idle(int i915, uint64_t flags)
+static void rc6_idle(int i915, uint32_t ctx_id, uint64_t flags)
 {
 	const int64_t duration_ns = SLEEP_DURATION * (int64_t)NSEC_PER_SEC;
 	const int tolerance = 20; /* Some RC6 is better than none! */
@@ -405,7 +406,7 @@ static void rc6_idle(int i915, uint64_t flags)
 	for (int p = 0; p < ARRAY_SIZE(phases); p++) {
 		memset(done, 0, 2 * sizeof(*done));
 		igt_fork(child, 1) /* Setup up a very light load */
-			bg_load(i915, flags, phases[p].flags, done);
+			bg_load(i915, ctx_id, flags, phases[p].flags, done);
 
 		rapl_read(&rapl, &sample[0]);
 		cycles = -READ_ONCE(done[1]);
@@ -549,7 +550,7 @@ igt_main
 		for_each_ctx_engine(i915, ctx, e) {
 			if (e->instance == 0) {
 				igt_dynamic_f("%s", e->name)
-					rc6_idle(i915, e->flags);
+					rc6_idle(i915, ctx->id, e->flags);
 			}
 		}
 	}
