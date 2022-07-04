@@ -971,6 +971,8 @@ int sort_drm_modes_by_res_asc(const void *a, const void *b);
 void igt_sort_connector_modes(drmModeConnector *connector,
 		int (*comparator)(const void *, const void*));
 
+bool igt_max_bpc_constraint(igt_display_t *display, enum pipe pipe,
+		igt_output_t *output, int bpc);
 bool igt_check_bigjoiner_support(igt_display_t *display);
 
 #endif /* __IGT_KMS_H__ */

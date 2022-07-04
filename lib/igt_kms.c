@@ -5668,6 +5668,44 @@ bool igt_check_output_bpc_equal(int drmfd, enum pipe pipe,
 }
 
 /*
+ * igt_max_bpc_constraint
+ * @display: a pointer to an #igt_display_t structure
+ * @pipe: Display pipe
+ * @output: Target output
+ * @bpc: BPC to compare with max & current bpc
+ *
+ * The "max bpc" property only ensures that the bpc will not go beyond
+ * the value set through this property. It does not guarantee that the
+ * same bpc will be used for the given mode.
+ *
+ * So, if we really want a particular bpc set, try reducing the resolution
+ * till we get the bpc that we set in max bpc property.
+ *
+ * Returns: True if suitable mode found to use requested bpc, else False.
+ */
+bool igt_max_bpc_constraint(igt_display_t *display, enum pipe pipe,
+			    igt_output_t *output, int bpc)
+{
+	drmModeConnector *connector = output->config.connector;
+
+	igt_sort_connector_modes(connector, sort_drm_modes_by_clk_dsc);
+
+	for_each_connector_mode(output) {
+		igt_output_override_mode(output, &connector->modes[j__]);
+		igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
+
+		if (!igt_check_output_bpc_equal(display->drm_fd, pipe,
+						output->name, bpc))
+			continue;
+
+		return true;
+	}
+
+	igt_output_override_mode(output, NULL);
+	return false;
+}
+
+/*
  * igt_check_bigjoiner_support:
  * @display: a pointer to an #igt_display_t structure
  *
