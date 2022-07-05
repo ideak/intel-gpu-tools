@@ -721,6 +721,15 @@ static void prioinv(int fd, int dir, const intel_ctx_t *ctx,
 
 		ctx2 = intel_ctx_create_all_physical(fd);
 		igt_assert(ctx2);
+		if (needs_recoverable_ctx(fd)) {
+			struct drm_i915_gem_context_param param = {
+				.ctx_id = ctx2->id,
+				.param = I915_CONTEXT_PARAM_RECOVERABLE,
+				.value = 0,
+			};
+
+			gem_context_set_param(fd, &param);
+		}
 
 		intel_allocator_init();
 		/* Reopen the allocator in the new process. */
