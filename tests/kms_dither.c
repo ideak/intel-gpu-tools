@@ -128,6 +128,7 @@ static void test_dithering(data_t *data, enum pipe pipe,
 	igt_display_t *display = &data->display;
 	dither_status_t status;
 	int bpc, ret;
+	bool constraint;
 
 	igt_info("Dithering test execution on %s PIPE_%s\n",
 			output->name, kmstest_pipe_name(pipe));
@@ -148,12 +149,12 @@ static void test_dithering(data_t *data, enum pipe pipe,
 	else
 		ret = igt_display_try_commit2(display, COMMIT_LEGACY);
 
-	igt_require_f(!ret, "%s don't support %d-bpc\n",
-				output->name, output_bpc);
+	if (ret)
+		goto cleanup;
 
-	igt_require_f(i915_clock_constraint(data, pipe, output, output_bpc),
-			"No supported mode found to use %d-bpc on %s\n",
-			output_bpc, output->name);
+	constraint = i915_clock_constraint(data, pipe, output, output_bpc);
+	if (!constraint)
+		goto cleanup;
 
 	/*
 	 * Check the status of Dithering block:
@@ -174,11 +175,16 @@ static void test_dithering(data_t *data, enum pipe pipe,
 	* Otherwise, previously updated value will stay forever and
 	* may cause the failures for next/other subtests.
 	*/
+cleanup:
 	igt_output_set_prop_value(output, IGT_CONNECTOR_MAX_BPC, bpc);
 	igt_plane_set_fb(data->primary, NULL);
 	igt_output_set_pipe(output, PIPE_NONE);
 	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 	igt_remove_fb(data->drm_fd, &data->fb);
+
+	igt_require_f(!ret, "%s don't support %d-bpc\n", output->name, output_bpc);
+	igt_require_f(constraint, "No supported mode found to use %d-bpc on %s\n",
+				  output_bpc, output->name);
 
 	/* Compute the result. */
 	if (fb_bpc > output_bpc)
@@ -208,6 +214,9 @@ run_dither_test(data_t *data, int fb_bpc, int fb_format, int output_bpc)
 		enum pipe pipe;
 
 		if (!is_supported(output))
+			continue;
+
+		if (igt_get_output_max_bpc(data->drm_fd, output->name) < output_bpc)
 			continue;
 
 		for_each_pipe(display, pipe) {
