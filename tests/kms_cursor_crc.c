@@ -873,6 +873,9 @@ igt_main
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
 
+		igt_display_require(&data.display, data.drm_fd);
+		igt_display_require_output(&data.display);
+
 		ret = drmGetCap(data.drm_fd, DRM_CAP_CURSOR_WIDTH, &cursor_width);
 		igt_assert(ret == 0 || errno == EINVAL);
 		/* Not making use of cursor_height since it is same as width, still reading */
@@ -882,9 +885,6 @@ igt_main
 		kmstest_set_vt_graphics_mode();
 
 		igt_require_pipe_crc(data.drm_fd);
-
-		igt_display_require(&data.display, data.drm_fd);
-		igt_display_require_output(&data.display);
 	}
 
 	data.cursor_max_w = cursor_width;
