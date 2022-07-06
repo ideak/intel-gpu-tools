@@ -607,10 +607,13 @@ static bool kernel_supports_probed_size(int fd)
 
 static bool needs_recoverable_ctx(int fd)
 {
+	uint16_t devid;
+
 	if (!kernel_supports_probed_size(fd))
 		return false;
 
-	return gem_has_lmem(fd) || intel_display_ver(intel_get_drm_devid(fd)) > 12;
+	devid = intel_get_drm_devid(fd);
+	return gem_has_lmem(fd) ||  intel_graphics_ver(devid) > IP_VER(12, 0);
 }
 
 #define find_first_available_engine(fd, ctx, e, saved) \
