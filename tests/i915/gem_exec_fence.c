@@ -2369,6 +2369,7 @@ static void test_syncobj_timeline_multiple_ext_nodes(int fd)
 #define HSW_CS_GPR(n)                   (0x600 + 8*(n))
 #define RING_TIMESTAMP                  (0x358)
 #define MI_PREDICATE_RESULT_1           (0x41c)
+#define MI_SET_PREDICATE_RESULT         (0x3b8)
 
 #define WAIT_BB_OFFSET			(64 << 20)
 #define COUNTER_OFFSET			(65 << 20)
@@ -2467,6 +2468,13 @@ get_cs_timestamp_frequency(int fd)
 	igt_skip("Kernel with PARAM_CS_TIMESTAMP_FREQUENCY support required\n");
 }
 
+static bool use_set_predicate_result(int i915)
+{
+	uint16_t devid = intel_get_drm_devid(i915);
+
+	return intel_graphics_ver(devid) >= IP_VER(12, 50);
+}
+
 static struct drm_i915_gem_exec_object2
 build_wait_bb(int i915,
 	      const struct intel_execution_engine2 *engine,
@@ -2523,20 +2531,35 @@ build_wait_bb(int i915,
 	*bb++ = MI_MATH_SUB;
 	*bb++ = MI_MATH_STORE(MI_MATH_REG(3), MI_MATH_REG_ACCU);
 
-	*bb++ = MI_MATH(4);
-	*bb++ = MI_MATH_LOAD(MI_MATH_REG_SRCA, MI_MATH_REG(0));
-	*bb++ = MI_MATH_LOAD(MI_MATH_REG_SRCB, MI_MATH_REG(3));
-	*bb++ = MI_MATH_ADD;
-	*bb++ = MI_MATH_STOREINV(MI_MATH_REG(4), MI_MATH_REG_CF);
+	if (use_set_predicate_result(i915)) {
+		*bb++ = MI_MATH(4);
+		*bb++ = MI_MATH_LOAD(MI_MATH_REG_SRCA, MI_MATH_REG(0));
+		*bb++ = MI_MATH_LOAD(MI_MATH_REG_SRCB, MI_MATH_REG(3));
+		*bb++ = MI_MATH_ADD;
+		*bb++ = MI_MATH_STORE(MI_MATH_REG(4), MI_MATH_REG_CF);
 
-	*bb++ = MI_LOAD_REGISTER_REG;
-	*bb++ = mmio_base + HSW_CS_GPR(4);
-	*bb++ = mmio_base + MI_PREDICATE_RESULT_1;
+		*bb++ = MI_LOAD_REGISTER_REG;
+		*bb++ = mmio_base + HSW_CS_GPR(4);
+		*bb++ = mmio_base + MI_SET_PREDICATE_RESULT;
+	} else {
+		*bb++ = MI_MATH(4);
+		*bb++ = MI_MATH_LOAD(MI_MATH_REG_SRCA, MI_MATH_REG(0));
+		*bb++ = MI_MATH_LOAD(MI_MATH_REG_SRCB, MI_MATH_REG(3));
+		*bb++ = MI_MATH_ADD;
+		*bb++ = MI_MATH_STOREINV(MI_MATH_REG(4), MI_MATH_REG_CF);
+
+		*bb++ = MI_LOAD_REGISTER_REG;
+		*bb++ = mmio_base + HSW_CS_GPR(4);
+		*bb++ = mmio_base + MI_PREDICATE_RESULT_1;
+	}
 
 	*bb++ = MI_BATCH_BUFFER_START | MI_BATCH_PREDICATE | 1;
 	relocs->offset = offset_in_page(bb);
 	*bb++ = obj.offset + relocs->delta;
 	*bb++ = obj.offset >> 32;
+
+	if (use_set_predicate_result(i915))
+		*bb++ = 1 << 23; // MI_SET_PREDICATE
 
 	*bb++ = MI_BATCH_BUFFER_END;
 
