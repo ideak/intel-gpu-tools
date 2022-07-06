@@ -397,8 +397,13 @@ static bool test_pipe_legacy_gamma_reset(data_t *data,
 	drmModeFreeCrtc(kms_crtc);
 
 	red_lut = malloc(sizeof(uint16_t) * legacy_lut_size);
+	igt_assert(red_lut);
+
 	green_lut = malloc(sizeof(uint16_t) * legacy_lut_size);
+	igt_assert(green_lut);
+
 	blue_lut = malloc(sizeof(uint16_t) * legacy_lut_size);
+	igt_assert(blue_lut);
 
 	for (i = 0; i < legacy_lut_size; i++)
 		red_lut[i] = green_lut[i] = blue_lut[i] = 0xffff;
@@ -427,13 +432,17 @@ static bool test_pipe_legacy_gamma_reset(data_t *data,
 			   lut[i].blue == 0xffff);
 	drmModeFreePropertyBlob(blob);
 
+	free(red_lut);
+	free(green_lut);
+	free(blue_lut);
+
+end:
 	igt_plane_set_fb(primary, NULL);
 	igt_output_set_pipe(output, PIPE_NONE);
 	igt_display_commit(&data->display);
 
 	free_lut(degamma_linear);
 	free_lut(gamma_zero);
-end:
 	return ret;
 }
 
