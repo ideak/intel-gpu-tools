@@ -385,6 +385,7 @@ static const struct intel_device_info intel_rocketlake_info = {
 
 static const struct intel_device_info intel_dg1_info = {
 	.graphics_ver = 12,
+	.graphics_rel = 10,
 	.display_ver = 12,
 	.is_dg1 = true,
 	.codename = "dg1"
@@ -392,6 +393,7 @@ static const struct intel_device_info intel_dg1_info = {
 
 static const struct intel_device_info intel_dg2_info = {
 	.graphics_ver = 12,
+	.graphics_rel = 55,
 	.display_ver = 13,
 	.has_4tile = true,
 	.is_dg2 = true,
@@ -429,6 +431,7 @@ static const struct intel_device_info intel_alderlake_n_info = {
 
 static const struct intel_device_info intel_ats_m_info = {
 	.graphics_ver = 12,
+	.graphics_rel = 55,
 	.display_ver = 0, /* no display support */
 	.is_dg2 = true,
 	.has_4tile = true,
@@ -581,6 +584,13 @@ out:
 unsigned intel_gen(uint16_t devid)
 {
 	return intel_get_device_info(devid)->graphics_ver ?: -1u;
+}
+
+unsigned intel_graphics_ver(uint16_t devid)
+{
+	const struct intel_device_info *info = intel_get_device_info(devid);
+
+	return IP_VER(info->graphics_ver, info->graphics_rel);
 }
 
 /**
