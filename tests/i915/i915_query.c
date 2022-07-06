@@ -784,9 +784,11 @@ static void fill_unallocated(int fd, struct drm_i915_query_item *item, int idx,
 	struct igt_list_head handles;
 	uint32_t num_handles;
 	uint64_t rem, total;
+	unsigned int seed;
 	int id;
 
-	srand(time(NULL));
+	seed = time(NULL);
+	srand(seed);
 
 	IGT_INIT_LIST_HEAD(&handles);
 
@@ -829,27 +831,27 @@ static void fill_unallocated(int fd, struct drm_i915_query_item *item, int idx,
 
 	upload(fd, &handles, num_handles);
 
+	igt_debug("fill completed with seed=%u, cpu_access=%d, idx=%d, total=%"PRIu64"KiB, num_handles=%u\n",
+		  seed, cpu_access, idx, total >> 10, num_handles);
+
 	old_info = new_info;
 	memset(regions, 0, item->length);
 	i915_query_items(fd, item, 1);
 	new_info = regions->regions[idx];
 
-	igt_assert_lte(new_info.unallocated_size,
-		       new_info.probed_size - total);
-	igt_assert_lt(new_info.unallocated_size, old_info.unallocated_size);
+	igt_assert_lte_u64(new_info.unallocated_size,
+			   new_info.probed_size - total);
+	igt_assert_lt_u64(new_info.unallocated_size, old_info.unallocated_size);
 	if (new_info.probed_cpu_visible_size ==
 	    new_info.probed_size) { /* full BAR */
-		igt_assert_eq(new_info.unallocated_cpu_visible_size,
-			      new_info.unallocated_size);
+		igt_assert_eq_u64(new_info.unallocated_cpu_visible_size,
+				  new_info.unallocated_size);
 	} else if (cpu_access) {
-		igt_assert_lt(new_info.unallocated_cpu_visible_size,
-			      old_info.unallocated_cpu_visible_size);
-		igt_assert_lte(new_info.unallocated_cpu_visible_size,
-			       new_info.probed_cpu_visible_size - total);
+		igt_assert_lt_u64(new_info.unallocated_cpu_visible_size,
+				  old_info.unallocated_cpu_visible_size);
+		igt_assert_lte_u64(new_info.unallocated_cpu_visible_size,
+				   new_info.probed_cpu_visible_size - total);
 	}
-
-	igt_debug("fill completed with idx=%d, total=%"PRIu64"KiB, num_handles=%u\n",
-		  idx, total >> 10, num_handles);
 
 	igt_list_for_each_entry_safe(iter, tmp, &handles, link) {
 		gem_close(fd, iter->handle);
@@ -863,11 +865,11 @@ static void fill_unallocated(int fd, struct drm_i915_query_item *item, int idx,
 	i915_query_items(fd, item, 1);
 	new_info = regions->regions[idx];
 
-	igt_assert(new_info.unallocated_size >=
-		   old_info.unallocated_size + total);
+	igt_assert_lte_u64(old_info.unallocated_size + total,
+			   new_info.unallocated_size);
 	if (cpu_access)
-		igt_assert(new_info.unallocated_cpu_visible_size >=
-			   old_info.unallocated_cpu_visible_size + total);
+		igt_assert_lte_u64(old_info.unallocated_cpu_visible_size + total,
+				   new_info.unallocated_cpu_visible_size);
 }
 
 static void test_query_regions_unallocated(int fd)
