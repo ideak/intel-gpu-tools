@@ -1068,8 +1068,8 @@ static void dump_general_definitions(struct context *context,
 	child_dev_num = (block->size - sizeof(*defs)) / defs->child_dev_size;
 
 	printf("\tCRT DDC GMBUS addr: 0x%02x\n", defs->crt_ddc_gmbus_pin);
-	printf("\tUse ACPI DPMS CRT power states: %s\n",
-	       YESNO(defs->dpms_acpi));
+	printf("\tUse Non ACPI DPMS CRT power states: %s\n",
+	       YESNO(defs->dpms_non_acpi));
 	printf("\tSkip CRT detect at boot: %s\n",
 	       YESNO(defs->skip_boot_crt_detect));
 	printf("\tUse DPMS on AIM devices: %s\n", YESNO(defs->dpms_aim));
