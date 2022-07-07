@@ -43,28 +43,50 @@ static void test_plane(uint32_t plane_id, int expected_ret)
 				   sizeof(ckey)) == expected_ret);
 }
 
-igt_simple_main
+igt_main
 {
-	drm_fd = drm_open_driver_master(DRIVER_INTEL);
+	igt_fixture {
+		drm_fd = drm_open_driver_master(DRIVER_INTEL);
 
-	kmstest_set_vt_graphics_mode();
+		kmstest_set_vt_graphics_mode();
 
-	igt_display_require(&display, drm_fd);
+		igt_display_require(&display, drm_fd);
+		for_each_pipe(&display, p) {
+			for_each_plane_on_pipe(&display, p, plane) {
+				max_id = max(max_id, plane->drm_plane->plane_id);
+			}
+		}
 
-	for_each_pipe(&display, p) {
-		for_each_plane_on_pipe(&display, p, plane) {
-			bool is_valid = (plane->type == DRM_PLANE_TYPE_PRIMARY ||
-			                 plane->type == DRM_PLANE_TYPE_CURSOR);
-			test_plane(plane->drm_plane->plane_id,
-				   is_valid ? -ENOENT : 0);
+	}
 
-			max_id = max(max_id, plane->drm_plane->plane_id);
+	igt_describe("Test to check the legacy set colorkey ioctl "
+		     "only works for sprite planes.\n");
+	igt_subtest_with_dynamic("basic") {
+		for_each_pipe(&display, p) {
+			igt_dynamic_f("pipe-%s", kmstest_pipe_name(p)) {
+				for_each_plane_on_pipe(&display, p, plane) {
+					bool is_valid = (plane->type == DRM_PLANE_TYPE_PRIMARY ||
+							 plane->type == DRM_PLANE_TYPE_CURSOR);
+
+					test_plane(plane->drm_plane->plane_id,
+						   is_valid ? -ENOENT : 0);
+					max_id = max(max_id, plane->drm_plane->plane_id);
+				}
+			}
 		}
 	}
 
 	/* try some invalid IDs too */
-	test_plane(0, -ENOENT);
-	test_plane(max_id + 1, -ENOENT);
+	igt_describe("Check invalid plane id's, zero and outrange\n");
+	igt_subtest_with_dynamic("invalid-plane") {
+		igt_dynamic("zero-id")
+			test_plane(0, -ENOENT);
+		igt_dynamic("outrange-id")
+			test_plane(max_id + 1, -ENOENT);
+	}
 
-	igt_display_fini(&display);
+	igt_fixture {
+		igt_display_fini(&display);
+		close(drm_fd);
+	}
 }
