@@ -35,7 +35,6 @@ struct _data {
 	enum pipe pipe;
 	igt_display_t display;
 	igt_output_t *output;
-	drmModeResPtr res;
 	int max_dotclock;
 	bool (*adjust_mode)(data_t *data, drmModeModeInfoPtr mode);
 };
@@ -182,35 +181,29 @@ static void
 test_output(data_t *data)
 {
 	igt_output_t *output = data->output;
-	drmModeModeInfo mode;
 	struct igt_fb fb;
 	int ret;
-	uint32_t crtc_id;
+	drmModeModeInfo *mode;
 
-	/*
-	 * FIXME test every mode we have to be more
-	 * sure everything is really getting rejected?
-	 */
-	mode = *igt_output_get_mode(output);
-	igt_require(data->adjust_mode(data, &mode));
+	igt_output_set_pipe(output, data->pipe);
 
-	igt_create_fb(data->drm_fd,
-		      max_t(uint16_t, mode.hdisplay, 64),
-		      max_t(uint16_t, mode.vdisplay, 64),
-		      DRM_FORMAT_XRGB8888,
+	igt_create_fb(data->drm_fd, 512, 512, DRM_FORMAT_XRGB8888,
 		      DRM_FORMAT_MOD_LINEAR,
 		      &fb);
 
-	kmstest_unset_all_crtcs(data->drm_fd, data->res);
-
-	crtc_id = data->display.pipes[data->pipe].crtc_id;
-
-	ret = drmModeSetCrtc(data->drm_fd, crtc_id,
-			     fb.fb_id, 0, 0,
-			     &output->id, 1, &mode);
-	igt_assert_lt(ret, 0);
+	for_each_connector_mode(output) {
+		mode = &output->config.connector->modes[j__];
+		igt_require(data->adjust_mode(data, mode));
+		igt_output_override_mode(output, mode);
+		ret = igt_display_try_commit2(&data->display, data->display.is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
+		igt_assert(ret == -EINVAL);
+	}
 
 	igt_remove_fb(data->drm_fd, &fb);
+	igt_output_override_mode(output, NULL);
+	/*unset_all_crtcs*/
+	igt_display_reset(&data->display);
+	igt_display_commit(&data->display);
 }
 
 static int i915_max_dotclock(data_t *data)
@@ -290,11 +283,10 @@ igt_main
 		kmstest_set_vt_graphics_mode();
 
 		igt_display_require(&data.display, data.drm_fd);
-		data.res = drmModeGetResources(data.drm_fd);
-		igt_assert(data.res);
 
 		data.max_dotclock = i915_max_dotclock(&data);
 		igt_info("Max dotclock: %d kHz\n", data.max_dotclock);
+		igt_display_require_output(&data.display);
 	}
 
 	igt_describe("Make sure all modesets are rejected when the requested mode is invalid");
@@ -314,6 +306,5 @@ igt_main
 	igt_fixture {
 		igt_display_fini(&data.display);
 		igt_reset_connectors();
-		drmModeFreeResources(data.res);
 	}
 }
