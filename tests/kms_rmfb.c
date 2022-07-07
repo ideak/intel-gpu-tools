@@ -36,6 +36,9 @@
 #define DRM_CAP_CURSOR_HEIGHT 0x9
 #endif
 
+IGT_TEST_DESCRIPTION("This tests rmfb and close-fd behavior. In these cases"
+		     "the framebuffers should be removed from the crtc.");
+
 struct rmfb_data {
 	int drm_fd;
 	igt_display_t display;
@@ -151,13 +154,28 @@ run_rmfb_test(struct rmfb_data *data, bool reopen)
 	igt_output_t *output;
 	enum pipe pipe;
 
-	for_each_pipe_with_single_output(&data->display, pipe, output)
-		test_rmfb(data, output, pipe, reopen);
+	for_each_pipe_with_single_output(&data->display, pipe, output) {
+		igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(pipe),
+			      igt_output_name(output))
+			test_rmfb(data, output, pipe, reopen);
+	}
 }
 
 igt_main
 {
+	const struct {
+		bool reopen;
+		const char *name;
+		const char *description;
+	} tests[] = {
+		{ false, "rmfb-ioctl", "RMFB is supposed to free the framebuffers from any and all "
+				       "planes so test this and make sure it works."},
+		{ true, "close-fd", "RMFB is supposed to free the framebuffers from any and all "
+				    "planes so test this and make sure it works with fd close "
+				    "and reopen."},
+	};
 	struct rmfb_data data = {};
+	int i;
 
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
@@ -168,15 +186,13 @@ igt_main
 		igt_display_require_output(&data.display);
 	}
 
-	igt_describe("RMFB is supposed to free the framebuffers from any and all "
-		     "planes so test this and make sure it works.");
-	igt_subtest_f("rmfb-ioctl")
-		run_rmfb_test(&data, false);
+	for (i = 0; i < ARRAY_SIZE(tests); i++) {
+		igt_describe(tests[i].description);
+		igt_subtest_with_dynamic(tests[i].name) {
+			run_rmfb_test(&data, tests[i].reopen);
 
-	igt_describe("RMFB is supposed to free the framebuffers from any and all planes "
-		     "so test this and make sure it works with fd close and reopen.");
-	igt_subtest_f("close-fd")
-		run_rmfb_test(&data, true);
+		}
+	}
 
 	igt_fixture {
 		igt_display_fini(&data.display);
