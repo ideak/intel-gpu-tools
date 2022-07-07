@@ -721,7 +721,7 @@ static const struct {
 	{ DEVICE_HANDLE_EFP2, "EFP 2 (HDMI/DVI/DP)" },
 	{ DEVICE_HANDLE_EFP3, "EFP 3 (HDMI/DVI/DP)" },
 	{ DEVICE_HANDLE_EFP4, "EFP 4 (HDMI/DVI/DP)" },
-	{ DEVICE_HANDLE_LPF1, "LFP 1 (eDP)" },
+	{ DEVICE_HANDLE_LFP1, "LFP 1 (eDP)" },
 	{ DEVICE_HANDLE_LFP2, "LFP 2 (eDP)" },
 };
 static const int num_child_device_handles =
@@ -895,8 +895,24 @@ static void dump_child_device(struct context *context,
 		printf("\t\tSignature: %.*s\n", (int)sizeof(child->device_id), child->device_id);
 	} else {
 		printf("\t\tI2C speed: 0x%02x\n", child->i2c_speed);
-		printf("\t\tDP onboard redriver: 0x%02x\n", child->dp_onboard_redriver);
-		printf("\t\tDP ondock redriver: 0x%02x\n", child->dp_ondock_redriver);
+		printf("\t\tDP onboard redriver:\n");
+		printf("\t\t\tpresent: %s\n",
+		       YESNO((child->dp_onboard_redriver_present)));
+		printf("\t\t\tvswing: %s (0x%x)\n",
+		       dp_vswing(child->dp_onboard_redriver_vswing),
+		       child->dp_onboard_redriver_vswing);
+		printf("\t\t\tpre-emphasis: %s (0x%x)\n",
+		       dp_preemph(child->dp_onboard_redriver_preemph),
+		       child->dp_onboard_redriver_preemph);
+		printf("\t\tDP ondock redriver:\n");
+		printf("\t\t\tpresent: %s\n",
+		       YESNO((child->dp_ondock_redriver_present)));
+		printf("\t\t\tvswing: %s (0x%x)\n",
+		       dp_vswing(child->dp_ondock_redriver_vswing),
+		       child->dp_ondock_redriver_vswing);
+		printf("\t\t\tpre-emphasis: %s (0x%x)\n",
+		       dp_preemph(child->dp_ondock_redriver_preemph),
+		       child->dp_ondock_redriver_preemph);
 		printf("\t\tHDMI level shifter value: 0x%02x\n", child->hdmi_level_shifter_value);
 		dump_hmdi_max_data_rate(child->hdmi_max_data_rate);
 		printf("\t\tOffset to DTD buffer for edidless CHILD: 0x%02x\n", child->dtd_buf_ptr);
@@ -905,7 +921,6 @@ static void dump_child_device(struct context *context,
 		printf("\t\tCompression method CPS: %s\n", YESNO(child->compression_method_cps));
 		printf("\t\tDual pipe ganged eDP: %s\n", YESNO(child->ganged_edp));
 		printf("\t\tCompression structure index: 0x%02x)\n", child->compression_structure_index);
-		printf("\t\tSlave DDI port: 0x%02x (%s)\n", child->slave_port, dvo_port(child->slave_port));
 	}
 
 	printf("\t\tAIM offset: %d\n", child->addin_offset);
@@ -1324,9 +1339,9 @@ static void dump_driver_feature(struct context *context,
 	printf("\tBoot Device Algorithm: %s\n", feature->boot_dev_algorithm ?
 	       "driver default" : "os default");
 	printf("\tBlock display switching when DVD active: %s\n",
-	       YESNO(feature->block_display_switch));
+	       YESNO(feature->allow_display_switch_dvd));
 	printf("\tAllow display switching when in Full Screen DOS: %s\n",
-	       YESNO(feature->allow_display_switch));
+	       YESNO(feature->allow_display_switch_dos));
 	printf("\tHot Plug DVO: %s\n", YESNO(feature->hotplug_dvo));
 	printf("\tDual View Zoom: %s\n", YESNO(feature->dual_view_zoom));
 	printf("\tDriver INT 15h hook: %s\n", YESNO(feature->int15h_hook));
