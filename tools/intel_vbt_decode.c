@@ -1116,17 +1116,15 @@ static void dump_lvds_options(struct context *context,
 		printf("\t\tChannel type: %s (0x%x)\n",
 		       channel_type[val], val);
 
-		val = panel_bool(options->ssc_bits, i);
-		printf("\t\tSSC: %s (0x%x)\n",
-		       YESNO(val), val);
+		printf("\t\tSSC: %s\n",
+		       YESNO(panel_bool(options->ssc_bits, i)));
 
 		val = panel_bool(options->ssc_freq, i);
 		printf("\t\tSSC frequency: %d MHz (0x%x)\n",
 		       decode_ssc_freq(context, val), val);
 
-		val = panel_bool(options->ssc_ddt, i);
-		printf("\t\tDisable SSC in dual display twin: %s (0x%x)\n",
-		       YESNO(val), val);
+		printf("\t\tDisable SSC in dual display twin: %s\n",
+		       YESNO(panel_bool(options->ssc_ddt, i)));
 
 		if (block->size < 16)
 			continue;
@@ -1149,9 +1147,8 @@ static void dump_lvds_options(struct context *context,
 		if (context->bdb->version < 200)
 			continue;
 
-		val = panel_bool(options->lcdvcc_s0_enable, i);
-		printf("\t\tLCDVCC on during S0 state: %s (0x%x)\n",
-		       YESNO(val), val);
+		printf("\t\tLCDVCC on during S0 state: %s\n",
+		       YESNO(panel_bool(options->lcdvcc_s0_enable, i)));
 
 		if (context->bdb->version < 228)
 			continue;
@@ -1477,15 +1474,13 @@ static void dump_edp(struct context *context,
 		       dp_vswing(edp->fast_link_params[i].vswing),
 		       edp->fast_link_params[i].vswing);
 
-		if (context->bdb->version >= 162) {
-			bool val = panel_bool(edp->edp_s3d_feature, i);
-			printf("\t\tStereo 3D feature: %s\n", YESNO(val));
-		}
+		if (context->bdb->version >= 162)
+			printf("\t\tStereo 3D feature: %s\n",
+			       YESNO(panel_bool(edp->edp_s3d_feature, i)));
 
-		if (context->bdb->version >= 165) {
-			bool val = panel_bool(edp->edp_t3_optimization, i);
-			printf("\t\tT3 optimization: %s\n", YESNO(val));
-		}
+		if (context->bdb->version >= 165)
+			printf("\t\tT3 optimization: %s\n",
+			       YESNO(panel_bool(edp->edp_t3_optimization, i)));
 
 		if (context->bdb->version >= 173) {
 			int val = (edp->edp_vswing_preemph >> (i * 4)) & 0xf;
@@ -1504,28 +1499,25 @@ static void dump_edp(struct context *context,
 			}
 		}
 
-		if (context->bdb->version >= 182) {
-			bool val = panel_bool(edp->fast_link_training, i);
-			printf("\t\tFast link training: %s\n", YESNO(val));
-		}
+		if (context->bdb->version >= 182)
+			printf("\t\tFast link training: %s\n",
+			       YESNO(panel_bool(edp->fast_link_training, i)));
 
-		if (context->bdb->version >= 185) {
-			bool val = panel_bool(edp->dpcd_600h_write_required, i);
-			printf("\t\tDPCD 600h write required: %s\n", YESNO(val));
-		}
+		if (context->bdb->version >= 185)
+			printf("\t\tDPCD 600h write required: %s\n",
+			       YESNO(panel_bool(edp->dpcd_600h_write_required, i)));
 
-		if (context->bdb->version >= 186) {
+		if (context->bdb->version >= 186)
 			printf("\t\tPWM delays:\n"
 			       "\t\t\tPWM on to backlight enable: %d\n"
 			       "\t\t\tBacklight disable to PWM off: %d\n",
 			       edp->pwm_delays[i].pwm_on_to_backlight_enable,
 			       edp->pwm_delays[i].backlight_disable_to_pwm_off);
-		}
 
 		if (context->bdb->version >= 199) {
-			bool val = panel_bool(edp->full_link_params_provided, i);
+			printf("\t\tFull link params provided: %s\n",
+			       YESNO(panel_bool(edp->full_link_params_provided, i)));
 
-			printf("\t\tFull link params provided: %s\n", YESNO(val));
 			printf("\t\tFull link params:\n");
 			printf("\t\t\tpre-emphasis: %s (0x%x)\n",
 			       dp_preemph(edp->full_link_params[i].preemphasis),
