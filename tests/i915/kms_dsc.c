@@ -165,6 +165,23 @@ static bool check_dsc_on_connector(data_t *data)
 	return true;
 }
 
+/* Force dsc enable supports resolutions above 5K in DP */
+static bool check_5k_dp_test_constraint(data_t *data)
+{
+	igt_output_t *output = data->output;
+	drmModeConnector *connector = output->config.connector;
+	drmModeModeInfo *mode = get_highres_mode(output);
+
+	if (connector->connector_type == DRM_MODE_CONNECTOR_DisplayPort &&
+	    mode->hdisplay < HDISPLAY_5K) {
+		igt_debug("Force dsc enable does not support res. < 5K in %s\n",
+			   output->name);
+		return false;
+	}
+
+	return true;
+}
+
 static bool check_big_joiner_test_constraint(data_t *data,
 					     enum dsc_test_type test_type)
 {
@@ -285,6 +302,7 @@ static void update_display(data_t *data, enum dsc_test_type test_type, unsigned 
 	test_cleanup(data);
 }
 
+
 static void test_dsc(data_t *data, enum dsc_test_type test_type, int bpp, unsigned int plane_format)
 {
 	igt_display_t *display = &data->display;
@@ -298,6 +316,9 @@ static void test_dsc(data_t *data, enum dsc_test_type test_type, int bpp, unsign
 		data->pipe = pipe;
 
 		if (!check_dsc_on_connector(data))
+			continue;
+
+		if (!check_5k_dp_test_constraint(data))
 			continue;
 
 		if (!check_big_joiner_test_constraint(data, test_type))
