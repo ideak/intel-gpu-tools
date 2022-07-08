@@ -230,6 +230,8 @@ static bool test_pipe_legacy_gamma(data_t *data,
 	legacy_lut_size = kms_crtc->gamma_size;
 	drmModeFreeCrtc(kms_crtc);
 
+	igt_require(legacy_lut_size > 0);
+
 	red_lut = malloc(sizeof(uint16_t) * legacy_lut_size);
 	green_lut = malloc(sizeof(uint16_t) * legacy_lut_size);
 	blue_lut = malloc(sizeof(uint16_t) * legacy_lut_size);
