@@ -709,7 +709,7 @@ static void create_ext_cpu_access_big(int fd)
 
 		lmem_size = qmr.probed_size;
 		visible_size = qmr.probed_cpu_visible_size;
-		igt_assert_neq(visible_size, 0);
+		igt_assert_neq_u64(visible_size, 0);
 
 		if (visible_size <= (0.70 * lmem_size)) {
 			/*
