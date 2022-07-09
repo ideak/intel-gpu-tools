@@ -146,6 +146,7 @@ static void run_test_linear_tiling(data_t *data, int pipe, const drmModeModeInfo
 	igt_crc_t zero, captured[IGT_MAX_PIPES];
 	int i = 0, num_pipes = 0;
 	enum pipe p;
+	int ret;
 
 	/* Cannot use igt_display_get_n_pipes() due to fused pipes on i915 where they do
 	 * not give the numver of valid crtcs and always return IGT_MAX_PIPES */
@@ -174,6 +175,12 @@ static void run_test_linear_tiling(data_t *data, int pipe, const drmModeModeInfo
 
 		igt_plane_set_fb(data->primary[i], &buffer[i]);
 	}
+
+	ret = igt_display_try_commit_atomic(display,
+					    DRM_MODE_ATOMIC_ALLOW_MODESET |
+					    DRM_MODE_ATOMIC_TEST_ONLY,
+					    NULL);
+	igt_skip_on_f(ret != 0, "Unsupported mode\n");
 
 	igt_display_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
 
