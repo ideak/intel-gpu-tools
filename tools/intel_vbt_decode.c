@@ -531,26 +531,20 @@ static int decode_ssc_freq(struct context *context, bool alternate)
 	}
 }
 
+static const char * const panel_fitting[] = {
+	[0] = "disabled",
+	[1] = "text only",
+	[2] = "graphics only",
+	[3] = "text & graphics",
+};
+
 static void dump_general_features(struct context *context,
 				  const struct bdb_block *block)
 {
 	const struct bdb_general_features *features = block_data(block);
 
-	printf("\tPanel fitting: ");
-	switch (features->panel_fitting) {
-	case 0:
-		printf("disabled\n");
-		break;
-	case 1:
-		printf("text only\n");
-		break;
-	case 2:
-		printf("graphics only\n");
-		break;
-	case 3:
-		printf("text & graphics\n");
-		break;
-	}
+	printf("\tPanel fitting: %s (0x%x)\n",
+	       panel_fitting[features->panel_fitting], features->panel_fitting);
 	printf("\tFlexaim: %s\n", YESNO(features->flexaim));
 	printf("\tMessage: %s\n", YESNO(features->msg_enable));
 	printf("\tClear screen: %d\n", features->clear_screen);
