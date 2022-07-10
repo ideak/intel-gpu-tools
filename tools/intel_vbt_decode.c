@@ -1338,6 +1338,13 @@ static void dump_lvds_data(struct context *context,
 	free(ptrs_block);
 }
 
+static const char * const lvds_config[] = {
+	[BDB_DRIVER_NO_LVDS] = "No LVDS",
+	[BDB_DRIVER_INT_LVDS] = "Integrated LVDS",
+	[BDB_DRIVER_SDVO_LVDS] = "SDVO LVDS",
+	[BDB_DRIVER_EDP] = "Embedded DisplayPort",
+};
+
 static void dump_driver_feature(struct context *context,
 				const struct bdb_block *block)
 {
@@ -1382,21 +1389,8 @@ static void dump_driver_feature(struct context *context,
 	printf("\tEnable SDVO device power down: %s\n",
 	       YESNO(feature->sdvo_device_power_down));
 	printf("\tCRT hotplug: %s\n", YESNO(feature->crt_hotplug));
-	printf("\tLVDS config: ");
-	switch (feature->lvds_config) {
-	case BDB_DRIVER_NO_LVDS:
-		printf("No LVDS\n");
-		break;
-	case BDB_DRIVER_INT_LVDS:
-		printf("Integrated LVDS\n");
-		break;
-	case BDB_DRIVER_SDVO_LVDS:
-		printf("SDVO LVDS\n");
-		break;
-	case BDB_DRIVER_EDP:
-		printf("Embedded DisplayPort\n");
-		break;
-	}
+	printf("\tLVDS config: %s (0x%x)\n",
+	       lvds_config[feature->lvds_config], feature->lvds_config);
 	printf("\tDefine Display statically: %s\n",
 	       YESNO(feature->static_display));
 	printf("\tLegacy CRT max X: %d\n", feature->legacy_crt_max_x);
