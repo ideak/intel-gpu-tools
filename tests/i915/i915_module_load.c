@@ -38,6 +38,9 @@
 #include "igt_sysfs.h"
 #include "igt_core.h"
 
+#define BAR_SIZE_SHIFT 20
+#define MIN_BAR_SIZE 256
+
 IGT_TEST_DESCRIPTION("Tests the i915 module loading.");
 
 static void store_all(int i915)
@@ -260,6 +263,46 @@ static void load_and_check_i915(void)
 	gem_sanitycheck();
 }
 
+static uint32_t  driver_load_with_lmem_bar_size(uint32_t lmem_bar_size, bool check_support)
+{
+	int i915 = -1;
+	char lmem_bar[64];
+
+	igt_i915_driver_unload();
+	if (lmem_bar_size == 0)
+		igt_assert_eq(igt_i915_driver_load(NULL), 0);
+	else {
+		sprintf(lmem_bar, "lmem_bar_size=%u", lmem_bar_size);
+		igt_assert_eq(igt_i915_driver_load(lmem_bar), 0);
+	}
+
+	i915 = __drm_open_driver(DRIVER_INTEL);
+	igt_require_fd(i915);
+	igt_require_gem(i915);
+	igt_require(gem_has_lmem(i915));
+
+	if (check_support) {
+		char *tmp;
+
+		tmp = __igt_params_get(i915, "lmem_bar_size");
+		if (!tmp)
+			igt_skip("lmem_bar_size modparam not supported on this kernel. Skipping the test.\n");
+		free(tmp);
+	}
+
+	for_each_memory_region(r, i915) {
+		if (r->ci.memory_class == I915_MEMORY_CLASS_DEVICE) {
+			lmem_bar_size = (r->cpu_size >> BAR_SIZE_SHIFT);
+
+			igt_skip_on_f(lmem_bar_size == 0, "CPU visible size should be greater than zero. Skipping for older kernel.\n");
+		}
+	}
+
+	close(i915);
+
+	return lmem_bar_size;
+}
+
 igt_main
 {
 	igt_describe("Check if i915 and friends are not yet loaded, then load them.");
@@ -318,6 +361,51 @@ igt_main
 		igt_assert(i > 1);
 
 		/* inject_fault() leaves the module unloaded */
+	}
+
+	igt_describe("Check whether lmem bar size can be resized to only supported sizes.");
+	igt_subtest("resize-bar") {
+		uint32_t result_bar_size;
+		uint32_t lmem_bar_size;
+		int i915 = -1;
+
+		if (igt_kmod_is_loaded("i915")) {
+			i915 = __drm_open_driver(DRIVER_INTEL);
+			igt_require_fd(i915);
+			igt_require_gem(i915);
+			igt_require(gem_has_lmem(i915));
+			igt_skip_on_f(igt_sysfs_get_num_gt(i915) > 1, "Skips for more than one lmem instance.\n");
+			close(i915);
+		}
+
+		/* Test for lmem_bar_size modparam support */
+		lmem_bar_size = driver_load_with_lmem_bar_size(MIN_BAR_SIZE, true);
+		igt_assert_eq(lmem_bar_size, MIN_BAR_SIZE);
+
+		lmem_bar_size = driver_load_with_lmem_bar_size(0, false);
+
+		lmem_bar_size = roundup_power_of_two(lmem_bar_size);
+
+		igt_skip_on_f(lmem_bar_size == MIN_BAR_SIZE, "Bar is already set to minimum size.\n");
+
+		while (lmem_bar_size > MIN_BAR_SIZE) {
+			lmem_bar_size = lmem_bar_size >> 1;
+
+			result_bar_size = driver_load_with_lmem_bar_size(lmem_bar_size, false);
+
+			igt_assert_f(lmem_bar_size == result_bar_size, "Bar couldn't be resized.\n");
+		}
+
+		/* Test with unsupported sizes */
+		lmem_bar_size = 80;
+		result_bar_size = driver_load_with_lmem_bar_size(lmem_bar_size, false);
+		igt_assert_f(lmem_bar_size != result_bar_size, "Bar resized to unsupported size.\n");
+
+		lmem_bar_size = 16400;
+		result_bar_size = driver_load_with_lmem_bar_size(lmem_bar_size, false);
+		igt_assert_f(lmem_bar_size != result_bar_size, "Bar resized to unsupported size.\n");
+
+		igt_i915_driver_unload();
 	}
 
 	/* Subtests should unload the module themselves if they use modparams */
