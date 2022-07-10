@@ -25,7 +25,6 @@
 #include <fcntl.h>
 #include <glob.h>
 #include <string.h>
-#include <sys/poll.h>
 #include <sys/stat.h>
 
 #include "igt.h"
@@ -197,8 +196,7 @@ do_mapping_test(struct msm_pipe *pipe, const char *buffername, bool write)
 	fence_fd = igt_msm_cmd_submit(cmd);
 
 	/* Wait for submit to complete: */
-	poll(&(struct pollfd){fence_fd, POLLIN}, 1, -1);
-	close(fence_fd);
+	igt_wait_and_close(fence_fd);
 
 	igt_msm_bo_free(scratch_bo);
 

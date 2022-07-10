@@ -22,7 +22,6 @@
  */
 
 #include <fcntl.h>
-#include <sys/poll.h>
 
 #include "igt.h"
 #include "igt_msm.h"
@@ -50,16 +49,6 @@ mem_write(struct msm_cmd *cmd, uint32_t offset_dwords, uint32_t val)
 	msm_cmd_pkt7(cmd, CP_MEM_WRITE, 3);
 	msm_cmd_bo  (cmd, scratch_bo, offset_dwords * 4);  /* ADDR_LO/HI */
 	msm_cmd_emit(cmd, val);                            /* VAL */
-}
-
-/*
- * Helper to wait on a fence-fd:
- */
-static void
-wait_and_close(int fence_fd)
-{
-	poll(&(struct pollfd){fence_fd, POLLIN}, 1, -1);
-	close(fence_fd);
 }
 
 /*
@@ -107,7 +96,7 @@ do_hang_test(struct msm_pipe *pipe)
 	scratch[0] = 1;
 
 	for (unsigned i = 0; i < ARRAY_SIZE(cmds); i++) {
-		wait_and_close(fence_fds[i]);
+		igt_wait_and_close(fence_fds[i]);
 		igt_msm_cmd_free(cmds[i]);
 		if (i == 10)
 			continue;
@@ -163,7 +152,7 @@ igt_main
 		msm_cmd_emit(cmd, 0x1);                  /* ADDR_HI */
 		msm_cmd_emit(cmd, 0x123);                /* VAL */
 
-		wait_and_close(igt_msm_cmd_submit(cmd));
+		igt_wait_and_close(igt_msm_cmd_submit(cmd));
 	}
 
 	igt_fixture {

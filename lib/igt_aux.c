@@ -1919,3 +1919,14 @@ void *igt_memdup(const void *ptr, size_t len)
 
 	return dup;
 }
+
+/**
+ * igt_wait_and_close: helper to wait on a fence-fd and then close it
+ *
+ * @fence_fd: the fence-fd to wait on and close
+ */
+void igt_wait_and_close(int fence_fd)
+{
+	poll(&(struct pollfd){fence_fd, POLLIN}, 1, -1);
+	close(fence_fd);
+}

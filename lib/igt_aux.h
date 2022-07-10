@@ -337,4 +337,6 @@ uint64_t vfs_file_max(void);
 
 void *igt_memdup(const void *ptr, size_t len);
 
+void igt_wait_and_close(int fence_fd);
+
 #endif /* IGT_AUX_H */
