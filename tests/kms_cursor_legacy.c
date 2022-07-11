@@ -429,6 +429,8 @@ static void flip(igt_display_t *display,
 	results = mmap(NULL, PAGE_SIZE, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 	igt_assert(results != MAP_FAILED);
 
+	igt_display_reset(display);
+
 	flip_pipe = find_connected_pipe(display, !!flip_pipe);
 	cursor_pipe = find_connected_pipe(display, !!cursor_pipe);
 
