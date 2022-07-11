@@ -97,29 +97,6 @@ static dither_status_t get_dither_state(data_t *data, enum pipe pipe)
 	return status;
 }
 
-static bool i915_clock_constraint(data_t *data, enum pipe pipe,
-				  igt_output_t *output, int bpc)
-{
-	drmModeConnector *connector = output->config.connector;
-	igt_display_t *display = &data->display;
-
-	igt_sort_connector_modes(connector, sort_drm_modes_by_clk_dsc);
-
-	for_each_connector_mode(output) {
-		igt_output_override_mode(output, &connector->modes[j__]);
-		igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
-
-		if (!igt_check_output_bpc_equal(data->drm_fd, pipe,
-						output->name, bpc))
-			continue;
-
-		return true;
-	}
-
-	igt_output_override_mode(output, NULL);
-	return false;
-}
-
 static void test_dithering(data_t *data, enum pipe pipe,
 			   igt_output_t *output,
 			   int fb_bpc, int fb_format,
@@ -152,7 +129,7 @@ static void test_dithering(data_t *data, enum pipe pipe,
 	if (ret)
 		goto cleanup;
 
-	constraint = i915_clock_constraint(data, pipe, output, output_bpc);
+	constraint = igt_max_bpc_constraint(display, pipe, output, output_bpc);
 	if (!constraint)
 		goto cleanup;
 

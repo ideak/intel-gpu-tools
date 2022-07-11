@@ -660,28 +660,6 @@ static void test_pipe_limited_range_ctm(data_t *data,
 }
 #endif
 
-static bool i915_clock_constraint(data_t *data, enum pipe pipe, int bpc)
-{
-	igt_output_t *output = data->output;
-	drmModeConnector *connector = output->config.connector;
-
-	igt_sort_connector_modes(connector, sort_drm_modes_by_clk_dsc);
-
-	for_each_connector_mode(output) {
-		igt_output_override_mode(output, &connector->modes[j__]);
-		igt_display_commit_atomic(&data->display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
-
-		if (!igt_check_output_bpc_equal(data->drm_fd, pipe,
-						data->output->name, bpc))
-			continue;
-
-		return true;
-	}
-
-	igt_output_override_mode(output, NULL);
-	return false;
-}
-
 static void
 prep_pipe(data_t *data, enum pipe p)
 {
@@ -845,7 +823,7 @@ run_deep_color_tests_for_pipe(data_t *data, enum pipe p)
 		igt_display_commit_atomic(&data->display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
 
 		if (is_i915_device(data->drm_fd) &&
-		    !i915_clock_constraint(data, p, 10))
+		    !igt_max_bpc_constraint(&data->display, p, output, 10))
 			continue;
 
 		data->color_depth = 10;
