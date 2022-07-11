@@ -509,7 +509,7 @@ static void rc6_fence(int i915, const intel_ctx_t *ctx)
 		igt_debug("%s: slept=%lu perf=%"PRIu64", rc6=%"PRIu64"\n",
 			  e->name, slept, ts[1] - ts[0], rc6);
 		if (rapl_read(&rapl, &sample[1]))  {
-			uint64_t power = power_J(&rapl, &sample[0], &sample[1]);
+			double power = power_J(&rapl, &sample[0], &sample[1]);
 			igt_info("Total energy used for %s: %.1fmJ (%.1fmW)\n",
 				 e->name,
 				 power * 1e3,
