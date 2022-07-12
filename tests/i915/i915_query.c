@@ -1348,14 +1348,14 @@ static void query_parse_and_validate_hwconfig_table(int i915)
 			if (!value)
 				igt_info("-\n");
 
-			j = 0;
-			while (value) {
+			for (j = 0; j < __INTEL_HWCONFIG_CACHE_TYPE_LIMIT; j++) {
 				if (value & BIT(j)) {
 					value &= ~BIT(j);
-					igt_assert(j < __INTEL_HWCONFIG_CACHE_TYPE_LIMIT);
 					igt_info("%s%s", hwconfig_cachetypes[j], value ? ", " : "\n");
 				}
 			}
+
+			igt_assert(!value);
 			break;
 
 		default:
