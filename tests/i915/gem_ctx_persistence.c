@@ -370,7 +370,7 @@ static void test_nohangcheck_hostile(int i915, const intel_ctx_cfg_t *cfg)
 	igt_require(__enable_hangcheck(dir, false));
 
 	for_each_ctx_cfg_engine(i915, cfg, e) {
-		int64_t timeout = reset_timeout_ms * NSEC_PER_MSEC;
+		int64_t timeout = 10000 * NSEC_PER_MSEC;
 		const intel_ctx_t *ctx = intel_ctx_create(i915, cfg);
 		uint64_t ahnd = get_reloc_ahnd(i915, ctx->id);
 		igt_spin_t *spin;
