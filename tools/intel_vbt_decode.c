@@ -855,6 +855,28 @@ static void dump_dp_max_link_rate(uint16_t version, uint8_t dp_max_link_rate)
 		       link_rate / 100.0f, dp_max_link_rate);
 }
 
+static const char *dp_vswing(u8 vswing)
+{
+	switch (vswing) {
+	case 0: return "0.4V";
+	case 1: return "0.6V";
+	case 2: return "0.8V";
+	case 3: return "1.2V";
+	default: return "<unknown>";
+	}
+}
+
+static const char *dp_preemph(u8 preemph)
+{
+	switch (preemph) {
+	case 0: return "0dB";
+	case 1: return "3.5dB";
+	case 2: return "6dB";
+	case 3: return "9.5dB";
+	default: return "<unknown>";
+	}
+}
+
 static void dump_child_device(struct context *context,
 			      const struct child_device_config *child)
 {
@@ -1422,44 +1444,12 @@ static void dump_edp(struct context *context,
 		}
 		printf("\t\t\tlanes: X%d",
 		       edp->fast_link_params[i].lanes + 1);
-		printf("\t\t\tpre-emphasis: ");
-		switch (edp->fast_link_params[i].preemphasis) {
-		case EDP_PREEMPHASIS_NONE:
-			printf("none\n");
-			break;
-		case EDP_PREEMPHASIS_3_5dB:
-			printf("3.5dB\n");
-			break;
-		case EDP_PREEMPHASIS_6dB:
-			printf("6dB\n");
-			break;
-		case EDP_PREEMPHASIS_9_5dB:
-			printf("9.5dB\n");
-			break;
-		default:
-			printf("(unknown value %d)\n",
-			       edp->fast_link_params[i].preemphasis);
-			break;
-		}
-		printf("\t\t\tvswing: ");
-		switch (edp->fast_link_params[i].vswing) {
-		case EDP_VSWING_0_4V:
-			printf("0.4V\n");
-			break;
-		case EDP_VSWING_0_6V:
-			printf("0.6V\n");
-			break;
-		case EDP_VSWING_0_8V:
-			printf("0.8V\n");
-			break;
-		case EDP_VSWING_1_2V:
-			printf("1.2V\n");
-			break;
-		default:
-			printf("(unknown value %d)\n",
-			       edp->fast_link_params[i].vswing);
-			break;
-		}
+		printf("\t\t\tpre-emphasis: %s (0x%x)\n",
+		       dp_preemph(edp->fast_link_params[i].preemphasis),
+		       edp->fast_link_params[i].preemphasis);
+		printf("\t\t\tvswing: %s (0x%x)\n",
+		       dp_vswing(edp->fast_link_params[i].vswing),
+		       edp->fast_link_params[i].vswing);
 
 		if (context->bdb->version >= 162) {
 			bool val = (edp->edp_s3d_feature >> i) & 1;
@@ -1511,44 +1501,12 @@ static void dump_edp(struct context *context,
 
 			printf("\t\tFull link params provided: %s\n", YESNO(val));
 			printf("\t\tFull link params:\n");
-			printf("\t\t\tpre-emphasis: ");
-			switch (edp->full_link_params[i].preemphasis) {
-			case EDP_PREEMPHASIS_NONE:
-				printf("none\n");
-				break;
-			case EDP_PREEMPHASIS_3_5dB:
-				printf("3.5dB\n");
-				break;
-			case EDP_PREEMPHASIS_6dB:
-				printf("6dB\n");
-				break;
-			case EDP_PREEMPHASIS_9_5dB:
-				printf("9.5dB\n");
-				break;
-			default:
-				printf("(unknown value %d)\n",
-				       edp->full_link_params[i].preemphasis);
-				break;
-			}
-			printf("\t\t\tvswing: ");
-			switch (edp->full_link_params[i].vswing) {
-			case EDP_VSWING_0_4V:
-				printf("0.4V\n");
-				break;
-			case EDP_VSWING_0_6V:
-				printf("0.6V\n");
-				break;
-			case EDP_VSWING_0_8V:
-				printf("0.8V\n");
-				break;
-			case EDP_VSWING_1_2V:
-				printf("1.2V\n");
-				break;
-			default:
-				printf("(unknown value %d)\n",
-				       edp->full_link_params[i].vswing);
-				break;
-			}
+			printf("\t\t\tpre-emphasis: %s (0x%x)\n",
+			       dp_preemph(edp->full_link_params[i].preemphasis),
+			       edp->full_link_params[i].preemphasis);
+			printf("\t\t\tvswing: %s (0x%x)\n",
+			       dp_vswing(edp->full_link_params[i].vswing),
+			       edp->full_link_params[i].vswing);
 		}
 
 		if (context->bdb->version >= 224) {
