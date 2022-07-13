@@ -960,7 +960,7 @@ static void dump_child_device(struct context *context,
 		printf("\t\tCompression enable: %s\n", YESNO(child->compression_enable));
 		printf("\t\tCompression method CPS: %s\n", YESNO(child->compression_method_cps));
 		printf("\t\tDual pipe ganged eDP: %s\n", YESNO(child->ganged_edp));
-		printf("\t\tCompression structure index: 0x%02x)\n", child->compression_structure_index);
+		printf("\t\tCompression structure index: %d\n", child->compression_structure_index);
 
 		if (context->bdb->version >= 237) {
 			printf("\t\tHDMI Max FRL rate valid: %s\n",
