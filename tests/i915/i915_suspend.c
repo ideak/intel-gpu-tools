@@ -209,8 +209,9 @@ test_suspend_without_i915(int state)
 	igt_kmsg(KMSG_INFO "Unloading i915\n");
 	igt_assert_eq(igt_i915_driver_unload(),0);
 
-	igt_skip_on_f(igt_get_memsleep_state() == MEM_SLEEP_S2IDLE && state > SUSPEND_STATE_FREEZE,
-		      "Platform default mem_sleep state is s2idle\n");
+	igt_skip_on_f(igt_get_memsleep_state() == MEM_SLEEP_S2IDLE &&
+		      state == SUSPEND_STATE_MEM,
+		      "S3 not possible: platform default mem_sleep state is s2idle\n");
 	igt_system_suspend_autoresume(state, SUSPEND_TEST_NONE);
 
 	igt_kmsg(KMSG_INFO "Re-loading i915 \n");
