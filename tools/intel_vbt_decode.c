@@ -778,6 +778,29 @@ static const char *dvo_port(uint8_t type)
 		return "unknown";
 }
 
+static const char *aux_ch_names[] = {
+	[0] = "none",
+	[DP_AUX_A >> 4] = "AUX-A",
+	[DP_AUX_B >> 4] = "AUX-B",
+	[DP_AUX_C >> 4] = "AUX-C",
+	[DP_AUX_D >> 4] = "AUX-D",
+	[DP_AUX_E >> 4] = "AUX-E",
+	[DP_AUX_F >> 4] = "AUX-F",
+	[DP_AUX_G >> 4] = "AUX-G",
+	[DP_AUX_H >> 4] = "AUX-H",
+	[DP_AUX_I >> 4] = "AUX-I",
+};
+
+static const char *aux_ch(uint8_t aux_ch)
+{
+	aux_ch >>= 4;
+
+	if (aux_ch < ARRAY_SIZE(aux_ch_names) && aux_ch_names[aux_ch])
+		return aux_ch_names[aux_ch];
+	else
+		return "unknown";
+}
+
 static const char *mipi_bridge_type(uint8_t type)
 {
 	switch (type) {
@@ -974,7 +997,8 @@ static void dump_child_device(struct context *context,
 		printf("\t\tHDMI compatible? %s\n", YESNO(child->hdmi_support));
 		printf("\t\tDP compatible? %s\n", YESNO(child->dp_support));
 		printf("\t\tTMDS compatible? %s\n", YESNO(child->tmds_support));
-		printf("\t\tAux channel: 0x%02x\n", child->aux_channel);
+		printf("\t\tAux channel: %s (0x%02x)\n",
+		       aux_ch(child->aux_channel), child->aux_channel);
 		printf("\t\tDongle detect: 0x%02x\n", child->dongle_detect);
 	}
 
