@@ -135,13 +135,19 @@ bool igt_aub_dump_enabled(void);
 
 /**
  *  igt_suspend_state:
- *  @SUSPEND_STATE_FREEZE: suspend-to-idle target state, aka S0ix or freeze,
+ *  @SUSPEND_STATE_FREEZE: Suspend-To-Idle target state, aka S0ix or freeze,
  *			   first non-hibernation state
- *  @SUSPEND_STATE_STANDBY: standby target state, aka S1, second
+ *  @SUSPEND_STATE_STANDBY: "Power-On Suspend" target state, aka S1, second
  *			    non-hibernation state
- *  @SUSPEND_STATE_MEM: suspend-to-mem target state aka S3, third
- *			non-hibernation state
- *  @SUSPEND_STATE_DISK: suspend-to-disk target state, aka S4 or hibernation
+ *  @SUSPEND_STATE_S3: Suspend-To-RAM: It enforces a "deep" state to mem_sleep,
+ *		       what forces the system to go to the third
+ *		       non-hibernation state, aka S3.
+ *  @SUSPEND_STATE_MEM: A memory sleep (non-hibernation) target state,
+ *			respecting the system's mem_sleep default:
+ *				s2idle: Suspend-To-Idle target state
+ *				shallow: "Power-On Suspend"
+ *				deep: Suspend-To-RAM
+ *  @SUSPEND_STATE_DISK: Suspend-To-Disk target state, aka S4 or hibernation
  *
  *  Target suspend states used with igt_system_suspend_autoresume().
  *  See /sys/power/state for the available states on a given machine.
@@ -149,7 +155,8 @@ bool igt_aub_dump_enabled(void);
 enum igt_suspend_state {
 	SUSPEND_STATE_FREEZE,
 	SUSPEND_STATE_STANDBY,
-	SUSPEND_STATE_MEM,
+	SUSPEND_STATE_S3, /* Forces Suspend-to-Ram (S3) */
+	SUSPEND_STATE_MEM, /* Respects system default */
 	SUSPEND_STATE_DISK,
 
 	/*< private >*/

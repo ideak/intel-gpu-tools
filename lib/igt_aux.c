@@ -698,7 +698,8 @@ static int autoresume_delay;
 static const char *suspend_state_name[] = {
 	[SUSPEND_STATE_FREEZE] = "freeze",
 	[SUSPEND_STATE_STANDBY] = "standby",
-	[SUSPEND_STATE_MEM] = "mem",
+	[SUSPEND_STATE_S3] = "mem", /* Forces Suspend-to-Ram (S3) */
+	[SUSPEND_STATE_MEM] = "mem", /* Respects system default */
 	[SUSPEND_STATE_DISK] = "disk",
 };
 
@@ -833,6 +834,63 @@ static bool is_state_supported(int power_dir, enum igt_suspend_state state)
 }
 
 /**
+ * igt_get_memsleep_state
+ *
+ * Reads the value of /sys/power/mem_sleep and
+ * returns the current suspend state associated with 'mem'.
+ *
+ * Returns : an #igt_mem_sleep state, current suspend state associated with 'mem'.
+ */
+int igt_get_memsleep_state(void)
+{
+	char *mem_sleep_states;
+	char *mem_sleep_state;
+	enum igt_mem_sleep mem_sleep;
+	int power_dir;
+
+	igt_require((power_dir = open("/sys/power", O_RDONLY)) >= 0);
+
+	if (faccessat(power_dir, "mem_sleep", R_OK, 0))
+		return MEM_SLEEP_NONE;
+
+	igt_assert((mem_sleep_states = igt_sysfs_get(power_dir, "mem_sleep")));
+	for (mem_sleep_state = strtok(mem_sleep_states, " "); mem_sleep_state;
+	     mem_sleep_state = strtok(NULL, " ")) {
+		if (mem_sleep_state[0] == '[') {
+			mem_sleep_state[strlen(mem_sleep_state) - 1] = '\0';
+			mem_sleep_state++;
+			break;
+		}
+	}
+
+	if (!mem_sleep_state) {
+		free(mem_sleep_states);
+		return MEM_SLEEP_NONE;
+	}
+
+	for (mem_sleep = MEM_SLEEP_S2IDLE; mem_sleep < MEM_SLEEP_NUM; mem_sleep++) {
+		if (strcmp(mem_sleep_name[mem_sleep], mem_sleep_state) == 0)
+			break;
+	}
+
+	igt_assert_f(mem_sleep < MEM_SLEEP_NUM, "Invalid mem_sleep state\n");
+
+	free(mem_sleep_states);
+	close(power_dir);
+	return mem_sleep;
+}
+
+static void set_mem_sleep(int power_dir, enum igt_mem_sleep sleep)
+{
+	igt_assert(sleep < MEM_SLEEP_NUM);
+
+	igt_assert_eq(faccessat(power_dir, "mem_sleep", W_OK, 0), 0);
+
+	igt_assert(igt_sysfs_set(power_dir, "mem_sleep",
+				 mem_sleep_name[sleep]));
+}
+
+/**
  * igt_system_suspend_autoresume:
  * @state: an #igt_suspend_state, the target suspend state
  * @test: an #igt_suspend_test, test point at which to complete the suspend
@@ -858,6 +916,7 @@ void igt_system_suspend_autoresume(enum igt_suspend_state state,
 {
 	int power_dir;
 	enum igt_suspend_test orig_test;
+	enum igt_mem_sleep orig_mem_sleep = MEM_SLEEP_NONE;
 
 	igt_require((power_dir = open("/sys/power", O_RDONLY)) >= 0);
 	igt_require(is_state_supported(power_dir, state));
@@ -869,12 +928,23 @@ void igt_system_suspend_autoresume(enum igt_suspend_state state,
 		      "Suspend to disk requires swap space.\n");
 
 	orig_test = get_suspend_test(power_dir);
+
+	if (state == SUSPEND_STATE_S3) {
+		orig_mem_sleep = igt_get_memsleep_state();
+		set_mem_sleep(power_dir, MEM_SLEEP_DEEP);
+		igt_skip_on_f(igt_get_memsleep_state() != MEM_SLEEP_DEEP,
+			      "S3 not possible in this system.\n");
+	}
+
 	set_suspend_test(power_dir, test);
 
 	if (test == SUSPEND_TEST_NONE)
 		suspend_via_rtcwake(state);
 	else
 		suspend_via_sysfs(power_dir, state);
+
+	if (orig_mem_sleep)
+		set_mem_sleep(power_dir, orig_mem_sleep);
 
 	set_suspend_test(power_dir, orig_test);
 	close(power_dir);
@@ -950,52 +1020,6 @@ int igt_get_autoresume_delay(enum igt_suspend_state state)
 	return delay;
 }
 
-/**
- * igt_get_memsleep_state
- *
- * Reads the value of /sys/power/mem_sleep and
- * returns the current suspend state associated with 'mem'.
- *
- * Returns : an #igt_mem_sleep state, current suspend state associated with 'mem'.
- */
-int igt_get_memsleep_state(void)
-{
-	char *mem_sleep_states;
-	char *mem_sleep_state;
-	enum igt_mem_sleep mem_sleep;
-	int power_dir;
-
-	igt_require((power_dir = open("/sys/power", O_RDONLY)) >= 0);
-
-	if (faccessat(power_dir, "mem_sleep", R_OK, 0))
-		return MEM_SLEEP_NONE;
-
-	igt_assert((mem_sleep_states = igt_sysfs_get(power_dir, "mem_sleep")));
-	for (mem_sleep_state = strtok(mem_sleep_states, " "); mem_sleep_state;
-	     mem_sleep_state = strtok(NULL, " ")) {
-		if (mem_sleep_state[0] == '[') {
-			mem_sleep_state[strlen(mem_sleep_state) - 1] = '\0';
-			mem_sleep_state++;
-			break;
-		}
-	}
-
-	if (!mem_sleep_state) {
-		free(mem_sleep_states);
-		return MEM_SLEEP_NONE;
-	}
-
-	for (mem_sleep = MEM_SLEEP_S2IDLE; mem_sleep < MEM_SLEEP_NUM; mem_sleep++) {
-		if (strcmp(mem_sleep_name[mem_sleep], mem_sleep_state) == 0)
-			break;
-	}
-
-	igt_assert_f(mem_sleep < MEM_SLEEP_NUM, "Invalid mem_sleep state\n");
-
-	free(mem_sleep_states);
-	close(power_dir);
-	return mem_sleep;
-}
 /**
  * igt_drop_root:
  *
