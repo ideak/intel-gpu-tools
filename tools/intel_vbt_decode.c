@@ -972,7 +972,8 @@ static void dump_child_device(struct context *context,
 	}
 
 	printf("\t\tAIM offset: %d\n", child->addin_offset);
-	printf("\t\tDVO Port: 0x%02x (%s)\n", child->dvo_port, dvo_port(child->dvo_port));
+	printf("\t\tDVO Port: %s (0x%02x)\n",
+	       dvo_port(child->dvo_port), child->dvo_port);
 
 	printf("\t\tAIM I2C pin: 0x%02x\n", child->i2c_pin);
 	printf("\t\tAIM Slave address: 0x%02x\n", child->slave_addr);
