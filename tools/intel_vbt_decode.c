@@ -882,6 +882,19 @@ static const char *dp_preemph(u8 preemph)
 	}
 }
 
+static const char *hdmi_frl_rate(u8 frl_rate)
+{
+	switch (frl_rate) {
+	case 0: return "FRL not supported";
+	case 1: return "3 GT/s";
+	case 2: return "6 GT/s";
+	case 3: return "8 GT/s";
+	case 4: return "10 GT/s";
+	case 5: return "12 GT/s";
+	default: return "<unknown>";
+	}
+}
+
 static void dump_child_device(struct context *context,
 			      const struct child_device_config *child)
 {
@@ -925,6 +938,14 @@ static void dump_child_device(struct context *context,
 		printf("\t\tCompression method CPS: %s\n", YESNO(child->compression_method_cps));
 		printf("\t\tDual pipe ganged eDP: %s\n", YESNO(child->ganged_edp));
 		printf("\t\tCompression structure index: 0x%02x)\n", child->compression_structure_index);
+
+		if (context->bdb->version >= 237) {
+			printf("\t\tHDMI Max FRL rate valid: %s\n",
+			       YESNO(child->hdmi_max_frl_rate_valid));
+			printf("\t\tHDMI Max FRL rate: %s (0x%x)\n",
+			       hdmi_frl_rate(child->hdmi_max_frl_rate),
+			       child->hdmi_max_frl_rate);
+		}
 	}
 
 	printf("\t\tAIM offset: %d\n", child->addin_offset);
