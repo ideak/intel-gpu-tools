@@ -833,15 +833,7 @@ static bool is_state_supported(int power_dir, enum igt_suspend_state state)
 	return str;
 }
 
-/**
- * igt_get_memsleep_state
- *
- * Reads the value of /sys/power/mem_sleep and
- * returns the current suspend state associated with 'mem'.
- *
- * Returns : an #igt_mem_sleep state, current suspend state associated with 'mem'.
- */
-int igt_get_memsleep_state(void)
+static int get_mem_sleep(void)
 {
 	char *mem_sleep_states;
 	char *mem_sleep_state;
@@ -930,9 +922,9 @@ void igt_system_suspend_autoresume(enum igt_suspend_state state,
 	orig_test = get_suspend_test(power_dir);
 
 	if (state == SUSPEND_STATE_S3) {
-		orig_mem_sleep = igt_get_memsleep_state();
+		orig_mem_sleep = get_mem_sleep();
 		set_mem_sleep(power_dir, MEM_SLEEP_DEEP);
-		igt_skip_on_f(igt_get_memsleep_state() != MEM_SLEEP_DEEP,
+		igt_skip_on_f(get_mem_sleep() != MEM_SLEEP_DEEP,
 			      "S3 not possible in this system.\n");
 	}
 
