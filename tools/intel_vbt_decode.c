@@ -968,6 +968,7 @@ static void dump_child_device(struct context *context,
 		printf("\t\tOnboard LSPCON: %s\n", YESNO(child->lspcon));
 		printf("\t\tIboost enable: %s\n", YESNO(child->iboost));
 		printf("\t\tHPD sense invert: %s\n", YESNO(child->hpd_invert));
+		printf("\t\tUse VBT vswing/premph table: %s\n", YESNO(child->use_vbt_vswing));
 		printf("\t\tHDMI compatible? %s\n", YESNO(child->hdmi_support));
 		printf("\t\tDP compatible? %s\n", YESNO(child->dp_support));
 		printf("\t\tTMDS compatible? %s\n", YESNO(child->tmds_support));
