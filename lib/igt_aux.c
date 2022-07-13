@@ -712,9 +712,9 @@ static const char *suspend_test_name[] = {
 };
 
 static const char *mem_sleep_name[] = {
-	[MEM_SLEEP_FREEZE] = "s2idle",
-	[MEM_SLEEP_STANDBY] = "shallow",
-	[MEM_SLEEP_MEM] = "deep"
+	[MEM_SLEEP_S2IDLE] = "s2idle",
+	[MEM_SLEEP_SHALLOW] = "shallow",
+	[MEM_SLEEP_DEEP] = "deep"
 };
 
 static enum igt_suspend_test get_suspend_test(int power_dir)
@@ -993,7 +993,7 @@ int igt_get_memsleep_state(void)
 		return MEM_SLEEP_NONE;
 	}
 
-	for (mem_sleep = MEM_SLEEP_FREEZE; mem_sleep < MEM_SLEEP_NUM; mem_sleep++) {
+	for (mem_sleep = MEM_SLEEP_S2IDLE; mem_sleep < MEM_SLEEP_NUM; mem_sleep++) {
 		if (strcmp(mem_sleep_name[mem_sleep], mem_sleep_state) == 0)
 			break;
 	}

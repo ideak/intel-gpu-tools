@@ -196,9 +196,9 @@ enum igt_suspend_test {
  */
 enum igt_mem_sleep {
 	MEM_SLEEP_NONE,
-	MEM_SLEEP_FREEZE,
-	MEM_SLEEP_STANDBY,
-	MEM_SLEEP_MEM,
+	MEM_SLEEP_S2IDLE,
+	MEM_SLEEP_SHALLOW,
+	MEM_SLEEP_DEEP,
 
 	/*<private>*/
 	MEM_SLEEP_NUM,
