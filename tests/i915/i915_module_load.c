@@ -166,6 +166,33 @@ static int open_parameters(const char *module_name)
 	return open(path, O_RDONLY);
 }
 
+static void unload_or_die(const char *module_name)
+{
+	int err, loop;
+
+	/* should be unloaded, so expect a no-op */
+	for (loop = 0;; loop++) {
+		err = igt_kmod_unload(module_name, 0);
+		if (err == -ENOENT) /* -ENOENT == unloaded already */
+			err = 0;
+		if (!err || loop >= 10)
+			break;
+
+		sleep(1); /* wait for external clients to drop */
+		if (!strcmp(module_name, "i915"))
+			igt_i915_driver_unload();
+	}
+
+	igt_abort_on_f(err,
+		       "Failed to unload '%s' err:%d after %ds, leaving dangerous modparams intact!\n",
+		       module_name, err, loop);
+}
+
+static void must_unload(int sig)
+{
+	unload_or_die("i915");
+}
+
 static int
 inject_fault(const char *module_name, const char *opt, int fault)
 {
@@ -349,6 +376,14 @@ igt_main
 
 		igt_i915_driver_unload();
 
+		/*
+		 * inject_fault() leaves the module unloaded, but if that fails
+		 * we must abort the run. Otherwise, we leave a dangerous
+		 * modparam affecting all subsequent tests causing bizarre
+		 * failures.
+		 */
+		igt_install_exit_handler(must_unload);
+
 		i = 0;
 		param = getenv("IGT_SRANDOM");
 		if (param)
@@ -367,7 +402,7 @@ igt_main
 		while (inject_fault("i915", param, i) == 0)
 			i += 1 + random() % 17;
 
-		/* inject_fault() leaves the module unloaded */
+		unload_or_die("i915");
 	}
 
 	igt_describe("Check whether lmem bar size can be resized to only supported sizes.");
