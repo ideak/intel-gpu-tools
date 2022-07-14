@@ -172,6 +172,8 @@ static void prepare_crtc(data_t *data)
 	igt_output_t *output = data->output;
 	drmModeModeInfo *mode;
 
+	igt_display_reset(display);
+
 	/* select the pipe we want to use */
 	igt_output_set_pipe(output, data->pipe);
 
@@ -207,7 +209,7 @@ static void cleanup_crtc(data_t *data)
 
 	igt_plane_set_fb(data->primary, NULL);
 
-	igt_output_set_pipe(output, PIPE_ANY);
+	igt_output_set_pipe(output, PIPE_NONE);
 	igt_display_commit(display);
 
 	igt_remove_fb(data->drm_fd, &data->fb[0]);
@@ -265,6 +267,7 @@ igt_main_args("n", NULL, NULL, opt_handler, NULL)
 		igt_require_pipe_crc(data.drm_fd);
 
 		igt_display_require(&data.display, data.drm_fd);
+		igt_display_require_output(&data.display);
 
 		fork_cpuhog_helper();
 	}
@@ -293,6 +296,7 @@ igt_main_args("n", NULL, NULL, opt_handler, NULL)
 
 	igt_fixture {
 		igt_display_fini(&data.display);
+		close(data.drm_fd);
 
 		igt_stop_helper(&hog);
 	}
