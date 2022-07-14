@@ -214,27 +214,6 @@ static void cleanup_crtc(data_t *data)
 	igt_remove_fb(data->drm_fd, &data->fb[1]);
 }
 
-static void run_test(data_t *data)
-{
-	igt_display_t *display = &data->display;
-	igt_output_t *output;
-	enum pipe pipe;
-
-	for_each_pipe_with_valid_output(display, pipe, output) {
-		data->output = output;
-		data->pipe = pipe;
-
-		prepare_crtc(data);
-		test(data);
-		cleanup_crtc(data);
-
-		/* once is enough */
-		return;
-	}
-
-	igt_skip("no valid crtc/connector combinations found\n");
-}
-
 struct igt_helper_process hog;
 
 /**
@@ -273,6 +252,8 @@ static data_t data;
 igt_main_args("n", NULL, NULL, opt_handler, NULL)
 {
 	int i;
+	igt_output_t *output;
+	enum pipe pipe;
 
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
@@ -289,10 +270,25 @@ igt_main_args("n", NULL, NULL, opt_handler, NULL)
 	}
 
 	igt_describe("Tests that caching mode has become UC/WT and flushed using mmap write");
-	igt_subtest("main") {
-		igt_info("Using %d rounds for the test\n", ROUNDS);
-		for (i = 0; i < ROUNDS; i++)
-			run_test(&data);
+
+	igt_subtest_with_dynamic("main") {
+		for_each_pipe_with_valid_output(&data.display, pipe, output) {
+			igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(pipe),
+				      igt_output_name(output)) {
+				data.output = output;
+				data.pipe = pipe;
+
+				igt_info("Using %d rounds for each pipe in the test\n", ROUNDS);
+				prepare_crtc(&data);
+
+				for (i = 0; i < ROUNDS; i++)
+					test(&data);
+
+				cleanup_crtc(&data);
+			}
+			/* once is enough */
+			break;
+		}
 	}
 
 	igt_fixture {
