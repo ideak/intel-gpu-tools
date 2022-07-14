@@ -345,20 +345,27 @@ igt_main
 		     " with fault injection.");
 	igt_subtest("reload-with-fault-injection") {
 		const char *param;
-		int i = 0;
+		int i;
 
 		igt_i915_driver_unload();
+
+		i = 0;
+		param = getenv("IGT_SRANDOM");
+		if (param)
+			i = atoi(param);
+		if (!i)
+			i = time(NULL);
+		igt_info("Using IGT_SRANDOM=%d for randomised faults\n", i);
+		srandom(i);
 
 		param = "inject_probe_failure";
 		if (!igt_kmod_has_param("i915", param))
 			param = "inject_load_failure";
 		igt_require(igt_kmod_has_param("i915", param));
 
-		while (inject_fault("i915", param, ++i) == 0)
-			;
-
-		/* We expect to hit at least one fault! */
-		igt_assert(i > 1);
+		i = 1;
+		while (inject_fault("i915", param, i) == 0)
+			i += 1 + random() % 17;
 
 		/* inject_fault() leaves the module unloaded */
 	}
