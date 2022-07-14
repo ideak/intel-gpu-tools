@@ -839,6 +839,7 @@ run_deep_color_tests_for_pipe(data_t *data, enum pipe p)
 		if (!panel_supports_deep_color(data->drm_fd, output->name))
 			continue;
 
+		igt_display_reset(&data->display);
 		igt_output_set_prop_value(output, IGT_CONNECTOR_MAX_BPC, 10);
 		igt_output_set_pipe(output, p);
 		igt_display_commit_atomic(&data->display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
@@ -850,7 +851,10 @@ run_deep_color_tests_for_pipe(data_t *data, enum pipe p)
 		data->color_depth = 10;
 		data->drm_format = DRM_FORMAT_XRGB2101010;
 		data->output = output;
-		data->mode = igt_output_get_mode(data->output);
+
+		data->mode = malloc(sizeof(drmModeModeInfo));
+		igt_assert(data->mode);
+		memcpy(data->mode, igt_output_get_mode(data->output), sizeof(drmModeModeInfo));
 
 		igt_dynamic_f("pipe-%s-%s-gamma", kmstest_pipe_name(p), output->name) {
 			igt_display_reset(&data->display);
@@ -883,6 +887,8 @@ run_deep_color_tests_for_pipe(data_t *data, enum pipe p)
 			igt_output_set_prop_value(output, IGT_CONNECTOR_MAX_BPC, max_bpc);
 			igt_assert(ret);
 		}
+
+		free(data->mode);
 
 		break;
 	}
