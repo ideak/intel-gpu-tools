@@ -1664,6 +1664,8 @@ __igt_lsof_audio_and_kill_proc(proc_t *proc_info, char *proc_path)
 		return 0;
 
 	dp = opendir(proc_path);
+	if (!dp && errno == ENOENT)
+		return 0;
 	igt_assert(dp);
 
 	while ((d = readdir(dp))) {
