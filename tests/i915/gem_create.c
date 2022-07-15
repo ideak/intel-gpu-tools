@@ -538,7 +538,9 @@ static int upload(int fd, uint32_t handle)
 	 * for sure placed in one of requested regions.
 	 */
 	exec[0].handle = handle;
+	exec[0].flags = EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 	exec[1].handle = batch_create_size(fd, PAGE_SIZE);
+	exec[1].flags = EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 
 	return __gem_execbuf(fd, &execbuf);
 }
