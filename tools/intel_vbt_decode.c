@@ -1420,22 +1420,8 @@ static void dump_edp(struct context *context,
 			       edp->fast_link_params[i].rate);
 			break;
 		}
-		printf("\t\t\tlanes: ");
-		switch (edp->fast_link_params[i].lanes) {
-		case EDP_LANE_1:
-			printf("x1 mode\n");
-			break;
-		case EDP_LANE_2:
-			printf("x2 mode\n");
-			break;
-		case EDP_LANE_4:
-			printf("x4 mode\n");
-			break;
-		default:
-			printf("(unknown value %d)\n",
-			       edp->fast_link_params[i].lanes);
-			break;
-		}
+		printf("\t\t\tlanes: X%d",
+		       edp->fast_link_params[i].lanes + 1);
 		printf("\t\t\tpre-emphasis: ");
 		switch (edp->fast_link_params[i].preemphasis) {
 		case EDP_PREEMPHASIS_NONE:
