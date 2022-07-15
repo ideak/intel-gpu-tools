@@ -18,6 +18,12 @@ features of ChromeOS devices. It was initially developed internally by Google as
 part of the ChromeOS effort under the name Chameleon and was later made external
 as part of the ChromiumOS effort, under the name Chamelium.
 
+A new Chamelium V3 (Cv3) was released in 2022, which is built with different
+hardware while maintaining software backwards compatibility with v2.
+
+Chamelium V2
+------------
+
 It consists of a custom-made display emulator board connected to an Arrow SoCKit
 via a flexible cable, with two DisplayPort connectors, one HDMI and one VGA.
 
@@ -25,14 +31,26 @@ The SoCKit uses a Cyclone V SoC, with both a FPGA and an ARM CPU. While the FPGA
 is used for logic control, the CPU runs daemons that allow the board to be
 controlled over the network via a XMLRPC interface.
 
-Documentation
--------------
+Chamelium V3
+------------
+It consists of a custom-made display emulator board that has an Enclustra FPGA
+module mounted on it, with two DisplayPort and two HDMI connectors.
+
+The Enclustra FPGA Module uses a Arria 10 SoC, with both a FPGA and an ARM CPU.
+While the FPGA is used for logic control, the CPU runs daemons that allow the
+board to be controlled over the network via a XMLRPC interface.
+
+[Current limitation] Cv3 hardware uses an ITE chip which allows only 1 port to
+be plugged in a time. This limitation will be fixed in the upcoming iteration. 
+
+Chamelium V2 Documentation
+--------------------------
 
 Documentation about the Chamelium is made available by Google through the
 ChromiumOS projet wiki: https://www.chromium.org/chromium-os/testing/chamelium
 
-Deploying the Chamelium With IGT
---------------------------------
+Setting up Chamelium V2
+-----------------------
 
 Instructions from the ChromiumOS wiki detail how to setup the Chamelium:
 https://www.chromium.org/chromium-os/testing/chamelium#TOC-Setting-up-Chamelium
@@ -56,6 +74,9 @@ and then configure eth0 like so:
 
 This document supposes that target PC's network IP has "192.168.1.1/24" and
 the Chamelium's network IP has "192.168.1.2/24".
+
+Deploying the Chamelium With IGT
+--------------------------------
 
 Chamelium support requires setting up dedicated IGT configuration, as explained
 in the Core and Chamelium parts of the IGT API Reference in the documentation.
@@ -99,16 +120,11 @@ example (only Chamelium.URL is mandatory):
 
     # The name of the DRM connector
     # The DP-1 of [Chamelium:DP-1] and the HDMI-A-1 of [Chamelium:HDMI-A-1] indicate
-    # "connector info type" of /sys/kernel/debug/dri/0/i915_display_info.
+    # "connector info type" of /sys/kernel/debug/dri/0/i915_display_info on the DUT.
     [Chamelium:DP-1]
     # The ChameliumPortID indicates physical port (device) id of a Chamelium Board.
-    # A Chamelium daemon program defines these port ids as
-    # - DP1 (located next to the HDMI port) = 1
-    # - DP2 (located next to the VGA connector) = 2
-    # - HDMI = 3
-    # - VGA = 4
-    # The port ids are defined at:
-    # https://chromium.googlesource.com/chromiumos/platform/chameleon/+/master/chameleond/utils/ids.py
+    # For Chamelium daemon program definition of these port IDs, check the Port IDs sections below.
+    # You should only assign the ports that are physically connected to the DUT.
     ChameliumPortID=1
 
     [Chamelium:HDMI-A-1]
@@ -124,6 +140,21 @@ example (only Chamelium.URL is mandatory):
 
     [Chamelium:VGA-1]
     ChameliumPortID=4
+
+Chamelium V2 Port IDs
+---------------------
+defined at: https://chromium.googlesource.com/chromiumos/platform/chameleon/+/master/chameleond/utils/ids.py
+DP1 (located next to the HDMI port) = 1
+DP2 (located next to the VGA connector) = 2
+HDMI = 3
+VGA = 4
+
+Cv3 Port IDs
+---------------------
+DP1 (top left) = 0
+DP2 (top right) = 1
+HDMI1 (bottom left) = 2
+HDMI2 (bottom right) = 3
 
 Running the Chamelium With IGT
 ------------------------------
@@ -144,12 +175,18 @@ The XML-RPC Chamelium interface is described here:
 https://chromium.googlesource.com/chromiumos/platform/chameleon/+/refs/heads/master/chameleond/interface.py
 
 Logs that may be useful for debugging can be obtained either by connecting to
-the board via SSH or serial console and looking at the daemon logs from
+the board via SSH or serial console and looking at the daemon logs/
+On V2:
+------
 /var/log, such as:
 $ tail -f /var/log/chameleon*
+On V3:
+------
+Chameleon v3 uses systemd to manage the chameleond service. The logs can be
+accessed using  `$ journalctl -u chameleond`, or the  .GetChameleonLogs()  XMLRPC call.
 
-Daemon Source, Build and Deploy
--------------------------------
+Daemon Source, Build and Deploy [V2 only]
+-----------------------------------------
 
 Source code for the daemon running on the Chamelium is available at:
 https://chromium.googlesource.com/chromiumos/platform/chameleon/
@@ -225,7 +262,6 @@ Future Developments
 With the current generation of the hardware platform, support for testing a
 number of additional display features could be included as future developments,
 including:
-* Audio capture from HDMI
 * Check all channels are independent from each other
 * Playback using more than 2 channels, different sampling rates and different
   sample sizes
