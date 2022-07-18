@@ -36,6 +36,8 @@
 #include "igt_sysfs.h"
 #include "igt_psr.h"
 
+#define TIME SLOW_QUICK(1000, 10000)
+
 IGT_TEST_DESCRIPTION("Test the Kernel's frontbuffer tracking mechanism and "
 		     "its related features: FBC, PSR and DRRS");
 
@@ -2306,7 +2308,7 @@ static void wait_flip_event(void)
 	pfd.events = POLLIN;
 	pfd.revents = 0;
 
-	rc = poll(&pfd, 1, 1000);
+	rc = poll(&pfd, 1, TIME);
 	switch (rc) {
 	case 0:
 		igt_assert_f(false, "Poll timeout\n");
