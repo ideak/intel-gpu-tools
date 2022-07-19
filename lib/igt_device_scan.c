@@ -513,6 +513,11 @@ static struct igt_device *igt_device_new_from_udev(struct udev_device *dev)
 	get_props(dev, idev);
 	get_attrs(dev, idev);
 
+	if (is_pci_subsystem(idev)) {
+		set_vendor_device(idev);
+		set_pci_slot_name(idev);
+	}
+
 	return idev;
 }
 
@@ -671,10 +676,6 @@ static void update_or_add_parent(struct udev_device *dev,
 	parent_idev = igt_device_find(subsystem, syspath);
 	if (!parent_idev) {
 		parent_idev = igt_device_new_from_udev(parent_dev);
-		if (is_pci_subsystem(parent_idev)) {
-			set_vendor_device(parent_idev);
-			set_pci_slot_name(parent_idev);
-		}
 		igt_list_add_tail(&parent_idev->link, &igt_devs.all);
 	}
 	devname = udev_device_get_devnode(dev);
@@ -804,8 +805,8 @@ static void scan_drm_devices(void)
 		path = udev_list_entry_get_name(dev_list_entry);
 		udev_dev = udev_device_new_from_syspath(udev, path);
 		idev = igt_device_new_from_udev(udev_dev);
-		update_or_add_parent(udev_dev, idev);
 		igt_list_add_tail(&idev->link, &igt_devs.all);
+		update_or_add_parent(udev_dev, idev);
 
 		udev_device_unref(udev_dev);
 	}
