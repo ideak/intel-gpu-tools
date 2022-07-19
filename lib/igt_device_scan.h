@@ -50,6 +50,7 @@ struct igt_devices_print_format {
 	enum igt_devices_print_type   type;
 	enum igt_devices_print_option option;
 	bool numeric;
+	bool codename;
 };
 
 #define INTEGRATED_I915_GPU_PCI_ID "0000:00:02.0"
