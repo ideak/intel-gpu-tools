@@ -34,6 +34,7 @@
 #include <libudev.h>
 #include <linux/limits.h>
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <sys/types.h>
 
 /**
@@ -170,7 +171,7 @@
 { \
 	struct timeval tm; \
 	gettimeofday(&tm, NULL); \
-	printf("%10ld.%03ld: ", tm.tv_sec, tm.tv_usec); \
+	printf("%10ld.%06ld: ", tm.tv_sec, tm.tv_usec); \
 	printf(__VA_ARGS__); \
 }
 
