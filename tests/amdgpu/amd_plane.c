@@ -449,9 +449,11 @@ static void test_display_mpo(data_t *data, enum test test, uint32_t format, int 
 {
 
 	igt_display_t *display = &data->display;
+	igt_output_t *output;
 	uint32_t regamma_lut_size;
 	lut_t lut;
 	struct fbc fb[4];
+	int valid_outputs = 0;
 	int videos[][2]= {
 		{426, 240},
 		{640, 360},
@@ -463,6 +465,13 @@ static void test_display_mpo(data_t *data, enum test test, uint32_t format, int 
 	};
 
 	test_init(data);
+
+	/* Skip if there is less valid outputs than the required. */
+	for_each_connected_output(display, output)
+		valid_outputs++;
+
+	igt_skip_on_f(valid_outputs < display_count,
+			"Valid outputs (%d) should be equal or greater than %d\n", valid_outputs, display_count);
 
 	regamma_lut_size = igt_pipe_obj_get_prop(data->pipe[0], IGT_CRTC_GAMMA_LUT_SIZE);
 	igt_assert_lt(0, regamma_lut_size);
@@ -586,9 +595,17 @@ static void test_mpo_swizzle_toggle_multihead(data_t *data)
 {
 	struct amdgpu_bo_metadata meta = {};
 	igt_display_t *display = &data->display;
+	igt_output_t *output;
 	igt_fb_t fb_1280_xr24_tiled, fb_1280_ar24_tiled, fb_1920_xb24_tiled,
 		fb_1920_xb24_linear, fb_1920_xr24_tiled;
 	int w, h;
+	int valid_outputs = 0;
+
+	/* Skip if only one display is connected. */
+	for_each_connected_output(display, output)
+		valid_outputs++;
+
+	igt_skip_on_f(valid_outputs == 1, "Must have more than one output connected\n");
 
 	w = 2400;
 	h = 1350;
