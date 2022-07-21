@@ -158,18 +158,29 @@
 #define     CONTEXT_CONTROL_LOAD_CE_RAM(x)     (((unsigned)(x) & 0x1) << 28)
 #define     CONTEXT_CONTROL_SHADOW_ENABLE(x)   (((unsigned)(x) & 0x1) << 31)
 
-#define PKT3_CLEAR_STATE                       0x12
+#define PKT3_CLEAR_STATE			0x12
 
-#define PKT3_SET_SH_REG                        0x76
-#define		PACKET3_SET_SH_REG_START			0x00002c00
+#define PKT3_SET_SH_REG				0x76
+#define	PACKET3_SET_SH_REG_START		0x00002c00
 
 #define PKT3_SET_SH_REG_INDEX			0x9B
 
-#define	PACKET3_DISPATCH_DIRECT				0x15
-#define PACKET3_EVENT_WRITE				0x46
-#define PACKET3_ACQUIRE_MEM				0x58
-#define PACKET3_SET_CONTEXT_REG				0x69
-#define PACKET3_SET_UCONFIG_REG				0x79
-#define PACKET3_DRAW_INDEX_AUTO				0x2D
+#define	PACKET3_DISPATCH_DIRECT			0x15
+#define PACKET3_EVENT_WRITE			0x46
+#define PACKET3_ACQUIRE_MEM			0x58
+#define PACKET3_SET_CONTEXT_REG			0x69
+#define PACKET3_SET_UCONFIG_REG			0x79
+#define PACKET3_DRAW_INDEX_AUTO			0x2D
+
+/*TODO organize as iit is in MESA*/
+/* gfx 8 */
+#define mmCOMPUTE_PGM_LO			0x2e0c
+#define mmCOMPUTE_PGM_RSRC1			0x2e12
+#define mmCOMPUTE_TMPRING_SIZE			0x2e18
+#define mmCOMPUTE_USER_DATA_0			0x2e40
+#define mmCOMPUTE_USER_DATA_1			0x2e41
+#define mmCOMPUTE_RESOURCE_LIMITS		0x2e15
+#define mmCOMPUTE_NUM_THREAD_X			0x2e07
+
 
 #endif
