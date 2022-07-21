@@ -406,9 +406,96 @@ get_ip_block(amdgpu_device_handle device, enum amd_ip_block_type type)
 	return NULL;
 }
 
+static int
+cmd_allocate_buf(struct amdgpu_cmd_base  *base, uint32_t size_dw)
+{
+	if (size_dw > base->max_dw) {
+		if (base->buf) {
+			free(base->buf);
+			base->buf = NULL;
+			base->max_dw = 0;
+			base->cdw = 0;
+		}
+		base->buf = calloc(4, size_dw);
+		if (!base->buf)
+			return -1;
+		base->max_dw = size_dw;
+		base->cdw = 0;
+	}
+	return 0;
+}
 
+static int
+cmd_attach_buf(struct amdgpu_cmd_base  *base, void *ptr, uint32_t size_bytes)
+{
+	if (base->buf && base->is_assigned_buf)
+		return -1;
 
+	if (base->buf) {
+		free(base->buf);
+		base->buf = NULL;
+		base->max_dw = 0;
+		base->cdw = 0;
+	}
+	assert(ptr != NULL);
+	base->buf = (uint32_t *)ptr;
+	base->max_dw = size_bytes>>2;
+	base->cdw = 0;
+	base->is_assigned_buf = true; /* allocated externally , no free */
+	return 0;
+}
 
+static void
+cmd_emit(struct amdgpu_cmd_base  *base, uint32_t value)
+{
+	assert(base->cdw <  base->max_dw  );
+	base->buf[base->cdw++] = value;
+}
+
+static void
+cmd_emit_buf(struct amdgpu_cmd_base  *base, const void *ptr, uint32_t offset_bytes, uint32_t size_bytes)
+{
+	/* we assume that caller knows what is doing and we loose the buffer current index */
+	/* we may do this later abstract the internal index */
+	assert(base->cdw + ((offset_bytes + size_bytes)>>2) <  base->max_dw  );
+	memcpy(base->buf + offset_bytes , ptr, size_bytes);
+}
+
+struct amdgpu_cmd_base *
+get_cmd_base(void)
+{
+	struct amdgpu_cmd_base *base = calloc(1 ,sizeof(*base));
+
+	base->cdw = 0;
+	base->max_dw = 0;
+	base->buf = NULL;
+	base->is_assigned_buf = false;
+
+	base->allocate_buf = cmd_allocate_buf;
+	base->attach_buf = cmd_attach_buf;
+	base->emit = cmd_emit;
+	base->emit_buf = cmd_emit_buf;
+
+	return base;
+}
+
+void
+free_cmd_base(struct amdgpu_cmd_base * base)
+{
+	if (base) {
+		if (base->buf && base->is_assigned_buf == false)
+			free(base->buf);
+		free(base);
+	}
+
+}
+
+void
+append_cmd_base(struct amdgpu_cmd_base *base, uint32_t mask, uint32_t cmd)
+{
+	while(base->cdw & mask)
+		base->emit(base, cmd);
+}
 
 /*
  * GFX: 8.x

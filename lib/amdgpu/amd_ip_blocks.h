@@ -112,5 +112,24 @@ setup_amdgpu_ip_blocks(uint32_t major, uint32_t minor, struct amdgpu_gpu_info *a
 const struct amdgpu_ip_block_version *
 get_ip_block(amdgpu_device_handle device, enum amd_ip_block_type type);
 
+struct amdgpu_cmd_base {
+	uint32_t cdw;  /* Number of used dwords. */
+	uint32_t max_dw; /* Maximum number of dwords. */
+	uint32_t *buf; /* The base pointer of the chunk. */
+	bool is_assigned_buf;
+
+	/* functions */
+	int (*allocate_buf)(struct amdgpu_cmd_base  *base, uint32_t size);
+	int (*attach_buf)(struct amdgpu_cmd_base  *base, void *ptr, uint32_t size_bytes);
+	void (*emit)(struct amdgpu_cmd_base  *base, uint32_t value);
+	void (*emit_buf)(struct amdgpu_cmd_base  *base, const void *ptr, uint32_t offset_bytes, uint32_t size_bytes);
+};
+
+struct amdgpu_cmd_base* get_cmd_base(void);
+
+void free_cmd_base(struct amdgpu_cmd_base *base);
+
+void
+append_cmd_base(struct amdgpu_cmd_base *base, uint32_t mask, uint32_t cmd);
 
 #endif
