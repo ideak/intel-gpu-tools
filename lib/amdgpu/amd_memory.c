@@ -71,6 +71,39 @@
 
  /**
   *
+  * @param dev
+  * @param size
+  * @param alignment
+  * @param heap
+  * @param flags
+  * @param bo
+  * @return
+  */
+int
+amdgpu_bo_alloc_wrap(amdgpu_device_handle dev, unsigned size,
+		     unsigned alignment, unsigned heap, uint64_t flags,
+		     amdgpu_bo_handle *bo)
+{
+	amdgpu_bo_handle buf_handle;
+	int r;
+	struct amdgpu_bo_alloc_request req = {
+		.alloc_size = size,
+		.phys_alignment = alignment,
+		.preferred_heap = heap,
+		.flags = flags,
+	};
+
+	r = amdgpu_bo_alloc(dev, &req, &buf_handle);
+	if (r)
+		return r;
+
+	*bo = buf_handle;
+
+	return 0;
+}
+
+ /**
+  *
   * @param bo
   * @param va_handle
   * @param vmc_addr

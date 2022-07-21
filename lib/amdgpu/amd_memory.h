@@ -38,6 +38,10 @@ gpu_mem_alloc(amdgpu_device_handle device_handle,
 				      uint64_t flags,
 				      uint64_t *vmc_addr,
 				      amdgpu_va_handle *va_handle);
+int
+amdgpu_bo_alloc_wrap(amdgpu_device_handle dev, unsigned size,
+		     unsigned alignment, unsigned heap, uint64_t flags,
+		     amdgpu_bo_handle *bo);
 
 void
 gpu_mem_free(amdgpu_bo_handle bo,
