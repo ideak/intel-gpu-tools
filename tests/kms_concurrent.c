@@ -252,7 +252,7 @@ get_lowres_mode(data_t *data, const drmModeModeInfo *mode_default,
 			return igt_memdup(mode, sizeof(*mode));
 	}
 
-	igt_skip_on_f(mode_default->vdisplay < 1024, "No suitable resolution was found\n");
+	igt_skip_on_f(mode_default->hdisplay < 1024, "No suitable resolution was found\n");
 	return igt_std_1024_mode_get(igt_output_preferred_vrefresh(output));
 }
 
