@@ -132,6 +132,7 @@ if libdrm_amdgpu.found()
 		'amdgpu/amd_compute.c',
 		'amdgpu/amd_gfx.c',
 		'amdgpu/amd_ip_blocks.c',
+		'amdgpu/amd_shaders.c',
 	]
 endif
 
