@@ -195,7 +195,7 @@ sub parse_info_data($)
 		# FNH:<number of function hit>
 		if (m/^FNH:(-?\d+)/) {
 			my $hits = $1;
-			if ($record{$source}{$func}{fnh} < $hits) {
+			if (!defined($record{$source}{$func}{fnh}) || $record{$source}{$func}{fnh} < $hits) {
 				$record{$source}{$func}{fnh} = $hits;
 			}
 			next;
@@ -234,7 +234,7 @@ sub parse_info_data($)
 		# BRH:<number of branches hit>
 		if (m/^BRH:(-?\d+)/) {
 			my $hits = $1;
-			if ($record{$source}{$func}{brh} < $hits) {
+			if (!defined($record{$source}{$func}{brh}) || $record{$source}{$func}{brh} < $hits) {
 				$record{$source}{$func}{brh} = $hits;
 			}
 			next;
@@ -268,7 +268,7 @@ sub parse_info_data($)
 		# LH:<number of lines with a non-zero execution count>
 		if (m/^LH:(-?\d+)/) {
 			my $hits = $1;
-			if ($record{$source}{$func}{lh} < $hits) {
+			if (!defined($record{$source}{$func}{lh}) || $record{$source}{$func}{lh} < $hits) {
 				$record{$source}{$func}{lh} = $hits;
 			}
 			next;
