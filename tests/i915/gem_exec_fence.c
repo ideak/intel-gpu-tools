@@ -350,18 +350,20 @@ static void test_fence_await(int fd, const intel_ctx_t *ctx,
 	/* Long, but not too long to anger preemption disable checks */
 	usleep(50 * 1000); /* 50 ms, typical preempt reset is 150+ms */
 
-	/* Check for invalidly completing the task early */
-	igt_assert(fence_busy(spin->out_fence));
-	for (int n = 0; n < i; n++)
-		igt_assert_eq_u32(out[n], 0);
+	if ((flags & HANG) == 0) {
+		/* Check for invalidly completing the task early */
+		igt_assert(fence_busy(spin->out_fence));
+		for (int n = 0; n < i; n++)
+			igt_assert_eq_u32(out[n], 0);
 
-	if ((flags & HANG) == 0)
 		igt_spin_end(spin);
+	}
 
 	igt_waitchildren();
 
 	gem_set_domain(fd, scratch, I915_GEM_DOMAIN_GTT, 0);
-	while (i--)
+	igt_assert(!fence_busy(spin->out_fence));
+	while ((flags & HANG) == 0 && i--)
 		igt_assert_eq_u32(out[i], i);
 	munmap(out, 4096);
 
