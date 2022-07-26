@@ -685,7 +685,7 @@ no_sema(int gem_fd, const intel_ctx_t *ctx,
 #define MI_SEMAPHORE_WAIT	MI_INSTR(0x1c, 2) /* GEN8+ */
 #define   MI_SEMAPHORE_POLL		(1<<15)
 #define   MI_SEMAPHORE_SAD_GTE_SDD	(1<<12)
-#define   MI_SEMAPHORE_SAD_NEQ_SDD      (5 << 12)
+#define   MI_SEMAPHORE_SAD_EQ_SDD       (4 << 12)
 
 static void
 sema_wait(int gem_fd, const intel_ctx_t *ctx,
@@ -812,9 +812,9 @@ create_sema(int gem_fd, uint64_t ahnd,
 		0,
 		1,
 
-		/* Wait until the semaphore value is set to 0 [by caller] */
-		MI_SEMAPHORE_WAIT | MI_SEMAPHORE_POLL | MI_SEMAPHORE_SAD_NEQ_SDD,
-		1,
+		/* Wait until the semaphore value is set to 2 [by caller] */
+		MI_SEMAPHORE_WAIT | MI_SEMAPHORE_POLL | MI_SEMAPHORE_SAD_EQ_SDD,
+		2,
 		0,
 		0,
 
@@ -872,26 +872,37 @@ __sema_busy(int gem_fd, uint64_t ahnd, int pmu, const intel_ctx_t *ctx,
 	};
 	igt_spin_t *spin;
 	uint32_t *map;
+	struct timespec tv = {};
+	int timeout = 3;
 
 	/* Time spent being busy includes time waiting on semaphores */
 	igt_assert(busy_pct >= sema_pct);
 
 	gem_quiescent_gpu(gem_fd);
 
-	map = gem_mmap__device_coherent(gem_fd, obj.handle, 0, 4096, PROT_WRITE);
+	map = gem_mmap__device_coherent(gem_fd, obj.handle, 0, 4096, PROT_READ | PROT_WRITE);
 	gem_execbuf(gem_fd, &eb);
 	spin = igt_spin_new(gem_fd, .ahnd = ahnd, .ctx = ctx, .engine = e->flags);
 
-	/* Wait until the batch is executed and the semaphore is busy-waiting */
-	while (!READ_ONCE(*map) && gem_bo_busy(gem_fd, obj.handle))
+	/*
+	 * Wait until the batch is executed and the semaphore is busy-waiting.
+	 * Also stop on timeout.
+	 */
+	igt_nsec_elapsed(&tv);
+	while (READ_ONCE(*map) != 1 && gem_bo_busy(gem_fd, obj.handle) &&
+	       igt_seconds_elapsed(&tv) < timeout)
 		;
+	igt_debug("bo_busy = %d, *map = %u, timeout: [%u/%u]\n",
+		  gem_bo_busy(gem_fd, obj.handle), *map,
+		  igt_seconds_elapsed(&tv), timeout);
+	igt_assert(*map == 1);
 	igt_assert(gem_bo_busy(gem_fd, obj.handle));
 	gem_close(gem_fd, obj.handle);
 
 	total = pmu_read_multi(pmu, 2, start);
 
 	sema = measured_usleep(batch_duration_ns * sema_pct / 100 / 1000);
-	*map = 0; __sync_synchronize();
+	*map = 2; __sync_synchronize();
 	busy = measured_usleep(batch_duration_ns * (busy_pct - sema_pct) / 100 / 1000);
 	igt_spin_end(spin);
 	measured_usleep(batch_duration_ns * (100 - busy_pct) / 100 / 1000);
