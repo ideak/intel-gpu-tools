@@ -1145,7 +1145,7 @@ igt_main
 		from_gpu(fd);
 
 	igt_subtest_with_dynamic("basic-active") {
-		igt_dynamic("all")
+		igt_dynamic("all-engines")
 			active(fd, ctx, ALL_ENGINES);
 
 		for_each_ctx_engine(fd, ctx, e) {

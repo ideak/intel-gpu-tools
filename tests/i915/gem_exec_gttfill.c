@@ -255,7 +255,7 @@ igt_main
 
 	igt_describe("Stress test check behaviour/correctness of handling"
 		     " batches to fill gtt");
-	igt_subtest("all")
+	igt_subtest("all-engines")
 		fillgtt(i915, ctx, ALL_ENGINES, 20);
 
 	igt_fixture {

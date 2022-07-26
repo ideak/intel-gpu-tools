@@ -1303,7 +1303,7 @@ igt_main
 		store_all(fd, ctx, 1, 2);
 
 	igt_describe("Extended version of existing basic-all test.");
-	igt_subtest("all")
+	igt_subtest("wait-all")
 		sync_all(fd, ctx, 1, 20);
 	igt_describe("Extended version of existing basic-store-all test.");
 	igt_subtest("store-all")

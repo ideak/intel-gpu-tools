@@ -831,7 +831,7 @@ void igt_kselftests(const char *module_name,
 		igt_require(igt_kselftest_begin(&tst) == 0);
 
 	igt_kselftest_get_tests(tst.kmod, filter, &tests);
-	igt_subtest_with_dynamic(filter ?: "all") {
+	igt_subtest_with_dynamic(filter ?: "all-tests") {
 		igt_list_for_each_entry_safe(tl, tn, &tests, link) {
 			unsigned long taints;
 

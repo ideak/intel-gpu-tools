@@ -970,7 +970,7 @@ static void test_busy(int i915, int clients)
 			}
 		}
 
-		igt_dynamic("all") {
+		igt_dynamic("all-engines") {
 			gem_quiescent_gpu(i915);
 			igt_fork(child, 1)
 				busy_all(i915, clients, &cfg);

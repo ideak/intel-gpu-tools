@@ -629,7 +629,7 @@ igt_main
 			igt_dynamic_f("%s", e->name)
 				independent(i915, ctx, e);
 		}
-		igt_dynamic("all")
+		igt_dynamic("all-engines")
 			independent_all(i915, ctx);
 	}
 

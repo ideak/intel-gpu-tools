@@ -160,7 +160,7 @@ static void test_all_engines(const char *name, int i915, const intel_ctx_t *ctx,
 	const struct intel_execution_engine2 *e;
 
 	igt_subtest_with_dynamic(name) {
-		igt_dynamic("all") {
+		igt_dynamic("all-engines") {
 			gem_quiescent_gpu(i915);
 			basic(i915, ctx, ALL_ENGINES, test);
 			gem_quiescent_gpu(i915);

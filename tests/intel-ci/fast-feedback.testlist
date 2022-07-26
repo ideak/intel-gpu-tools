@@ -13,7 +13,7 @@ igt@fbdev@write
 igt@gem_basic@bad-close
 igt@gem_basic@create-close
 igt@gem_basic@create-fd-close
-igt@gem_busy@busy@all
+igt@gem_busy@busy@all-engines
 igt@gem_close_race@basic-process
 igt@gem_close_race@basic-threads
 igt@gem_ctx_create@basic
@@ -48,8 +48,8 @@ igt@gem_sync@basic-each
 igt@gem_tiled_blits@basic
 igt@gem_tiled_fence_blits@basic
 igt@gem_tiled_pread_basic
-igt@gem_wait@busy@all
-igt@gem_wait@wait@all
+igt@gem_wait@busy@all-engines
+igt@gem_wait@wait@all-engines
 igt@i915_getparams_basic@basic-eu-total
 igt@i915_getparams_basic@basic-subslice-total
 igt@i915_hangman@error-state-basic
@@ -167,7 +167,7 @@ igt@i915_pm_rpm@module-reload
 
 # Kernel selftests
 igt@i915_selftest@live
-igt@dmabuf@all
+igt@dmabuf@all-tests
 
 # System wide suspend tests
 igt@i915_suspend@basic-s2idle-without-i915

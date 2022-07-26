@@ -449,7 +449,7 @@ igt_main
 
 		igt_describe("Basic test to check busyness of each engine.");
 		igt_subtest_with_dynamic("busy") {
-			igt_dynamic("all") {
+			igt_dynamic("all-engines") {
 				gem_quiescent_gpu(fd);
 				all(fd, ctx);
 			}
