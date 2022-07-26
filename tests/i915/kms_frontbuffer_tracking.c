@@ -1788,6 +1788,8 @@ static bool enable_features_for_test(const struct test_mode *t)
 
 static void check_test_requirements(const struct test_mode *t)
 {
+	int ver;
+
 	if (t->pipes == PIPE_DUAL)
 		igt_require_f(scnd_mode_params.output,
 			    "Can't test dual pipes with the current outputs\n");
@@ -1815,6 +1817,14 @@ static void check_test_requirements(const struct test_mode *t)
 
 	if (opt.only_pipes != PIPE_COUNT)
 		igt_require(t->pipes == opt.only_pipes);
+
+	/* Kernel disables fbc for display versions 12 and 13 if psr is enabled. */
+	ver = intel_display_ver(intel_get_drm_devid(drm.fd));
+	if (ver >= 12 && ver <= 13)
+		igt_require_f(!((t->feature & FEATURE_PSR) &&
+				(t->feature & FEATURE_FBC)),
+			      "Can't test PSR and FBC together\n");
+
 }
 
 static void set_crtc_fbs(const struct test_mode *t)
