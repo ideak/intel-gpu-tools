@@ -324,7 +324,9 @@ static void test_fence_await(int fd, const intel_ctx_t *ctx,
 			    .ahnd = ahnd,
 			    .ctx = ctx,
 			    .engine = e->flags,
-			    .flags = IGT_SPIN_FENCE_OUT | spin_hang(flags));
+			    .flags = IGT_SPIN_FENCE_OUT |
+				     IGT_SPIN_POLL_RUN |
+				     spin_hang(flags));
 	igt_assert(spin->out_fence != -1);
 
 	i = 0;
@@ -347,6 +349,7 @@ static void test_fence_await(int fd, const intel_ctx_t *ctx,
 		i++;
 	}
 
+	igt_spin_busywait_until_started(spin);
 	/* Long, but not too long to anger preemption disable checks */
 	usleep(50 * 1000); /* 50 ms, typical preempt reset is 150+ms */
 
