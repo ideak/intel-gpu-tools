@@ -861,6 +861,7 @@ __sema_busy(int gem_fd, uint64_t ahnd, int pmu, const intel_ctx_t *ctx,
 		.handle = create_sema(gem_fd, ahnd, reloc, &obj.offset),
 		.relocation_count = !ahnd ? 2 : 0,
 		.relocs_ptr = to_user_pointer(reloc),
+		.flags = !ahnd ? 0 : EXEC_OBJECT_PINNED,
 	};
 	struct drm_i915_gem_execbuffer2 eb = {
 		.batch_start_offset = 64,
