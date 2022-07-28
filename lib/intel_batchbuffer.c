@@ -1346,7 +1346,6 @@ __intel_bb_create(int i915, uint32_t ctx, uint32_t size, bool do_relocs,
 
 	igt_assert(ibb);
 
-	ibb->allows_obj_alignment = gem_allows_obj_alignment(i915);
 	ibb->uses_full_ppgtt = gem_uses_full_ppgtt(i915);
 	ibb->devid = intel_get_drm_devid(i915);
 	ibb->gen = intel_gen(ibb->devid);
@@ -1358,6 +1357,13 @@ __intel_bb_create(int i915, uint32_t ctx, uint32_t size, bool do_relocs,
 	 */
 	if (!ibb->uses_full_ppgtt)
 		do_relocs = true;
+
+	/*
+	 * For softpin mode allocator has full control over offsets allocation
+	 * so we want kernel to not interfere with this.
+	 */
+	if (do_relocs)
+		ibb->allows_obj_alignment = gem_allows_obj_alignment(i915);
 
 	/* Use safe start offset instead assuming 0x0 is safe */
 	start = max_t(uint64_t, start, gem_detect_safe_start_offset(i915));
