@@ -859,12 +859,14 @@ static void engine_order(int i915)
 
 static void pm_rps_exit_handler(int sig)
 {
-	if (origfreqs[MIN] > readval(sysfs_files[MAX].filp)) {
-		writeval(sysfs_files[MAX].filp, origfreqs[MAX]);
-		writeval(sysfs_files[MIN].filp, origfreqs[MIN]);
-	} else {
-		writeval(sysfs_files[MIN].filp, origfreqs[MIN]);
-		writeval(sysfs_files[MAX].filp, origfreqs[MAX]);
+	if (sysfs_files[MAX].filp) {
+		if (origfreqs[MIN] > readval(sysfs_files[MAX].filp)) {
+			writeval(sysfs_files[MAX].filp, origfreqs[MAX]);
+			writeval(sysfs_files[MIN].filp, origfreqs[MIN]);
+		} else {
+			writeval(sysfs_files[MIN].filp, origfreqs[MIN]);
+			writeval(sysfs_files[MAX].filp, origfreqs[MAX]);
+		}
 	}
 
 	if (lh.igt_proc.running)
