@@ -558,6 +558,16 @@ static void get_attrs(struct udev_device *dev, struct igt_device *idev)
 #define is_drm_subsystem(dev)  (strequal(get_prop_subsystem(dev), "drm"))
 #define is_pci_subsystem(dev)  (strequal(get_prop_subsystem(dev), "pci"))
 
+static void print_ht(GHashTable *ht);
+static void dump_props_and_attrs(const struct igt_device *dev)
+{
+	printf("\n[properties]\n");
+	print_ht(dev->props_ht);
+	printf("\n[attributes]\n");
+	print_ht(dev->attrs_ht);
+	printf("\n");
+}
+
 /*
  * Get PCI_SLOT_NAME property, it should be in format of
  * xxxx:yy:zz.z
@@ -565,9 +575,20 @@ static void get_attrs(struct udev_device *dev, struct igt_device *idev)
 static void set_pci_slot_name(struct igt_device *dev)
 {
 	const char *pci_slot_name = get_prop(dev, "PCI_SLOT_NAME");
+	int len;
 
-	if (!pci_slot_name || (strlen(pci_slot_name) != PCI_SLOT_NAME_SIZE))
-		return;
+	if (!pci_slot_name) {
+		dump_props_and_attrs(dev);
+		igt_assert_f(pci_slot_name, "PCI_SLOT_NAME property == NULL\n");
+	}
+
+	len = strlen(pci_slot_name);
+	if (len != PCI_SLOT_NAME_SIZE) {
+		dump_props_and_attrs(dev);
+		igt_assert_f(len != PCI_SLOT_NAME_SIZE,
+			     "PCI_SLOT_NAME length != %d [%s]\n", len, pci_slot_name);
+	}
+
 	dev->pci_slot_name = strdup(pci_slot_name);
 }
 
@@ -1249,11 +1270,7 @@ igt_devs_print_detail(struct igt_list_head *view,
 			_print_key_value("codename", dev->codename);
 		}
 
-		printf("\n[properties]\n");
-		print_ht(dev->props_ht);
-		printf("\n[attributes]\n");
-		print_ht(dev->attrs_ht);
-		printf("\n");
+		dump_props_and_attrs(dev);
 	}
 }
 
