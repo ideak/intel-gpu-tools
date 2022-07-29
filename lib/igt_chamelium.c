@@ -2311,7 +2311,7 @@ static bool chamelium_read_port_mappings(struct chamelium *chamelium,
 		port->id = g_key_file_get_integer(igt_key_file, group,
 						  "ChameliumPortID",
 						  &error);
-		if (!port->id) {
+		if (error) {
 			igt_warn("Failed to read chamelium port ID for %s: %s\n",
 				 map_name, error->message);
 			ret = false;
