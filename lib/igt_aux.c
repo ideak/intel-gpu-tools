@@ -815,29 +815,21 @@ static void suspend_via_sysfs(int power_dir, enum igt_suspend_state state)
 				 suspend_state_name[state]));
 }
 
-static uint32_t get_supported_suspend_states(int power_dir)
+static bool is_state_supported(int power_dir, enum igt_suspend_state state)
 {
+	const char *str;
 	char *states;
-	char *state_name;
-	uint32_t state_mask;
 
 	igt_assert((states = igt_sysfs_get(power_dir, "state")));
-	state_mask = 0;
-	for (state_name = strtok(states, " "); state_name;
-	     state_name = strtok(NULL, " ")) {
-		enum igt_suspend_state state;
 
-		for (state = SUSPEND_STATE_FREEZE; state < SUSPEND_STATE_NUM;
-		     state++)
-			if (strcmp(state_name, suspend_state_name[state]) == 0)
-				break;
-		igt_assert(state < SUSPEND_STATE_NUM);
-		state_mask |= 1 << state;
-	}
+	str = strstr(states, suspend_state_name[state]);
+
+	if (!str)
+		igt_info("State %s not supported.\nSupported States: %s\n",
+			 suspend_state_name[state], states);
 
 	free(states);
-
-	return state_mask;
+	return str;
 }
 
 /**
@@ -868,7 +860,7 @@ void igt_system_suspend_autoresume(enum igt_suspend_state state,
 	enum igt_suspend_test orig_test;
 
 	igt_require((power_dir = open("/sys/power", O_RDONLY)) >= 0);
-	igt_require(get_supported_suspend_states(power_dir) & (1 << state));
+	igt_require(is_state_supported(power_dir, state));
 	igt_require(test == SUSPEND_TEST_NONE ||
 		    faccessat(power_dir, "pm_test", R_OK | W_OK, 0) == 0);
 
