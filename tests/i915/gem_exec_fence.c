@@ -331,7 +331,7 @@ static void test_fence_await(int fd, const intel_ctx_t *ctx,
 
 	i = 0;
 	for_each_ctx_engine(fd, ctx, e2) {
-		if (!gem_class_can_store_dword(fd, e->class))
+		if (!gem_class_can_store_dword(fd, e2->class))
 			continue;
 
 		if (flags & NONBLOCK) {
