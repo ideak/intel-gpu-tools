@@ -365,8 +365,6 @@ static bool __get_card_for_nth_filter(int idx, struct igt_device_card *card)
 			igt_debug("Filter matched %s | %s\n", card->card, card->render);
 			return true;
 		}
-
-		igt_warn("No card matches the filter!\n");
 	}
 
 	return false;
@@ -442,7 +440,8 @@ int __drm_open_driver_another(int idx, int chipset)
 		}
 
 		if (!found || !strlen(card.card))
-			igt_warn("No card matches the filter!\n");
+			igt_warn("No card matches the filter! [%s]\n",
+				 igt_device_filter_get(idx));
 		else if (_is_already_opened(card.card, idx))
 			igt_warn("card maching filter %d is already opened\n", idx);
 		else
