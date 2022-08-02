@@ -21,6 +21,7 @@
  * IN THE SOFTWARE.
  */
 
+#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/poll.h>
 #include <sys/signal.h>
@@ -307,12 +308,12 @@ static void test_fence_await(int fd, const intel_ctx_t *ctx,
 			     const struct intel_execution_engine2 *e,
 			     unsigned flags)
 {
+	uint64_t scratch_offset, ahnd = get_reloc_ahnd(fd, ctx->id);
 	const struct intel_execution_engine2 *e2;
 	uint32_t scratch = gem_create(fd, 4096);
+	uint32_t *out, tmp[4096 / sizeof(*out)];
 	igt_spin_t *spin;
-	uint32_t *out;
-	uint64_t scratch_offset, ahnd = get_reloc_ahnd(fd, ctx->id);
-	int i;
+	int i, n;
 
 	scratch_offset = get_offset(ahnd, scratch, 4096, 0);
 
@@ -353,11 +354,20 @@ static void test_fence_await(int fd, const intel_ctx_t *ctx,
 	/* Long, but not too long to anger preemption disable checks */
 	usleep(50 * 1000); /* 50 ms, typical preempt reset is 150+ms */
 
+	/*
+	 * Check for invalidly completing the task early.
+	 * In -hang variants, invalid spin batch may trigger an immediate reset,
+	 * then we are able to verify if store batches haven't been started yet
+	 * only if the fence of the spin batch is still busy.
+	 * Just run *await-hang subtest multiple times to build confidence.
+	 */
+	memcpy(tmp, out, (i + 1) * sizeof(*out));
+	if (fence_busy(spin->out_fence)) {
+		for (n = 0; n <= i; n++)
+			igt_assert_eq_u32(tmp[n], 0);
+	}
 	if ((flags & HANG) == 0) {
-		/* Check for invalidly completing the task early */
 		igt_assert(fence_busy(spin->out_fence));
-		for (int n = 0; n <= i; n++)
-			igt_assert_eq_u32(out[n], 0);
 
 		igt_spin_end(spin);
 	}
