@@ -629,8 +629,6 @@ static const char *help_str =
 
 static int opt_handler(int opt, int opt_index, void *data)
 {
-	float force_clock;
-
 	switch (opt) {
 	case '3':
 		test_stereo_modes = 1;
@@ -646,12 +644,8 @@ static int opt_handler(int opt, int opt_index, void *data)
 		break;
 	case 'f':
 		force_mode = 1;
-		if (sscanf(optarg,"%f,%hu,%hu,%hu,%hu,%hu,%hu,%hu,%hu",
-			   &force_clock,&force_timing.hdisplay, &force_timing.hsync_start,&force_timing.hsync_end,&force_timing.htotal,
-			   &force_timing.vdisplay, &force_timing.vsync_start, &force_timing.vsync_end, &force_timing.vtotal)!= 9)
+		if (!igt_parse_mode_string(optarg, &force_timing))
 			return IGT_OPT_HANDLER_ERROR;
-		force_timing.clock = force_clock*1000;
-
 		break;
 	case 's':
 		sleep_between_modes = atoi(optarg);
