@@ -334,6 +334,8 @@ static void test_fence_await(int fd, const intel_ctx_t *ctx,
 		if (!gem_class_can_store_dword(fd, e2->class))
 			continue;
 
+		i++;
+
 		if (flags & NONBLOCK) {
 			igt_store_word(fd, ahnd, ctx, e2, spin->out_fence,
 				       scratch, scratch_offset, i, i);
@@ -345,8 +347,6 @@ static void test_fence_await(int fd, const intel_ctx_t *ctx,
 				put_ahnd(ahnd);
 			}
 		}
-
-		i++;
 	}
 
 	igt_spin_busywait_until_started(spin);
@@ -356,7 +356,7 @@ static void test_fence_await(int fd, const intel_ctx_t *ctx,
 	if ((flags & HANG) == 0) {
 		/* Check for invalidly completing the task early */
 		igt_assert(fence_busy(spin->out_fence));
-		for (int n = 0; n < i; n++)
+		for (int n = 0; n <= i; n++)
 			igt_assert_eq_u32(out[n], 0);
 
 		igt_spin_end(spin);
@@ -366,8 +366,11 @@ static void test_fence_await(int fd, const intel_ctx_t *ctx,
 
 	gem_set_domain(fd, scratch, I915_GEM_DOMAIN_GTT, 0);
 	igt_assert(!fence_busy(spin->out_fence));
-	while ((flags & HANG) == 0 && i--)
-		igt_assert_eq_u32(out[i], i);
+	if ((flags & HANG) == 0) {
+		do
+			igt_assert_eq_u32(out[i], i);
+		while (i--);
+	}
 	munmap(out, 4096);
 
 	igt_spin_free(fd, spin);
