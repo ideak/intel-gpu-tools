@@ -476,7 +476,11 @@ set_stereo_mode(struct connector *c)
 int update_display(bool probe)
 {
 	struct connector *connectors;
+	igt_display_t display;
 	int c;
+
+	igt_display_require(&display, drm_fd);
+	igt_display_require_output(&display);
 
 	resources = drmModeGetResources(drm_fd);
 	igt_require(resources);
