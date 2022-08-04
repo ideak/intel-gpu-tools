@@ -5777,3 +5777,29 @@ bool igt_check_bigjoiner_support(igt_display_t *display)
 
 	return true;
 }
+
+/**
+ * igt_parse_mode_string:
+ * @mode_string: modeline string
+ * @mode: a pointer to a drm mode structure
+ *
+ * Parse mode string and populate mode
+ *
+ * Format: clock(MHz),hdisp,hsync-start,hsync-end,htotal,vdisp,vsync-start,
+ * vsync-end,vtotal
+ *
+ * Returns: true if the correct number of arguments are entered, else false.
+ */
+bool igt_parse_mode_string(const char *mode_string, drmModeModeInfo *mode)
+{
+	float force_clock;
+
+	if (sscanf(mode_string, "%f,%hu,%hu,%hu,%hu,%hu,%hu,%hu,%hu",
+	   &force_clock, &mode->hdisplay, &mode->hsync_start, &mode->hsync_end, &mode->htotal,
+	   &mode->vdisplay, &mode->vsync_start, &mode->vsync_end, &mode->vtotal) != 9)
+		return false;
+
+	mode->clock = force_clock * 1000;
+
+	return true;
+}
