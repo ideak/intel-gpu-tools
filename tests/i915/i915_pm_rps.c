@@ -621,11 +621,15 @@ static uint32_t batch_create(int i915, uint64_t sz)
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	const uint32_t chk = 0x5 << 23;
 	uint32_t handle = gem_create(i915, sz);
+	uint32_t *map;
 
-	for (uint64_t pg = 4096; pg + 4096 < sz; pg += 4096)
-		gem_write(i915, handle, pg, &chk, sizeof(chk));
+	map = gem_mmap__device_coherent(i915, handle, 0, sz, PROT_WRITE);
 
-	gem_write(i915, handle, sz - sizeof(bbe), &bbe, sizeof(bbe));
+	for (uint64_t pg = 1; pg * 4096 < sz; pg++)
+		map[(pg * 4096) / sizeof(*map)] = chk;
+
+	map[sz / sizeof(*map) - 1] = bbe;
+	munmap(map, sz);
 
 	return handle;
 }
