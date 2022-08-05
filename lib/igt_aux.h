@@ -197,9 +197,9 @@ enum igt_suspend_test {
 /**
  * igt_mem_sleep:
  * @MEM_SLEEP_NONE: no support
- * @MEM_SLEEP_FREEZE: suspend-to-idle target state, aka S0ix or freeze,
- * @MEM_SLEEP_STANDBY: standby target state, aka S1
- * @MEM_SLEEP_MEM: suspend-to-mem target state aka S3
+ * @MEM_SLEEP_S2IDLE: suspend-to-idle target state, aka S0ix or freeze,
+ * @MEM_SLEEP_SHALLOW: standby target state, aka S1
+ * @MEM_SLEEP_DEEP: suspend-to-mem target state aka S3
  */
 enum igt_mem_sleep {
 	MEM_SLEEP_NONE,
