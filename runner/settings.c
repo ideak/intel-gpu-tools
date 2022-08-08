@@ -1146,7 +1146,7 @@ static bool read_env_vars_from_file(struct igt_list_head *env_vars, FILE *f)
 	while ((line_length = getline(&line, &line_buffer_length, f)) != -1) {
 		char *line_ptr = line;
 
-		while (isspace(line_ptr)) {
+		while (isspace(*line_ptr)) {
 			line_length--;
 			line_ptr++;
 		}

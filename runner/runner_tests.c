@@ -281,6 +281,7 @@ igt_main
 		igt_assert(!settings->dry_run);
 		igt_assert_eq(settings->include_regexes.size, 0);
 		igt_assert_eq(settings->exclude_regexes.size, 0);
+		igt_assert(igt_list_empty(&settings->env_vars));
 		igt_assert(!settings->sync);
 		igt_assert_eq(settings->log_level, LOG_LEVEL_NORMAL);
 		igt_assert(!settings->overwrite);
@@ -421,6 +422,8 @@ igt_main
 
 	igt_subtest("parse-all-settings") {
 		char blacklist_name[PATH_MAX], blacklist2_name[PATH_MAX];
+		struct environment_variable *env_var;
+
 		const char *argv[] = { "runner",
 				       "--allow-non-root",
 				       "-n", "foo",
@@ -433,6 +436,8 @@ igt_main
 				       "-t", "pattern2",
 				       "-x", "xpattern1",
 				       "-x", "xpattern2",
+				       "-e", "HAVE_A_NICE=TESTING",
+				       "--environment", "ENVS_WITH_JUST_KEYS",
 				       "-b", blacklist_name,
 				       "--blacklist", blacklist2_name,
 				       "-s",
@@ -453,6 +458,8 @@ igt_main
 				       "path-to-results",
 		};
 
+		setenv("ENVS_WITH_JUST_KEYS", "SHOULD_WORK", 1);
+
 		sprintf(blacklist_name, "%s/test-blacklist.txt", testdatadir);
 		sprintf(blacklist2_name, "%s/test-blacklist2.txt", testdatadir);
 
@@ -464,14 +471,27 @@ igt_main
 		igt_assert_eqstr(settings->name, "foo");
 		igt_assert(settings->dry_run);
 		igt_assert(settings->allow_non_root);
+
 		igt_assert_eq(settings->include_regexes.size, 2);
 		igt_assert_eqstr(settings->include_regexes.regex_strings[0], "pattern1");
 		igt_assert_eqstr(settings->include_regexes.regex_strings[1], "pattern2");
+
 		igt_assert_eq(settings->exclude_regexes.size, 4);
 		igt_assert_eqstr(settings->exclude_regexes.regex_strings[0], "xpattern1");
 		igt_assert_eqstr(settings->exclude_regexes.regex_strings[1], "xpattern2");
 		igt_assert_eqstr(settings->exclude_regexes.regex_strings[2], "xpattern3"); /* From blacklist */
 		igt_assert_eqstr(settings->exclude_regexes.regex_strings[3], "xpattern4"); /* From blacklist2 */
+
+		igt_assert(!igt_list_empty(&settings->env_vars));
+
+		env_var = igt_list_first_entry(&settings->env_vars, env_var, link);
+		igt_assert_eqstr(env_var->key, "HAVE_A_NICE");
+		igt_assert_eqstr(env_var->value, "TESTING");
+
+		env_var = igt_list_last_entry(&settings->env_vars, env_var, link);
+		igt_assert_eqstr(env_var->key, "ENVS_WITH_JUST_KEYS");
+		igt_assert_eqstr(env_var->value, "SHOULD_WORK");
+
 		igt_assert(settings->sync);
 		igt_assert_eq(settings->log_level, LOG_LEVEL_VERBOSE);
 		igt_assert(settings->overwrite);
@@ -1029,9 +1049,12 @@ igt_main
 
 		igt_subtest("dry-run-option") {
 			struct execute_state state;
+			struct environment_variable *env_var;
+
 			const char *argv[] = { "runner",
 					       "--dry-run",
 					       "--allow-non-root",
+					       "-e", "JUST_TESTING=ENV_VARS",
 					       "-x", "^abort",
 					       testdatadir,
 					       dirname,
@@ -1058,6 +1081,9 @@ igt_main
 			igt_assert_f((fd = openat(dirfd, "joblist.txt", O_RDONLY)) >= 0,
 				     "Dry run initialization didn't serialize the job list.\n");
 			close(fd);
+			igt_assert_f((fd = openat(dirfd, "environment.txt", O_RDONLY)) >= 0,
+			             "Dry run initialization didn't serialize the environment file.\n");
+			close(fd);
 			igt_assert_f((fd = openat(dirfd, "uname.txt", O_RDONLY)) < 0,
 				     "Dry run initialization created uname.txt.\n");
 
@@ -1078,6 +1104,10 @@ igt_main
 				     "Dry run resume didn't create result directory.\n");
 			igt_assert_f((fd = openat(subdirfd, "journal.txt", O_RDONLY)) >= 0,
 				     "Dry run resume didn't create a journal.\n");
+
+			env_var = igt_list_first_entry(&settings->env_vars, env_var, link);
+			igt_assert_eqstr(env_var->key, "JUST_TESTING");
+			igt_assert_eqstr(env_var->value, "ENV_VARS");
 		}
 
 		igt_fixture {
