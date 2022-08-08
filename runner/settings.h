@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <glib.h>
 
+#include "igt_list.h"
+
 enum {
 	LOG_LEVEL_NORMAL = 0,
 	LOG_LEVEL_QUIET = -1,
@@ -37,6 +39,12 @@ struct regex_list {
 	size_t size;
 };
 
+struct environment_variable {
+	struct igt_list_head link;
+	char * key;
+	char * value;
+};
+
 struct settings {
 	int abort_mask;
 	size_t disk_usage_limit;
@@ -46,6 +54,7 @@ struct settings {
 	bool allow_non_root;
 	struct regex_list include_regexes;
 	struct regex_list exclude_regexes;
+	struct igt_list_head env_vars;
 	bool sync;
 	int log_level;
 	bool overwrite;

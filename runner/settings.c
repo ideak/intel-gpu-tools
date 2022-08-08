@@ -35,6 +35,7 @@ enum {
 	OPT_DRY_RUN = 'd',
 	OPT_INCLUDE = 't',
 	OPT_EXCLUDE = 'x',
+	OPT_ENVIRONMENT = 'e',
 	OPT_SYNC = 's',
 	OPT_LOG_LEVEL = 'l',
 	OPT_OVERWRITE = 'o',
@@ -390,6 +391,119 @@ static void free_regexes(struct regex_list *regexes)
 	free(regexes->regexes);
 }
 
+/**
+ * string_trim_and_duplicate() - returns a duplicated, trimmed string
+ * @string: string to trim and duplicate
+ * 
+ * If the provided string is NULL, a NULL is returned. In any other case, a
+ * newly-allocated string of length up to strlen(string) is returned. The
+ * returned string has its whitespace removed (as detected by isspace), while
+ * the original string is left unmodified.
+ */
+static char *string_trim_and_duplicate(const char *string) {
+	size_t length;
+
+	if (string == NULL)
+		return NULL;
+
+	length = strlen(string);
+
+	while (length > 0 && isspace(string[0])) {
+		string++;
+		length--;
+	}
+
+	while (length > 0 && isspace(string[length - 1])) {
+		length--;
+	}
+
+	return strndup(string, length);
+}
+
+/**
+ * add_env_var() - Adds a new environment variable to the runner settings.
+ * @env_vars: Pointer to the env var list head from the settings.
+ * @key_value: Environment variable key-value pair string to add.
+ *
+ * key_value must be a string like "KEY=VALUE" or just "KEY" if the value is to
+ * be loaded from the runner's environment variables. In the latter case, if
+ * the requested variable is not set, the operation will fail.
+ * 
+ * An empty variable may be set by providing an key_value of "KEY=" or setting
+ * an empty variable for the runner process, then providing just the "KEY".
+ */
+static bool add_env_var(struct igt_list_head *env_vars, const char *key_value) {
+	char *env_kv, *value_str;
+	struct environment_variable *var = NULL;
+
+	if (env_vars == NULL || key_value == NULL || strlen(key_value) == 0)
+		goto error;
+
+	env_kv = strdup(key_value);
+	value_str = strpbrk(env_kv, "\n=");
+
+	if (value_str == env_kv) {
+		fprintf(stderr, "Missing key for --environment \"%s\"\n", key_value);
+		goto error;
+	}
+
+	if (value_str != NULL && value_str[0] != '=') {
+		fprintf(stderr, "Invalid characters in key for --environment \"%s\"\n", key_value);
+		goto error;
+	}
+
+	if (value_str != NULL) {
+		/* value provided - copy string contents after '=' */
+		value_str[0] = '\0';
+		value_str++;
+	} else {
+		/* env_kv is the key - use the runner's environment, if set */
+		value_str = getenv(env_kv);
+		if (value_str == NULL) {
+			fprintf(stderr, "No value provided for --environment \"%s\" and "
+			                "variable is not set for igt_runner\n", env_kv);
+			goto error;
+		}
+	}
+
+	var = malloc(sizeof(struct environment_variable));
+
+	var->key = string_trim_and_duplicate(env_kv);
+	if (strlen(var->key) == 0) {
+		fprintf(stderr, "Environment variable key is empty for \"%s\"\n", key_value);
+		goto error;
+	}
+
+	var->value = strdup(value_str); /* Can be empty, that's okay */
+
+	igt_list_add_tail(&var->link, env_vars);
+	free(env_kv);
+	return true;
+
+error:
+	if (var != NULL)
+		free(var);
+
+	if (env_kv != NULL)
+		free(env_kv);
+
+	return false;
+}
+
+static void free_env_vars(struct igt_list_head *env_vars) {
+	struct environment_variable *iter;
+
+	while (!igt_list_empty(env_vars)) {
+		iter = igt_list_first_entry(env_vars, iter, link);
+
+		free(iter->key);
+		free(iter->value);
+
+		igt_list_del(&iter->link);
+		free(iter);
+	}
+}
+
 static bool readable_file(const char *filename)
 {
 	return !access(filename, R_OK);
@@ -486,6 +600,7 @@ static void print_version(void)
 void init_settings(struct settings *settings)
 {
 	memset(settings, 0, sizeof(*settings));
+	IGT_INIT_LIST_HEAD(&settings->env_vars);
 }
 
 void clear_settings(struct settings *settings)
@@ -497,6 +612,7 @@ void clear_settings(struct settings *settings)
 
 	free_regexes(&settings->include_regexes);
 	free_regexes(&settings->exclude_regexes);
+	free_env_vars(&settings->env_vars);
 
 	init_settings(settings);
 }
@@ -515,6 +631,7 @@ bool parse_options(int argc, char **argv,
 		{"allow-non-root", no_argument, NULL, OPT_ALLOW_NON_ROOT},
 		{"include-tests", required_argument, NULL, OPT_INCLUDE},
 		{"exclude-tests", required_argument, NULL, OPT_EXCLUDE},
+		{"environment", required_argument, NULL, OPT_ENVIRONMENT},
 		{"abort-on-monitored-error", optional_argument, NULL, OPT_ABORT_ON_ERROR},
 		{"disk-usage-limit", required_argument, NULL, OPT_DISK_USAGE_LIMIT},
 		{"sync", no_argument, NULL, OPT_SYNC},
@@ -544,7 +661,7 @@ bool parse_options(int argc, char **argv,
 
 	settings->dmesg_warn_level = -1;
 
-	while ((c = getopt_long(argc, argv, "hn:dt:x:sl:omb:L",
+	while ((c = getopt_long(argc, argv, "hn:dt:x:e:sl:omb:L",
 				long_options, NULL)) != -1) {
 		switch (c) {
 		case OPT_VERSION:
@@ -568,6 +685,10 @@ bool parse_options(int argc, char **argv,
 			break;
 		case OPT_EXCLUDE:
 			if (!add_regex(&settings->exclude_regexes, strdup(optarg)))
+				goto error;
+			break;
+		case OPT_ENVIRONMENT:
+			if (!add_env_var(&settings->env_vars, optarg))
 				goto error;
 			break;
 		case OPT_ABORT_ON_ERROR:
