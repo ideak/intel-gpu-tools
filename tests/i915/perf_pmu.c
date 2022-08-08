@@ -1809,7 +1809,7 @@ test_enable_race(int gem_fd, const intel_ctx_t *ctx,
 	int fd;
 
 	igt_require(gem_scheduler_has_engine_busy_stats(gem_fd));
-	igt_require(gem_context_has_engine(gem_fd, 0, e->flags));
+	igt_require(gem_context_has_engine(gem_fd, ctx->id, e->flags));
 
 	obj.handle = gem_create(gem_fd, 4096);
 	gem_write(gem_fd, obj.handle, 0, &bbend, sizeof(bbend));
