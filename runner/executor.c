@@ -1860,16 +1860,20 @@ bool execute(struct execute_state *state,
 	     struct settings *settings,
 	     struct job_list *job_list)
 {
+	int resdirfd, testdirfd, unamefd, timefd, sigfd;
+	struct environment_variable *env_var;
 	struct utsname unamebuf;
-	int resdirfd, testdirfd, unamefd, timefd;
 	sigset_t sigmask;
-	int sigfd;
 	double time_spent = 0.0;
 	bool status = true;
 
 	if (state->dry) {
 		outf("Dry run, not executing. Invoke igt_resume if you want to execute.\n");
 		return true;
+	}
+
+	igt_list_for_each_entry(env_var, &settings->env_vars, link) {
+		setenv(env_var->key, env_var->value, 1);
 	}
 
 	if ((resdirfd = open(settings->results_path, O_DIRECTORY | O_RDONLY)) < 0) {
