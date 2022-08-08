@@ -528,11 +528,14 @@ igt_main_args("b:c:dl", long_options, help_str, opt_handler, NULL)
 	 */
 	igt_describe("Check the writeback format");
 	igt_subtest("writeback-pixel-formats") {
-		igt_skip_on(data.dump_check || data.list_modes);
-		drmModePropertyBlobRes *formats_blob = get_writeback_formats_blob(output);
-		const char *valid_chars = "01234568 ABCGNRUVXY";
 		unsigned int i;
 		char *c;
+		drmModePropertyBlobRes *formats_blob;
+		const char *valid_chars;
+
+		igt_skip_on(data.dump_check || data.list_modes);
+		formats_blob = get_writeback_formats_blob(output);
+		valid_chars = "01234568 ABCGNRUVXY";
 
 		/*
 		 * We don't have a comprehensive list of formats, so just check
@@ -551,8 +554,9 @@ igt_main_args("b:c:dl", long_options, help_str, opt_handler, NULL)
 		     "(output framebuffer and fence); this test goes through"
 		     "the combination of possible bad options");
 	igt_subtest("writeback-invalid-parameters") {
-		igt_skip_on(data.dump_check || data.list_modes);
 		igt_fb_t invalid_output_fb;
+
+		igt_skip_on(data.dump_check || data.list_modes);
 		fb_id = igt_create_fb(display.drm_fd, mode.hdisplay / 2,
 				      mode.vdisplay / 2,
 				      DRM_FORMAT_XRGB8888,
@@ -567,8 +571,9 @@ igt_main_args("b:c:dl", long_options, help_str, opt_handler, NULL)
 
 	igt_describe("Validate WRITEBACK_FB_ID with valid and invalid options");
 	igt_subtest("writeback-fb-id") {
-		igt_skip_on(data.dump_check || data.list_modes);
 		igt_fb_t output_fb;
+
+		igt_skip_on(data.dump_check || data.list_modes);
 		fb_id = igt_create_fb(display.drm_fd, mode.hdisplay, mode.vdisplay,
 				      DRM_FORMAT_XRGB8888,
 				      DRM_FORMAT_MOD_LINEAR,
@@ -582,8 +587,9 @@ igt_main_args("b:c:dl", long_options, help_str, opt_handler, NULL)
 
 	igt_describe("Check writeback output with CRC validation");
 	igt_subtest("writeback-check-output") {
-		igt_skip_on(data.dump_check || data.list_modes);
 		igt_fb_t output_fb;
+
+		igt_skip_on(data.dump_check || data.list_modes);
 		fb_id = igt_create_fb(display.drm_fd, mode.hdisplay, mode.vdisplay,
 				      DRM_FORMAT_XRGB8888,
 				      igt_fb_mod_to_tiling(0),
