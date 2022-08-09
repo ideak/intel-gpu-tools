@@ -257,6 +257,10 @@ msm_progs = [
 	'msm_submit'
 ]
 
+chamelium_progs = [
+	'kms_chamelium',
+]
+
 test_deps = [ igt_deps ]
 
 if libdrm_nouveau.found()
@@ -267,13 +271,6 @@ if libdrm_nouveau.found()
 		'nouveau_crc',
 	]
 	test_deps += libdrm_nouveau
-endif
-
-if chamelium.found()
-	test_progs += [
-		'kms_chamelium',
-	]
-	test_deps += chamelium
 endif
 
 test_executables = []
@@ -306,6 +303,19 @@ foreach prog : msm_progs
 				       install : true)
 	test_list += prog
 endforeach
+
+if chamelium.found()
+	foreach prog : chamelium_progs
+		test_executables += executable(prog,
+				 join_paths('chamelium', prog + '.c'),
+				 dependencies : test_deps,
+				 install_dir : libexecdir,
+				 install_rpath : libexecdir_rpathdir,
+				 install : true)
+		test_list += prog
+	endforeach
+	test_deps += chamelium
+endif
 
 test_executables += executable('drm_fdinfo',
 	   join_paths('i915', 'drm_fdinfo.c'),
@@ -417,7 +427,7 @@ test_list += 'kms_color'
 
 if chamelium.found()
        test_executables += executable('kms_color_chamelium',
-                             [ 'kms_color_chamelium.c', 'kms_color_helper.c' ],
+                             [ 'chamelium/kms_color_chamelium.c', 'kms_color_helper.c' ],
                              dependencies : test_deps + [ chamelium ],
                              install_dir : libexecdir,
                              install_rpath : libexecdir_rpathdir,
