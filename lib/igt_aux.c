@@ -882,6 +882,23 @@ static void set_mem_sleep(int power_dir, enum igt_mem_sleep sleep)
 				 mem_sleep_name[sleep]));
 }
 
+static bool is_mem_sleep_state_supported(int power_dir, enum igt_mem_sleep state)
+{
+	const char *str;
+	char *mem_sleep_states;
+
+	igt_assert((mem_sleep_states = igt_sysfs_get(power_dir, "mem_sleep")));
+
+	str = strstr(mem_sleep_states, mem_sleep_name[state]);
+
+	if (!str)
+		igt_info("mem_sleep state %s not supported.\nSupported mem_sleep states: %s\n",
+			 mem_sleep_name[state], mem_sleep_states);
+
+	free(mem_sleep_states);
+	return str;
+}
+
 /**
  * igt_system_suspend_autoresume:
  * @state: an #igt_suspend_state, the target suspend state
@@ -923,6 +940,8 @@ void igt_system_suspend_autoresume(enum igt_suspend_state state,
 
 	if (state == SUSPEND_STATE_S3) {
 		orig_mem_sleep = get_mem_sleep();
+		igt_skip_on_f(!is_mem_sleep_state_supported(power_dir, MEM_SLEEP_DEEP),
+			      "S3 not supported in this system.\n");
 		set_mem_sleep(power_dir, MEM_SLEEP_DEEP);
 		igt_skip_on_f(get_mem_sleep() != MEM_SLEEP_DEEP,
 			      "S3 not possible in this system.\n");
