@@ -864,7 +864,7 @@ static bool parse_dmesg_line(char* line,
 	}
 
 	*message = strchr(line, ';');
-	if (!message) {
+	if (*message == NULL) {
 		fprintf(stderr, "No ; found in kmsg record, this shouldn't happen\n");
 		return false;
 	}
