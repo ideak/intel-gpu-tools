@@ -568,28 +568,54 @@ static void dump_props_and_attrs(const struct igt_device *dev)
 	printf("\n");
 }
 
+static void dump_uevent_file(struct igt_device *dev)
+{
+	char filename[FILENAME_MAX];
+	const char *devpath = get_prop(dev, "DEVPATH");
+	char *line = NULL;
+	FILE *in;
+	size_t n;
+
+	igt_assert_f(devpath, "DEVPATH property doesn't exist\n");
+	snprintf(filename, FILENAME_MAX, "/sys%s/uevent", devpath);
+
+	in = fopen(filename, "r");
+	igt_assert(in);
+
+	printf("[uevent: %s]\n", filename);
+	while (getline(&line, &n, in) >= 0)
+		printf("%s", line);
+
+	free(line);
+	fclose(in);
+}
+
 /*
  * Get PCI_SLOT_NAME property, it should be in format of
  * xxxx:yy:zz.z
  */
-static void set_pci_slot_name(struct igt_device *dev)
+static bool set_pci_slot_name(struct igt_device *dev)
 {
 	const char *pci_slot_name = get_prop(dev, "PCI_SLOT_NAME");
 	int len;
 
 	if (!pci_slot_name) {
 		dump_props_and_attrs(dev);
-		igt_assert_f(pci_slot_name, "PCI_SLOT_NAME property == NULL\n");
+		igt_warn("PCI_SLOT_NAME property == NULL\n");
+		dump_uevent_file(dev);
+		return false;
 	}
 
 	len = strlen(pci_slot_name);
 	if (len != PCI_SLOT_NAME_SIZE) {
 		dump_props_and_attrs(dev);
-		igt_assert_f(len != PCI_SLOT_NAME_SIZE,
-			     "PCI_SLOT_NAME length != %d [%s]\n", len, pci_slot_name);
+		igt_warn("PCI_SLOT_NAME length != %d [%s]\n", len, pci_slot_name);
+		dump_uevent_file(dev);
+		return false;
 	}
 
 	dev->pci_slot_name = strdup(pci_slot_name);
+	return true;
 }
 
 /*
@@ -649,7 +675,16 @@ static struct igt_device *igt_device_new_from_udev(struct udev_device *dev)
 		uint16_t vendor, device;
 
 		set_vendor_device(idev);
-		set_pci_slot_name(idev);
+
+		/*
+		 * Very rare we observe there's no PCI_SLOT_NAME property.
+		 * We depend on it so retry acquiring properties from udev.
+		 */
+		if (!set_pci_slot_name(idev)) {
+			g_hash_table_remove_all(idev->props_ht);
+			get_props(dev, idev);
+			igt_assert(set_pci_slot_name(idev));
+		}
 		get_pci_vendor_device(idev, &vendor, &device);
 		idev->codename = __pci_codename(vendor, device);
 		idev->dev_type = __pci_devtype(vendor, device, idev->pci_slot_name);
