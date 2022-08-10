@@ -621,7 +621,7 @@ static void process_dynamic_subtest_output(const char *piglit_name,
 
 	for (k = begin_idx + 1; k < result_idx; k++) {
 		struct json_object *current_dynamic_test = NULL;
-		int dyn_result_idx = -1;
+		int dyn_result_idx;
 		char dynamic_name[256];
 		char dynamic_piglit_name[256];
 		const char *dynbeg, *dynend;
@@ -748,7 +748,7 @@ static bool fill_from_output(int fd, const char *binary, const char *key,
 	matches = find_matches(buf, bufend, needles);
 
 	for (i = 0; i < subtests->size; i++) {
-		int begin_idx = -1, result_idx = -1;
+		int begin_idx, result_idx;
 		const char *resulttext;
 		const char *beg, *end;
 		double time;
@@ -975,7 +975,6 @@ static bool fill_from_dmesg(int fd,
 	FILE *f = fdopen(fd, "r");
 	char piglit_name[256];
 	char dynamic_piglit_name[256];
-	ssize_t read;
 	size_t i;
 	GRegex *re;
 
@@ -988,7 +987,7 @@ static bool fill_from_dmesg(int fd,
 		return false;
 	}
 
-	while ((read = getline(&line, &linelen, f)) > 0) {
+	while (getline(&line, &linelen, f) > 0) {
 		char *formatted;
 		unsigned flags;
 		unsigned long long ts_usec;
