@@ -258,7 +258,7 @@ int igt_sysfs_gt_open(int device, int gt)
 {
 	char path[96];
 
-	if (igt_debug_on(!igt_sysfs_gt_path(device, gt, path, sizeof(path))))
+	if (!igt_sysfs_gt_path(device, gt, path, sizeof(path)))
 		return -1;
 
 	return open(path, O_RDONLY);
