@@ -518,6 +518,16 @@ max_hw_stride_async_flip_test(data_t *data)
 		igt_display_commit_atomic(&data->display,
 					  DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
 
+		/* First async flip on Gen13+ will be treated as a sync flip*/
+		if (intel_display_ver(data->devid) >= 13) {
+			do {
+				ret = drmModePageFlip(data->drm_fd, data->output->config.crtc->crtc_id,
+						      data->big_fb.fb_id,
+						      DRM_MODE_PAGE_FLIP_ASYNC, NULL);
+			} while (ret == -EBUSY);
+			igt_assert(ret == 0);
+		}
+
 		igt_wait_for_vblank(data->drm_fd, data->display.pipes[primary->pipe->pipe].crtc_offset);
 		startframe = kmstest_get_vblank(data->drm_fd, data->pipe, 0) + 1;
 
