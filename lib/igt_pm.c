@@ -1202,3 +1202,20 @@ void igt_pm_print_pci_card_runtime_status(void)
 		igt_pm_print_pci_dev_runtime_status(__pci_dev_pwrattr[i].pci_dev);
 	}
 }
+
+bool i915_is_slpc_enabled(int fd)
+{
+	int debugfs_fd = igt_debugfs_dir(fd);
+	char buf[4096] = {};
+	int len;
+
+	igt_require(debugfs_fd != -1);
+
+	len = igt_debugfs_simple_read(debugfs_fd, "gt/uc/guc_slpc_info", buf, sizeof(buf));
+	close(debugfs_fd);
+
+	if (len < 0)
+		return false;
+	else
+		return strstr(buf, "SLPC state: running");
+}

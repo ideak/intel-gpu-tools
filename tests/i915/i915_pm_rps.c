@@ -914,35 +914,55 @@ igt_main
 		igt_install_exit_handler(pm_rps_exit_handler);
 	}
 
-	igt_subtest("basic-api")
+	igt_subtest("basic-api") {
+		igt_skip_on_f(i915_is_slpc_enabled(drm_fd),
+			      "This subtest is not supported when SLPC is enabled\n");
 		min_max_config(basic_check, false);
+	}
 
 	/* Verify the constraints, check if we can reach idle */
-	igt_subtest("min-max-config-idle")
+	igt_subtest("min-max-config-idle") {
+		igt_skip_on_f(i915_is_slpc_enabled(drm_fd),
+			      "This subtest is not supported when SLPC is enabled\n");
 		min_max_config(idle_check, true);
+	}
 
 	/* Verify the constraints with high load, check if we can reach max */
 	igt_subtest("min-max-config-loaded") {
+		igt_skip_on_f(i915_is_slpc_enabled(drm_fd),
+			      "This subtest is not supported when SLPC is enabled\n");
 		load_helper_run(HIGH);
 		min_max_config(loaded_check, false);
 		load_helper_stop();
 	}
 
 	/* Checks if we achieve boost using gem_wait */
-	igt_subtest("waitboost")
+	igt_subtest("waitboost") {
+		igt_skip_on_f(i915_is_slpc_enabled(drm_fd),
+			      "This subtest is not supported when SLPC is enabled\n");
 		waitboost(drm_fd, false);
+	}
 
 	igt_describe("Check if the order of fences does not affect waitboosting");
-	igt_subtest("fence-order")
+	igt_subtest("fence-order") {
+		igt_skip_on_f(i915_is_slpc_enabled(drm_fd),
+			      "This subtest is not supported when SLPC is enabled\n");
 		fence_order(drm_fd);
+	}
 
 	igt_describe("Check if context reuse does not affect waitboosting");
-	igt_subtest("engine-order")
+	igt_subtest("engine-order") {
+		igt_skip_on_f(i915_is_slpc_enabled(drm_fd),
+			      "This subtest is not supported when SLPC is enabled\n");
 		engine_order(drm_fd);
+	}
 
 	/* Test boost frequency after GPU reset */
 	igt_subtest("reset") {
-		igt_hang_t hang = igt_allow_hang(drm_fd, 0, 0);
+		igt_hang_t hang;
+		igt_skip_on_f(i915_is_slpc_enabled(drm_fd),
+			      "This subtest is not supported when SLPC is enabled\n");
+		hang = igt_allow_hang(drm_fd, 0, 0);
 		waitboost(drm_fd, true);
 		igt_disallow_hang(drm_fd, hang);
 	}
