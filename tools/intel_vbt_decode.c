@@ -1130,11 +1130,9 @@ static void dump_lvds_options(struct context *context,
 {
 	const struct bdb_lvds_options *options = block_data(block);
 
-	if (context->panel_type == options->panel_type)
-		printf("\tPanel type: %d\n", options->panel_type);
-	else
-		printf("\tPanel type: %d (override %d)\n",
-		       options->panel_type, context->panel_type);
+	printf("\tPanel type: %d\n", options->panel_type);
+	if (context->bdb->version >= 212)
+		printf("\tPanel type 2: %d\n", options->panel_type2);
 	printf("\tLVDS EDID available: %s\n", YESNO(options->lvds_edid));
 	printf("\tPixel dither: %s\n", YESNO(options->pixel_dither));
 	printf("\tPFIT auto ratio: %s\n", YESNO(options->pfit_ratio_auto));
