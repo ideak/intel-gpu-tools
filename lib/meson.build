@@ -168,9 +168,15 @@ else
     srcdir = join_paths(meson.source_root(), 'tests')
 endif
 
+if get_option('version_hash') != ''
+    vcs_command = ['echo', get_option('version_hash')]
+else
+    vcs_command = [ 'git', 'log', '-n1', '--pretty=format:g%h' ]
+endif
+
 lib_version = vcs_tag(input : 'version.h.in', output : 'version.h',
 		      fallback : 'NO-GIT',
-		      command : [ 'git', 'log', '-n1', '--pretty=format:g%h' ] )
+		      command : vcs_command )
 
 lib_intermediates = []
 foreach f: lib_sources
