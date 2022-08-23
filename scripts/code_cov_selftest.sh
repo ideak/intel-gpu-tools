@@ -1,7 +1,9 @@
-#!/bin/bash
+#!/bin/sh
 
-trap 'catch $LINENO' ERR
+set -e
+trap 'catch $LINENO' EXIT
 catch() {
+	[ $? -eq 0 ] && exit
 	echo "===> ERROR: Code coverage selftest failed on $0:$1" >&2
         exit 1
 }

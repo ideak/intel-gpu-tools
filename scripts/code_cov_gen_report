@@ -1,11 +1,13 @@
-#!/bin/bash
+#!/bin/sh
 
 MERGED_INFO="merged"
 GATHER_ON_BUILD="code_cov_gather_on_build.sh"
 PARSE_INFO="code_cov_parse_info.pl"
 
-trap 'catch $LINENO' ERR
+set -e
+trap 'catch $LINENO' EXIT
 catch() {
+	[ $? -eq 0 ] && exit
 	echo "$0: error on line $1. HTML report not generated."
 	exit $1
 }
@@ -32,7 +34,7 @@ DEST_DIR=
 FORCE=
 PARSE_ARGS=
 
-while [ "$1" != "" ]; do
+while [ "x$1" != "x" ]; do
 	case $1 in
 	--info|-i)
 		MODE=info
@@ -41,7 +43,7 @@ while [ "$1" != "" ]; do
 		MODE=tar.gz
 		;;
 	--kernel-source|-k)
-		if [ "$2" == "" ]; then
+		if [ "x$2" = "x" ]; then
 			usage 1
 		else
 			KSRC=$(realpath $2)
@@ -49,7 +51,7 @@ while [ "$1" != "" ]; do
 		fi
 		;;
 	--kernel-object|-O)
-		if [ "$2" == "" ]; then
+		if [ "x$2" = "x" ]; then
 			usage 1
 		else
 			KOBJ=$(realpath $2)
@@ -57,7 +59,7 @@ while [ "$1" != "" ]; do
 		fi
 		;;
 	--output-dir|-o)
-		if [ "$2" == "" ]; then
+		if [ "x$2" = "x" ]; then
 			usage 1
 		else
 			DEST_DIR=$(realpath $2)
@@ -65,7 +67,7 @@ while [ "$1" != "" ]; do
 		fi
 		;;
 	--read|-r)
-		if [ "$2" == "" ]; then
+		if [ "x$2" = "x" ]; then
 			usage 1
 		else
 			RESULTS=$(realpath $2)
@@ -76,7 +78,7 @@ while [ "$1" != "" ]; do
 		PARSE_ARGS="$PARSE_ARGS $1"
 		;;
 	--func-filters|--source-filters)
-		if [ "$2" == "" ]; then
+		if [ "x$2" = "x" ]; then
 			usage 1
 		else
 			PARSE_ARGS="$PARSE_ARGS $1 $2"
@@ -98,7 +100,7 @@ while [ "$1" != "" ]; do
 	shift
 done
 
-if [ "x$RESULTS" == "x" -o "x$KSRC" == "x" -o "x$DEST_DIR" == "x" -o "x$MODE" == "x" ]; then
+if [ "x$RESULTS" = "x" -o "x$KSRC" = "x" -o "x$DEST_DIR" = "x" -o "x$MODE" = "x" ]; then
 	echo "Missing a mandatory argument"
 	usage 1
 fi
@@ -136,8 +138,7 @@ if [ "$MODE" != "info" ]; then
 		echo "Creating per-file info files..."
 		echo -n "" >${MERGED_INFO}.info
 		for i in $RESULTS/*.tar.gz; do
-			TITLE=$(basename $i)
-			TITLE=${TITLE/.tar.gz/}
+			TITLE=$(basename "$i" .tar.gz)
 
 			echo "Adding results from $i..."
 			tar xf $i
@@ -153,8 +154,7 @@ if [ "$MODE" != "info" ]; then
 
 		TITLE=${MERGED_INFO}
 	else
-		TITLE=$(basename $RESULTS)
-		TITLE=${TITLE/.tar.gz/}
+		TITLE=$(basename "$RESULTS" .tar.gz)
 
 		echo "Adding results from $RESULTS..."
 		tar xf $RESULTS
@@ -175,8 +175,7 @@ else
 		echo "Copying $RESULTS to $DEST_DIR..."
 		cp $RESULTS .
 
-		TITLE=$(basename $RESULTS)
-		TITLE=${TITLE/.info/}
+		TITLE=$(basename "$RESULTS" .info)
 	fi
 fi
 

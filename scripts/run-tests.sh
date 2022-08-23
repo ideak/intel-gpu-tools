@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 #
 # Copyright © 2014 Intel Corporation
 #
@@ -38,7 +38,7 @@ USE_PIGLIT=0
 RUNNER=
 RESUME=
 
-function find_file # basename <possible paths>
+find_file() # basename <possible paths>
 {
 	base=$1
 	shift
@@ -72,7 +72,7 @@ fi
 
 IGT_TEST_ROOT="`readlink -f ${IGT_TEST_ROOT}`"
 
-function find_runner_binary # basename
+find_runner_binary() # basename
 {
 	base=$1
 	shift
@@ -89,37 +89,41 @@ function find_runner_binary # basename
 	return 1
 }
 
-function find_lcov_binary # basename
+find_lcov_binary() # basename
 {
-	if command -v $LCOV_CMD &> /dev/null; then
+	if command -v $LCOV_CMD > /dev/null 2>&1; then
 		return 0
 	fi
 
 	return 1
 }
 
-function download_piglit {
+download_piglit() {
 	git clone https://anongit.freedesktop.org/git/piglit.git "$ROOT/piglit"
 }
 
-function execute_runner # as-root <runner> <args>
+execute_runner() # as-root <runner> <args>
 {
-	local need_root=$1
+	need_root=$1
 	shift
-	local runner=$1
+	runner=$1
 	shift
-	local sudo
 
 	export IGT_TEST_ROOT IGT_CONFIG_PATH IGT_KERNEL_TREE
 
-	if [ "$need_root" -ne 0 -a "$EUID" -ne 0 ]; then
-		sudo="sudo --preserve-env=IGT_TEST_ROOT,IGT_CONFIG_PATH,IGT_KERNEL_TREE"
+	if [ "$need_root" -ne 0 -a "$(id -u)" -ne 0 ]; then
+		if command -v sudo > /dev/null 2>&1; then
+			sudo="sudo --preserve-env=IGT_TEST_ROOT,IGT_CONFIG_PATH,IGT_KERNEL_TREE"
+		else
+			echo "$0: Could not start runner: Permission denied."
+			exit 1
+		fi
 	fi
 
 	$sudo $runner "$@"
 }
 
-function print_help {
+print_help() {
 	echo "Usage: run-tests.sh [options]"
 	echo "Available options:"
 	echo "  -c <capture_script>"
@@ -191,7 +195,7 @@ if [ "x$1" != "x" ]; then
 	exit 1
 fi
 
-if [ "x$PIGLIT" == "x" ]; then
+if [ "x$PIGLIT" = "x" ]; then
 	PIGLIT="$ROOT/piglit/piglit"
 fi
 
@@ -241,7 +245,7 @@ if [ "x$LIST_TESTS" != "x" ]; then
 fi
 
 if [ "x$RESUME_RUN" != "x" ]; then
-	if [ "x$COV_ARGS" != "x" -a "x$COV_PER_TEST" == "x" ]; then
+	if [ "x$COV_ARGS" != "x" -a "x$COV_PER_TEST" = "x" ]; then
 		echo "Can't continue collecting coverage tests. Next time, run"
 		echo "$0 with '-P' in order to generate separate code coverage results".
 		exit 1
@@ -252,7 +256,7 @@ else
 	execute_runner 1 $RUNNER $RUN_ARGS -o -s "$RESULTS" $COV_ARGS $VERBOSE $FILTER
 fi
 
-if [ "$SUMMARY" == "html" ]; then
+if [ "$SUMMARY" = "html" ]; then
 	if [ ! -x "$PIGLIT" ]; then
 		echo "Could not find Piglit, required for HTML generation."
 		echo "Please install Piglit or use -d to download Piglit locally."

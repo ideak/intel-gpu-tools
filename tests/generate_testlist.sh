@@ -1,18 +1,18 @@
-#!/bin/bash
+#!/bin/sh
 
 OUTPUT=$1
 shift
 
 echo TESTLIST > $OUTPUT
 
-if [[ $# -gt 0 ]] ; then
-	echo -n $1 >> $OUTPUT
+if [ $# -gt 0 ] ; then
+	printf "$1" >> $OUTPUT
 	shift
 fi
 
-while [[ $# -gt 0 ]] ; do
-	echo -n " $1" >> $OUTPUT
+while [ $# -gt 0 ] ; do
+	printf " $1" >> $OUTPUT
 	shift
 done
 
-echo -e "\nEND TESTLIST" >> $OUTPUT
+printf "\nEND TESTLIST\n" >> $OUTPUT

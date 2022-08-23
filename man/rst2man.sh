@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 rst2man=$1
 input=$2

@@ -1,7 +1,9 @@
-#!/bin/bash
+#!/bin/sh
 
-trap 'catch $LINENO' ERR
+set -e
+trap 'catch $LINENO' EXIT
 catch() {
+	[ $? -eq 0 ] && exit
 	echo "$0: error on line $1. Code coverage not stored." >&2
 	exit 1
 }
