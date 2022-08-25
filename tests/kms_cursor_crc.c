@@ -690,14 +690,26 @@ static void test_rapid_movement(data_t *data)
 static void run_size_tests(data_t *data, void (*testfunc)(data_t *),
 			   int w, int h)
 {
-	char name[32];
 	enum pipe pipe;
 
-	snprintf(name, sizeof(name), "%dx%d", w, h);
+	if (w == 0 && h == 0) {
+		w = data->cursor_max_w;
+		h = data->cursor_max_h;
+
+		/*
+		 * No point in doing the "max-size" test if
+		 * it was already covered by the other tests.
+		 */
+		if ((w == h) && (w <= 512) && (h <= 512) &&
+		    is_power_of_two(w) && is_power_of_two(h)) {
+			igt_info("Cursor max size %dx%d already covered by other tests\n", w, h);
+			return;
+		}
+	}
 
 	create_cursor_fb(data, w, h);
 	if (require_cursor_size(data, w, h)) {
-		igt_debug("Cursor size %dx%d not supported by driver\n", w, h);
+		igt_info("Cursor size %dx%d not supported by driver\n", w, h);
 
 		igt_remove_fb(data->drm_fd, &data->fb);
 		return;
@@ -705,8 +717,8 @@ static void run_size_tests(data_t *data, void (*testfunc)(data_t *),
 
 	for_each_pipe(&data->display, pipe) {
 		data->pipe = pipe;
-		igt_dynamic_f("pipe-%s-%s-%s",
-			      kmstest_pipe_name(pipe), data->output->name, name)
+		igt_dynamic_f("pipe-%s-%s",
+			      kmstest_pipe_name(pipe), igt_output_name(data->output))
 			run_test(data, testfunc, w, h);
 	}
 
@@ -837,25 +849,25 @@ static void run_tests_on_pipe(data_t *data)
 	for (i = 0; i < ARRAY_SIZE(size_tests); i++) {
 		igt_describe(size_tests[i].desc);
 		igt_subtest_group {
-			igt_subtest_with_dynamic_f("%s", size_tests[i].name) {
-				for (cursor_size = 32; cursor_size <= 512; cursor_size *= 2) {
-					int w = cursor_size;
-					int h = cursor_size;
+			for (cursor_size = 32; cursor_size <= 512; cursor_size *= 2) {
+				int w = cursor_size;
+				int h = cursor_size;
 
-					igt_subtest_group
-						run_size_tests(data, size_tests[i].testfunc, w, h);
+				igt_subtest_with_dynamic_f("%s-%dx%d", size_tests[i].name, w, h)
+					run_size_tests(data, size_tests[i].testfunc, w, h);
 
-					/*
-					 * Test non-square cursors a bit on the platforms
-					 * that support such things. And make it a bit more
-					 * interesting by using a non-pot height.
-					 */
-					h /= 3;
-
-					igt_subtest_group
-						run_size_tests(data, size_tests[i].testfunc, w, h);
-				}
+				/*
+				 * Test non-square cursors a bit on the platforms
+				 * that support such things. And make it a bit more
+				 * interesting by using a non-pot height.
+				 */
+				h /= 3;
+				igt_subtest_with_dynamic_f("%s-%dx%d", size_tests[i].name, w, h)
+					run_size_tests(data, size_tests[i].testfunc, w, h);
 			}
+
+			igt_subtest_with_dynamic_f("%s-max-size", size_tests[i].name)
+				run_size_tests(data, size_tests[i].testfunc, 0, 0);
 		}
 	}
 }
