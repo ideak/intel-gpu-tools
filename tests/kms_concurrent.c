@@ -276,8 +276,6 @@ test_resolution_with_output(data_t *data, enum pipe pipe, int max_planes, igt_ou
 		/* switch to lower resolution */
 		igt_output_override_mode(output, mode_lo);
 		free(mode_lo);
-		if (is_amdgpu_device(data->drm_fd))
-			igt_output_set_pipe(output, PIPE_NONE);
 		igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
 		/* switch back to higher resolution */
