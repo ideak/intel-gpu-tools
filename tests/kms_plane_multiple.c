@@ -159,7 +159,7 @@ create_fb_for_mode_position(data_t *data, igt_output_t *output, drmModeModeInfo 
 			continue;
 		igt_paint_color(cr, rect_x[i], rect_y[i],
 				rect_w[i], rect_h[i], 0.0, 0.0, 0.0);
-		}
+	}
 
 	igt_put_cairo_ctx(cr);
 }
@@ -231,6 +231,8 @@ prepare_planes(data_t *data, enum pipe pipe_id, color_t *color,
 		uint32_t plane_format;
 		uint64_t plane_modifier;
 
+		data->plane[i] = plane;
+
 		if (plane->type == DRM_PLANE_TYPE_PRIMARY)
 			continue;
 		else if (plane->type == DRM_PLANE_TYPE_CURSOR)
@@ -240,8 +242,6 @@ prepare_planes(data_t *data, enum pipe pipe_id, color_t *color,
 
 		x[i] = rand() % (mode->hdisplay - size[i]);
 		y[i] = rand() % (mode->vdisplay - size[i]);
-
-		data->plane[i] = plane;
 
 		plane_format = data->plane[i]->type == DRM_PLANE_TYPE_CURSOR ? DRM_FORMAT_ARGB8888 : DRM_FORMAT_XRGB8888;
 		plane_modifier = data->plane[i]->type == DRM_PLANE_TYPE_CURSOR ? DRM_FORMAT_MOD_LINEAR : modifier;
