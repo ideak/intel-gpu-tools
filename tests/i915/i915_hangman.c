@@ -295,6 +295,20 @@ static void context_unban(int fd, unsigned ctx)
 	gem_context_set_param(fd, &param);
 }
 
+static void chk_err(int *dst, int err, int expected)
+{
+	if (err == expected)
+		return;
+
+	*dst = err;
+}
+
+#define ERR_HANG_WAIT  0
+#define ERR_HANG_STAT  1
+#define ERR_FENCE_BUSY 2
+#define ERR_FENCE_END  3
+#define ERR_FENCE_STAT 4
+
 static void
 test_engine_hang(const intel_ctx_t *ctx,
 		 const struct intel_execution_engine2 *e, unsigned int flags)
@@ -305,6 +319,7 @@ test_engine_hang(const intel_ctx_t *ctx,
 	IGT_LIST_HEAD(list);
 	uint64_t ahnd = get_reloc_ahnd(device, ctx->id), ahndN;
 	int num_ctx;
+	int err[ERR_FENCE_STAT + 1];
 
 	igt_skip_on(flags & IGT_SPIN_INVALID_CS &&
 		    gem_engine_has_cmdparser(device, &ctx->cfg, e->flags));
@@ -340,18 +355,20 @@ test_engine_hang(const intel_ctx_t *ctx,
 				      flags));
 
 	/* Wait for the hangcheck to terminate the hanger */
-	igt_assert(sync_fence_wait(spin->out_fence, 30000) == 0); /* 30s */
-	igt_assert_eq(sync_fence_status(spin->out_fence), -EIO);
+	err[ERR_HANG_WAIT] = sync_fence_wait(spin->out_fence, 30000); /* 30s */
+	err[ERR_HANG_STAT] = sync_fence_status(spin->out_fence); /* -EIO */
 	igt_spin_free(device, spin);
 
 	/* But no other engines/clients should be affected */
+	err[ERR_FENCE_BUSY] = -ETIME;
+	err[ERR_FENCE_END] = 0;
+	err[ERR_FENCE_STAT] = 1;
 	igt_list_for_each_entry_safe(spin, next, &list, link) {
 		ahndN = spin->opts.ahnd;
-		igt_assert(sync_fence_wait(spin->out_fence, 0) == -ETIME);
+		chk_err(err+ERR_FENCE_BUSY, sync_fence_wait(spin->out_fence, 0), -ETIME);
 		igt_spin_end(spin);
-
-		igt_assert(sync_fence_wait(spin->out_fence, 500) == 0);
-		igt_assert_eq(sync_fence_status(spin->out_fence), 1);
+		chk_err(err+ERR_FENCE_END, sync_fence_wait(spin->out_fence, 500), 0);
+		chk_err(err+ERR_FENCE_STAT, sync_fence_status(spin->out_fence), 1);
 		igt_spin_free(device, spin);
 		put_ahnd(ahndN);
 	}
@@ -360,6 +377,11 @@ test_engine_hang(const intel_ctx_t *ctx,
 	while (num_ctx)
 		intel_ctx_destroy(device, local_ctx[--num_ctx]);
 
+	igt_assert_f(err[ERR_HANG_WAIT] == 0, "hanged spinner wait failed\n");
+	igt_assert_f(err[ERR_HANG_STAT] == -EIO, "hanged spinner failed\n");
+	igt_assert_f(err[ERR_FENCE_BUSY] == -ETIME, "background spinner not busy\n");
+	igt_assert_f(err[ERR_FENCE_END] == 0, "background spinner not terminated\n");
+	igt_assert_f(err[ERR_FENCE_STAT] == 1, "background fence not signalled\n");
 	check_alive();
 }
 
