@@ -544,7 +544,7 @@ amdgpu_sync_dependency_test(amdgpu_device_handle device_handle)
 	base->emit(base, 1);
 	base->emit(base, 1);
 	base->emit(base, 0x00000045);
-	append_cmd_base(base, 7, GFX_COMPUTE_NOP);
+	base->emit_aligned(base, 7, GFX_COMPUTE_NOP);
 
 	base->emit_buf(base, shader, code_offset,size_bytes);
 
@@ -571,7 +571,7 @@ amdgpu_sync_dependency_test(amdgpu_device_handle device_handle)
 	base->emit(base,  0xfffffffc & (ib_result_mc_address + data_offset * 4));
 	base->emit(base,  (0xffffffff00000000 & (ib_result_mc_address + data_offset * 4)) >> 32);
 	base->emit(base,  99);
-	append_cmd_base(base, 7, GFX_COMPUTE_NOP);
+	base->emit_aligned(base, 7, GFX_COMPUTE_NOP);
 
 	memset(&ib_info, 0, sizeof(struct amdgpu_cs_ib_info));
 	ib_info.ib_mc_address = ib_result_mc_address + cdw_old * 4;

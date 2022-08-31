@@ -25,6 +25,8 @@
 #ifndef AMD_IP_BLOCKS_H
 #define AMD_IP_BLOCKS_H
 
+#include "amd_registers.h"
+
 enum amd_ip_block_type {
 	AMD_IP_GFX,
 	AMD_IP_COMPUTE,
@@ -33,7 +35,6 @@ enum amd_ip_block_type {
 	AMD_IP_VCE,
 	AMD_IP_MAX,
 };
-
 
 /* aux struct to hold misc parameters for convenience to maintain */
 struct amdgpu_ring_context {
@@ -72,6 +73,7 @@ struct amdgpu_ring_context {
 	struct amdgpu_cs_request ibs_request; /* amdgpu_cs_query_fence_status */
 };
 
+
 struct amdgpu_ip_funcs {
 	uint32_t	family_id;
 	uint32_t	align_mask;
@@ -84,6 +86,8 @@ struct amdgpu_ip_funcs {
 	int (*copy_linear)(const struct amdgpu_ip_funcs *func, const struct amdgpu_ring_context *context, uint32_t *pm4_dw);
 	int (*compare)(const struct amdgpu_ip_funcs *func, const struct amdgpu_ring_context *context, int div);
 	int (*compare_pattern)(const struct amdgpu_ip_funcs *func, const struct amdgpu_ring_context *context, int div);
+	int (*get_reg_offset)(enum general_reg reg);
+
 };
 
 extern const struct amdgpu_ip_block_version gfx_v6_0_ip_block;
@@ -122,14 +126,14 @@ struct amdgpu_cmd_base {
 	int (*allocate_buf)(struct amdgpu_cmd_base  *base, uint32_t size);
 	int (*attach_buf)(struct amdgpu_cmd_base  *base, void *ptr, uint32_t size_bytes);
 	void (*emit)(struct amdgpu_cmd_base  *base, uint32_t value);
+	void (*emit_aligned)(struct amdgpu_cmd_base  *base,uint32_t mask, uint32_t value);
+	void (*emit_repeat)(struct amdgpu_cmd_base  *base, uint32_t value, uint32_t number_of_times);
+	void (*emit_at_offset)(struct amdgpu_cmd_base  *base, uint32_t value, uint32_t offset_dwords);
 	void (*emit_buf)(struct amdgpu_cmd_base  *base, const void *ptr, uint32_t offset_bytes, uint32_t size_bytes);
 };
 
 struct amdgpu_cmd_base* get_cmd_base(void);
 
 void free_cmd_base(struct amdgpu_cmd_base *base);
-
-void
-append_cmd_base(struct amdgpu_cmd_base *base, uint32_t mask, uint32_t cmd);
 
 #endif

@@ -32,6 +32,7 @@
 #include <amdgpu_drm.h>
 #include "amdgpu_asic_addr.h"
 #include "amd_family.h"
+#include "amd_gfx_v8_0.h"
 
 /*
  * SDMA functions:
@@ -328,9 +329,9 @@ static const struct amdgpu_ip_funcs gfx_v8_x_ip_funcs = {
 	.const_fill = gfx_ring_const_fill,
 	.copy_linear = gfx_ring_copy_linear,
 	.compare = x_compare,
-	.compare_pattern = x_compare_pattern
+	.compare_pattern = x_compare_pattern,
+	.get_reg_offset = gfx_v8_0_get_reg_offset,
 };
-
 
 static const struct amdgpu_ip_funcs sdma_v3_x_ip_funcs = {
 	.family_id = FAMILY_VI,
@@ -342,9 +343,9 @@ static const struct amdgpu_ip_funcs sdma_v3_x_ip_funcs = {
 	.const_fill = sdma_ring_const_fill,
 	.copy_linear = sdma_ring_copy_linear,
 	.compare = x_compare,
-	.compare_pattern = x_compare_pattern
+	.compare_pattern = x_compare_pattern,
+	.get_reg_offset = gfx_v8_0_get_reg_offset,
 };
-
 
 const struct amdgpu_ip_block_version gfx_v8_x_ip_block = {
 	.type = AMD_IP_GFX,
@@ -453,12 +454,39 @@ cmd_emit(struct amdgpu_cmd_base  *base, uint32_t value)
 }
 
 static void
+cmd_emit_aligned(struct amdgpu_cmd_base *base, uint32_t mask, uint32_t cmd)
+{
+	while(base->cdw & mask)
+		base->emit(base, cmd);
+}
+static void
 cmd_emit_buf(struct amdgpu_cmd_base  *base, const void *ptr, uint32_t offset_bytes, uint32_t size_bytes)
 {
-	/* we assume that caller knows what is doing and we loose the buffer current index */
-	/* we may do this later abstract the internal index */
-	assert(base->cdw + ((offset_bytes + size_bytes)>>2) <  base->max_dw  );
-	memcpy(base->buf + offset_bytes , ptr, size_bytes);
+	uint32_t total_offset_dw = (offset_bytes + size_bytes) >> 2;
+	uint32_t offset_dw = offset_bytes >> 2;
+	/*TODO read the requirements to fix */
+	assert(size_bytes % 4 == 0); /* no gaps */
+	assert(offset_bytes % 4 == 0);
+	assert(base->cdw + total_offset_dw <  base->max_dw);
+	memcpy(base->buf + base->cdw + offset_dw , ptr, size_bytes);
+	base->cdw += total_offset_dw;
+}
+
+static void
+cmd_emit_repeat(struct amdgpu_cmd_base  *base, uint32_t value, uint32_t number_of_times)
+{
+	while (number_of_times > 0) {
+		assert(base->cdw <  base->max_dw);
+		base->buf[base->cdw++] = value;
+		number_of_times--;
+	}
+}
+
+static void
+cmd_emit_at_offset(struct amdgpu_cmd_base  *base, uint32_t value, uint32_t offset_dwords)
+{
+	assert(base->cdw + offset_dwords <  base->max_dw);
+	base->buf[base->cdw + offset_dwords] = value;
 }
 
 struct amdgpu_cmd_base *
@@ -474,6 +502,9 @@ get_cmd_base(void)
 	base->allocate_buf = cmd_allocate_buf;
 	base->attach_buf = cmd_attach_buf;
 	base->emit = cmd_emit;
+	base->emit_aligned= cmd_emit_aligned;
+	base->emit_repeat = cmd_emit_repeat;
+	base->emit_at_offset = cmd_emit_at_offset;
 	base->emit_buf = cmd_emit_buf;
 
 	return base;
@@ -488,13 +519,6 @@ free_cmd_base(struct amdgpu_cmd_base * base)
 		free(base);
 	}
 
-}
-
-void
-append_cmd_base(struct amdgpu_cmd_base *base, uint32_t mask, uint32_t cmd)
-{
-	while(base->cdw & mask)
-		base->emit(base, cmd);
 }
 
 /*
