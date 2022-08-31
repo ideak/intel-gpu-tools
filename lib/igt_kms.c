@@ -5546,20 +5546,20 @@ int igt_force_dsc_enable(int drmfd, char *connector_name)
 }
 
 /*
- * igt_force_dsc_enable_bpp:
+ * igt_force_dsc_enable_bpc:
  * @drmfd: A drm file descriptor
  * @connector_name: Name of the libdrm connector we're going to use
- * @bpp: Compressed bpp to be used with DSC
+ * @bpc: Input BPC
  *
  * Returns: No. of bytes written or negative error code, in case of failure.
  */
-int igt_force_dsc_enable_bpp(int drmfd, char *connector_name, int bpp)
+int igt_force_dsc_enable_bpc(int drmfd, char *connector_name, int bpc)
 {
 	char buf[20] = {0};
 
-	sprintf(buf, "%d", bpp);
+	sprintf(buf, "%d", bpc);
 
-	return write_dsc_debugfs(drmfd, connector_name, "i915_dsc_bpp", buf);
+	return write_dsc_debugfs(drmfd, connector_name, "i915_dsc_bpc", buf);
 }
 
 /*

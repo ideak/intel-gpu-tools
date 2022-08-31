@@ -953,8 +953,8 @@ bool igt_is_fec_supported(int drmfd, char *connector_name);
 bool igt_is_dsc_enabled(int drmfd, char *connector_name);
 bool igt_is_force_dsc_enabled(int drmfd, char *connector_name);
 int igt_force_dsc_enable(int drmfd, char *connector_name);
-int igt_force_dsc_enable_bpp(int drmfd, char *connector_name,
-			     int bpp);
+int igt_force_dsc_enable_bpc(int drmfd, char *connector_name,
+			     int bpc);
 int igt_get_dsc_debugfs_fd(int drmfd, char *connector_name);
 
 unsigned int igt_get_output_max_bpc(int drmfd, char *connector_name);
