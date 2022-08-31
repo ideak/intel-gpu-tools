@@ -1,5 +1,4 @@
 /*
- * Copyright 2014 Advanced Micro Devices, Inc.
  * Copyright 2022 Advanced Micro Devices, Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -22,23 +21,22 @@
  *
  *
  */
-#ifndef AMD_SHADERS_H
-#define AMD_SHADERS_H
+#ifndef AMD_SHARED_DISPATCH_H
+#define AMD_SHARED_DISPATCH_H
 
-#include "drmtest.h"
-#include <amdgpu.h>
-#include "amd_shared_dispatch.h"
 
-const uint32_t *
-get_shader_bin(uint32_t *size_bytes, uint32_t *code_offset, uint32_t *data_offset);
+enum cs_type {
+	CS_BUFFERCLEAR,
+	CS_BUFFERCOPY,
+	CS_HANG,
+	CS_HANG_SLOW
+};
 
-int
-amdgpu_dispatch_load_cs_shader_hang_slow(uint32_t *ptr, uint32_t family_id);
-
-int
-amdgpu_dispatch_load_cs_shader(uint8_t *ptr, int cs_type, uint32_t version);
-
-int
-amdgpu_draw_load_ps_shader_hang_slow(uint32_t *ptr, int family);
+enum ps_type {
+	PS_CONST,
+	PS_TEX,
+	PS_HANG,
+	PS_HANG_SLOW
+};
 
 #endif
