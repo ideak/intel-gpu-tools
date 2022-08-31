@@ -6,6 +6,7 @@ if libdrm_amdgpu.found()
 			  'amd_assr',
 			  'amd_basic',
 			  'amd_bypass',
+			  'amd_deadlock',
 			  'amd_color',
 			  'amd_cs_nop',
 			  'amd_hotplug',
