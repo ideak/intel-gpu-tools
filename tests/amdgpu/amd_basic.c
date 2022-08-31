@@ -30,6 +30,7 @@
 #include "lib/amdgpu/amd_compute.h"
 #include "lib/amdgpu/amd_gfx.h"
 #include "lib/amdgpu/amd_shaders.h"
+#include "lib/amdgpu/amd_dispatch.h"
 
 #define BUFFER_SIZE (8 * 1024)
 
@@ -625,6 +626,18 @@ amdgpu_sync_dependency_test(amdgpu_device_handle device_handle)
 	free_cmd_base(base);
 }
 
+static void
+amdgpu_gfx_dispatch_test_gfx(amdgpu_device_handle device_handle)
+{
+	amdgpu_gfx_dispatch_test(device_handle, AMDGPU_HW_IP_GFX);
+}
+
+static void
+amdgpu_gfx_dispatch_test_compute(amdgpu_device_handle device_handle)
+{
+	amdgpu_gfx_dispatch_test(device_handle, AMDGPU_HW_IP_COMPUTE);
+}
+
 igt_main
 {
 	amdgpu_device_handle device;
@@ -678,6 +691,11 @@ igt_main
 	igt_subtest("sync_dependency_test")
 		amdgpu_sync_dependency_test(device);
 
+	igt_subtest("amdgpu_gfx_dispatch_test_compute")
+	amdgpu_gfx_dispatch_test_compute(device);
+
+	igt_subtest("amdgpu_gfx_dispatch_test_gfx")
+	amdgpu_gfx_dispatch_test_gfx(device);
 
 	igt_fixture {
 		amdgpu_device_deinitialize(device);
