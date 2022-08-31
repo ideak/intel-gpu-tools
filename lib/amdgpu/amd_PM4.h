@@ -49,6 +49,7 @@
 			 (((op) & 0xFF) << 8) |				\
 			 ((n) & 0x3FFF) << 16)
 
+#define PACKET3_COMPUTE(op, n) PACKET3(op, n) | (1 << 1)
 /* Packet 3 types */
 #define	PACKET3_NOP					0x10
 
@@ -137,7 +138,6 @@
 #              define PACKET3_DMA_DATA_CMD_DAIC    (1 << 29)
 #              define PACKET3_DMA_DATA_CMD_RAW_WAIT  (1 << 30)
 
-
 #define	PACKET3_ATOMIC_MEM				0x1E
 #define     TC_OP_ATOMIC_CMPSWAP_RTN_32          0x00000008
 #define     ATOMIC_MEM_COMMAND(x)               ((x) << 8)
@@ -151,8 +151,6 @@
 #define     ATOMIC_MEM_ENGINESEL(x)             ((x) << 30)
             /* 0 - micro_engine.*/
 
-
-
 #define PKT3_CONTEXT_CONTROL                   0x28
 #define     CONTEXT_CONTROL_LOAD_ENABLE(x)     (((unsigned)(x) & 0x1) << 31)
 #define     CONTEXT_CONTROL_LOAD_CE_RAM(x)     (((unsigned)(x) & 0x1) << 28)
@@ -161,7 +159,6 @@
 #define PKT3_CLEAR_STATE			0x12
 
 #define PKT3_SET_SH_REG				0x76
-#define	PACKET3_SET_SH_REG_START		0x00002c00
 
 #define PKT3_SET_SH_REG_INDEX			0x9B
 
@@ -171,16 +168,5 @@
 #define PACKET3_SET_CONTEXT_REG			0x69
 #define PACKET3_SET_UCONFIG_REG			0x79
 #define PACKET3_DRAW_INDEX_AUTO			0x2D
-
-/*TODO organize as iit is in MESA*/
-/* gfx 8 */
-#define mmCOMPUTE_PGM_LO			0x2e0c
-#define mmCOMPUTE_PGM_RSRC1			0x2e12
-#define mmCOMPUTE_TMPRING_SIZE			0x2e18
-#define mmCOMPUTE_USER_DATA_0			0x2e40
-#define mmCOMPUTE_USER_DATA_1			0x2e41
-#define mmCOMPUTE_RESOURCE_LIMITS		0x2e15
-#define mmCOMPUTE_NUM_THREAD_X			0x2e07
-
 
 #endif

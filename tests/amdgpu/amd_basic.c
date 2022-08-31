@@ -477,6 +477,7 @@ amdgpu_sync_dependency_test(amdgpu_device_handle device_handle)
 	const uint32_t *shader;
 
 	struct amdgpu_cmd_base * base = get_cmd_base();
+	const struct amdgpu_ip_block_version * ip_block = get_ip_block(device_handle, AMD_IP_GFX);
 
 	r = amdgpu_cs_ctx_create(device_handle, &context_handle[0]);
 	igt_assert_eq(r, 0);
@@ -499,6 +500,7 @@ amdgpu_sync_dependency_test(amdgpu_device_handle device_handle)
 	/* assign cmd buffer */
 	base->attach_buf(base, ib_result_cpu, const_size);
 
+
 	base->emit(base, PACKET3(PKT3_CONTEXT_CONTROL, 1));
 	base->emit(base, 0x80000000);
 	base->emit(base, 0x80000000);
@@ -509,31 +511,31 @@ amdgpu_sync_dependency_test(amdgpu_device_handle device_handle)
 	/* Program compute regs */
 	/* TODO ASIC registers do based on predefined offsets */
 	base->emit(base, PACKET3(PKT3_SET_SH_REG, 2));
-	base->emit(base, mmCOMPUTE_PGM_LO - PACKET3_SET_SH_REG_START);
+	base->emit(base, ip_block->funcs->get_reg_offset(COMPUTE_PGM_LO));
 	base->emit(base, (ib_result_mc_address + code_offset * 4) >> 8);
 	base->emit(base, (ib_result_mc_address + code_offset * 4) >> 40);
 
 	base->emit(base,PACKET3(PKT3_SET_SH_REG, 2));
-	base->emit(base, mmCOMPUTE_PGM_RSRC1 - PACKET3_SET_SH_REG_START);
+	base->emit(base, ip_block->funcs->get_reg_offset(COMPUTE_PGM_RSRC1));
 
 	base->emit(base, 0x002c0040);
 	base->emit(base, 0x00000010);
 
 	base->emit(base, PACKET3(PKT3_SET_SH_REG, 1));
-	base->emit(base, mmCOMPUTE_TMPRING_SIZE - PACKET3_SET_SH_REG_START);
+	base->emit(base, ip_block->funcs->get_reg_offset(COMPUTE_TMPRING_SIZE));
 	base->emit(base, 0x00000100);
 
 	base->emit(base, PACKET3(PKT3_SET_SH_REG, 2));
-	base->emit(base, mmCOMPUTE_USER_DATA_0 - PACKET3_SET_SH_REG_START);
+	base->emit(base, ip_block->funcs->get_reg_offset(COMPUTE_USER_DATA_0));
 	base->emit(base, 0xffffffff & (ib_result_mc_address + data_offset * 4));
 	base->emit(base, (0xffffffff00000000 & (ib_result_mc_address + data_offset * 4)) >> 32);
 
 	base->emit(base, PACKET3(PKT3_SET_SH_REG, 1));
-	base->emit(base, mmCOMPUTE_RESOURCE_LIMITS - PACKET3_SET_SH_REG_START);
+	base->emit(base, ip_block->funcs->get_reg_offset(COMPUTE_RESOURCE_LIMITS));
 	base->emit(base, 0);
 
 	base->emit(base, PACKET3(PKT3_SET_SH_REG, 3));
-	base->emit(base, mmCOMPUTE_NUM_THREAD_X - PACKET3_SET_SH_REG_START);
+	base->emit(base, ip_block->funcs->get_reg_offset(COMPUTE_NUM_THREAD_X));
 	base->emit(base, 1);
 	base->emit(base, 1);
 	base->emit(base, 1);
@@ -546,11 +548,11 @@ amdgpu_sync_dependency_test(amdgpu_device_handle device_handle)
 	base->emit(base, 0x00000045);
 	base->emit_aligned(base, 7, GFX_COMPUTE_NOP);
 
-	base->emit_buf(base, shader, code_offset,size_bytes);
+	memcpy(base->buf + code_offset , shader, size_bytes);
 
 	memset(&ib_info, 0, sizeof(struct amdgpu_cs_ib_info));
 	ib_info.ib_mc_address = ib_result_mc_address;
-	ib_info.size = base->cdw;;
+	ib_info.size = base->cdw;
 
 	memset(&ibs_request, 0, sizeof(struct amdgpu_cs_request));
 	ibs_request.ip_type = AMDGPU_HW_IP_GFX;
