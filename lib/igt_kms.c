@@ -1586,6 +1586,7 @@ void igt_sort_connector_modes(drmModeConnector *connector,
 bool kmstest_get_connector_default_mode(int drm_fd, drmModeConnector *connector,
 					drmModeModeInfo *mode)
 {
+	char *env;
 	int i;
 
 	if (!connector->count_modes) {
@@ -1594,6 +1595,26 @@ bool kmstest_get_connector_default_mode(int drm_fd, drmModeConnector *connector,
 		return false;
 	}
 
+	env = getenv("IGT_KMS_RESOLUTION");
+	if (env) {
+		/*
+		 * Only (0 or 1) and (lowest or highest) are allowed.
+		 *
+		 * 0/lowest: Choose connector mode with lowest possible resolution.
+		 * 1/highest: Choose connector mode with highest possible resolution.
+		 */
+		if (!strcmp(env, "highest") || !strcmp(env, "1"))
+			igt_sort_connector_modes(connector, sort_drm_modes_by_res_dsc);
+		else if (!strcmp(env, "lowest") || !strcmp(env, "0"))
+			igt_sort_connector_modes(connector, sort_drm_modes_by_res_asc);
+		else
+			goto default_mode;
+
+		*mode = connector->modes[0];
+		return true;
+	}
+
+default_mode:
 	for (i = 0; i < connector->count_modes; i++) {
 		if (i == 0 ||
 		    connector->modes[i].type & DRM_MODE_TYPE_PREFERRED) {
