@@ -121,15 +121,17 @@ static void bad_object(int i915)
 	handles[i] = real_handle + 1;
 
 	for (; i >= 0; i--) {
-		struct drm_i915_gem_mmap_offset arg = {
-			.handle = handles[i],
-			.flags = I915_MMAP_OFFSET_WB,
-		};
+		for_each_mmap_offset_type(i915, t) {
+			struct drm_i915_gem_mmap_offset arg = {
+				.handle = handles[i],
+				.flags = t->type,
+			};
 
-		igt_debug("Trying MMAP IOCTL with handle %x\n",
-			  handles[i]);
-		igt_assert_eq(mmap_offset_ioctl(i915, &arg),
-			      -ENOENT);
+			igt_debug("Trying MMAP IOCTL[%s] with handle %x\n",
+				  t->name, handles[i]);
+			igt_assert_eq(mmap_offset_ioctl(i915, &arg),
+				      -ENOENT);
+		}
 	}
 
 	gem_close(i915, real_handle);
