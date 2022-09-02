@@ -287,7 +287,7 @@ static void isolation(int i915)
 	}
 }
 
-static void pf_nonblock(int i915)
+static void pf_nonblock_batch(int i915)
 {
 	uint64_t ahnd = get_reloc_ahnd(i915, 0);
 	igt_spin_t *spin = igt_spin_new(i915, .ahnd = ahnd);
@@ -310,6 +310,42 @@ static void pf_nonblock(int i915)
 	}
 
 	igt_spin_free(i915, spin);
+	put_ahnd(ahnd);
+}
+
+static void pf_nonblock(int i915)
+{
+	uint64_t ahnd = get_reloc_ahnd(i915, 0);
+
+	pf_nonblock_batch(i915);
+
+	for_each_memory_region(r, i915) {
+		igt_spin_t *spin;
+		uint32_t handle;
+
+		handle = gem_create_in_memory_region_list(i915, 4096, 0, &r->ci, 1);
+		spin = igt_spin_new(i915, .ahnd = ahnd, .dependency = handle);
+
+		for_each_mmap_offset_type(i915, t) {
+			uint32_t *ptr;
+
+			ptr = __mmap_offset(i915, handle, 0, 4096,
+					    PROT_READ | PROT_WRITE,
+					    t->type);
+			if (!ptr)
+				continue;
+
+			igt_set_timeout(1, t->name);
+			/* no set-domain as we want to verify the pagefault is async */
+			ptr[256] = 0;
+			igt_reset_timeout();
+
+			munmap(ptr, 4096);
+		}
+
+		igt_spin_free(i915, spin);
+		gem_close(i915, handle);
+	}
 	put_ahnd(ahnd);
 }
 
