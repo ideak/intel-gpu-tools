@@ -289,7 +289,8 @@ static void always_clear(int i915, const struct gem_memory_region *r, int timeou
 	igt_info("Checked %'lu page allocations\n", checked);
 }
 
-static void busy_create(int i915, const struct gem_memory_region *r, int timeout)
+static void busy_create(int i915, const struct gem_memory_region *r, int timeout, unsigned int flags)
+#define BUSY_HOG 0x1
 {
 	struct intel_execution_engine2 *e;
 	const intel_ctx_t *ctx;
@@ -300,12 +301,14 @@ static void busy_create(int i915, const struct gem_memory_region *r, int timeout
 	ctx = intel_ctx_create_all_physical(i915);
 	ahnd = get_reloc_ahnd(i915, ctx->id);
 
-	igt_fork_hang_detector(i915);
-	for_each_ctx_engine(i915, ctx, e)
-		spin[e->flags] = igt_spin_new(i915,
-					      .ahnd = ahnd,
-					      .ctx = ctx,
-					      .engine = e->flags);
+	for_each_ctx_engine(i915, ctx, e) {
+		spin[e->flags] =
+			igt_spin_new(i915,
+				     .ahnd = ahnd,
+				     .ctx = ctx,
+				     .engine = e->flags,
+				     .flags = flags & BUSY_HOG ? IGT_SPIN_NO_PREEMPTION : 0);
+	}
 
 	igt_until_timeout(timeout) {
 		for_each_ctx_engine(i915, ctx, e) {
@@ -313,12 +316,13 @@ static void busy_create(int i915, const struct gem_memory_region *r, int timeout
 			igt_spin_t *next;
 
 			handle = gem_create_in_memory_region_list(i915, 4096, 0, &r->ci, 1);
-			next = igt_spin_new(i915,
-					    .ahnd = ahnd,
-					    .ctx = ctx,
-					    .engine = e->flags,
-					    .dependency = handle,
-					    .flags = IGT_SPIN_SOFTDEP);
+			next = __igt_spin_new(i915,
+					      .ahnd = ahnd,
+					      .ctx = ctx,
+					      .engine = e->flags,
+					      .dependency = handle,
+					      .flags = ((flags & BUSY_HOG ? IGT_SPIN_NO_PREEMPTION : 0) |
+							IGT_SPIN_SOFTDEP));
 			gem_close(i915, handle);
 
 			igt_spin_free(i915, spin[e->flags]);
@@ -334,7 +338,6 @@ static void busy_create(int i915, const struct gem_memory_region *r, int timeout
 	igt_info("Created %ld objects while busy\n", count);
 
 	gem_quiescent_gpu(i915);
-	igt_stop_hang_detector();
 }
 
 static void size_update(int fd)
@@ -861,11 +864,26 @@ igt_main
 	}
 
 	igt_describe("Create buffer objects while GPU is busy.");
-	igt_subtest_with_dynamic("busy-create") {
-		for_each_memory_region(r, fd) {
-			igt_dynamic_f("%s", r->name)
-				busy_create(fd, r, 30);
+	igt_subtest_group {
+		igt_fixture
+			igt_fork_hang_detector(fd);
+
+		igt_subtest_with_dynamic("busy-create") {
+			for_each_memory_region(r, fd) {
+				igt_dynamic_f("%s", r->name)
+					busy_create(fd, r, 30, 0);
+			}
 		}
+
+		igt_subtest_with_dynamic("hog-create") {
+			for_each_memory_region(r, fd) {
+				igt_dynamic_f("%s", r->name)
+					busy_create(fd, r, 30, BUSY_HOG);
+			}
+		}
+
+		igt_fixture
+			igt_stop_hang_detector();
 	}
 
 	igt_describe("Exercise create_ext placements extension.");
