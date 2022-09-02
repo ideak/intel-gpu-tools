@@ -558,29 +558,30 @@ static void close_race(int i915, int timeout)
 
 	igt_fork(child, ncpus + 1) {
 		do {
-			struct drm_i915_gem_mmap_offset mmap_arg = {};
-			const int i = 1 + random() % ncpus;
-			uint32_t old;
+			for_each_memory_region(r, i915) {
+				const int i = 1 + random() % ncpus;
+				uint64_t size = 4096;
+				uint32_t bo, old;
 
-			mmap_arg.handle = gem_create(i915, 4096);
-			mmap_arg.flags = I915_MMAP_OFFSET_WB;
-			old = atomic_exchange(&handles[i], mmap_arg.handle);
-			ioctl(i915, DRM_IOCTL_GEM_CLOSE, &old);
+				igt_assert_eq(__gem_create_in_memory_region_list(i915, &bo, &size, 0, &r->ci, 1), 0);
+				make_resident(i915, 0, bo);
 
-			if (ioctl(i915,
-				  DRM_IOCTL_I915_GEM_MMAP_OFFSET,
-				  &mmap_arg) != -1) {
-				void *ptr;
+				old = atomic_exchange(&handles[i], bo);
+				ioctl(i915, DRM_IOCTL_GEM_CLOSE, &old);
 
-				ptr = mmap64(0, 4096,
-					     PROT_WRITE, MAP_SHARED, i915,
-					     mmap_arg.offset);
-				if (ptr != MAP_FAILED) {
+				for_each_mmap_offset_type(i915, t) {
+					void *ptr;
+
+					ptr = __mmap_offset(i915, bo, 0, size,
+							    PROT_READ | PROT_WRITE,
+							    t->type);
+					if (!ptr)
+						continue;
+
 					*(volatile uint32_t *)ptr = 0;
-					munmap(ptr, 4096);
+					munmap(ptr, size);
 				}
 			}
-
 		} while (!READ_ONCE(handles[0]));
 	}
 
