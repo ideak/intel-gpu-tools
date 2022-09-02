@@ -148,7 +148,8 @@ static void basic_uaf(int i915)
 		}
 
 		expected = calloc(obj_size, sizeof(*expected));
-		gem_set_domain(i915, handle, t->domain, 0);
+		if (t->domain)
+			gem_set_domain(i915, handle, t->domain, 0);
 		igt_assert_f(memcmp(addr, expected, obj_size) == 0,
 			     "mmap(%s) not clear on gem_create()\n",
 			     t->name);
@@ -157,15 +158,18 @@ static void basic_uaf(int i915)
 		buf = calloc(obj_size, sizeof(*buf));
 		memset(buf + 1024, 0x01, 1024);
 		gem_write(i915, handle, 0, buf, obj_size);
-		gem_set_domain(i915, handle, t->domain, 0);
+		if (t->domain)
+			gem_set_domain(i915, handle, t->domain, 0);
 		igt_assert_f(memcmp(buf, addr, obj_size) == 0,
 			     "mmap(%s) not coherent with gem_write()\n",
 			     t->name);
 
-		gem_set_domain(i915, handle, t->domain, t->domain);
+		if (t->domain)
+			gem_set_domain(i915, handle, t->domain, t->domain);
 		memset(addr + 2048, 0xff, 1024);
 		gem_read(i915, handle, 0, buf, obj_size);
-		gem_set_domain(i915, handle, t->domain, 0);
+		if (t->domain)
+			gem_set_domain(i915, handle, t->domain, 0);
 		igt_assert_f(memcmp(buf, addr, obj_size) == 0,
 			     "mmap(%s) not coherent with gem_read()\n",
 			     t->name);
