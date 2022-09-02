@@ -65,11 +65,11 @@ unsigned int gem_get_lmem_region_count(int fd);
 bool gem_has_lmem(int fd);
 
 int __gem_create_in_memory_region_list(int fd, uint32_t *handle, uint64_t *size, uint32_t flags,
-				       struct drm_i915_gem_memory_class_instance *mem_regions,
+				       const struct drm_i915_gem_memory_class_instance *mem_regions,
 				       int num_regions);
 
 uint32_t gem_create_in_memory_region_list(int fd, uint64_t size, uint32_t flags,
-					  struct drm_i915_gem_memory_class_instance *mem_regions,
+					  const struct drm_i915_gem_memory_class_instance *mem_regions,
 					  int num_regions);
 
 /*
