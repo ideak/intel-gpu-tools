@@ -107,6 +107,73 @@ static void make_resident(int i915, uint32_t batch, uint32_t handle)
 		gem_close(i915, obj[1].handle);
 }
 
+static void perf(int i915, const struct gem_memory_region *r)
+{
+#define MiB (1024 * 1024)
+	const unsigned int rep = 1024;
+	const uint64_t sz = 4096;
+	struct timespec tv;
+	uint32_t handle;
+	char buf[4096];
+
+	/*
+	 * Time reading/writing through each mmap type into each
+	 * memory region to have a rough estimate of the memory
+	 * bandwidth exposed to userspace across each link.
+	 *
+	 * For example, we would expect that reading and writing to
+	 * lmem would utilise the full PCIe bandwidth (>3.2GiB/s),
+	 * and notably be symmetric, the same in both directions.
+	 */
+
+	handle = gem_create_in_memory_region_list(i915, 4096, 0, &r->ci, 1);
+	make_resident(i915, 0, handle);
+
+	for_each_mmap_offset_type(i915, t) {
+		double ns;
+		void *ptr;
+
+		ptr = __mmap_offset(i915, handle, 0, sz,
+				    PROT_READ | PROT_WRITE,
+				    t->type);
+		if (!ptr)
+			continue;
+
+		igt_nsec_elapsed(memset(&tv, 0, sizeof(tv)));
+		for (int i = 0; i < rep; i++)
+			memset(ptr, 0, sz);
+		ns = igt_nsec_elapsed(&tv);
+		igt_info("%s: Clear    %12.2fMiB/s\n",
+			 t->name, sz * rep * NSEC_PER_SEC / ns / MiB);
+
+		igt_nsec_elapsed(memset(&tv, 0, sizeof(tv)));
+		for (int i = 0; i < rep; i++)
+			memcpy(ptr, buf, sz);
+		ns = igt_nsec_elapsed(&tv);
+		igt_info("%s: Write    %12.2fMiB/s\n",
+			 t->name, sz * rep * NSEC_PER_SEC / ns / MiB);
+
+		igt_nsec_elapsed(memset(&tv, 0, sizeof(tv)));
+		for (int i = 0; i < rep; i++)
+			memcpy(buf, ptr, sz);
+		ns = igt_nsec_elapsed(&tv);
+		igt_info("%s: Read     %12.2fMiB/s\n",
+			 t->name, sz * rep * NSEC_PER_SEC / ns / MiB);
+
+		igt_nsec_elapsed(memset(&tv, 0, sizeof(tv)));
+		for (int i = 0; i < rep; i++)
+			igt_memcpy_from_wc(buf, ptr, sz);
+		ns = igt_nsec_elapsed(&tv);
+		igt_info("%s: movntqda %12.2fMiB/s\n",
+			 t->name, sz * rep * NSEC_PER_SEC / ns / MiB);
+
+		munmap(ptr, sz);
+	}
+
+	gem_close(i915, handle);
+#undef MiB
+}
+
 static void bad_object(int i915)
 {
 	uint32_t real_handle;
@@ -832,6 +899,13 @@ igt_main
 		for_each_memory_region(r, i915) {
 			igt_dynamic_f("%s", r->name)
 				always_clear(i915, r, 20);
+		}
+	}
+
+	igt_subtest_with_dynamic("perf") {
+		for_each_memory_region(r, i915) {
+			igt_dynamic_f("%s", r->name)
+				perf(i915, r);
 		}
 	}
 
