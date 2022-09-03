@@ -476,6 +476,13 @@ static struct bdb_block *find_section(const struct context *context, int section
 
 	size = get_blocksize(data);
 
+	/*
+	 * Version number and new block size are considered
+	 * part of the header for MIPI sequenece block v3+.
+	 */
+	if (section_id == BDB_MIPI_SEQUENCE && *(const u8*)data >= 3)
+		size += 5;
+
 	/* expect to have the full definition for each block with modern VBTs */
 	if (min_size && size > min_size &&
 	    section_id != BDB_CHILD_DEVICE_TABLE &&
