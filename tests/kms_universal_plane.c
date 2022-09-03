@@ -699,15 +699,14 @@ gen9_test_fini(gen9_test_t *test, igt_output_t *output)
  * windowing)
  */
 static void
-gen9_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
+pageflip_win_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 {
 	gen9_test_t test = { .data = data };
 	igt_plane_t *primary;
 
 	int ret = 0;
 
-	igt_require_intel(data->drm_fd);
-	igt_skip_on(data->display_ver < 9);
+	igt_skip_on(is_i915_device(data->drm_fd) && data->display_ver < 9);
 	igt_require_pipe(&data->display, pipe);
 
 	igt_output_set_pipe(output, pipe);
@@ -787,10 +786,10 @@ run_tests_for_pipe(data_t *data, enum pipe pipe)
 			cursor_leak_test_pipe(data, pipe, output);
 
 	igt_describe("Check if pageflip succeeds in windowed setting");
-	igt_subtest_f("universal-plane-gen9-features-pipe-%s",
+	igt_subtest_f("universal-plane-pageflip-windowed-pipe-%s",
 		      kmstest_pipe_name(pipe))
 		for_each_valid_output_on_pipe(&data->display, pipe, output)
-			gen9_test_pipe(data, pipe, output);
+			pageflip_win_test_pipe(data, pipe, output);
 }
 
 static data_t data;
