@@ -93,10 +93,13 @@ static const char * const plane_name[] = {
 	NAME(SPR_F),
 };
 
+struct ilk_plane {
+	bool enabled, trickle_feed_dis;
+};
+
 struct ilk_wm_level {
 	int primary, sprite, cursor, latency, fbc;
 	bool enabled, sprite_enabled;
-	bool primary_trickle_feed_dis, sprite_trickle_feed_dis;
 };
 
 struct ilk_wm {
@@ -604,13 +607,15 @@ static void ilk_wm_dump(void)
 	struct intel_mmio_data mmio_data;
 	int i;
 	uint32_t dspcntr[3];
-	uint32_t spcntr[3];
+	uint32_t sprcntr[3];
+	uint32_t curcntr[3];
 	uint32_t wm_pipe[3];
 	uint32_t wm_linetime[3];
 	uint32_t wm_lp[3];
 	uint32_t wm_lp_spr[3];
 	uint32_t arb_ctl, arb_ctl2, wm_misc = 0;
 	int num_pipes = intel_gen(devid) >= 7 ? 3 : 2;
+	struct ilk_plane primary[3] = {}, sprite[3] = {}, cursor[3] = {};
 	struct ilk_wm wm = {};
 
 	intel_register_access_init(&mmio_data, intel_get_pci_device(), 0, -1);
@@ -618,9 +623,13 @@ static void ilk_wm_dump(void)
 	for (i = 0; i < num_pipes; i++) {
 		dspcntr[i] = read_reg(0x70180 + i * 0x1000);
 		if (intel_gen(devid) >= 7)
-			spcntr[i] = read_reg(0x70280 + i * 0x1000);
+			sprcntr[i] = read_reg(0x70280 + i * 0x1000);
 		else
-			spcntr[i] = read_reg(0x72180 + i * 0x1000);
+			sprcntr[i] = read_reg(0x72180 + i * 0x1000);
+		if (intel_gen(devid) >= 7)
+			curcntr[i] = read_reg(0x70080 + i * 0x1000);
+		else
+			curcntr[i] = read_reg(0x70080 + i * 0x40);
 	}
 
 	wm_pipe[0] = read_reg(0x45100);
@@ -649,6 +658,12 @@ static void ilk_wm_dump(void)
 	if (IS_BROADWELL(devid) || IS_HASWELL(devid))
 		wm_misc = read_reg(0x45260);
 
+	for (i = 0; i < num_pipes; i++) {
+		printf("    DSPCNTR_%c = 0x%08x\n", pipe_name(i), dspcntr[i]);
+		printf("    SPRCNTR_%c = 0x%08x\n", pipe_name(i), sprcntr[i]);
+		printf("    CURCNTR_%c = 0x%08x\n", pipe_name(i), curcntr[i]);
+	}
+
 	for (i = 0; i < num_pipes; i++)
 		printf("    WM_PIPE_%c = 0x%08x\n", pipe_name(i), wm_pipe[i]);
 	if (IS_BROADWELL(devid) || IS_HASWELL(devid)) {
@@ -669,6 +684,21 @@ static void ilk_wm_dump(void)
 		printf("      WM_MISC = 0x%08x\n", wm_misc);
 
 	for (i = 0 ; i < num_pipes; i++) {
+		primary[i].enabled = REG_DECODE1(dspcntr[i], 31, 1);
+		sprite[i].enabled = REG_DECODE1(sprcntr[i], 31, 1);
+		cursor[i].enabled = REG_DECODE1(curcntr[i], 0, 3) ||
+			REG_DECODE1(curcntr[i], 5, 1);
+
+		primary[i].trickle_feed_dis = REG_DECODE1(dspcntr[i], 14, 1);
+
+		if (IS_GEN5(devid))
+			continue;
+
+		sprite[i].trickle_feed_dis = REG_DECODE1(sprcntr[i], 14, 1);
+		cursor[i].trickle_feed_dis = REG_DECODE1(curcntr[i], 14, 1);
+	}
+
+	for (i = 0 ; i < num_pipes; i++) {
 		wm.pipe[i].primary = REG_DECODE1(wm_pipe[i], 16, 8);
 		wm.pipe[i].sprite = REG_DECODE1(wm_pipe[i], 8, 8);
 		wm.pipe[i].cursor = REG_DECODE1(wm_pipe[i], 0, 6);
@@ -677,12 +707,6 @@ static void ilk_wm_dump(void)
 			wm.linetime[i].linetime = REG_DECODE1(wm_linetime[i], 0, 9);
 			wm.linetime[i].ips = REG_DECODE1(wm_linetime[i], 16, 9);
 		}
-
-		wm.pipe[i].primary_trickle_feed_dis =
-			REG_DECODE1(dspcntr[i], 14, 1);
-		if (!IS_GEN5(devid))
-			wm.pipe[i].sprite_trickle_feed_dis =
-				REG_DECODE1(spcntr[i], 14, 1);
 	}
 
 	for (i = 0; i < 3; i++) {
@@ -733,11 +757,17 @@ static void ilk_wm_dump(void)
 		}
 	}
 	for (i = 0; i < num_pipes; i++) {
-		printf("Primary %c trickle feed = %s\n",
-		       pipe_name(i), endis(!wm.pipe[i].primary_trickle_feed_dis));
-		if (!IS_GEN5(devid))
-			printf("Sprite %c trickle feed = %s\n",
-			       pipe_name(i), endis(!wm.pipe[i].sprite_trickle_feed_dis));
+		printf("Primary %c: %s, trickle feed = %s\n",
+		       pipe_name(i), endis(primary[i].enabled),
+		       endis(!primary[i].trickle_feed_dis));
+		printf("Sprite %c: %s, trickle feed = %s\n",
+		       pipe_name(i), endis(sprite[i].enabled),
+		       IS_GEN5(devid) ? "n/a" :
+		       endis(!sprite[i].trickle_feed_dis));
+		printf("Cursor %c: %s, trickle feed = %s\n",
+		       pipe_name(i), endis(cursor[i].enabled),
+		       IS_GEN5(devid) ? "n/a" :
+		       endis(!cursor[i].trickle_feed_dis));
 	}
 	if (IS_BROADWELL(devid) || IS_HASWELL(devid)) {
 		printf("DDB partitioning = %s\n",
