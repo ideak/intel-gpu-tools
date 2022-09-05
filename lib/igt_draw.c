@@ -666,7 +666,7 @@ static void draw_rect_blt(int fd, struct cmd_data *cmd_data,
 	ibb = intel_bb_create(fd, PAGE_SIZE);
 	intel_bb_add_intel_buf(ibb, dst, true);
 
-	if (IS_DG2(intel_get_drm_devid(fd))) {
+	if (HAS_4TILE(intel_get_drm_devid(fd))) {
 		int buf_height = buf->size / buf->stride;
 
 		switch (buf->bpp) {
