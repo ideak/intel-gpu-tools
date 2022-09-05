@@ -177,15 +177,6 @@ static void draw_method_subtest(enum igt_draw_method method,
 {
 	igt_crc_t crc;
 
-	igt_skip_on(modifier == I915_FORMAT_MOD_4_TILED &&
-		    !HAS_4TILE(intel_get_drm_devid(drm_fd)));
-
-	igt_skip_on(method == IGT_DRAW_MMAP_WC && !gem_mmap__has_wc(drm_fd));
-	igt_skip_on(method == IGT_DRAW_MMAP_GTT &&
-		    !gem_has_mappable_ggtt(drm_fd));
-
-	igt_require(format_is_supported(formats[format_index], modifier));
-
 	/* Use IGT_DRAW_MMAP_GTT/WC on an untiled buffer as the parameter for
 	 * comparison. Cache the value so we don't recompute it for every single
 	 * subtest. */
@@ -331,22 +322,39 @@ igt_main
 {
 	enum igt_draw_method method;
 	int format_idx, modifier_idx;
+	uint64_t modifier;
 
 	igt_fixture
 		setup_environment();
 
-	for (format_idx = 0; format_idx < ARRAY_SIZE(formats); format_idx++) {
-	for (method = 0; method < IGT_DRAW_METHOD_COUNT; method++) {
-	for (modifier_idx = 0; modifier_idx < ARRAY_SIZE(modifiers); modifier_idx++) {
-		igt_describe("This subtest verfies igt_draw library works "
-			     "with different modifiers, DRM_FORMATS, DRAW_METHODS.");
-		igt_subtest_f("draw-method-%s-%s-%s",
-			      format_str(format_idx),
-			      igt_draw_get_method_name(method),
-			      modifier_str(modifier_idx))
-			draw_method_subtest(method, format_idx,
-					    modifiers[modifier_idx]);
-	} } }
+	igt_describe("This subtest verfies igt_draw library works "
+		     "with different modifiers, DRM_FORMATS, DRAW_METHODS.");
+	igt_subtest_with_dynamic("draw-method") {
+		for (format_idx = 0; format_idx < ARRAY_SIZE(formats); format_idx++) {
+			for (method = 0; method < IGT_DRAW_METHOD_COUNT; method++) {
+				for (modifier_idx = 0; modifier_idx < ARRAY_SIZE(modifiers); modifier_idx++) {
+					modifier = modifiers[modifier_idx];
+
+					if (method == IGT_DRAW_MMAP_WC && !gem_mmap__has_wc(drm_fd))
+						continue;
+
+					if (method == IGT_DRAW_MMAP_GTT &&
+					    !gem_has_mappable_ggtt(drm_fd))
+						continue;
+
+					if (!format_is_supported(formats[format_idx], modifier))
+						continue;
+
+					igt_dynamic_f("%s-%s-%s",
+						      format_str(format_idx),
+						      igt_draw_get_method_name(method),
+						      modifier_str(modifier_idx))
+						draw_method_subtest(method, format_idx,
+								    modifier);
+				}
+			}
+		}
+	}
 
 	igt_describe("This subtest verifies CRC after filling fb with x-tiling "
 		     "or none.");
