@@ -978,6 +978,12 @@ static void dump_child_device(struct context *context,
 		if (context->bdb->version >= 161)
 			printf("\t\tOffset to DTD buffer for edidless CHILD: 0x%02x\n", child->dtd_buf_ptr);
 
+		if (context->bdb->version >= 251)
+			printf("\t\tDisable compression for external DP/HDMI: %s\n",
+			       YESNO(child->disable_compression_for_ext_disp));
+		if (context->bdb->version >= 235)
+			printf("\t\tLTTPR Mode: %stransparent\n",
+			       child->lttpr_non_transparent ? "non-" : "");
 		if (context->bdb->version >= 202)
 			printf("\t\tDual pipe ganged eDP: %s\n", YESNO(child->ganged_edp));
 		if (context->bdb->version >= 198) {
@@ -1060,6 +1066,10 @@ static void dump_child_device(struct context *context,
 
 	printf("\t\tDVO function: 0x%02x\n", child->dvo_function);
 
+	if (context->bdb->version >= 209) {
+		printf("\t\tDP port trace length: 0x%x\n", child->dp_port_trace_length);
+		printf("\t\tThunderbolt port: %s\n", YESNO(child->tbt));
+	}
 	if (context->bdb->version >= 195)
 		printf("\t\tDP USB type C support: %s\n", YESNO(child->dp_usb_type_c));
 
