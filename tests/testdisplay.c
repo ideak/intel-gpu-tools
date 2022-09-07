@@ -69,6 +69,8 @@
 #include <stdlib.h>
 #include <signal.h>
 
+IGT_TEST_DESCRIPTION("Tests basic display functionality.");
+
 enum {
 	OPT_YB,
 	OPT_YF,
@@ -427,7 +429,6 @@ set_stereo_mode(struct connector *c)
 {
 	int i, n;
 
-
 	if (specified_mode_num != -1)
 		n = 1;
 	else
@@ -515,7 +516,6 @@ int update_display(bool probe)
 			if (test_preferred_mode || force_mode ||
 			    specified_mode_num != -1)
 				crtc_idx_mask &= ~(1 << connector->pipe);
-
 		}
 	}
 
