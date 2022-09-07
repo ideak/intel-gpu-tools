@@ -321,9 +321,12 @@ static void skl_wm_dump(void)
 	uint32_t nv12_buf_cfg[num_pipes][max_planes];
 	uint32_t plane_ctl[num_pipes][max_planes];
 	uint32_t wm_linetime[num_pipes];
-	uint32_t wm_dbg;
+	uint32_t arb_ctl, arb_ctl2, wm_dbg;
 
 	intel_register_access_init(&mmio_data, intel_get_pci_device(), 0, -1);
+
+	arb_ctl = read_reg(0x45000);
+	arb_ctl2 = read_reg(0x45004);
 
 	for (pipe = 0; pipe < num_pipes; pipe++) {
 		int num_planes = skl_num_planes(devid, pipe);
@@ -450,6 +453,22 @@ static void skl_wm_dump(void)
 			printf("0x%08x\t", nv12_buf_cfg[pipe][plane]);
 		}
 		printf("\n");
+	}
+	printf("\n");
+
+	if (intel_gen(devid) >= 13) {
+		printf(" ARB_LP_CTL 0x%08x\n", arb_ctl);
+		printf(" ARB_HP_CTL 0x%08x\n", arb_ctl2);
+	} else if (intel_gen(devid) >= 12) {
+		printf("        ARB_CTL 0x%08x\n", arb_ctl);
+		printf("  ARB_CTL_ABOX1 0x%08x\n", read_reg(0x45800));
+		printf("  ARB_CTL_ABOX2 0x%08x\n", read_reg(0x45808));
+		printf("       ARB_CTL2 0x%08x\n", arb_ctl2);
+		printf(" ARB_CTL2_ABOX1 0x%08x\n", read_reg(0x45804));
+		printf(" ARB_CTL2_ABOX2 0x%08x\n", read_reg(0x4580c));
+	} else {
+		printf("  ARB_CTL 0x%08x\n", arb_ctl);
+		printf(" ARB_CTL2 0x%08x\n", arb_ctl2);
 	}
 	printf("\n");
 
@@ -582,6 +601,12 @@ static void skl_wm_dump(void)
 
 		printf("\n\n\n");
 	}
+
+	if (intel_gen(devid) < 13)
+		printf("FBC watermark: %s\n", endis(!REG_DECODE1(arb_ctl, 15, 1)));
+	printf("IPC: %s\n", endis(REG_DECODE1(arb_ctl2, 3, 1)));
+
+	printf("\n");
 
 	printf("* plane watermark enabled\n");
 	printf("(x) line watermark if enabled\n");
