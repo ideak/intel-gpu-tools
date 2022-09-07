@@ -948,37 +948,47 @@ static void dump_child_device(struct context *context,
 		printf("\t\tI2C speed: %s (0x%02x)\n",
 		       i2c_speed(child->i2c_speed), child->i2c_speed);
 
-		printf("\t\tDP onboard redriver:\n");
-		printf("\t\t\tpresent: %s\n",
-		       YESNO((child->dp_onboard_redriver_present)));
-		printf("\t\t\tvswing: %s (0x%x)\n",
-		       dp_vswing(child->dp_onboard_redriver_vswing),
-		       child->dp_onboard_redriver_vswing);
-		printf("\t\t\tpre-emphasis: %s (0x%x)\n",
-		       dp_preemph(child->dp_onboard_redriver_preemph),
-		       child->dp_onboard_redriver_preemph);
+		if (context->bdb->version >= 158) {
+			printf("\t\tDP onboard redriver:\n");
+			printf("\t\t\tpresent: %s\n",
+			       YESNO((child->dp_onboard_redriver_present)));
+			printf("\t\t\tvswing: %s (0x%x)\n",
+			       dp_vswing(child->dp_onboard_redriver_vswing),
+			       child->dp_onboard_redriver_vswing);
+			printf("\t\t\tpre-emphasis: %s (0x%x)\n",
+			       dp_preemph(child->dp_onboard_redriver_preemph),
+			       child->dp_onboard_redriver_preemph);
 
-		printf("\t\tDP ondock redriver:\n");
-		printf("\t\t\tpresent: %s\n",
-		       YESNO((child->dp_ondock_redriver_present)));
-		printf("\t\t\tvswing: %s (0x%x)\n",
-		       dp_vswing(child->dp_ondock_redriver_vswing),
-		       child->dp_ondock_redriver_vswing);
-		printf("\t\t\tpre-emphasis: %s (0x%x)\n",
-		       dp_preemph(child->dp_ondock_redriver_preemph),
-		       child->dp_ondock_redriver_preemph);
+			printf("\t\tDP ondock redriver:\n");
+			printf("\t\t\tpresent: %s\n",
+			       YESNO((child->dp_ondock_redriver_present)));
+			printf("\t\t\tvswing: %s (0x%x)\n",
+			       dp_vswing(child->dp_ondock_redriver_vswing),
+			       child->dp_ondock_redriver_vswing);
+			printf("\t\t\tpre-emphasis: %s (0x%x)\n",
+			       dp_preemph(child->dp_ondock_redriver_preemph),
+			       child->dp_ondock_redriver_preemph);
+		}
 
-		dump_hmdi_max_data_rate(child->hdmi_max_data_rate);
-		printf("\t\tHDMI level shifter value: 0x%02x\n", child->hdmi_level_shifter_value);
+		if (context->bdb->version >= 204)
+			dump_hmdi_max_data_rate(child->hdmi_max_data_rate);
+		if (context->bdb->version >= 169)
+			printf("\t\tHDMI level shifter value: 0x%02x\n", child->hdmi_level_shifter_value);
 
-		printf("\t\tOffset to DTD buffer for edidless CHILD: 0x%02x\n", child->dtd_buf_ptr);
+		if (context->bdb->version >= 161)
+			printf("\t\tOffset to DTD buffer for edidless CHILD: 0x%02x\n", child->dtd_buf_ptr);
 
-		printf("\t\tDual pipe ganged eDP: %s\n", YESNO(child->ganged_edp));
-		printf("\t\tCompression method CPS: %s\n", YESNO(child->compression_method_cps));
-		printf("\t\tCompression enable: %s\n", YESNO(child->compression_enable));
-		printf("\t\tEdidless EFP: %s\n", YESNO(child->edidless_efp));
+		if (context->bdb->version >= 202)
+			printf("\t\tDual pipe ganged eDP: %s\n", YESNO(child->ganged_edp));
+		if (context->bdb->version >= 198) {
+			printf("\t\tCompression method CPS: %s\n", YESNO(child->compression_method_cps));
+			printf("\t\tCompression enable: %s\n", YESNO(child->compression_enable));
+		}
+		if (context->bdb->version >= 161)
+			printf("\t\tEdidless EFP: %s\n", YESNO(child->edidless_efp));
 
-		printf("\t\tCompression structure index: %d\n", child->compression_structure_index);
+		if (context->bdb->version >= 198)
+			printf("\t\tCompression structure index: %d\n", child->compression_structure_index);
 
 		if (context->bdb->version >= 237) {
 			printf("\t\tHDMI Max FRL rate valid: %s\n",
@@ -1007,16 +1017,24 @@ static void dump_child_device(struct context *context,
 	} else {
 		if (context->bdb->version >= 244)
 			printf("\t\teDP/DP max lane count: X%d\n", child->dp_max_lane_count + 1);
-		printf("\t\tUse VBT vswing/premph table: %s\n", YESNO(child->use_vbt_vswing));
-		printf("\t\tHPD sense invert: %s\n", YESNO(child->hpd_invert));
-		printf("\t\tIboost enable: %s\n", YESNO(child->iboost));
-		printf("\t\tOnboard LSPCON: %s\n", YESNO(child->lspcon));
-		printf("\t\tLane reversal: %s\n", YESNO(child->lane_reversal));
-		printf("\t\tEFP routed through dock: %s\n", YESNO(child->efp_routed));
+		if (context->bdb->version >= 218)
+			printf("\t\tUse VBT vswing/premph table: %s\n", YESNO(child->use_vbt_vswing));
+		if (context->bdb->version >= 196) {
+			printf("\t\tHPD sense invert: %s\n", YESNO(child->hpd_invert));
+			printf("\t\tIboost enable: %s\n", YESNO(child->iboost));
+		}
+		if (context->bdb->version >= 192)
+			printf("\t\tOnboard LSPCON: %s\n", YESNO(child->lspcon));
+		if (context->bdb->version >= 184)
+			printf("\t\tLane reversal: %s\n", YESNO(child->lane_reversal));
+		if (context->bdb->version >= 158)
+			printf("\t\tEFP routed through dock: %s\n", YESNO(child->efp_routed));
 
-		printf("\t\tTMDS compatible? %s\n", YESNO(child->tmds_support));
-		printf("\t\tDP compatible? %s\n", YESNO(child->dp_support));
-		printf("\t\tHDMI compatible? %s\n", YESNO(child->hdmi_support));
+		if (context->bdb->version >= 158) {
+			printf("\t\tTMDS compatible? %s\n", YESNO(child->tmds_support));
+			printf("\t\tDP compatible? %s\n", YESNO(child->dp_support));
+			printf("\t\tHDMI compatible? %s\n", YESNO(child->hdmi_support));
+		}
 
 		printf("\t\tAux channel: %s (0x%02x)\n",
 		       aux_ch(child->aux_channel), child->aux_channel);
