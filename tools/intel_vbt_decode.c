@@ -918,6 +918,17 @@ static const char *hdmi_frl_rate(u8 frl_rate)
 	}
 }
 
+static const char *i2c_speed(u8 i2c_speed)
+{
+	switch (i2c_speed) {
+	case 0: return "100 kHz";
+	case 1: return "50 kHz";
+	case 2: return "400 kHz";
+	case 3: return "1 MHz";
+	default: return "<unknown>";
+	}
+}
+
 static void dump_child_device(struct context *context,
 			      const struct child_device_config *child)
 {
@@ -934,7 +945,8 @@ static void dump_child_device(struct context *context,
 	if (context->bdb->version < 152) {
 		printf("\t\tSignature: %.*s\n", (int)sizeof(child->device_id), child->device_id);
 	} else {
-		printf("\t\tI2C speed: 0x%02x\n", child->i2c_speed);
+		printf("\t\tI2C speed: %s (0x%02x)\n",
+		       i2c_speed(child->i2c_speed), child->i2c_speed);
 		printf("\t\tDP onboard redriver:\n");
 		printf("\t\t\tpresent: %s\n",
 		       YESNO((child->dp_onboard_redriver_present)));
