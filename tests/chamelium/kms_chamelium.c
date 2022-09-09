@@ -2945,6 +2945,11 @@ igt_main
 
 	igt_describe("Tests that operate on all connectors");
 	igt_subtest_group {
+
+		igt_fixture {
+			igt_require(data.port_count);
+		}
+
 		igt_describe(test_suspend_resume_hpd_common_desc);
 		igt_subtest("common-hpd-after-suspend")
 			test_suspend_resume_hpd_common(&data,
