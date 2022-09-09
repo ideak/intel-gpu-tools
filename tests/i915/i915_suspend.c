@@ -43,6 +43,7 @@
 #include "igt.h"
 #include "igt_kmod.h"
 #include "igt_device.h"
+#include "igt_device_scan.h"
 
 #define OBJECT_SIZE (16*1024*1024)
 
@@ -206,13 +207,38 @@ test_forcewake(int fd, bool hibernate)
 static void
 test_suspend_without_i915(int state)
 {
+	struct igt_device_card card;
+	char d3cold_allowed[2];
+	int fd;
+
+	fd = __drm_open_driver(DRIVER_INTEL);
+	igt_devices_scan(false);
+
+	/*
+	 * When module is unloaded and s2idle is triggered, PCI core leaves the endpoint
+	 * in D0 and the bridge in D3 state causing PCIE spec violation and config space
+	 * is read as 0xFF. Keep the bridge in D0 before module unload to prevent
+	 * this issue
+	 */
+	if (state == SUSPEND_STATE_FREEZE &&
+	    igt_device_find_first_i915_discrete_card(&card)) {
+		igt_pm_get_d3cold_allowed(&card, d3cold_allowed);
+		igt_pm_set_d3cold_allowed(&card, "0\n");
+	}
+	close(fd);
+
 	igt_kmsg(KMSG_INFO "Unloading i915\n");
 	igt_assert_eq(igt_i915_driver_unload(),0);
 
 	igt_system_suspend_autoresume(state, SUSPEND_TEST_NONE);
 
+	if (state == SUSPEND_STATE_FREEZE && strlen(card.card))
+		igt_pm_set_d3cold_allowed(&card, d3cold_allowed);
+
 	igt_kmsg(KMSG_INFO "Re-loading i915 \n");
 	igt_assert_eq(igt_i915_driver_load(NULL), 0);
+
+	igt_devices_free();
 }
 
 int fd;
