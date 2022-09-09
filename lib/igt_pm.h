@@ -63,6 +63,8 @@ struct	igt_pm_pci_dev_pwrattr {
 	char autosuspend_delay[64];
 };
 
+struct igt_device_card;
+
 bool igt_setup_runtime_pm(int device);
 void igt_disable_runtime_pm(void);
 void igt_restore_runtime_pm(void);
@@ -76,6 +78,8 @@ enum igt_acpi_d_state
 igt_pm_get_acpi_real_d_state(struct pci_device *pci_dev);
 void igt_pm_enable_pci_card_runtime_pm(struct pci_device *root,
 				       struct pci_device *i915);
+void igt_pm_get_d3cold_allowed(struct igt_device_card *card, char *val);
+void igt_pm_set_d3cold_allowed(struct igt_device_card *card, const char *val);
 void igt_pm_setup_pci_card_runtime_pm(struct pci_device *pci_dev);
 void igt_pm_restore_pci_card_runtime_pm(void);
 void igt_pm_print_pci_card_runtime_status(void);
