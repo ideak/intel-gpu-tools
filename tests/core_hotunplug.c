@@ -187,6 +187,7 @@ static void driver_bind(struct hotunplug *priv, int timeout)
 	if (priv->snd_driver) {
 		igt_info("Realoading %s\n", priv->snd_driver);
 		igt_kmod_load(priv->snd_driver, NULL);
+		free(priv->snd_driver);
 		priv->snd_driver = NULL;
 	}
 }
