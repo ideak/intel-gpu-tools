@@ -387,6 +387,7 @@ static void tiling_tests(int fd)
 		f.pitches[0] = 1024*4;
 		igt_subtest("basic-y-tiled-legacy") {
 			igt_require(!gem_has_lmem(fd));
+			igt_require(gem_available_fences(fd) > 0);
 			f.handles[0] = tiled_y_bo;
 
 			igt_assert(drmIoctl(fd, DRM_IOCTL_MODE_ADDFB2, &f) == -1 &&
