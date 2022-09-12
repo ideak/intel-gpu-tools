@@ -215,6 +215,7 @@ i915_progs = [
 	'i915_hangman',
 	'i915_module_load',
 	'i915_pciid',
+	'i915_pipe_stress',
 	'i915_pm_backlight',
 	'i915_pm_lpsp',
 	'i915_pm_rpm',
