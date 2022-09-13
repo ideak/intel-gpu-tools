@@ -69,6 +69,15 @@ typedef struct {
 static bool dc_state_wait_entry(int drm_fd, int dc_flag, int prev_dc_count);
 static void check_dc_counter(data_t *data, int dc_flag, uint32_t prev_dc_count);
 
+static bool is_dgfx(data_t *data)
+{
+	char buf[4096];
+
+	igt_debugfs_simple_read(data->debugfs_fd, "i915_capabilities",
+				buf, sizeof(buf));
+	return strstr(buf, "is_dgfx: yes");
+}
+
 static void setup_output(data_t *data)
 {
 	igt_display_t *display = &data->display;
@@ -424,15 +433,6 @@ static void check_dc9(data_t *data, int dc_target, int prev_dc)
 			data->debugfs_dump = igt_sysfs_get(data->debugfs_fd, RPM_STATUS));
 }
 
-static bool check_is_dgfx(data_t *data)
-{
-	char buf[4096];
-
-	igt_debugfs_simple_read(data->debugfs_fd, "i915_gpu_info",
-				buf, sizeof(buf));
-	return strstr(buf, "is_dgfx: yes");
-}
-
 static void setup_dc9_dpms(data_t *data, int dc_target)
 {
 	int prev_dc, sysfs_fd;
@@ -542,7 +542,7 @@ int main(int argc, char *argv[])
 
 	igt_describe("This test validates display engine entry to DC9 state");
 	igt_subtest("dc9-dpms") {
-		if (!(check_is_dgfx(&data)))
+		if (!(is_dgfx(&data)))
 			igt_require_f(igt_pm_pc8_plus_residencies_enabled(data.msr_fd),
 				      "PC8+ residencies not supported\n");
 		test_dc9_dpms(&data);
