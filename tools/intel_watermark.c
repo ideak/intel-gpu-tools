@@ -131,6 +131,11 @@ static char endis_ast(bool enabled)
 	return enabled ? '*' : ' ';
 }
 
+static bool is_cursor(int plane)
+{
+	return plane == 0;
+}
+
 static int skl_num_pipes(uint32_t d)
 {
 	return intel_gen(d) >= 12 ? 4 : 3;
@@ -183,7 +188,7 @@ static const char *skl_plane_name(int plane)
 {
 	static char name[32];
 
-	if (plane == 0)
+	if (is_cursor(plane))
 		snprintf(name, sizeof(name), "CURSOR");
 	else
 		snprintf(name, sizeof(name), "PLANE_%1d", plane);
@@ -204,7 +209,7 @@ static const char *skl_plane_ctl_reg_name(int plane)
 {
 	static char reg_name[32];
 
-	if (plane == 0)
+	if (is_cursor(plane))
 		snprintf(reg_name, sizeof(reg_name), "CUR_CTL");
 	else
 		snprintf(reg_name, sizeof(reg_name), "PLANE_CTL_%1d", plane);
@@ -216,7 +221,7 @@ static const char *skl_wm_reg_name(int plane, int level)
 {
 	static char reg_name[32];
 
-	if (plane == 0)
+	if (is_cursor(plane))
 		snprintf(reg_name, sizeof(reg_name), "CUR_WM_%1d", level);
 	else
 		snprintf(reg_name, sizeof(reg_name), "PLANE_WM_%1d_%1d", plane, level);
@@ -228,7 +233,7 @@ static const char *skl_wm_trans_reg_name(int plane)
 {
 	static char reg_name[32];
 
-	if (plane == 0)
+	if (is_cursor(plane))
 		snprintf(reg_name, sizeof(reg_name), "CUR_WM_TRANS");
 	else
 		snprintf(reg_name, sizeof(reg_name), "PLANE_WM_TRANS_%1d", plane);
@@ -240,7 +245,7 @@ static const char *skl_wm_sagv_reg_name(int plane)
 {
 	static char reg_name[32];
 
-	if (plane == 0)
+	if (is_cursor(plane))
 		snprintf(reg_name, sizeof(reg_name), "CUR_WM_SAGV");
 	else
 		snprintf(reg_name, sizeof(reg_name), "PLANE_WM_SAGV_%1d", plane);
@@ -252,7 +257,7 @@ static const char *skl_wm_sagv_trans_reg_name(int plane)
 {
 	static char reg_name[32];
 
-	if (plane == 0)
+	if (is_cursor(plane))
 		snprintf(reg_name, sizeof(reg_name), "CUR_WM_SAGV_TRANS");
 	else
 		snprintf(reg_name, sizeof(reg_name), "PLANE_WM_SAGV_TRANS_%1d", plane);
@@ -264,7 +269,7 @@ static const char *skl_buf_cfg_reg_name(int plane)
 {
 	static char reg_name[32];
 
-	if (plane == 0)
+	if (is_cursor(plane))
 		snprintf(reg_name, sizeof(reg_name), "CUR_BUF_CFG");
 	else
 		snprintf(reg_name, sizeof(reg_name), "PLANE_BUF_CFG_%1d", plane);
@@ -328,7 +333,7 @@ static void skl_wm_dump(void)
 			plane_ctl[pipe][plane] = read_reg(addr + 0x80);
 			wm_trans[pipe][plane] = read_reg(addr + 0x00168);
 			buf_cfg[pipe][plane] = read_reg(addr + 0x0017C);
-			if (plane != 0 && intel_gen(devid) < 11)
+			if (!is_cursor(plane) && intel_gen(devid) < 11)
 				nv12_buf_cfg[pipe][plane] = read_reg(addr + 0x00178);
 			else
 				nv12_buf_cfg[pipe][plane] = 0;
@@ -431,7 +436,7 @@ static void skl_wm_dump(void)
 		if (intel_gen(devid) >= 11)
 			continue;
 
-		if (plane == 0)
+		if (is_cursor(plane))
 			continue;
 
 		printf("%21s\t", skl_nv12_buf_cfg_reg_name(plane));
@@ -458,7 +463,7 @@ static void skl_wm_dump(void)
 
 		printf("     LEVEL");
 		for (plane = 0; plane < num_planes; plane++) {
-			if (plane == 0)
+			if (is_cursor(plane))
 				enable = REG_DECODE1(plane_ctl[pipe][plane], 0, 3) ||
 					REG_DECODE1(plane_ctl[pipe][plane], 5, 1);
 			else
