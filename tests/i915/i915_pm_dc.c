@@ -472,7 +472,6 @@ static void setup_dc9_dpms(data_t *data, int dc_target)
 	}
 	prev_rpm = read_runtime_suspended_time(data->drm_fd);
 	dpms_off(data);
-	sleep(1); /* wait for counters reset*/
 	check_dc9(data, dc_target, prev_dc, prev_rpm);
 	dpms_on(data);
 }
