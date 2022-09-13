@@ -55,6 +55,7 @@ struct hotunplug {
 	bool need_healthcheck;
 	bool has_intel_perf;
  	char *snd_driver;
+	int chipset;
 };
 
 /* Helpers */
@@ -397,7 +398,7 @@ static void node_healthcheck(struct hotunplug *priv, unsigned flags)
 	if (closed)	/* store fd for cleanup if not dirty */
 		priv->fd.drm_hc = fd_drm;
 
-	if (is_i915_device(fd_drm)) {
+	if (priv->chipset == DRIVER_INTEL) {
 		/* don't report library failed asserts as healthcheck failure */
 		priv->failure = "Unrecoverable test failure";
 		if (local_i915_healthcheck(fd_drm, "") &&
@@ -625,6 +626,7 @@ igt_main
 		.need_healthcheck = true,
 		.has_intel_perf = false,
 		.snd_driver	= NULL,
+		.chipset	= DRIVER_ANY,
 	};
 
 	igt_fixture {
@@ -634,6 +636,8 @@ igt_main
 		igt_skip_on_f(fd_drm < 0, "No known DRM device found\n");
 
 		if (is_i915_device(fd_drm)) {
+			priv.chipset = DRIVER_INTEL;
+
 			gem_quiescent_gpu(fd_drm);
 			igt_require_gem(fd_drm);
 
