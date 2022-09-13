@@ -44,6 +44,8 @@
 #define KMS_HELPER "/sys/module/drm_kms_helper/parameters/"
 #define KMS_POLL_DISABLE 0
 
+IGT_TEST_DESCRIPTION("Tests to validate display power DC states.");
+
 bool kms_poll_saved_state;
 
 typedef struct {
@@ -473,7 +475,6 @@ static void kms_poll_state_restore(int sig)
 	}
 }
 
-IGT_TEST_DESCRIPTION("These tests validate Display Power DC states");
 int main(int argc, char *argv[])
 {
 	data_t data = {};
