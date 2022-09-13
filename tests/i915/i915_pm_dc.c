@@ -496,11 +496,10 @@ static void kms_poll_state_restore(int sig)
 	}
 }
 
-int main(int argc, char *argv[])
+igt_main
 {
 	data_t data = {};
 
-	igt_subtest_init(argc, argv);
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
 		data.debugfs_fd = igt_debugfs_dir(data.drm_fd);
