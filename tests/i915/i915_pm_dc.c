@@ -31,8 +31,11 @@
 #include "igt_kmod.h"
 #include "igt_psr.h"
 #include "igt_sysfs.h"
+#include "igt_device.h"
+#include "igt_device_scan.h"
 #include "limits.h"
 #include "time.h"
+#include "igt_pm.h"
 
 /* DC State Flags */
 #define CHECK_DC5	(1 << 0)
@@ -43,6 +46,7 @@
 #define RPM_STATUS "i915_runtime_pm_status"
 #define KMS_HELPER "/sys/module/drm_kms_helper/parameters/"
 #define KMS_POLL_DISABLE 0
+#define DC9_RESETS_DC_COUNTERS(devid) (!(IS_DG1(devid) || IS_DG2(devid)))
 
 IGT_TEST_DESCRIPTION("Tests to validate display power DC states.");
 
@@ -416,42 +420,60 @@ static bool support_dc6(int debugfs_fd)
 	return strstr(buf, "DC5 -> DC6 count");
 }
 
-static bool dc9_wait_entry(uint32_t debugfs_fd, int dc_target, int prev_dc, int seconds)
+static int read_runtime_suspended_time(int drm_fd)
 {
-	/*
-	 * since we do not have DC9 counter,
-	 * so we rely on dc5/dc6 counter reset to check if display engine was in DC9.
-	 */
-	return igt_wait(read_dc_counter(debugfs_fd, dc_target) <
-			prev_dc, seconds, 100);
+	struct pci_device *i915;
+	int ret;
+
+	i915 = igt_device_get_pci_device(drm_fd);
+	ret = igt_pm_get_runtime_suspended_time(i915);
+	igt_assert_lte(0, ret);
+
+	return ret;
 }
 
-static void check_dc9(data_t *data, int dc_target, int prev_dc)
+static bool dc9_wait_entry(data_t *data, int dc_target, int prev_dc, int prev_rpm, int msecs)
 {
-	igt_assert_f(dc9_wait_entry(data->debugfs_fd, dc_target, prev_dc, 3000),
+	/*
+	 * Runtime suspended residency should increment once DC9 is achieved;
+	 * this condition is valid for all platforms.
+	 * However, resetting of dc5/dc6 counter to check if display engine was in DC9;
+	 * this condition at present can be skipped for dg1 and dg2 platforms.
+	 */
+	return igt_wait((read_runtime_suspended_time(data->drm_fd) > prev_rpm) &&
+			(!DC9_RESETS_DC_COUNTERS(data->devid) ||
+			(read_dc_counter(data->debugfs_fd, dc_target) < prev_dc)), msecs, 1000);
+}
+
+static void check_dc9(data_t *data, int dc_target, int prev_dc, int prev_rpm)
+{
+	igt_assert_f(dc9_wait_entry(data, dc_target, prev_dc, prev_rpm, 3000),
 			"DC9 state is not achieved\n%s:\n%s\n", RPM_STATUS,
 			data->debugfs_dump = igt_sysfs_get(data->debugfs_fd, RPM_STATUS));
 }
 
 static void setup_dc9_dpms(data_t *data, int dc_target)
 {
-	int prev_dc, sysfs_fd;
+	int prev_dc = 0, prev_rpm, sysfs_fd;
 
 	igt_require((sysfs_fd = open(KMS_HELPER, O_RDONLY)) >= 0);
 	kms_poll_saved_state = igt_sysfs_get_boolean(sysfs_fd, "poll");
 	igt_sysfs_set_boolean(sysfs_fd, "poll", KMS_POLL_DISABLE);
 	close(sysfs_fd);
-	prev_dc = read_dc_counter(data->debugfs_fd, dc_target);
-	setup_dc_dpms(data);
-	dpms_off(data);
-	igt_skip_on_f(!(igt_wait(read_dc_counter(data->debugfs_fd, dc_target) >
+	if (DC9_RESETS_DC_COUNTERS(data->devid)) {
+		prev_dc = read_dc_counter(data->debugfs_fd, dc_target);
+		setup_dc_dpms(data);
+		dpms_off(data);
+		igt_skip_on_f(!(igt_wait(read_dc_counter(data->debugfs_fd, dc_target) >
 				prev_dc, 3000, 100)), "Unable to enters shallow DC states\n");
-	prev_dc = read_dc_counter(data->debugfs_fd, dc_target);
-	dpms_on(data);
-	cleanup_dc_dpms(data);
+		prev_dc = read_dc_counter(data->debugfs_fd, dc_target);
+		dpms_on(data);
+		cleanup_dc_dpms(data);
+	}
+	prev_rpm = read_runtime_suspended_time(data->drm_fd);
 	dpms_off(data);
 	sleep(1); /* wait for counters reset*/
-	check_dc9(data, dc_target, prev_dc);
+	check_dc9(data, dc_target, prev_dc, prev_rpm);
 	dpms_on(data);
 }
 
