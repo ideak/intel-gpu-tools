@@ -954,6 +954,20 @@ static int igt_pm_get_power_attr_fd(struct pci_device *pci_dev, const char *attr
 	return fd;
 }
 
+static int igt_pm_get_power_attr_fd_rdonly(struct pci_device *pci_dev, const char *attr)
+{
+	char name[PATH_MAX];
+	int fd;
+
+	snprintf(name, PATH_MAX, "/sys/bus/pci/devices/%04x:%02x:%02x.%01x/power/%s",
+		 pci_dev->domain, pci_dev->bus, pci_dev->dev, pci_dev->func, attr);
+
+	fd = open(name, O_RDONLY);
+	igt_assert_f(fd >= 0, "Can't open %s\n", attr);
+
+	return fd;
+}
+
 static bool igt_pm_read_power_attr(int fd, char *attr, int len, bool autosuspend_delay)
 {
 	int size;
@@ -1265,4 +1279,22 @@ bool i915_is_slpc_enabled(int fd)
 		return false;
 	else
 		return strstr(buf, "SLPC state: running");
+}
+
+int igt_pm_get_runtime_suspended_time(struct pci_device *pci_dev)
+{
+	char time_str[64];
+	int time, time_fd;
+
+	time_fd = igt_pm_get_power_attr_fd_rdonly(pci_dev, "runtime_suspended_time");
+	if (igt_pm_read_power_attr(time_fd, time_str, 64, false)) {
+		igt_assert(sscanf(time_str, "%d", &time) > 0);
+
+		igt_debug("runtime suspend time for PCI '%04x:%02x:%02x.%01x' = %d\n",
+			  pci_dev->domain, pci_dev->bus, pci_dev->dev, pci_dev->func, time);
+
+		return time;
+	}
+
+	return -1;
 }
