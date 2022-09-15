@@ -857,8 +857,8 @@ if ($only_i915) {
 
 if ($only_drm) {
 	# Please keep in sync with the documentation
-	push @src_exclude_regexes, "trace.*\.h";
-	push @src_exclude_regexes, "drm.*\.h";
+	push @src_exclude_regexes, "trace.*\.h\$";
+	push @src_exclude_regexes, "^/drm/";
 }
 
 $str = open_filter_file($func_filters, \@func_regexes, \@func_exclude_regexes);
@@ -1051,7 +1051,9 @@ E. g. it will exclude *.h files that match the following regular expressions:
 
 And *.h files that don't match:
 
-	- drm
+	- /drm/
+
+(e. g. macros and other code outside DRM subsystem)
 
 =item B<--only-i915> or B<--only_i915>
 
