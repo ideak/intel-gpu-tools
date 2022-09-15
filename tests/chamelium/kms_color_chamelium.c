@@ -443,7 +443,7 @@ static int test_setup(data_t *data, enum pipe p)
 		}
 	}
 
-	return 0;
+	return -1;
 }
 
 static void
@@ -452,7 +452,7 @@ run_gamma_degamma_tests_for_pipe(data_t *data, enum pipe p,
 {
 	int port_idx = test_setup(data, p);
 
-	igt_require(port_idx);
+	igt_require(port_idx >= 0);
 
 	data->color_depth = 8;
 	data->drm_format = DRM_FORMAT_XRGB8888;
@@ -476,7 +476,7 @@ run_ctm_tests_for_pipe(data_t *data, enum pipe p,
 	};
 	int port_idx = test_setup(data, p);
 
-	igt_require(port_idx);
+	igt_require(port_idx >= 0);
 	/*
 	 * CherryView generates values on 10bits that we
 	 * produce with an 8 bits per color framebuffer.
@@ -531,7 +531,7 @@ run_limited_range_ctm_test_for_pipe(data_t *data, enum pipe p,
 {
 	int port_idx = test_setup(data, p);
 
-	igt_require(port_idx);
+	igt_require(port_idx >= 0);
 	igt_require(igt_output_has_prop(data->output, IGT_CONNECTOR_BROADCAST_RGB));
 
 	data->color_depth = 8;
