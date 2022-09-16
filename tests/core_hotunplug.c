@@ -463,7 +463,12 @@ static void pre_check(struct hotunplug *priv)
 
 static void recover(struct hotunplug *priv)
 {
+	bool late_close = priv->fd.drm >= 0;
+
 	cleanup(priv);
+
+	if (!priv->failure && late_close)
+		igt_ignore_warn(healthcheck(priv, false));
 
 	/* unbind the driver from a possibly hot rebound unhealthy device */
 	if (!faccessat(priv->fd.sysfs_drv, priv->dev_bus_addr, F_OK, 0) &&
