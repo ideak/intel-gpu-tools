@@ -650,7 +650,7 @@ sub generate_report($)
 	} else {
 		print OUT "    <td>N. A.</td>\n";
 	}
-	print OUT "  <td>" . $stats{"func_count"} . "</td>";
+	print OUT "    <td>" . $stats{"func_count"} . "</td>\n";
 	print OUT "  </tr><tr>\n";
 
 	print OUT "    <td><b>Branches</b></td>\n";
@@ -671,7 +671,7 @@ sub generate_report($)
 	} else {
 		print OUT "    <td>N. A.</td>\n";
 	}
-	print OUT "  <td>" . $stats{"branch_count"} . "</td>";
+	print OUT "    <td>" . $stats{"branch_count"} . "</td>\n";
 	print OUT "  </tr><tr>\n";
 
 	print OUT "    <td><b>Lines</b></td>\n";
@@ -693,7 +693,7 @@ sub generate_report($)
 	} else {
 		print OUT "    <td>N. A.</td>\n";
 	}
-	print OUT "  <td>" . $stats{"line_count"} . "</td>";
+	print OUT "    <td>" . $stats{"line_count"} . "</td>\n";
 
 	# If there are more than one tests per file, report them
 	my $total = scalar(keys %test_names);
