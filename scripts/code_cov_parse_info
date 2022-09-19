@@ -228,7 +228,7 @@ sub parse_info_data($)
 
 		# BRF:<number of branches found>
 		if (m/^BRF:(-?\d+)/) {
-			$record{$source}{brf} = $1;
+			$record{$source}{$func}{brf} = $1;
 			next;
 		}
 		# BRH:<number of branches hit>
