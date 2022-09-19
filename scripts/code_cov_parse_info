@@ -574,6 +574,8 @@ sub generate_report($)
 	%used_source = ();
 	%files = ();
 	%test_names = ();
+	my @all_func_keys;
+	my %info_files_with_func;
 
 	foreach my $f (@info_files) {
 		foreach my $source (keys(%{$report{$f}{"all_line"}})) {
@@ -586,6 +588,14 @@ sub generate_report($)
 			foreach my $file (keys(%{$report{$f}{"all_func"}{$func}})) {
 				$all_func{$func}{$file}->{ln} = $report{$f}{"all_func"}{$func}{$file}->{ln};
 				$used_func{$func}->{$file} = 1 if ($report{$f}{"used_func"}{$func}->{$file});
+				if ($report{$f}{"used_func"}{$func}->{$file}) {
+					$used_func{$func}->{$file} = 1;
+					if (!$info_files_with_func{"$file $func"}) {
+						$info_files_with_func{"$file $func"} = 1;
+					} else {
+						$info_files_with_func{"$file $func"}++;
+					}
+				}
 			}
 		}
 		foreach my $source (keys(%{$report{$f}{"all_branch"}})) {
@@ -602,6 +612,25 @@ sub generate_report($)
 		}
 	}
 	gen_stats();
+
+	# Gen code coverage set comparision counters
+	my $common_func_count = 0;
+	foreach my $k (keys %info_files_with_func) {
+		$common_func_count++ if ($info_files_with_func{$k} == scalar (@info_files));
+	}
+	foreach my $f (@info_files) {
+		$report{$f}{"more_func"} = 0;
+		$report{$f}{"uniq_func"} = 0;
+		foreach my $func (keys(%{$report{$f}{"all_func"}})) {
+			foreach my $file (keys(%{$report{$f}{"all_func"}{$func}})) {
+				next if (!$report{$f}{"used_func"}{$func}->{$file});
+				next if ($info_files_with_func{"$file $func"} == scalar (@info_files));
+
+				$report{$f}{"more_func"}++;
+				$report{$f}{"uniq_func"}++ if ($info_files_with_func{"$file $func"} == 1);
+			}
+		}
+	}
 
 	# Colors for the html output
 
@@ -719,6 +748,58 @@ sub generate_report($)
 
 	}
 	print OUT "  </tr>\n</table><p/>\n\n";
+
+	# Print function diff
+	print OUT "  <h2>Differences on function coverage</h2>\n";
+	print OUT "<table width=\"100%\" border=1 cellspacing=0 cellpadding=0>\n  <tr>\n";
+	print OUT "    <th></th>\n";
+	print OUT "    <th>Common to all</th>\n";
+	foreach my $f (@info_files) {
+		print OUT "    <th>$f</th>\n";
+	}
+	print OUT "    <th>TOTAL</th>\n";
+
+	print OUT "  </tr><tr>\n";
+	print OUT "    <td>#Functions per category</td>\n";
+
+	printf OUT "    <td>%d</td>\n", $common_func_count;
+
+	foreach my $f (@info_files) {
+		my %st = %{$report{$f}{"stats"}};
+		if ($st{"func_count"}) {
+			printf OUT "    <td>%d</td>\n", $st{"func_used"};
+
+		}
+	}
+	print OUT "    <td>" . $stats{"func_count"} . "</td>\n";
+
+	print OUT "  </tr><tr>\n";
+	print OUT "    <td>#functions not in common</td>\n";
+	print OUT "    <td></td>\n";
+	foreach my $f (@info_files) {
+		my %st = %{$report{$f}{"stats"}};
+		if ($st{"func_count"}) {
+			printf OUT "    <td>%d</td>\n", $report{$f}{"more_func"};
+
+		}
+	}
+	print OUT "    <td></td>\n";
+
+	print OUT "  </tr><tr>\n";
+	print OUT "    <td>Unique functions</td>\n";
+	print OUT "    <td></td>\n";
+	foreach my $f (@info_files) {
+		my %st = %{$report{$f}{"stats"}};
+		if ($st{"func_count"}) {
+			printf OUT "    <td>%d</td>\n", $report{$f}{"uniq_func"};
+
+		}
+	}
+	print OUT "    <td></td>\n";
+
+	print OUT "  </tr>\n</table><p/>\n\n";
+
+	# Print the filters applied when generating the report
 
 	if ($filter_str ne "") {
 		printf OUT "<p>Filters: %s.</p>\n", $filter_str;
