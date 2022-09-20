@@ -185,6 +185,7 @@ static void do_single_test(data_t *data, int x, int y, bool hw_test,
 	igt_pipe_crc_t *pipe_crc = data->pipe_crc;
 	igt_crc_t crc;
 	int ret = 0, swbufidx;
+	int vblank_wait_count = is_msm_device(data->drm_fd) ? 2 : 1;
 
 	igt_print_activity();
 
@@ -202,8 +203,8 @@ static void do_single_test(data_t *data, int x, int y, bool hw_test,
 		igt_display_commit(display);
 
 		/* Extra vblank wait is because nonblocking cursor ioctl */
-		igt_wait_for_vblank(data->drm_fd,
-				display->pipes[data->pipe].crtc_offset);
+		igt_wait_for_vblank_count(data->drm_fd,
+				display->pipes[data->pipe].crtc_offset, vblank_wait_count);
 
 		igt_pipe_crc_get_current(data->drm_fd, pipe_crc, hwcrc);
 
@@ -243,8 +244,8 @@ static void do_single_test(data_t *data, int x, int y, bool hw_test,
 		igt_plane_set_fb(data->primary, &data->primary_fb[swbufidx]);
 
 		igt_display_commit(display);
-		igt_wait_for_vblank(data->drm_fd,
-				display->pipes[data->pipe].crtc_offset);
+		igt_wait_for_vblank_count(data->drm_fd,
+				display->pipes[data->pipe].crtc_offset, vblank_wait_count);
 
 		igt_pipe_crc_get_current(data->drm_fd, pipe_crc, &crc);
 		igt_assert_crc_equal(&crc, hwcrc);
