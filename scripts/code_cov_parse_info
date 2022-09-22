@@ -136,7 +136,9 @@ sub parse_info_data($)
 		# Function coverage
 
 		# FN:<line number of function start>,<function name>
-		if (m/^FN:(-?\d+),(.*)/) {
+		# Note: /w+ intentionally removes IPA gcc-optimization names, as
+		# this is more related to branch coverage
+		if (m/^FN:(-?\d+),(\w+)/) {
 			my $ln = $1;
 
 			$func = $2;
@@ -156,7 +158,9 @@ sub parse_info_data($)
 
 		# Parse functions that were actually used
 		# FNDA:<execution count>,<function name>
-		if (m/^FNDA:(-?\d+),(.*)/) {
+		# Note: /w+ intentionally removes IPA gcc-optimization names, as
+		# this is more related to branch coverage
+		if (m/^FNDA:(-?\d+),(\w+)/) {
 			my $count = $1;
 
 			# Negative gcov results are possible, as reported at:
