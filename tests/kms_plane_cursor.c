@@ -87,8 +87,6 @@ static void test_init(data_t *data, enum pipe pipe_id, igt_output_t *output)
 	data->pipe_crc = igt_pipe_crc_new(data->drm_fd, data->pipe_id,
 					  INTEL_PIPE_CRC_SOURCE_AUTO);
 
-	igt_output_set_pipe(data->output, data->pipe_id);
-
 	/* Overlay rectangle for a rect in the center of the screen */
 	data->or.x = data->mode->hdisplay / 4;
 	data->or.y = data->mode->vdisplay / 4;
@@ -244,6 +242,7 @@ static void test_cursor(data_t *data, int size, unsigned int flags)
 			    1.0, 0.0, 1.0, &data->cfb);
 
 	igt_plane_set_fb(data->primary, &data->pfb);
+	igt_output_set_pipe(data->output, data->pipe_id);
 	igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
 	test_cursor_spots(data, size, flags);
