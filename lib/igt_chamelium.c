@@ -183,6 +183,20 @@ unsigned int chamelium_port_get_type(const struct chamelium_port *port) {
 }
 
 /**
+ * chamelium_port_get_name:
+ * @port: The chamelium port to retrieve the name of
+ *
+ * Gets the name of the DRM connector corresponding to the given Chamelium
+ * port.
+ *
+ * Returns: the name of the DRM connector
+ */
+const char *chamelium_port_get_name(struct chamelium_port *port)
+{
+	return port->name;
+}
+
+/**
  * chamelium_port_get_connector:
  * @chamelium: The Chamelium instance to use
  * @port: The chamelium port to retrieve the DRM connector for
@@ -197,30 +211,79 @@ drmModeConnector *chamelium_port_get_connector(struct chamelium *chamelium,
 					       struct chamelium_port *port,
 					       bool reprobe)
 {
-	drmModeConnector *connector;
+	typedef drmModeConnectorPtr (*getConnectorPtr)(int fd,
+						       uint32_t connector_id);
 
-	if (reprobe)
-		connector = drmModeGetConnector(chamelium->drm_fd,
-						port->connector_id);
-	else
-		connector = drmModeGetConnectorCurrent(
-		    chamelium->drm_fd, port->connector_id);
+	drmModeRes *res = NULL;
+	int i;
 
+	bool is_mst_port = !!port->connector_path;
+	getConnectorPtr getConnector = reprobe ? &drmModeGetConnector :
+						 &drmModeGetConnectorCurrent;
+	int drm_fd = chamelium->drm_fd;
+	drmModeConnector *connector = getConnector(drm_fd, port->connector_id);
+
+	/* If the port isn't MST, then the connector ID should be consistent to grab the connector. */
+	if (!is_mst_port) {
+		return connector;
+	}
+
+	/* If the port is MST, then we need to find the connector ID from the path. */
+
+	/* In case the connector ID is still valid, do a quick check if we're have the connector we expect. 
+	 * Otherwise, read the new resources and find the new connector we're looking for. */
+	if (connector) {
+		drmModePropertyBlobPtr path_blob =
+			kmstest_get_path_blob(drm_fd, connector->connector_id);
+		if (path_blob) {
+			bool is_correct_connector =
+				strcmp(port->connector_path, path_blob->data) ==
+				0;
+			drmModeFreePropertyBlob(path_blob);
+			if (is_correct_connector)
+				return connector;
+		}
+
+		drmModeFreeConnector(connector);
+		connector = NULL;
+	}
+
+	res = drmModeGetResources(drm_fd);
+	for (i = 0; i < res->count_connectors; i++) {
+		drmModePropertyBlobPtr path_blob = NULL;
+
+		connector = getConnector(drm_fd, res->connectors[i]);
+		/* Check if the connector is not disconnected and in zombie mode. */
+		if (!connector)
+			continue;
+		/* Check if the connector is MST. */
+		path_blob =
+			kmstest_get_path_blob(drm_fd, connector->connector_id);
+		if (!path_blob)
+			continue;
+
+		if (strcmp(path_blob->data, port->connector_path) == 0) {
+			char connector_name[50];
+			/* At finding the connector, update its metadata. */
+			port->connector_id = connector->connector_id;
+
+			snprintf(connector_name, 50, "%s-%u",
+				 kmstest_connector_type_str(
+					 connector->connector_type),
+				 connector->connector_type_id);
+			port->name = strdup(connector_name);
+
+			goto out;
+		}
+
+		drmModeFreePropertyBlob(path_blob);
+		drmModeFreeConnector(connector);
+		connector = NULL;
+	}
+
+out:
+	drmModeFreeResources(res);
 	return connector;
-}
-
-/**
- * chamelium_port_get_name:
- * @port: The chamelium port to retrieve the name of
- *
- * Gets the name of the DRM connector corresponding to the given Chamelium
- * port.
- *
- * Returns: the name of the DRM connector
- */
-const char *chamelium_port_get_name(struct chamelium_port *port)
-{
-	return port->name;
 }
 
 /**
@@ -2862,7 +2925,7 @@ struct chamelium *chamelium_init(int drm_fd)
 		bool type_mismatch = false;
 		struct chamelium_port * port = &chamelium->ports[i];
 		drmModeConnectorPtr connector =
-			drmModeGetConnectorCurrent(drm_fd, port->connector_id);
+			chamelium_port_get_connector(chamelium, port, false);
 
 		igt_assert(connector != NULL);
 

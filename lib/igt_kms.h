@@ -234,6 +234,7 @@ bool kmstest_get_connector_default_mode(int drm_fd, drmModeConnector *connector,
 bool kmstest_get_connector_config(int drm_fd, uint32_t connector_id,
 				  unsigned long crtc_idx_mask,
 				  struct kmstest_connector_config *config);
+drmModePropertyBlobPtr kmstest_get_path_blob(int drm_fd, uint32_t connector_id);
 bool kmstest_probe_connector_config(int drm_fd, uint32_t connector_id,
 				    unsigned long crtc_idx_mask,
 				    struct kmstest_connector_config *config);

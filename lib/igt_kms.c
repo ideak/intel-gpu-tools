@@ -1786,6 +1786,22 @@ bool kmstest_get_connector_config(int drm_fd, uint32_t connector_id,
 					 config, 0);
 }
 
+drmModePropertyBlobPtr kmstest_get_path_blob(int drm_fd, uint32_t connector_id)
+{
+	uint64_t path_blob_id = 0;
+	drmModePropertyBlobPtr path_blob = NULL;
+
+	if (!kmstest_get_property(drm_fd, connector_id,
+				  DRM_MODE_OBJECT_CONNECTOR, "PATH", NULL,
+				  &path_blob_id, NULL)) {
+		return NULL;
+	}
+
+	path_blob = drmModeGetPropertyBlob(drm_fd, path_blob_id);
+	igt_assert(path_blob);
+	return path_blob;
+}
+
 /**
  * kmstest_probe_connector_config:
  * @drm_fd: DRM fd
