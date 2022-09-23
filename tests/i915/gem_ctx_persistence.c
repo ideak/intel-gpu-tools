@@ -1214,7 +1214,7 @@ static void do_test(void (*test)(int i915, const intel_ctx_cfg_t *cfg,
 	if (timeout != -1) {
 		igt_require(gem_engine_property_printf(i915, name,
 						       ATTR, "%d", 50) > 0);
-		reset_timeout_ms = 200;
+		reset_timeout_ms = 700;
 	}
 
 	test(i915, cfg, engine);
