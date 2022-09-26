@@ -513,7 +513,7 @@ run_ctm_tests_for_pipe(data_t *data, enum pipe p,
 			expected_colors[0].r =
 				expected_colors[1].g =
 				expected_colors[2].b =
-				0.5 + delta * (i - 2);
+				ctm[0] + delta * (i - (iter / 2));
 			if (test_pipe_ctm(data, data->primary,
 					  red_green_blue, expected_colors,
 					  ctm, data->ports[port_idx])) {
