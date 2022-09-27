@@ -1254,24 +1254,29 @@ void gen12_render_clearfunc(struct intel_bb *ibb,
 			    unsigned int width, unsigned int height,
 			    const float clear_color[4])
 {
-	if (!HAS_4TILE(ibb->devid)) {
-		struct aux_pgtable_info pgtable_info = { };
+	struct aux_pgtable_info pgtable_info = { };
 
-		gen12_aux_pgtable_init(&pgtable_info, ibb, NULL, dst);
+	gen12_aux_pgtable_init(&pgtable_info, ibb, NULL, dst);
 
-		_gen9_render_op(ibb, NULL, 0, 0,
-				width, height, dst, dst_x, dst_y,
-				pgtable_info.pgtable_buf,
-				clear_color,
-				gen12_render_copy,
-				sizeof(gen12_render_copy));
-		gen12_aux_pgtable_cleanup(ibb, &pgtable_info);
-	} else {
-			_gen9_render_op(ibb, NULL, 0, 0,
-					width, height, dst, dst_x, dst_y,
-					NULL,
-					clear_color,
-					gen12p71_render_copy,
-					sizeof(gen12p71_render_copy));
-	}
+	_gen9_render_op(ibb, NULL, 0, 0,
+			width, height, dst, dst_x, dst_y,
+			pgtable_info.pgtable_buf,
+			clear_color,
+			gen12_render_copy,
+			sizeof(gen12_render_copy));
+	gen12_aux_pgtable_cleanup(ibb, &pgtable_info);
+}
+
+void gen12p71_render_clearfunc(struct intel_bb *ibb,
+			       struct intel_buf *dst,
+			       unsigned int dst_x, unsigned int dst_y,
+			       unsigned int width, unsigned int height,
+			       const float clear_color[4])
+{
+	_gen9_render_op(ibb, NULL, 0, 0,
+			width, height, dst, dst_x, dst_y,
+			NULL,
+			clear_color,
+			gen12p71_render_copy,
+			sizeof(gen12p71_render_copy));
 }

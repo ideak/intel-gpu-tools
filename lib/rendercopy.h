@@ -23,6 +23,10 @@ static inline void emit_vertex_normalized(struct intel_bb *ibb,
 	intel_bb_out(ibb, u.ui);
 }
 
+void gen12p71_render_clearfunc(struct intel_bb *ibb,
+			       struct intel_buf *dst, unsigned int dst_x, unsigned int dst_y,
+			       unsigned int width, unsigned int height,
+			       const float clear_color[4]);
 void gen12_render_clearfunc(struct intel_bb *ibb,
 			    struct intel_buf *dst, unsigned int dst_x, unsigned int dst_y,
 			    unsigned int width, unsigned int height,

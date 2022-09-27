@@ -1166,7 +1166,13 @@ igt_vebox_copyfunc_t igt_get_vebox_copyfunc(int devid)
 
 igt_render_clearfunc_t igt_get_render_clearfunc(int devid)
 {
-	return IS_GEN12(devid) ? gen12_render_clearfunc : NULL;
+	if (IS_DG2(devid)) {
+		return gen12p71_render_clearfunc;
+	} else if (IS_GEN12(devid)) {
+		return gen12_render_clearfunc;
+	} else {
+		return NULL;
+	}
 }
 
 /**
