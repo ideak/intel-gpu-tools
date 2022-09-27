@@ -725,18 +725,6 @@ static void set_mode_for_params(struct modeset_params *params)
 	igt_display_commit(&drm.display);
 }
 
-static void __debugfs_read(const char *param, char *buf, int len)
-{
-	len = igt_debugfs_simple_read(drm.debugfs, param, buf, len);
-	if (len < 0)
-		igt_assert(len == -ENOENT || len == -ENODEV);
-}
-
-static int __debugfs_write(const char *param, char *buf, int len)
-{
-	return igt_sysfs_write(drm.debugfs, param, buf, len - 1);
-}
-
 static void __debugfs_read_crtc(const char *param, char *buf, int len)
 {
 	int dir;
@@ -749,9 +737,35 @@ static void __debugfs_read_crtc(const char *param, char *buf, int len)
 	close(dir);
 }
 
-#define debugfs_read(p, arr) __debugfs_read(p, arr, sizeof(arr))
-#define debugfs_write(p, arr) __debugfs_write(p, arr, sizeof(arr))
+static int __debugfs_write_crtc(const char *param, const char *buf, int len)
+{
+	int dir, ret;
+	enum pipe pipe;
+
+	pipe = prim_mode_params.pipe;
+	dir = igt_debugfs_pipe_dir(drm.fd, pipe, O_DIRECTORY);
+	igt_require_fd(dir);
+	ret = igt_sysfs_write(dir, param, buf, len - 1);
+	close(dir);
+
+	return ret;
+}
+
+static void __debugfs_read_connector(const char *param, char *buf, int len)
+{
+	int dir;
+	igt_output_t *output;
+
+	output = prim_mode_params.output;
+	dir = igt_debugfs_connector_dir(drm.fd, output->name, O_DIRECTORY);
+	igt_require_fd(dir);
+	igt_debugfs_simple_read(dir, param, buf, len);
+	close(dir);
+}
+
 #define debugfs_read_crtc(p, arr) __debugfs_read_crtc(p, arr, sizeof(arr))
+#define debugfs_write_crtc(p, arr) __debugfs_write_crtc(p, arr, sizeof(arr))
+#define debugfs_read_connector(p, arr) __debugfs_read_connector(p, arr, sizeof(arr))
 
 static char last_fbc_buf[128];
 
@@ -781,7 +795,7 @@ static void drrs_set(unsigned int val)
 
 	igt_debug("Manually %sabling DRRS. %u\n", val ? "en" : "dis", val);
 	snprintf(buf, sizeof(buf), "%d", val);
-	ret = debugfs_write("i915_drrs_ctl", buf);
+	ret = debugfs_write_crtc("i915_drrs_ctl", buf);
 
 	/*
 	 * drrs_enable() is called on DRRS capable platform only,
@@ -796,44 +810,48 @@ static bool is_drrs_high(void)
 {
 	char buf[MAX_DRRS_STATUS_BUF_LEN];
 
-	debugfs_read("i915_drrs_status", buf);
-	return strstr(buf, "DRRS_HIGH_RR");
+	debugfs_read_crtc("i915_drrs_status", buf);
+	return strstr(buf, "DRRS refresh rate: high");
 }
 
 static bool is_drrs_low(void)
 {
 	char buf[MAX_DRRS_STATUS_BUF_LEN];
 
-	debugfs_read("i915_drrs_status", buf);
-	return strstr(buf, "DRRS_LOW_RR");
+	debugfs_read_crtc("i915_drrs_status", buf);
+	return strstr(buf, "DRRS refresh rate: low");
 }
 
 static bool is_drrs_supported(void)
 {
 	char buf[MAX_DRRS_STATUS_BUF_LEN];
 
-	debugfs_read("i915_drrs_status", buf);
-	return strcasestr(buf, "DRRS Supported: Yes");
+	debugfs_read_crtc("i915_drrs_status", buf);
+	return strcasestr(buf, "DRRS enabled:");
 }
 
 static bool is_drrs_inactive(void)
 {
 	char buf[MAX_DRRS_STATUS_BUF_LEN];
 
-	debugfs_read("i915_drrs_status", buf);
-
-	if (strstr(buf, "DRRS_State: "))
-		return false;
-
-	return true;
+	debugfs_read_crtc("i915_drrs_status", buf);
+	return strstr(buf, "DRRS active: no");
 }
 
 static void drrs_print_status(void)
 {
 	char buf[MAX_DRRS_STATUS_BUF_LEN];
 
-	debugfs_read("i915_drrs_status", buf);
+	debugfs_read_crtc("i915_drrs_status", buf);
 	igt_info("DRRS STATUS :\n%s\n", buf);
+}
+
+static bool output_has_drrs(void)
+{
+	char buf[MAX_DRRS_STATUS_BUF_LEN];
+
+	debugfs_read_connector("i915_drrs_type", buf);
+	return strstr(buf, "seamless");
 }
 
 static struct timespec fbc_get_last_action(void)
@@ -1450,9 +1468,8 @@ static void teardown_psr(void)
 
 static void setup_drrs(void)
 {
-	if (prim_mode_params.output->config.connector->connector_type !=
-	    DRM_MODE_CONNECTOR_eDP) {
-		igt_info("Can't test DRRS: no usable eDP screen.\n");
+	if (!output_has_drrs()) {
+		igt_info("Can't test DRRS: no usable screen.\n");
 		return;
 	}
 
