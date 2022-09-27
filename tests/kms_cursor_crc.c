@@ -72,6 +72,7 @@ typedef struct {
 	cairo_surface_t *surface;
 	uint32_t devid;
 	double alpha;
+	int vblank_wait_count; /* because of msm */
 } data_t;
 
 #define TEST_DPMS (1<<0)
@@ -124,6 +125,12 @@ static void cursor_disable(data_t *data)
 {
 	igt_plane_set_fb(data->cursor, NULL);
 	igt_plane_set_position(data->cursor, 0, 0);
+	igt_display_commit(&data->display);
+
+	/* do this wait here so it will not need to be added everywhere */
+	igt_wait_for_vblank_count(data->drm_fd,
+				  data->display.pipes[data->pipe].crtc_offset,
+				  data->vblank_wait_count);
 }
 
 static bool chv_cursor_broken(data_t *data, int x)
@@ -185,7 +192,6 @@ static void do_single_test(data_t *data, int x, int y, bool hw_test,
 	igt_pipe_crc_t *pipe_crc = data->pipe_crc;
 	igt_crc_t crc;
 	int ret = 0, swbufidx;
-	int vblank_wait_count = is_msm_device(data->drm_fd) ? 2 : 1;
 
 	igt_print_activity();
 
@@ -204,7 +210,8 @@ static void do_single_test(data_t *data, int x, int y, bool hw_test,
 
 		/* Extra vblank wait is because nonblocking cursor ioctl */
 		igt_wait_for_vblank_count(data->drm_fd,
-				display->pipes[data->pipe].crtc_offset, vblank_wait_count);
+					  display->pipes[data->pipe].crtc_offset,
+					  data->vblank_wait_count);
 
 		igt_pipe_crc_get_current(data->drm_fd, pipe_crc, hwcrc);
 
@@ -242,11 +249,7 @@ static void do_single_test(data_t *data, int x, int y, bool hw_test,
 
 		restore_image(data, swbufidx, &((cursorarea){x, y, data->curw, data->curh}));
 		igt_plane_set_fb(data->primary, &data->primary_fb[swbufidx]);
-
 		igt_display_commit(display);
-		igt_wait_for_vblank_count(data->drm_fd,
-				display->pipes[data->pipe].crtc_offset, vblank_wait_count);
-
 		igt_pipe_crc_get_current(data->drm_fd, pipe_crc, &crc);
 		igt_assert_crc_equal(&crc, hwcrc);
 	}
@@ -264,9 +267,7 @@ static void do_fail_test(data_t *data, int x, int y, int expect)
 	igt_plane_set_position(data->cursor, x, y);
 	ret = igt_display_try_commit2(display, COMMIT_LEGACY);
 
-	igt_plane_set_position(data->cursor, 0, 0);
 	cursor_disable(data);
-	igt_display_commit(display);
 
 	igt_assert_eq(ret, expect);
 }
@@ -895,6 +896,8 @@ igt_main
 		kmstest_set_vt_graphics_mode();
 
 		igt_require_pipe_crc(data.drm_fd);
+
+		data.vblank_wait_count = is_msm_device(data.drm_fd) ? 2 : 1;
 	}
 
 	data.cursor_max_w = cursor_width;
