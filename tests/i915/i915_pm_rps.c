@@ -483,14 +483,15 @@ static void idle_check(void)
 		read_freqs(freqs);
 		dump(freqs);
 		check_freq_constraints(freqs);
-		if (freqs[ACT] == freqs[RPn])
+		if (freqs[ACT] <= freqs[RPn])
 			break;
 		usleep(1000 * IDLE_WAIT_TIMESTEP_MSEC);
 		wait += IDLE_WAIT_TIMESTEP_MSEC;
 	} while (wait < IDLE_WAIT_TIMEOUT_MSEC);
 
 	igt_debugfs_dump(drm_fd, "i915_rps_boost_info");
-	igt_assert_eq(freqs[ACT], freqs[RPn]);
+	/* Actual freq may be 0 when idle or in RC6 */
+	igt_assert_lte(freqs[ACT], freqs[RPn]);
 	igt_debug("Required %d msec to reach cur=idle\n", wait);
 }
 
