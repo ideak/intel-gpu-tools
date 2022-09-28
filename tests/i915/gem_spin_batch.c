@@ -225,7 +225,7 @@ igt_main
 	test_each_legacy_ring("legacy-resubmit-new")
 		spin_resubmit(fd, intel_ctx_0(fd), eb_ring(e), RESUBMIT_NEW_CTX);
 
-#undef test_each_legcy_ring
+#undef test_each_legacy_ring
 
 	igt_subtest("spin-all")
 		spin_all(fd, ctx, 0);
