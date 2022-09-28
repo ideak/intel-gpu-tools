@@ -65,7 +65,7 @@ static bool chdir_to_tools_dir(void)
 	char path[PATH_MAX];
 	char *cwd;
 
-	cwd = get_current_dir_name();
+	cwd = getcwd(NULL, 0);
 	igt_info("Current working directory: %s\n", cwd);
 	free(cwd);
 
@@ -83,7 +83,7 @@ static bool chdir_to_tools_dir(void)
 		chdir(dirname(path));
 	}
 
-	cwd = get_current_dir_name();
+	cwd = getcwd(NULL, 0);
 	igt_info("Current working directory: %s\n", cwd);
 	free(cwd);
 
@@ -99,7 +99,7 @@ igt_main
 
 		igt_require_f(chdir_to_tools_dir(),
 			      "Unable to determine the tools directory, expecting them in $cwd/" TOOLS " or $path/" TOOLS "\n");
-		path = get_current_dir_name();
+		path = getcwd(NULL, 0);
 		igt_info("Using tools from %s\n", path);
 		free(path);
 	}

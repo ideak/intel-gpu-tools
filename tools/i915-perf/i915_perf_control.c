@@ -102,7 +102,7 @@ main(int argc, char *argv[])
 
 			fwrite(data, total_len, 1, command_fifo_file);
 		} else {
-			char *cwd = get_current_dir_name();
+			char *cwd = getcwd(NULL, 0);
 			uint32_t path_len = strlen(cwd) + 1 + strlen(dump_file) + 1;
 			uint32_t total_len = sizeof(struct recorder_command_base) + path_len;
 			struct {
