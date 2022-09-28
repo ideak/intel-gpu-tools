@@ -28,12 +28,12 @@
 
 IGT_TEST_DESCRIPTION("Basic sanity check of execbuf-ioctl rings.");
 
-static uint32_t batch_create(int fd, uint32_t batch_size, uint32_t region)
+static uint32_t batch_create(int fd, uint64_t *batch_size, uint32_t region)
 {
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
 	uint32_t handle;
 
-	handle = gem_create_in_memory_regions(fd, batch_size, region);
+	igt_assert(__gem_create_in_memory_regions(fd, &handle, batch_size, region) == 0);
 	gem_write(fd, handle, 0, &bbe, sizeof(bbe));
 
 	return handle;
@@ -44,7 +44,7 @@ igt_main
 	const struct intel_execution_engine2 *e;
 	struct drm_i915_query_memory_regions *query_info;
 	struct igt_collection *regions, *set;
-	uint32_t batch_size;
+	uint64_t batch_size;
 	const intel_ctx_t *ctx;
 	int fd = -1;
 
@@ -71,9 +71,9 @@ igt_main
 			struct drm_i915_gem_exec_object2 exec;
 			uint32_t region = igt_collection_get_value(regions, 0);
 
-			batch_size = gem_get_batch_size(fd, MEMORY_TYPE_FROM_REGION(region));
+			batch_size = 4096;
 			memset(&exec, 0, sizeof(exec));
-			exec.handle = batch_create(fd, batch_size, region);
+			exec.handle = batch_create(fd, &batch_size, region);
 
 			for_each_ctx_engine(fd, ctx, e) {
 				igt_dynamic_f("%s-%s", e->name, sub_name) {
