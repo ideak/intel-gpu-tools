@@ -93,20 +93,6 @@ const char *get_memory_region_name(uint32_t region)
 }
 
 /**
- *  gem_get_batch_size:
- *  @fd: open i915 drm file descriptor
- *  @mem_region_type: used memory_region type
- *
- *  With introduction of LMEM we observe different page sizes for those two
- *  memory regions. Without this helper funtion we may be prone to forget
- *  about setting proper page size.
- */
-uint32_t gem_get_batch_size(int fd, uint8_t mem_region_type)
-{
-	return (mem_region_type == I915_MEMORY_CLASS_DEVICE) ? 65536 : 4096;
-}
-
-/**
  * gem_get_query_memory_regions:
  * @fd: open i915 drm file descriptor
  *

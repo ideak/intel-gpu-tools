@@ -56,7 +56,6 @@
 bool gem_has_query_support(int fd);
 
 const char *get_memory_region_name(uint32_t region);
-uint32_t gem_get_batch_size(int fd, uint8_t mem_region_type);
 
 struct drm_i915_query_memory_regions *gem_get_query_memory_regions(int fd);
 
