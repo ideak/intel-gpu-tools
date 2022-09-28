@@ -60,8 +60,10 @@ def print_err(*args):
     sys.stderr.write(' '.join(map(str,args)) + '\n')
 
 def guid_hashing_key(guid_obj):
-    return oa_registry.Registry.chipset_derive_hash(guid_obj['chipset'],
-                                                    guid_obj['mdapi_config_hash'])
+    ret = oa_registry.Registry.chipset_derive_hash(guid_obj['chipset'],
+                                                   guid_obj['name'],
+                                                   guid_obj['mdapi_config_hash'])
+    return ret
 
 parser = argparse.ArgumentParser()
 parser.add_argument("xml", nargs="+", help="XML description of metrics")
@@ -101,6 +103,7 @@ for guid in guids_xml.findall(".//guid"):
 
     if 'mdapi_config_hash' in guid_obj:
         hashing_key = oa_registry.Registry.chipset_derive_hash(guid_obj['chipset'],
+                                                               guid_obj['name'],
                                                                guid_obj['mdapi_config_hash'])
         mdapi_config_hash_guid_table[hashing_key] = guid_obj
 
@@ -121,20 +124,20 @@ for arg in args.xml:
     internal = et.parse(arg)
 
     concurrent_group = internal.find(".//ConcurrentGroup")
+    chipset = oa_registry.Registry.chipset_name(concurrent_group.get('SupportedHW')).lower()
+    if concurrent_group.get('SupportedGT') != None:
+        chipset = chipset + oa_registry.Registry.gt_name(concurrent_group.get('SupportedGT')).lower()
+
 
     for mdapi_set in internal.findall(".//MetricSet"):
 
         mdapi_config_hash = oa_registry.Registry.mdapi_hw_config_hash(mdapi_set)
 
-        chipset = oa_registry.Registry.chipset_name(mdapi_set.get('SupportedHW')).lower()
-        if concurrent_group.get('SupportedGT') != None:
-            chipset = chipset + oa_registry.Registry.gt_name(concurrent_group.get('SupportedGT')).lower()
-
-        set_name = mdapi_set.get('SymbolName')
+        set_name = oa_registry.Registry.sanitize_symbol_name(mdapi_set.get('SymbolName'))
 
         name = chipset + "_" + set_name;
 
-        hashing_key = oa_registry.Registry.chipset_derive_hash(chipset, mdapi_config_hash)
+        hashing_key = oa_registry.Registry.chipset_derive_hash(chipset, set_name, mdapi_config_hash)
         if hashing_key in mdapi_config_hash_guid_table:
             guid_obj = mdapi_config_hash_guid_table[hashing_key]
 
@@ -174,7 +177,9 @@ chipsets = [ 'hsw',
              'bxt', 'glk',
              'cnl',
              'icl', 'ehl',
-             'tglgt1', 'tglgt2', 'rkl', 'dg1', 'adl' ]
+             'tglgt1', 'tglgt2', 'rkl', 'dg1', 'adl',
+             'acmgt1', 'acmgt2', 'acmgt3',
+]
 
 for chipset in chipsets:
     filename = 'oa-' + chipset + '.xml'

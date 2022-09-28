@@ -72,16 +72,15 @@ class Registry:
 
         return hashlib.md5(registers_str).hexdigest()
 
-
     @staticmethod
-    def chipset_derive_hash(chipset, hash):
-        """Derive a HW config hash for a given chipset.
+    def chipset_derive_hash(chipset, set_name, hash):
+        """Derive a HW config hash for a given chipset & set name.
 
         This helps us avoiding collisions with identical config across
         different Gen or GT.
         """
 
-        return "%s-%s" % (chipset, hash)
+        return "%s-%s-%s" % (chipset, set_name, hash)
 
 
     @staticmethod
@@ -99,7 +98,9 @@ class Registry:
                            'EHL',
                            'TGL',
                            'RKL',
-                           'DG1' )
+                           'DG1',
+                           'ACM',
+                           'PVC' )
         if name in known_chipsets:
             return name
 
@@ -110,3 +111,7 @@ class Registry:
     @staticmethod
     def gt_name(name):
         return re.sub(' ', '', name)
+
+    @staticmethod
+    def sanitize_symbol_name(text):
+        return text.replace('#', "_")
