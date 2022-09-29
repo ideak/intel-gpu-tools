@@ -170,18 +170,15 @@ static void modeset_with_fb(const enum pipe pipe, igt_output_t *output,
 			    enum igt_commit_style s)
 {
 	igt_display_t *display = &data.display;
-	drmModeModeInfo mode;
+	drmModeModeInfo *mode;
 	igt_plane_t *primary;
 
-	igt_assert(kmstest_get_connector_default_mode(
-			display->drm_fd, output->config.connector, &mode));
-
-	igt_output_override_mode(output, &mode);
+	mode = igt_output_get_mode(output);
 	igt_output_set_pipe(output, pipe);
 
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_plane_set_fb(primary, &data.red);
-	igt_fb_set_size(&data.red, primary, mode.hdisplay, mode.vdisplay);
+	igt_fb_set_size(&data.red, primary, mode->hdisplay, mode->vdisplay);
 
 	igt_display_commit2(display, s);
 
@@ -322,7 +319,6 @@ static void test_content_protection_on_output(igt_output_t *output,
 					      int content_type)
 {
 	igt_display_t *display = &data.display;
-	igt_plane_t *primary;
 	bool ret;
 
 	test_cp_enable_with_retry(output, s, 3, content_type, false,
@@ -374,13 +370,6 @@ static void test_content_protection_on_output(igt_output_t *output,
 						  content_type, false,
 						  false);
 	}
-
-	test_cp_disable(output, s);
-	primary = igt_output_get_plane_type(output,
-					    DRM_PLANE_TYPE_PRIMARY);
-	igt_plane_set_fb(primary, NULL);
-	igt_output_set_pipe(output, PIPE_NONE);
-
 }
 
 static void __debugfs_read(int fd, const char *param, char *buf, int len)
@@ -479,6 +468,19 @@ static bool output_hdcp_capable(igt_output_t *output, int content_type)
 }
 
 static void
+test_fini(igt_output_t *output, enum igt_commit_style s)
+{
+	igt_plane_t *primary;
+
+	test_cp_disable(output, s);
+	primary = igt_output_get_plane_type(output,
+					    DRM_PLANE_TYPE_PRIMARY);
+	igt_plane_set_fb(primary, NULL);
+	igt_output_set_pipe(output, PIPE_NONE);
+	igt_display_commit2(&data.display, s);
+}
+
+static void
 test_content_protection(enum igt_commit_style s, int content_type)
 {
 	igt_display_t *display = &data.display;
@@ -495,6 +497,7 @@ test_content_protection(enum igt_commit_style s, int content_type)
 			if (!igt_pipe_connector_valid(pipe, output))
 				continue;
 
+			igt_display_reset(display);
 			modeset_with_fb(pipe, output, s);
 
 			if (!output_hdcp_capable(output, content_type))
@@ -502,6 +505,8 @@ test_content_protection(enum igt_commit_style s, int content_type)
 
 			test_content_protection_on_output(output, pipe, s, content_type);
 			valid_tests++;
+
+			test_fini(output, s);
 			/*
 			 * Testing a output with a pipe is enough for HDCP
 			 * testing. No ROI in testing the connector with other
@@ -692,7 +697,7 @@ static void test_content_protection_cleanup(void)
 			continue;
 
 		igt_info("CP Prop being UNDESIRED on %s\n", output->name);
-		test_cp_disable(output, COMMIT_ATOMIC);
+		test_cp_disable(output, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 	}
 
 	igt_remove_fb(data.drm_fd, &data.red);
