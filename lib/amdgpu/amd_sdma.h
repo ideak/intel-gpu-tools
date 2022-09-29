@@ -35,6 +35,9 @@
 	/* 0 = byte fill
 	 * 2 = DW fill
 	 */
+
+#define SDMA_OP_POLL_REGMEM  8
+
 #define SDMA_PACKET(op, sub_op, e)	((((e) & 0xFFFF) << 16) |	\
 					(((sub_op) & 0xFF) << 8) |	\
 					(((op) & 0xFF) << 0))

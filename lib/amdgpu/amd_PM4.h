@@ -169,4 +169,47 @@
 #define PACKET3_SET_UCONFIG_REG			0x79
 #define PACKET3_DRAW_INDEX_AUTO			0x2D
 
+#define	PACKET3_WAIT_REG_MEM				0x3C
+#define		WAIT_REG_MEM_FUNCTION(x)                ((x) << 0)
+		/* 0 - always
+		 * 1 - <
+		 * 2 - <=
+		 * 3 - ==
+		 * 4 - !=
+		 * 5 - >=
+		 * 6 - >
+		 */
+#define		WAIT_REG_MEM_MEM_SPACE(x)               ((x) << 4)
+		/* 0 - reg
+		 * 1 - mem
+		 */
+#define		WAIT_REG_MEM_OPERATION(x)               ((x) << 6)
+		/* 0 - wait_reg_mem
+		 * 1 - wr_wait_wr_reg
+		 */
+#define		WAIT_REG_MEM_ENGINE(x)                  ((x) << 8)
+		/* 0 - me
+		 * 1 - pfp
+		 */
+
+#define	PACKET3_WRITE_DATA				0x37
+#define		WRITE_DATA_DST_SEL(x)                   ((x) << 8)
+		/* 0 - register
+		 * 1 - memory (sync - via GRBM)
+		 * 2 - gl2
+		 * 3 - gds
+		 * 4 - reserved
+		 * 5 - memory (async - direct)
+		 */
+#define		WR_ONE_ADDR                             (1 << 16)
+#define		WR_CONFIRM                              (1 << 20)
+#define		WRITE_DATA_CACHE_POLICY(x)              ((x) << 25)
+		/* 0 - LRU
+		 * 1 - Stream
+		 */
+#define		WRITE_DATA_ENGINE_SEL(x)                ((x) << 30)
+		/* 0 - me
+		 * 1 - pfp
+		 * 2 - ce
+		 */
 #endif
