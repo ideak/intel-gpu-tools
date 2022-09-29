@@ -114,7 +114,7 @@ static void setup_execbuf(int fd, const intel_ctx_t *ctx,
 	memset(reloc, 0, NUMSTORES * sizeof(*reloc));
 
 	execbuf->buffers_ptr = to_user_pointer(obj);
-	execbuf->flags = ring | (1 << 11) | (1 << 12);
+	execbuf->flags = ring | I915_EXEC_NO_RELOC | I915_EXEC_HANDLE_LUT;
 
 	if (gen > 3 && gen < 6)
 		execbuf->flags |= I915_EXEC_SECURE;
@@ -124,7 +124,7 @@ static void setup_execbuf(int fd, const intel_ctx_t *ctx,
 	obj[0].handle = gem_create(fd, 4096);
 	if (ahnd) {
 		obj[0].offset = get_offset(ahnd, obj[0].handle, 4096, 0);
-		obj[0].flags |= EXEC_OBJECT_PINNED;
+		obj[0].flags |= EXEC_OBJECT_PINNED | EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 	}
 
 	gem_write(fd, obj[0].handle, 0, &bbe, sizeof(bbe));
@@ -139,7 +139,7 @@ static void setup_execbuf(int fd, const intel_ctx_t *ctx,
 	if (ahnd) {
 		obj[1].offset = get_offset(ahnd, obj[1].handle,
 				NUMSTORES * 16 + 4096, 0);
-		obj[1].flags |= EXEC_OBJECT_PINNED;
+		obj[1].flags |= EXEC_OBJECT_PINNED | EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 	}
 
 	batch = gem_mmap__cpu(fd, obj[1].handle, 0, NUMSTORES * 16 + 4096,
