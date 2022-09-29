@@ -465,7 +465,7 @@ static bool test_pipe(data_t *data)
 static bool
 max_hw_stride_async_flip_test(data_t *data)
 {
-	uint32_t ret, startframe;
+	uint32_t ret;
 	const uint32_t w = data->output->config.default_mode.hdisplay,
 		       h = data->output->config.default_mode.vdisplay;
 	igt_plane_t *primary;
@@ -510,14 +510,14 @@ max_hw_stride_async_flip_test(data_t *data)
 					  INTEL_PIPE_CRC_SOURCE_AUTO);
 	igt_pipe_crc_start(data->pipe_crc);
 
+	igt_plane_set_fb(primary, &data->big_fb);
+	igt_fb_set_size(&data->big_fb, primary, w, h);
+	igt_plane_set_size(primary, w, h);
+	igt_display_commit_atomic(&data->display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
+	igt_pipe_crc_get_current(data->drm_fd, data->pipe_crc, &compare_crc);
+
 	igt_set_timeout(5, "Async pageflipping loop got stuck!\n");
 	for (int i = 0; i < 2; i++) {
-		igt_plane_set_fb(primary, &data->big_fb);
-		igt_fb_set_size(&data->big_fb, primary, w, h);
-		igt_plane_set_size(primary, w, h);
-		igt_display_commit_atomic(&data->display,
-					  DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
-
 		/* First async flip on Gen13+ will be treated as a sync flip*/
 		if (intel_display_ver(data->devid) >= 13) {
 			do {
@@ -527,9 +527,6 @@ max_hw_stride_async_flip_test(data_t *data)
 			} while (ret == -EBUSY);
 			igt_assert(ret == 0);
 		}
-
-		igt_wait_for_vblank(data->drm_fd, data->display.pipes[primary->pipe->pipe].crtc_offset);
-		startframe = kmstest_get_vblank(data->drm_fd, data->pipe, 0) + 1;
 
 		for (int j = 0; j < 2; j++) {
 			do {
@@ -547,13 +544,7 @@ max_hw_stride_async_flip_test(data_t *data)
 			igt_assert(ret == 0);
 		}
 
-		igt_pipe_crc_get_for_frame(data->drm_fd, data->pipe_crc,
-					   startframe, &compare_crc);
-		igt_pipe_crc_get_for_frame(data->drm_fd, data->pipe_crc,
-					   startframe + 1, &async_crc);
-
-		igt_assert_f(kmstest_get_vblank(data->drm_fd, data->pipe, 0) -
-			     startframe == 1, "lost frames\n");
+		igt_pipe_crc_get_current(data->drm_fd, data->pipe_crc, &async_crc);
 
 		igt_assert_f(igt_check_crc_equal(&compare_crc, &async_crc)^(i^1),
 			     "CRC failure with async flip, crc %s match for checked round\n",
