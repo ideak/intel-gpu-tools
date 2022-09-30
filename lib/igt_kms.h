@@ -544,16 +544,37 @@ static inline bool igt_output_is_connected(igt_output_t *output)
 #define for_each_if(condition) if (!(condition)) {} else
 
 /**
- * for_each_connected_output:
+ * for_each_output:
  * @display: a pointer to an #igt_display_t structure
  * @output: The output to iterate.
  *
  * This for loop iterates over all outputs.
  */
-#define for_each_connected_output(display, output)		\
+#define for_each_output(display, output)		\
 	for (int i__ = 0;  assert(igt_can_fail()), i__ < (display)->n_outputs; i__++)	\
-		for_each_if ((((output) = &(display)->outputs[i__]), \
-			      igt_output_is_connected((output))))
+		for_each_if (((output) = (&(display)->outputs[i__])))
+
+/**
+ * for_each_connected_output:
+ * @display: a pointer to an #igt_display_t structure
+ * @output: The output to iterate.
+ *
+ * This for loop iterates over all connected outputs.
+ */
+#define for_each_connected_output(display, output)		\
+	for_each_output((display), (output))	\
+		for_each_if ((igt_output_is_connected((output))))
+
+/**
+ * for_each_disconnected_output:
+ * @display: a pointer to an #igt_display_t structure
+ * @output: The output to iterate.
+ *
+ * This for loop iterates over all disconnected outputs.
+ */
+#define for_each_disconnected_output(display, output)		\
+	for_each_output((display), (output))	\
+		for_each_if ((!(igt_output_is_connected((output)))))
 
 /**
  * for_each_pipe_static:
