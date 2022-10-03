@@ -102,7 +102,7 @@ static void make_resident(int i915, uint32_t batch, uint32_t handle)
 		.buffer_count = ARRAY_SIZE(obj),
 	};
 
-	gem_execbuf(i915, &eb);
+	__gem_execbuf(i915, &eb);
 	if (obj[1].handle != batch)
 		gem_close(i915, obj[1].handle);
 }
@@ -704,7 +704,9 @@ static void *thread_clear(void *data)
 		size = npages << 12;
 
 		igt_assert_eq(__gem_create_in_memory_region_list(i915, &handle, &size, 0, &arg->region, 1), 0);
-		make_resident(i915, batch, handle);
+		/* Zero-init bo in execbuf or pagefault handler path randomly */
+		if (random() & 1)
+			make_resident(i915, batch, handle);
 
 		ptr = __mmap_offset(i915, handle, 0, size,
 				    PROT_READ | PROT_WRITE,
