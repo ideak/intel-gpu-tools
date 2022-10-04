@@ -581,8 +581,6 @@ static void test_query_regions_garbage_items(int fd)
 		struct drm_i915_memory_region_info info = regions->regions[i];
 		int j;
 
-		igt_assert_eq_u32(info.rsvd0, 0);
-
 		/*
 		 * rsvd1[0] : probed_cpu_visible_size
 		 * rsvd1[1] : unallocated_cpu_visible_size
