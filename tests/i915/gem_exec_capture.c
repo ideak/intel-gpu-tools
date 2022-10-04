@@ -578,11 +578,6 @@ __captureN(int fd, int dir, uint64_t ahnd, const intel_ctx_t *ctx,
 	return offsets;
 }
 
-/*
- * FIXME: remove once the kernel changes have landed and everything has settled.
- * The change here is non-backwards compatible, and we don't want to upset CI.
-*/
-#define probed_cpu_visible_size rsvd1[0]
 static bool kernel_supports_probed_size(int fd)
 {
 	struct drm_i915_query_memory_regions *regions;

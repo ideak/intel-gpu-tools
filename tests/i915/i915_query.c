@@ -516,12 +516,6 @@ static bool query_regions_supported(int fd)
 	return __i915_query_items(fd, &item, 1) == 0 && item.length > 0;
 }
 
-/**
- * XXX: Remove these once we can safely sync the uapi header with the kernel.
- * Should be source compatible either way though.
- */
-#define probed_cpu_visible_size rsvd1[0]
-#define unallocated_cpu_visible_size rsvd1[1]
 static bool query_regions_unallocated_supported(int fd)
 {
 	struct drm_i915_query_memory_regions *regions;

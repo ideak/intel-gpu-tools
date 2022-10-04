@@ -724,11 +724,6 @@ static void trap_sigbus(uint32_t *ptr)
 	signal(SIGBUS, old_sigbus);
 }
 
-/**
- * XXX: Remove this once we can safely sync the uapi header with the kernel.
- * Should be source compatible either way though.
- */
-#define probed_cpu_visible_size rsvd1[0]
 static void create_ext_cpu_access_big(int fd)
 {
 	struct drm_i915_query_memory_regions *regions;
