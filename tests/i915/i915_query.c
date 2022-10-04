@@ -588,7 +588,7 @@ static void test_query_regions_garbage_items(int fd)
 		 * rsvd1[1] : unallocated_cpu_visible_size
 		 */
 		for (j = 2; j < ARRAY_SIZE(info.rsvd1); j++)
-			igt_assert_eq_u32(info.rsvd1[j], 0);
+			igt_assert_eq_u64(info.rsvd1[j], 0);
 	}
 
 	/* Bogus; kernel is meant to set this */
