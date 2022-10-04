@@ -34,9 +34,6 @@
 
 #define BUFFER_SIZE (8 * 1024)
 
-#define GFX_COMPUTE_NOP  0xffff1000
-
-
 /**
  * MEM ALLOC TEST
  * @param device

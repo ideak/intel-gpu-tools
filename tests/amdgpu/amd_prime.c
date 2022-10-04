@@ -30,9 +30,8 @@
 #include "i915/gem_create.h"
 #include "igt.h"
 #include "igt_vgem.h"
-
-#define GFX_COMPUTE_NOP  0xffff1000
-#define SDMA_NOP  0x0
+#include "lib/amdgpu/amd_sdma.h"
+#include "lib/amdgpu/amd_PM4.h"
 
 static int
 amdgpu_bo_alloc_and_map(amdgpu_device_handle dev, unsigned size,

@@ -125,7 +125,7 @@ amdgpu_memset_dispatch_test(amdgpu_device_handle device_handle,
 	base_cmd->emit(base_cmd, 1);
 	base_cmd->emit(base_cmd, 1);
 
-	base_cmd->emit_aligned(base_cmd, 7, 0xffff1000);
+	base_cmd->emit_aligned(base_cmd, 7, GFX_COMPUTE_NOP);
 	resources[0] = bo_dst;
 	resources[1] = bo_shader;
 	resources[2] = bo_cmd;
@@ -278,7 +278,7 @@ amdgpu_memcpy_dispatch_test(amdgpu_device_handle device_handle,
 	base_cmd->emit(base_cmd, 1);
 	base_cmd->emit(base_cmd, 1);
 
-	base_cmd->emit_aligned(base_cmd, 7, 0xffff1000); /* type3 nop packet */
+	base_cmd->emit_aligned(base_cmd, 7, GFX_COMPUTE_NOP); /* type3 nop packet */
 
 	resources[0] = bo_shader;
 	resources[1] = bo_src;
@@ -448,7 +448,7 @@ amdgpu_memcpy_dispatch_hang_slow_test(amdgpu_device_handle device_handle,
 	base_cmd->emit(base_cmd, 1);
 	base_cmd->emit(base_cmd, 1);
 
-	base_cmd->emit_aligned(base_cmd, 7, 0xffff1000); /* type3 nop packet */
+	base_cmd->emit_aligned(base_cmd, 7, GFX_COMPUTE_NOP); /* type3 nop packet */
 
 	resources[0] = bo_shader;
 	resources[1] = bo_src;

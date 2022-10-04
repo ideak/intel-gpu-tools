@@ -102,4 +102,6 @@
 		 */
 #              define PACKET3_DMA_DATA_SI_CP_SYNC     (1 << 31)
 
+#define SDMA_NOP  0x0
+
 #endif

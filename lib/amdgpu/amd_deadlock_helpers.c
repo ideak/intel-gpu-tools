@@ -115,7 +115,7 @@ amdgpu_wait_memory_helper(amdgpu_device_handle device_handle, unsigned ip_type)
 	base_cmd->emit(base_cmd, 0);/* reference value */
 	base_cmd->emit(base_cmd, 0xffffffff); /* and mask */
 	base_cmd->emit(base_cmd, 0x00000004);/* poll interval */
-	base_cmd->emit_repeat(base_cmd, 0xffff1000, 16 - base_cmd->cdw);
+	base_cmd->emit_repeat(base_cmd, GFX_COMPUTE_NOP, 16 - base_cmd->cdw);
 
 	ib_result_cpu2 = ib_result_cpu;
 	ib_result_cpu2[MEMORY_OFFSET] = 0x0; /* the memory we wait on to change */
@@ -227,7 +227,7 @@ bad_access_helper(amdgpu_device_handle device_handle, int reg_access, unsigned i
 					0xdeadbee0);
 	base_cmd->emit(base_cmd, 0 );
 	base_cmd->emit(base_cmd, 0xdeadbeef );
-	base_cmd->emit_repeat(base_cmd, 0xffff1000, 16 - base_cmd->cdw);
+	base_cmd->emit_repeat(base_cmd, GFX_COMPUTE_NOP, 16 - base_cmd->cdw);
 
 	memset(&ib_info, 0, sizeof(struct amdgpu_cs_ib_info));
 	ib_info.ib_mc_address = ib_result_mc_address;

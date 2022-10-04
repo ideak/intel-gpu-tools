@@ -26,9 +26,9 @@
 
 #include <amdgpu.h>
 #include <amdgpu_drm.h>
+#include "lib/amdgpu/amd_PM4.h"
 
-#define GFX_COMPUTE_NOP  0xffff1000
-#define SDMA_NOP  0x0
+
 
 static int
 amdgpu_bo_alloc_and_map(amdgpu_device_handle dev, unsigned size,
