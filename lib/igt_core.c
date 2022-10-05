@@ -627,7 +627,7 @@ uint64_t igt_nsec_elapsed(struct timespec *start)
 void __igt_assert_in_outer_scope(void)
 {
 	internal_assert(!in_subtest,
-			"must only be called outside of a subtest");
+			"must only be called outside of a subtest\n");
 }
 
 bool __igt_fixture(void)
@@ -1688,7 +1688,7 @@ void igt_fail(int exitcode)
 		exit_subtest("FAIL");
 	} else {
 		internal_assert(igt_can_fail(), "failing test is only allowed"
-				" in fixtures, subtests and igt_simple_main");
+				" in fixtures, subtests and igt_simple_main\n");
 
 		if (in_fixture) {
 			skip_subtests_henceforth = FAIL;
@@ -1755,7 +1755,7 @@ void igt_describe_f(const char *fmt, ...)
 
 	internal_assert(!in_subtest || _igt_dynamic_tests_executed < 0,
 			"documenting dynamic subsubtests is impossible,"
-			" document the subtest instead.");
+			" document the subtest instead.\n");
 
 	if (!describe_subtests)
 		return;
