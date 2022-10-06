@@ -118,7 +118,7 @@ void *__gem_mmap__gtt(int fd, uint32_t handle, uint64_t size, unsigned prot)
 	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_MMAP_GTT, &mmap_arg))
 		return NULL;
 
-	ptr = mmap64(0, size, prot, MAP_SHARED, fd, mmap_arg.offset);
+	ptr = mmap(0, size, prot, MAP_SHARED, fd, mmap_arg.offset);
 	if (ptr == MAP_FAILED)
 		ptr = NULL;
 	else
@@ -331,7 +331,7 @@ void *__gem_mmap_offset(int fd, uint32_t handle, uint64_t offset, uint64_t size,
 	if (igt_ioctl(fd, DRM_IOCTL_I915_GEM_MMAP_OFFSET, &arg))
 		return NULL;
 
-	ptr = mmap64(0, size, prot, MAP_SHARED, fd, arg.offset + offset);
+	ptr = mmap(0, size, prot, MAP_SHARED, fd, arg.offset + offset);
 
 	if (ptr == MAP_FAILED)
 		ptr = NULL;

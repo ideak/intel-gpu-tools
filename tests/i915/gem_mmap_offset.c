@@ -67,7 +67,7 @@ __mmap_offset(int i915, uint32_t handle, uint64_t offset, uint64_t size,
 	if (mmap_offset_ioctl(i915, &arg))
 		return NULL;
 
-	ptr = mmap64(0, size, prot, MAP_SHARED, i915, arg.offset + offset);
+	ptr = mmap(0, size, prot, MAP_SHARED, i915, arg.offset + offset);
 	if (ptr == MAP_FAILED)
 		ptr = NULL;
 	else
@@ -321,12 +321,12 @@ static void isolation(int i915)
 				 t->name, B, b, offset_b);
 
 			errno = 0;
-			ptr = mmap64(0, 4096, PROT_READ, MAP_SHARED, i915, offset_a);
+			ptr = mmap(0, 4096, PROT_READ, MAP_SHARED, i915, offset_a);
 			igt_assert(ptr == MAP_FAILED);
 			igt_assert_eq(errno, EACCES);
 
 			errno = 0;
-			ptr = mmap64(0, 4096, PROT_READ, MAP_SHARED, i915, offset_b);
+			ptr = mmap(0, 4096, PROT_READ, MAP_SHARED, i915, offset_b);
 			igt_assert(ptr == MAP_FAILED);
 			igt_assert_eq(errno, EACCES);
 
@@ -344,13 +344,13 @@ static void isolation(int i915)
 
 			close(B);
 
-			ptr = mmap64(0, 4096, PROT_READ, MAP_SHARED, A, offset_a);
+			ptr = mmap(0, 4096, PROT_READ, MAP_SHARED, A, offset_a);
 			igt_assert(ptr != MAP_FAILED);
 			munmap(ptr, 4096);
 
 			close(A);
 
-			ptr = mmap64(0, 4096, PROT_READ, MAP_SHARED, A, offset_a);
+			ptr = mmap(0, 4096, PROT_READ, MAP_SHARED, A, offset_a);
 			igt_assert(ptr == MAP_FAILED);
 		}
 	}
@@ -553,7 +553,7 @@ static void close_race(int i915, int timeout)
 	_Atomic uint32_t *handles;
 	size_t len = ALIGN((ncpus + 1) * sizeof(uint32_t), 4096);
 
-	handles = mmap64(0, len, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+	handles = mmap(0, len, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 	igt_assert(handles != MAP_FAILED);
 
 	igt_fork(child, ncpus + 1) {

@@ -76,7 +76,7 @@ void *__vgem_mmap(int fd, struct vgem_bo *bo, unsigned prot)
 	if (drmIoctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &arg))
 		return NULL;
 
-	ptr = mmap64(0, bo->size, prot, MAP_SHARED, fd, arg.offset);
+	ptr = mmap(0, bo->size, prot, MAP_SHARED, fd, arg.offset);
 	if (ptr == MAP_FAILED)
 		return NULL;
 

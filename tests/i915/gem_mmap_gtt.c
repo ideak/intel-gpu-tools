@@ -113,11 +113,11 @@ test_access(int fd)
 	mmap_arg.handle = handle;
 	do_ioctl(fd, DRM_IOCTL_I915_GEM_MMAP_GTT, &mmap_arg);
 
-	igt_assert(mmap64(0, OBJECT_SIZE, PROT_READ | PROT_WRITE,
+	igt_assert(mmap(0, OBJECT_SIZE, PROT_READ | PROT_WRITE,
 			  MAP_SHARED, fd, mmap_arg.offset));
 
 	/* Check that the same offset on the other fd doesn't work. */
-	igt_assert(mmap64(0, OBJECT_SIZE, PROT_READ | PROT_WRITE,
+	igt_assert(mmap(0, OBJECT_SIZE, PROT_READ | PROT_WRITE,
 			  MAP_SHARED, fd2, mmap_arg.offset) == MAP_FAILED);
 	igt_assert(errno == EACCES);
 
@@ -128,7 +128,7 @@ test_access(int fd)
 
 	/* Recheck that it works after flink. */
 	/* Check that the same offset on the other fd doesn't work. */
-	igt_assert(mmap64(0, OBJECT_SIZE, PROT_READ | PROT_WRITE,
+	igt_assert(mmap(0, OBJECT_SIZE, PROT_READ | PROT_WRITE,
 			  MAP_SHARED, fd2, mmap_arg.offset));
 }
 
@@ -159,11 +159,11 @@ test_short(int fd)
 	for (pages = 1; pages <= OBJECT_SIZE / PAGE_SIZE; pages <<= 1) {
 		uint8_t *r, *w;
 
-		w = mmap64(0, pages * PAGE_SIZE, PROT_READ | PROT_WRITE,
+		w = mmap(0, pages * PAGE_SIZE, PROT_READ | PROT_WRITE,
 			   MAP_SHARED, fd, mmap_arg.offset);
 		igt_assert(w != MAP_FAILED);
 
-		r = mmap64(0, pages * PAGE_SIZE, PROT_READ,
+		r = mmap(0, pages * PAGE_SIZE, PROT_READ,
 			   MAP_SHARED, fd, mmap_arg.offset);
 		igt_assert(r != MAP_FAILED);
 
@@ -384,13 +384,13 @@ test_isolation(int i915)
 
 	close(B);
 
-	ptr = mmap64(0, 4096, PROT_READ, MAP_SHARED, A, offset_a);
+	ptr = mmap(0, 4096, PROT_READ, MAP_SHARED, A, offset_a);
 	igt_assert(ptr != MAP_FAILED);
 	munmap(ptr, 4096);
 
 	close(A);
 
-	ptr = mmap64(0, 4096, PROT_READ, MAP_SHARED, A, offset_a);
+	ptr = mmap(0, 4096, PROT_READ, MAP_SHARED, A, offset_a);
 	igt_assert(ptr == MAP_FAILED);
 }
 
@@ -400,7 +400,7 @@ test_close_race(int i915)
 	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
 	_Atomic uint32_t *handles;
 
-	handles = mmap64(0, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+	handles = mmap(0, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 	igt_assert(handles != MAP_FAILED);
 
 	igt_fork(child, ncpus + 1) {
@@ -418,7 +418,7 @@ test_close_race(int i915)
 				  &mmap_arg) != -1) {
 				void *ptr;
 
-				ptr = mmap64(0, 4096,
+				ptr = mmap(0, 4096,
 					     PROT_WRITE, MAP_SHARED, i915,
 					     mmap_arg.offset);
 				if (ptr != MAP_FAILED) {
@@ -444,7 +444,7 @@ test_flink_race(int i915)
 	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
 	_Atomic uint32_t *handles;
 
-	handles = mmap64(0, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+	handles = mmap(0, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 	igt_assert(handles != MAP_FAILED);
 
 	igt_fork(child, ncpus + 1) {
@@ -469,7 +469,7 @@ test_flink_race(int i915)
 				  &mmap_arg) != -1) {
 				void *ptr;
 
-				ptr = mmap64(0, 4096,
+				ptr = mmap(0, 4096,
 					     PROT_WRITE, MAP_SHARED, fd,
 					     mmap_arg.offset);
 				if (ptr != MAP_FAILED) {
