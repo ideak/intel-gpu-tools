@@ -43,6 +43,10 @@
 #include <getopt.h>
 #include <unistd.h>
 
+#ifdef __FreeBSD__
+#include "igt_freebsd.h"
+#endif
+
 #ifndef IGT_LOG_DOMAIN
 #define IGT_LOG_DOMAIN (NULL)
 #endif
