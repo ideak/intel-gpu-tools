@@ -96,6 +96,7 @@ static void check_alive(void)
 	gem_close(fd, scratch);
 	put_ahnd(ahnd);
 	intel_ctx_destroy(fd, ctx);
+	gem_quiescent_gpu(fd);
 	close(fd);
 }
 
