@@ -51,6 +51,10 @@
 
 #define sigev_notify_thread_id _sigev_un._tid
 
+#ifdef __FreeBSD__
+#include "igt_freebsd.h"
+#endif
+
 static volatile int done;
 
 struct gem_busyspin {

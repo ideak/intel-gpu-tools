@@ -41,6 +41,10 @@
 #include "intel_aub.h"
 #include "intel_chipset.h"
 
+#ifdef __FreeBSD__
+#include "igt_freebsd.h"
+#endif
+
 static int (*libc_close)(int fd);
 static int (*libc_ioctl)(int fd, unsigned long request, void *argp);
 
