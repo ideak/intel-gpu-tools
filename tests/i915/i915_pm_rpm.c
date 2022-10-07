@@ -40,8 +40,13 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#if defined(__linux__)
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
+#elif defined(__FreeBSD__)
+#include <dev/iicbus/iic.h>
+#define	addr	slave
+#endif
 
 #include <drm.h>
 
