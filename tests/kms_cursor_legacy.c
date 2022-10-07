@@ -802,6 +802,8 @@ static void flip_vs_cursor(igt_display_t *display, enum flip_test mode, int nloo
 		/* Nor should it have delayed the following cursor update */
 		if (!cursor_slowpath(display, mode))
 			igt_assert_eq(kmstest_get_vblank(display->drm_fd, pipe, 0), vblank_start);
+		else if (mode_requires_extra_vblank(mode))
+			igt_assert_lte(kmstest_get_vblank(display->drm_fd, pipe, 0), vblank_start + 2);
 		else
 			igt_assert_lte(kmstest_get_vblank(display->drm_fd, pipe, 0), vblank_start + 1);
 
