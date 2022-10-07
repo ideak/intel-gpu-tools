@@ -185,7 +185,6 @@ test_output(data_t *data)
 	int ret;
 	drmModeModeInfo *mode;
 
-	igt_display_reset(&data->display);
 	igt_output_set_pipe(output, data->pipe);
 
 	igt_create_fb(data->drm_fd, 512, 512, DRM_FORMAT_XRGB8888,
@@ -203,6 +202,7 @@ test_output(data_t *data)
 	igt_remove_fb(data->drm_fd, &fb);
 	igt_output_override_mode(output, NULL);
 	/*unset_all_crtcs*/
+	igt_display_reset(&data->display);
 	igt_display_commit(&data->display);
 }
 
