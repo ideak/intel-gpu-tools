@@ -42,7 +42,9 @@
 #include <limits.h>
 #include "drm.h"
 
+#ifdef __linux__
 #include <linux/unistd.h>
+#endif
 
 #include "i915/gem_create.h"
 #include "i915/gem_ring.h"

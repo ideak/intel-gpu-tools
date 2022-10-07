@@ -21,7 +21,9 @@
  * IN THE SOFTWARE.
  */
 
+#ifdef __linux__
 #include <linux/limits.h>
+#endif
 #include <signal.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>

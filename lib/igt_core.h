@@ -31,7 +31,9 @@
 #define IGT_CORE_H
 
 #include <assert.h>
+#ifdef __linux__
 #include <byteswap.h>
+#endif
 #include <setjmp.h>
 #include <stdbool.h>
 #include <stdint.h>

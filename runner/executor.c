@@ -2,7 +2,9 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <glib.h>
+#ifdef __linux__
 #include <linux/watchdog.h>
+#endif
 #if HAVE_OPING
 #include <oping.h>
 #endif

@@ -32,7 +32,9 @@
 #include <fcntl.h>
 #include <glib.h>
 #include <libudev.h>
+#ifdef __linux__
 #include <linux/limits.h>
+#endif
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>

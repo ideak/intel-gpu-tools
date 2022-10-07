@@ -27,7 +27,9 @@
 
 #include <stdint.h>
 
+#ifdef __linux__
 #include <linux/perf_event.h>
+#endif
 
 #include "igt_gt.h"
 

@@ -28,7 +28,9 @@
 #include <fcntl.h>
 #include <libgen.h>
 #include <unistd.h>
+#ifdef __linux__
 #include <linux/limits.h>
+#endif
 
 #define TOOLS "../tools/"
 
