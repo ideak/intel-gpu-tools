@@ -566,7 +566,7 @@ test_ptrace(int fd)
 	for (int i = 0; i < sz / sizeof(long); i++) {
 		long ret;
 
-		ret = ptrace(PTRACE_PEEKDATA, pid, gtt + i);
+		ret = ptrace(PTRACE_PEEKDATA, pid, gtt + i, (void *) 0);
 		igt_assert_eq_u64(ret, CC);
 		cpy[i] = ret;
 

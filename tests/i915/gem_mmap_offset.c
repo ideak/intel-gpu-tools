@@ -520,7 +520,7 @@ static void test_ptrace(int i915)
 				for (int i = 0; i < SZ / sizeof(long); i++) {
 					long ret;
 
-					ret = ptrace(PTRACE_PEEKDATA, pid, ptr + i);
+					ret = ptrace(PTRACE_PEEKDATA, pid, ptr + i, (void *) 0);
 					igt_assert_eq_u64(ret, CC);
 					cpy[i] = ret;
 
