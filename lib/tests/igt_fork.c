@@ -109,7 +109,7 @@ __noreturn static void igt_fork_timeout_leak(void)
 __noreturn static void subtest_leak(void)
 {
 	pid_t *children =
-		mmap(0, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
+		mmap(0, 4096, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 	const int num_children = 4096 / sizeof(*children);
 
 	igt_subtest_init(fake_argc, fake_argv);
