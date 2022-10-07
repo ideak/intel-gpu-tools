@@ -34,7 +34,7 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <unistd.h>
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
 # include <sys/syscall.h>
 #endif
 
