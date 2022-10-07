@@ -48,8 +48,8 @@
 # ifndef HAVE_GETTID
 #  define gettid() (pid_t)(syscall(__NR_gettid))
 # endif
+# define sigev_notify_thread_id _sigev_un._tid
 #endif
-#define sigev_notify_thread_id _sigev_un._tid
 
 /* auxialiary igt helpers from igt_aux.c */
 /* generally useful helpers */

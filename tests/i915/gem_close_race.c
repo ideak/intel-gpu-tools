@@ -46,6 +46,7 @@
 #include "i915/gem_create.h"
 #include "i915/gem_mman.h"
 #include "igt.h"
+#include "igt_aux.h"
 
 #define OBJECT_SIZE (256 * 1024)
 
@@ -60,8 +61,6 @@ static bool has_64bit_relocations;
 static bool has_softpin;
 static uint64_t exec_addr;
 static uint64_t data_addr;
-
-#define sigev_notify_thread_id _sigev_un._tid
 
 static void selfcopy(int fd, uint32_t ctx, uint32_t handle, int loops)
 {

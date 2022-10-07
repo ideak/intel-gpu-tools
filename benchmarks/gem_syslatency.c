@@ -48,8 +48,7 @@
 
 #include "i915/gem_create.h"
 #include "i915/gem_ring.h"
-
-#define sigev_notify_thread_id _sigev_un._tid
+#include "igt_aux.h"
 
 #ifdef __FreeBSD__
 #include "igt_freebsd.h"
