@@ -424,7 +424,7 @@ igt_main
 
 		/* Test for lmem_bar_size modparam support */
 		lmem_bar_size = driver_load_with_lmem_bar_size(MIN_BAR_SIZE, true);
-		igt_assert_eq(lmem_bar_size, MIN_BAR_SIZE);
+		igt_skip_on_f(lmem_bar_size != MIN_BAR_SIZE, "Device lacks PCI resizeable BAR support.\n");
 
 		lmem_bar_size = driver_load_with_lmem_bar_size(0, false);
 
