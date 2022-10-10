@@ -88,44 +88,6 @@ static void fini_buf(struct intel_buf *buf)
 	intel_buf_destroy(buf);
 }
 
-static void setup_fb(data_t *data, struct igt_fb *newfb, uint32_t width,
-		     uint32_t height, uint64_t format, uint64_t modifier, uint64_t stride)
-{
-	struct drm_mode_fb_cmd2 f = {0};
-	cairo_t *cr;
-
-	newfb->strides[0] = stride;
-	igt_create_bo_for_fb(data->drm_fd, width, height, format, modifier,
-			     newfb);
-
-	igt_assert(newfb->gem_handle > 0);
-
-	f.width = newfb->width;
-	f.height = newfb->height;
-	f.pixel_format = newfb->drm_format;
-	f.flags = DRM_MODE_FB_MODIFIERS;
-
-	for (int n = 0; n < newfb->num_planes; n++) {
-		f.handles[n] = newfb->gem_handle;
-		f.modifier[n] = newfb->modifier;
-		f.pitches[n] = newfb->strides[n];
-		f.offsets[n] = newfb->offsets[n];
-	}
-
-       if (data->planeclearrgb[0] != 0.0 || data->planeclearrgb[1] != 0.0 ||
-           data->planeclearrgb[2] != 0.0) {
-               cr = igt_get_cairo_ctx(data->drm_fd, newfb);
-               igt_paint_color(cr, 0, 0, newfb->width, newfb->height,
-                               data->planeclearrgb[0],
-                               data->planeclearrgb[1],
-                               data->planeclearrgb[2]);
-               igt_put_cairo_ctx(cr);
-       }
-
-	igt_assert(drmIoctl(data->drm_fd, DRM_IOCTL_MODE_ADDFB2, &f) == 0);
-	newfb->fb_id = f.fb_id;
-}
-
 static void copy_pattern(data_t *data,
 			 struct igt_fb *dst_fb, int dx, int dy,
 			 struct igt_fb *src_fb, int sx, int sy,
@@ -165,6 +127,53 @@ static void copy_pattern(data_t *data,
 	/* intel_bb cache doesn't know when objects dissappear, so
 	 * let's purge the cache */
 	intel_bb_reset(data->ibb, true);
+}
+
+static void setup_fb(data_t *data, struct igt_fb *newfb, uint32_t width,
+		     uint32_t height, uint64_t format, uint64_t modifier, uint64_t stride)
+{
+	struct drm_mode_fb_cmd2 f = {0};
+	struct igt_fb col_fb;
+
+	newfb->strides[0] = stride;
+	igt_create_bo_for_fb(data->drm_fd, width, height, format, modifier,
+			     newfb);
+
+	igt_assert(newfb->gem_handle > 0);
+
+	f.width = newfb->width;
+	f.height = newfb->height;
+	f.pixel_format = newfb->drm_format;
+	f.flags = DRM_MODE_FB_MODIFIERS;
+
+	for (int n = 0; n < newfb->num_planes; n++) {
+		f.handles[n] = newfb->gem_handle;
+		f.modifier[n] = newfb->modifier;
+		f.pitches[n] = newfb->strides[n];
+		f.offsets[n] = newfb->offsets[n];
+	}
+
+	if (data->planeclearrgb[0] != 0.0 || data->planeclearrgb[1] != 0.0 ||
+	    data->planeclearrgb[2] != 0.0) {
+		igt_create_color_fb(data->drm_fd, 512, 512,
+				    newfb->drm_format, newfb->modifier,
+				    data->planeclearrgb[0],
+				    data->planeclearrgb[1],
+				    data->planeclearrgb[2],
+				    &col_fb);
+
+		for (int y = 0; y < newfb->height; y += 512) {
+			for (int x = 0; x < newfb->width; x += 512) {
+				copy_pattern(data, newfb, x, y,
+					&col_fb, 0, 0,
+					512, 512);
+			}
+		}
+		igt_remove_fb(data->drm_fd, &col_fb);
+	}
+
+	igt_assert(drmIoctl(data->drm_fd, DRM_IOCTL_MODE_ADDFB2, &f) == 0);
+	newfb->fb_id = f.fb_id;
 }
 
 static void generate_pattern(data_t *data,
