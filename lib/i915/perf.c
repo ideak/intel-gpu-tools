@@ -37,6 +37,8 @@
 
 #include <i915_drm.h>
 
+#include "i915_pciids.h"
+
 #include "intel_chipset.h"
 #include "perf.h"
 
@@ -60,6 +62,9 @@
 #include "i915_perf_metrics_rkl.h"
 #include "i915_perf_metrics_dg1.h"
 #include "i915_perf_metrics_adl.h"
+#include "i915_perf_metrics_acmgt1.h"
+
+#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
 static int
 perf_ioctl(int fd, unsigned long request, void *arg)
@@ -143,6 +148,23 @@ unsupported_i915_perf_platform(struct intel_perf *perf)
 {
 	intel_perf_free(perf);
 	return NULL;
+}
+
+static bool
+is_acm_gt1(const struct intel_perf_devinfo *devinfo)
+{
+#undef INTEL_VGA_DEVICE
+#define INTEL_VGA_DEVICE(_id, _info) _id
+	static const uint32_t devids[] = {
+		INTEL_DG2_G11_IDS(NULL),
+	};
+#undef INTEL_VGA_DEVICE
+	for (uint32_t i = 0; i < ARRAY_SIZE(devids); i++) {
+		if (devids[i] == devinfo->devid)
+			return true;
+	}
+
+	return false;
 }
 
 struct intel_perf *
@@ -313,6 +335,13 @@ intel_perf_for_devinfo(uint32_t device_id,
 	} else if (devinfo->is_alderlake_s || devinfo->is_alderlake_p ||
 		   devinfo->is_raptorlake_s || devinfo->is_alderlake_n) {
 		intel_perf_load_metrics_adl(perf);
+	} else if (devinfo->is_dg2) {
+		perf->devinfo.eu_threads_count = 8;
+
+		if (is_acm_gt1(&perf->devinfo))
+			intel_perf_load_metrics_acmgt1(perf);
+		else
+			unsupported_i915_perf_platform(perf);
 	} else {
 		return unsupported_i915_perf_platform(perf);
 	}
