@@ -54,6 +54,13 @@ enum cursor_buffers {
 };
 
 typedef struct {
+	int x;
+	int y;
+	int width;
+	int height;
+} cursorarea;
+
+typedef struct {
 	int drm_fd;
 	igt_display_t display;
 	struct igt_fb primary_fb[MAXCURSORBUFFER];
@@ -73,6 +80,7 @@ typedef struct {
 	uint32_t devid;
 	double alpha;
 	int vblank_wait_count; /* because of msm */
+	cursorarea oldcursorarea[MAXCURSORBUFFER];
 } data_t;
 
 #define TEST_DPMS (1<<0)
@@ -82,13 +90,6 @@ typedef struct {
 #define GREEN 0.0, 1.0, 0.0
 #define BLUE 0.0, 0.0, 1.0
 #define WHITE 1.0, 1.0, 1.0
-
-typedef struct {
-	int x;
-	int y;
-	int width;
-	int height;
-} cursorarea;
 
 static void draw_cursor(cairo_t *cr, cursorarea *cursor, double alpha)
 {
@@ -176,11 +177,16 @@ static void restore_image(data_t *data, uint32_t buffer, cursorarea *cursor)
 	cr = igt_get_cairo_ctx(data->drm_fd, &data->primary_fb[buffer]);
 	cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
 	cairo_set_source_surface(cr, data->surface, 0, 0);
-	cairo_rectangle(cr, 0, 0, data->screenw, data->screenh);
+	cairo_rectangle(cr, data->oldcursorarea[buffer].x,
+			data->oldcursorarea[buffer].y,
+			data->oldcursorarea[buffer].width,
+			data->oldcursorarea[buffer].height);
 	cairo_fill(cr);
 
-	if (cursor)
+	if (cursor) {
 		draw_cursor(cr, cursor, data->alpha);
+		data->oldcursorarea[buffer] = *cursor;
+	}
 
 	igt_put_cairo_ctx(cr);
 }
@@ -235,7 +241,7 @@ static void do_single_test(data_t *data, int x, int y, bool hw_test,
 
 			if (data->flags & TEST_SUSPEND)
 				igt_system_suspend_autoresume(SUSPEND_STATE_MEM,
-							SUSPEND_TEST_NONE);
+							      SUSPEND_TEST_NONE);
 
 			igt_pipe_crc_start(pipe_crc);
 			igt_pipe_crc_get_current(data->drm_fd, pipe_crc, &crc_after);
@@ -508,6 +514,11 @@ static void prepare_crtc(data_t *data, int cursor_w, int cursor_h)
 	data->curw = cursor_w;
 	data->curh = cursor_h;
 	data->refresh = mode->vrefresh;
+
+	/* initialize old cursor area to full screen so first run will copy image in place */
+	data->oldcursorarea[HWCURSORBUFFER]      = (cursorarea){0, 0, data->screenw, data->screenh};
+	data->oldcursorarea[SWCOMPARISONBUFFER1] = (cursorarea){0, 0, data->screenw, data->screenh};
+	data->oldcursorarea[SWCOMPARISONBUFFER2] = (cursorarea){0, 0, data->screenw, data->screenh};
 
 	data->surface = cairo_image_surface_create(CAIRO_FORMAT_RGB24,
 						   data->screenw,
