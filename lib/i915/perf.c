@@ -63,6 +63,7 @@
 #include "i915_perf_metrics_dg1.h"
 #include "i915_perf_metrics_adl.h"
 #include "i915_perf_metrics_acmgt1.h"
+#include "i915_perf_metrics_acmgt2.h"
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
@@ -157,6 +158,23 @@ is_acm_gt1(const struct intel_perf_devinfo *devinfo)
 #define INTEL_VGA_DEVICE(_id, _info) _id
 	static const uint32_t devids[] = {
 		INTEL_DG2_G11_IDS(NULL),
+	};
+#undef INTEL_VGA_DEVICE
+	for (uint32_t i = 0; i < ARRAY_SIZE(devids); i++) {
+		if (devids[i] == devinfo->devid)
+			return true;
+	}
+
+	return false;
+}
+
+static bool
+is_acm_gt2(const struct intel_perf_devinfo *devinfo)
+{
+#undef INTEL_VGA_DEVICE
+#define INTEL_VGA_DEVICE(_id, _info) _id
+	static const uint32_t devids[] = {
+		INTEL_DG2_G12_IDS(NULL),
 	};
 #undef INTEL_VGA_DEVICE
 	for (uint32_t i = 0; i < ARRAY_SIZE(devids); i++) {
@@ -340,6 +358,8 @@ intel_perf_for_devinfo(uint32_t device_id,
 
 		if (is_acm_gt1(&perf->devinfo))
 			intel_perf_load_metrics_acmgt1(perf);
+		else if (is_acm_gt2(&perf->devinfo))
+			intel_perf_load_metrics_acmgt2(perf);
 		else
 			unsupported_i915_perf_platform(perf);
 	} else {
