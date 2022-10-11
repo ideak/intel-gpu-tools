@@ -241,6 +241,13 @@ static void invalid_tests(int fd)
 			}
 
 			count++;
+
+			/*
+			 * to avoid exessive logging stop after 10k loops
+			 */
+			if (count >= 10000) {
+				break;
+			}
 		}
 
 		/* After all the abuse, confirm the known_formats */
