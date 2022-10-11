@@ -1029,9 +1029,11 @@ void igt_devices_free(void)
 	}
 
 	igt_list_for_each_entry_safe(dev, tmp, &igt_devs.all, link) {
+		igt_list_del(&dev->link);
 		igt_device_free(dev);
 		free(dev);
 	}
+	igt_devs.devs_scanned = false;
 }
 
 /**
@@ -1045,22 +1047,8 @@ void igt_devices_free(void)
  */
 void igt_devices_scan(bool force)
 {
-	if (force && igt_devs.devs_scanned) {
-		struct igt_device *dev, *tmp;
-
-		igt_list_for_each_entry_safe(dev, tmp, &igt_devs.filtered,
-					     link) {
-			igt_list_del(&dev->link);
-			free(dev);
-		}
-		igt_list_for_each_entry_safe(dev, tmp, &igt_devs.all, link) {
-			igt_list_del(&dev->link);
-			igt_device_free(dev);
-			free(dev);
-		}
-
-		igt_devs.devs_scanned = false;
-	}
+	if (force && igt_devs.devs_scanned)
+		igt_devices_free();
 
 	if (igt_devs.devs_scanned)
 		return;
