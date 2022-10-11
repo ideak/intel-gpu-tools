@@ -312,6 +312,33 @@ static int opt_handler(int opt, int opt_index, void *data)
 	return IGT_OPT_HANDLER_SUCCESS;
 }
 
+static void gpu_engines_init_timeouts(int fd, int max_engines,
+				      int *num_engines, struct gem_engine_properties *props)
+{
+	const struct intel_execution_engine2 *e;
+
+	*num_engines = 0;
+	for_each_physical_engine(fd, e) {
+		igt_assert(*num_engines < max_engines);
+
+		props[*num_engines].engine = e;
+		props[*num_engines].preempt_timeout = 0;
+		props[*num_engines].heartbeat_interval = 250;
+
+		gem_engine_properties_configure(fd, &props[*num_engines]);
+
+		(*num_engines)++;
+	}
+}
+
+static void gpu_engines_restore_timeouts(int fd, int num_engines, const struct gem_engine_properties *props)
+{
+	int i;
+
+	for (i = 0; i < num_engines; i++)
+		gem_engine_properties_restore(fd, &props[i]);
+}
+
 const char *help_str =
 	"  -e \tRun on all pipes. (By default subtests will run on two pipes)\n";
 
@@ -335,10 +362,14 @@ igt_main_args("e", NULL, help_str, opt_handler, NULL)
 		{ "extended-modeset-hang-oldfb-with-reset", true, false, true },
 		{ "extended-modeset-hang-newfb-with-reset", true, true, true },
 	};
+	struct gem_engine_properties saved_gpu_timeouts[GEM_MAX_ENGINES];
+	int num_engines;
+	int fd;
 
 	igt_fixture {
-		int fd = drm_open_driver_master(DRIVER_INTEL);
 		enum pipe pipe;
+
+		fd = drm_open_driver_master(DRIVER_INTEL);
 
 		igt_require_gem(fd);
 		gem_require_mmap_device_coherent(fd);
@@ -352,6 +383,8 @@ igt_main_args("e", NULL, help_str, opt_handler, NULL)
 		for_each_pipe(&display, pipe)
 			active_pipes[last_pipe++] = pipe;
 		last_pipe--;
+
+		gpu_engines_init_timeouts(fd, ARRAY_SIZE(saved_gpu_timeouts), &num_engines, saved_gpu_timeouts);
 	}
 
 	/* XXX Extend to cover atomic rendering tests to all planes + legacy */
@@ -435,6 +468,7 @@ igt_main_args("e", NULL, help_str, opt_handler, NULL)
 	}
 
 	igt_fixture {
+		gpu_engines_restore_timeouts(fd, num_engines, saved_gpu_timeouts);
 		igt_display_fini(&display);
 		close(display.drm_fd);
 	}
