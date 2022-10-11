@@ -311,6 +311,7 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 		for_each_plane_on_pipe(&data->display, pipe, plane)
 			igt_plane_set_fb(plane, NULL);
 
+		igt_output_set_pipe(output, PIPE_NONE);
 		igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
 		for (int x = 0; x < c; x++)
@@ -326,16 +327,12 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 
 	i = 0;
 	while (i < iterations || loop_forever) {
-		/* Intel devices need it here, timing sensitive on few devices */
-		if (is_i915_device(data->drm_fd))
-			igt_pipe_crc_start(data->pipe_crc);
 
 		/* randomize planes and set up the holes */
 		prepare_planes(data, pipe, &blue, modifier, c, output);
 
 		igt_display_commit2(&data->display, COMMIT_ATOMIC);
-		if (!is_i915_device(data->drm_fd))
-			igt_pipe_crc_start(data->pipe_crc);
+		igt_pipe_crc_start(data->pipe_crc);
 
 		igt_pipe_crc_get_current(data->display.drm_fd, data->pipe_crc, &crc);
 		igt_assert_crc_equal(&data->ref_crc, &crc);
@@ -344,6 +341,7 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 		for_each_plane_on_pipe(&data->display, pipe, plane)
 			igt_plane_set_fb(plane, NULL);
 
+		igt_output_set_pipe(output, PIPE_NONE);
 		igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
 		for (int x = 0; x < c; x++)
