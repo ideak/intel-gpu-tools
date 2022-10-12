@@ -1096,9 +1096,12 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 				 * number of combinations, to avoid long runtimes due to modesets on
 				 * panels with long power cycle delays.
 				 */
-				if (((transition_tests[i].type == TRANSITION_MODESET) ||
-				     (transition_tests[i].type == TRANSITION_MODESET_FAST)) &&
+				if ((transition_tests[i].type == TRANSITION_MODESET) &&
 				    output_is_internal_panel(output))
+					continue;
+
+				if ((transition_tests[i].type == TRANSITION_MODESET_FAST) &&
+				    !output_is_internal_panel(output))
 					continue;
 
 				if (pipe_count == 2 * count && !data.extended)
