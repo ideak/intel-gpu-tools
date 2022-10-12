@@ -64,6 +64,8 @@ typedef struct data {
 	enum pipe pipe_id;
 	int drm_fd;
 	rect_t or;
+	uint64_t max_curw;
+	uint64_t max_curh;
 } data_t;
 
 /* Common test setup. */
@@ -222,6 +224,8 @@ static void test_cursor(data_t *data, int size, unsigned int flags)
 	int sw, sh;
 	int pad = 128;
 
+	igt_skip_on(size > data->max_curw || size > data->max_curh);
+
 	sw = data->mode->hdisplay;
 	sh = data->mode->vdisplay;
 
@@ -251,7 +255,7 @@ static void test_cursor(data_t *data, int size, unsigned int flags)
 igt_main
 {
 	static const int cursor_sizes[] = { 64, 128, 256 };
-	data_t data = {};
+	data_t data = { .max_curw = 64, .max_curh = 64 };
 	enum pipe pipe;
 	igt_output_t *output;
 	int i, j;
@@ -270,7 +274,14 @@ igt_main
 	};
 
 	igt_fixture {
+		int ret;
+
 		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
+
+		ret = drmGetCap(data.drm_fd, DRM_CAP_CURSOR_WIDTH, &data.max_curw);
+		igt_assert(ret == 0 || errno == EINVAL);
+		ret = drmGetCap(data.drm_fd, DRM_CAP_CURSOR_HEIGHT, &data.max_curh);
+		igt_assert(ret == 0 || errno == EINVAL);
 
 		kmstest_set_vt_graphics_mode();
 
