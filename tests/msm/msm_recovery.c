@@ -22,13 +22,55 @@
  */
 
 #include <fcntl.h>
+#include <glob.h>
 
 #include "igt.h"
 #include "igt_msm.h"
+#include "igt_io.h"
 
 static struct msm_device *dev;
 static struct msm_bo *scratch_bo;
 static uint32_t *scratch;
+
+/*
+ * Helper to read and clear devcore.  We want to read it completely to ensure
+ * we catch any kernel side regressions like:
+ * https://gitlab.freedesktop.org/drm/msm/-/issues/20
+ */
+
+static void
+read_and_clear_devcore(void)
+{
+	glob_t glob_buf = {0};
+	int ret, fd;
+
+	ret = glob("/sys/class/devcoredump/devcd*/data", GLOB_NOSORT, NULL, &glob_buf);
+	if ((ret == GLOB_NOMATCH) || !glob_buf.gl_pathc)
+		return;
+
+	fd = open(glob_buf.gl_pathv[0], O_RDWR);
+
+	if (fd >= 0) {
+		char buf[0x1000];
+
+		/*
+		 * We want to read the entire file but we can throw away the
+		 * contents.. we just want to make sure that we exercise the
+		 * kernel side codepaths hit when reading the devcore from
+		 * sysfs
+		 */
+		do {
+			ret = igt_readn(fd, buf, sizeof(buf));
+		} while (ret > 0);
+
+		/* Clear the devcore: */
+		igt_writen(fd, "1", 1);
+
+		close(fd);
+	}
+
+	globfree(&glob_buf);
+}
 
 /*
  * Helpers for cmdstream packet building:
@@ -102,6 +144,8 @@ do_hang_test(struct msm_pipe *pipe)
 			continue;
 		igt_assert_eq(scratch[1+i], 2+i);
 	}
+
+	read_and_clear_devcore();
 }
 
 /*
