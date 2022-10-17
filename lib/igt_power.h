@@ -39,7 +39,14 @@ struct power_sample {
 	uint64_t time;
 };
 
+struct igt_power {
+	struct rapl rapl;
+	int hwmon_fd;
+};
+
 int rapl_open(struct rapl *r, const char *domain);
+int igt_power_open(int i915, struct igt_power *p, const char *domain);
+void igt_power_close(struct igt_power *p);
 
 static inline int cpu_power_open(struct rapl *r)
 {
@@ -77,6 +84,11 @@ static inline void rapl_close(struct rapl *r)
 	r->fd = -1;
 }
 
+static inline bool igt_power_valid(struct igt_power *p)
+{
+	return (p->rapl.fd >= 0) || (p->hwmon_fd >= 0);
+}
+
 static inline double power_J(const struct rapl *r,
 			     const struct power_sample *p0,
 			     const struct power_sample *p1)
@@ -98,4 +110,14 @@ static inline double power_W(const struct rapl *r,
 	return power_J(r, p0, p1) / power_s(r, p0, p1);
 }
 
+void igt_power_get_energy(struct igt_power *p, struct power_sample *s);
+
+double igt_power_get_mJ(const struct igt_power *power,
+			const struct power_sample *p0,
+			const struct power_sample *p1);
+double igt_power_get_mW(const struct igt_power *power,
+			const struct power_sample *p0,
+			const struct power_sample *p1);
+double igt_power_get_s(const struct power_sample *p0,
+		       const struct power_sample *p1);
 #endif /* IGT_POWER_H */
