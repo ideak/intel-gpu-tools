@@ -210,7 +210,7 @@ static void whisper(int fd, const intel_ctx_t *ctx,
 	unsigned int reloc_interruptions = 0;
 	unsigned int eb_migrations = 0;
 	struct power_sample sample[2];
-	struct rapl rapl;
+	struct igt_power gpu;
 	uint64_t old_offset;
 	int i, n, loc;
 	int debugfs;
@@ -223,7 +223,7 @@ static void whisper(int fd, const intel_ctx_t *ctx,
 	}
 
 	debugfs = igt_debugfs_dir(fd);
-	gpu_power_open(&rapl);
+	igt_power_open(fd, &gpu, "gpu");
 
 	nengine = 0;
 	if (engine == ALL_ENGINES) {
@@ -258,7 +258,7 @@ static void whisper(int fd, const intel_ctx_t *ctx,
 		nchild *= nengine;
 
 	intel_detect_and_clear_missed_interrupts(fd);
-	rapl_read(&rapl, &sample[0]);
+	igt_power_get_energy(&gpu, &sample[0]);
 	igt_fork(child, nchild) {
 		unsigned int pass;
 
@@ -559,12 +559,14 @@ static void whisper(int fd, const intel_ctx_t *ctx,
 		fini_hang(&hang);
 	else
 		igt_assert_eq(intel_detect_and_clear_missed_interrupts(fd), 0);
-	if (rapl_read(&rapl, &sample[1]))  {
+
+	igt_power_get_energy(&gpu, &sample[1]);
+	if (sample[1].energy) {
 		igt_info("Total energy used: %.1fmJ\n",
-			 power_J(&rapl, &sample[0], &sample[1]) * 1e3);
+			 igt_power_get_mJ(&gpu, &sample[0], &sample[1]));
 	}
 
-	rapl_close(&rapl);
+	igt_power_close(&gpu);
 	close(debugfs);
 }
 
