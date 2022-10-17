@@ -53,7 +53,7 @@ static int rapl_parse(struct rapl *r, const char *str)
 	return 0;
 }
 
-int rapl_open(struct rapl *r, const char *domain)
+static int rapl_open(struct rapl *r, const char *domain)
 {
 	r->fd = rapl_parse(r, domain);
 	if (r->fd < 0)
@@ -70,6 +70,17 @@ int rapl_open(struct rapl *r, const char *domain)
 err:
 	errno = 0;
 	return r->fd;
+}
+
+static inline bool rapl_read(struct rapl *r, struct power_sample *s)
+{
+	return read(r->fd, s, sizeof(*s)) == sizeof(*s);
+}
+
+static inline void rapl_close(struct rapl *r)
+{
+	close(r->fd);
+	r->fd = -1;
 }
 
 /**

@@ -44,70 +44,12 @@ struct igt_power {
 	int hwmon_fd;
 };
 
-int rapl_open(struct rapl *r, const char *domain);
 int igt_power_open(int i915, struct igt_power *p, const char *domain);
 void igt_power_close(struct igt_power *p);
-
-static inline int cpu_power_open(struct rapl *r)
-{
-	return rapl_open(r, "cpu");
-}
-
-static inline int gpu_power_open(struct rapl *r)
-{
-	return rapl_open(r, "gpu");
-}
-
-static inline int pkg_power_open(struct rapl *r)
-{
-	return rapl_open(r, "pkg");
-}
-
-static inline bool rapl_valid(struct rapl *r)
-{
-	return r->fd >= 0;
-}
-
-static inline int ram_power_open(struct rapl *r)
-{
-	return rapl_open(r, "ram");
-}
-
-static inline bool rapl_read(struct rapl *r, struct power_sample *s)
-{
-	return read(r->fd, s, sizeof(*s)) == sizeof(*s);
-}
-
-static inline void rapl_close(struct rapl *r)
-{
-	close(r->fd);
-	r->fd = -1;
-}
 
 static inline bool igt_power_valid(struct igt_power *p)
 {
 	return (p->rapl.fd >= 0) || (p->hwmon_fd >= 0);
-}
-
-static inline double power_J(const struct rapl *r,
-			     const struct power_sample *p0,
-			     const struct power_sample *p1)
-{
-	return (p1->energy - p0->energy) * r->scale;
-}
-
-static inline double power_s(const struct rapl *r,
-			     const struct power_sample *p0,
-			     const struct power_sample *p1)
-{
-	return (p1->time - p0->time) * 1e-9;
-}
-
-static inline double power_W(const struct rapl *r,
-			     const struct power_sample *p0,
-			     const struct power_sample *p1)
-{
-	return power_J(r, p0, p1) / power_s(r, p0, p1);
 }
 
 void igt_power_get_energy(struct igt_power *p, struct power_sample *s);
