@@ -37,7 +37,7 @@
 #include "i915/gem_create.h"
 #include "igt.h"
 #include "igt_perf.h"
-#include "igt_rapl.h"
+#include "igt_power.h"
 #include "igt_sysfs.h"
 #include "sw_sync.h"
 

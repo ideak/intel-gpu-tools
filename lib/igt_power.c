@@ -7,7 +7,7 @@
 #include <inttypes.h>
 
 #include "igt_perf.h"
-#include "igt_rapl.h"
+#include "igt_power.h"
 #include "igt_sysfs.h"
 
 static int rapl_parse(struct rapl *r, const char *str)

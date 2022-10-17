@@ -21,7 +21,6 @@
 #include "i915/gem_create.h"
 #include "igt.h"
 #include "igt_rand.h"
-#include "igt_rapl.h"
 #include "igt_sysfs.h"
 #include "igt_syncobj.h"
 #include "igt_vgem.h"

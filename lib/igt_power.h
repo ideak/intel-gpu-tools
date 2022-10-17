@@ -22,8 +22,8 @@
  *
  */
 
-#ifndef IGT_RAPL_H
-#define IGT_RAPL_H
+#ifndef IGT_POWER_H
+#define IGT_POWER_H
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -98,4 +98,4 @@ static inline double power_W(const struct rapl *r,
 	return power_J(r, p0, p1) / power_s(r, p0, p1);
 }
 
-#endif /* IGT_RAPL_H */
+#endif /* IGT_POWER_H */
