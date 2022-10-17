@@ -228,11 +228,14 @@ functional_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 	igt_pipe_crc_collect_crc(test.pipe_crc, &test.crc_7);
 
 	/* Step 11: Disable primary plane */
+	igt_output_set_pipe(output, PIPE_NONE);
+	igt_display_commit2(display, COMMIT_ATOMIC);
 	igt_plane_set_fb(primary, NULL);
 	igt_display_commit2(display, COMMIT_UNIVERSAL);
 
 	/* Step 12: Legacy modeset to yellow FB (CRC 8) */
 	igt_plane_set_fb(primary, &test.yellow_fb);
+	igt_output_set_pipe(output, pipe);
 	igt_display_commit2(display, COMMIT_LEGACY);
 	igt_pipe_crc_collect_crc(test.pipe_crc, &test.crc_8);
 
@@ -497,6 +500,8 @@ pageflip_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 	igt_display_commit2(&data->display, COMMIT_LEGACY);
 
 	/* Disable the primary plane */
+	igt_output_set_pipe(output, PIPE_NONE);
+	igt_display_commit2(&data->display, COMMIT_ATOMIC);
 	igt_plane_set_fb(primary, NULL);
 	igt_display_commit2(&data->display, COMMIT_UNIVERSAL);
 
@@ -506,6 +511,7 @@ pageflip_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 	 * Note that crtc->primary->fb = NULL causes flip to return EBUSY for
 	 * historical reasons...
 	 */
+	igt_output_set_pipe(output, pipe);
 	igt_assert(drmModePageFlip(data->drm_fd, output->config.crtc->crtc_id,
 				   test.red_fb.fb_id, 0, NULL) == -EBUSY);
 
@@ -520,9 +526,13 @@ pageflip_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 	 * completes, which we don't have a good way to specifically test for,
 	 * but at least we can make sure that nothing blows up.
 	 */
+	igt_output_set_pipe(output, pipe);
+	igt_display_commit2(&data->display, COMMIT_ATOMIC);
 	igt_assert(drmModePageFlip(data->drm_fd, output->config.crtc->crtc_id,
 				   test.red_fb.fb_id, DRM_MODE_PAGE_FLIP_EVENT,
 				   &test) == 0);
+	igt_output_set_pipe(output, PIPE_NONE);
+	igt_display_commit2(&data->display, COMMIT_ATOMIC);
 	igt_plane_set_fb(primary, NULL);
 	igt_display_commit2(&data->display, COMMIT_UNIVERSAL);
 
