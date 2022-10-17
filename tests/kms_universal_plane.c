@@ -190,9 +190,11 @@ functional_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 	igt_pipe_crc_collect_crc(test.pipe_crc, &test.crc_4);
 
 	/* Step 5: Universal API's, disable primary plane (CRC 5) */
-	igt_plane_set_fb(primary, NULL);
-	igt_display_commit2(display, COMMIT_UNIVERSAL);
-	igt_pipe_crc_collect_crc(test.pipe_crc, &test.crc_5);
+	if (!is_amdgpu_device(data->drm_fd)) {
+		igt_plane_set_fb(primary, NULL);
+		igt_display_commit2(display, COMMIT_UNIVERSAL);
+		igt_pipe_crc_collect_crc(test.pipe_crc, &test.crc_5);
+	}
 
 	/* Step 6: Universal API's, re-enable primary with blue (CRC 6) */
 	igt_plane_set_fb(primary, &test.blue_fb);
@@ -265,9 +267,11 @@ functional_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 	 * Step 15: Explicitly disable primary after it's already been
 	 * implicitly disabled (CRC 10).
 	 */
-	igt_plane_set_fb(primary, NULL);
-	igt_display_commit2(display, COMMIT_UNIVERSAL);
-	igt_pipe_crc_collect_crc(test.pipe_crc, &test.crc_10);
+	if (!is_amdgpu_device(data->drm_fd)) {
+		igt_plane_set_fb(primary, NULL);
+		igt_display_commit2(display, COMMIT_UNIVERSAL);
+		igt_pipe_crc_collect_crc(test.pipe_crc, &test.crc_10);
+	}
 
 	/* Step 16: Legacy API's, blue primary, red sprite */
 	igt_plane_set_fb(primary, &test.blue_fb);
@@ -278,7 +282,8 @@ functional_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 	igt_assert_crc_equal(&test.crc_2, &test.crc_4);
 
 	/* Disabling primary plane should be same as black primary */
-	igt_assert_crc_equal(&test.crc_1, &test.crc_5);
+	if (!is_amdgpu_device(data->drm_fd))
+		igt_assert_crc_equal(&test.crc_1, &test.crc_5);
 
 	/* Re-enabling primary should return to blue properly */
 	igt_assert_crc_equal(&test.crc_2, &test.crc_6);
@@ -300,8 +305,7 @@ functional_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 	 * and have it disable successfully. Skip on amdgpu since crc_9 was
 	 * skipped with offscreen planes previously.
 	 */
-	if (!is_amdgpu_device(data->drm_fd))
-		igt_assert_crc_equal(&test.crc_5, &test.crc_9);
+	igt_assert_crc_equal(&test.crc_5, &test.crc_9);
 
 	/*
 	 * We should be able to explicitly disable an already
