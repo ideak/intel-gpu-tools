@@ -315,8 +315,8 @@ static drmModeModeInfo get_mode_for_port(struct chamelium *chamelium,
 static igt_output_t *get_output_for_port(data_t *data,
 					 struct chamelium_port *port)
 {
-	drmModeConnector *connector = chamelium_port_get_connector(data->chamelium,
-								   port, false);
+	drmModeConnector *connector =
+		chamelium_port_get_connector(data->chamelium, port, true);
 	igt_output_t *output = igt_output_from_connector(&data->display,
 							 connector);
 	drmModeFreeConnector(connector);
@@ -406,6 +406,7 @@ test_hotplug(data_t *data, struct chamelium_port *port, int toggle_count,
 		    (modeset_mode == TEST_MODESET_ON && i == 0 )) {
 			if (i == 0) {
 				/* We can only get mode and pipe once we are connected */
+				output = get_output_for_port(data, port);
 				pipe = get_pipe_for_output(&data->display, output);
 				mode = get_mode_for_port(data->chamelium, port);
 				create_fb_for_mode(data, &fb, &mode);
@@ -2582,7 +2583,7 @@ igt_main
 		igt_display_commit2(&data.display, COMMIT_ATOMIC);
 
 		/* we need to initalize chamelium after igt_display_require */
-		data.chamelium = chamelium_init(data.drm_fd);
+		data.chamelium = chamelium_init(data.drm_fd, &data.display);
 		igt_require(data.chamelium);
 
 		data.ports = chamelium_get_ports(data.chamelium,

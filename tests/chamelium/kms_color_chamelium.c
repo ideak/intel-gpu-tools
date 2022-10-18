@@ -680,7 +680,7 @@ igt_main
 		igt_chamelium_allow_fsm_handling = false;
 
 		/* we need to initalize chamelium after igt_display_require */
-		data.chamelium = chamelium_init(data.drm_fd);
+		data.chamelium = chamelium_init(data.drm_fd, &data.display);
 		igt_require(data.chamelium);
 
 		data.ports = chamelium_get_ports(data.chamelium,

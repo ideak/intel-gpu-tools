@@ -233,15 +233,18 @@ drmModeConnector *chamelium_port_get_connector(struct chamelium *chamelium,
 	/* In case the connector ID is still valid, do a quick check if we're have the connector we expect. 
 	 * Otherwise, read the new resources and find the new connector we're looking for. */
 	if (connector) {
-		drmModePropertyBlobPtr path_blob =
-			kmstest_get_path_blob(drm_fd, connector->connector_id);
-		if (path_blob) {
-			bool is_correct_connector =
-				strcmp(port->connector_path, path_blob->data) ==
-				0;
-			drmModeFreePropertyBlob(path_blob);
-			if (is_correct_connector)
-				return connector;
+		if (connector->connection == DRM_MODE_CONNECTED) {
+			drmModePropertyBlobPtr path_blob =
+				kmstest_get_path_blob(drm_fd,
+						      connector->connector_id);
+			if (path_blob) {
+				bool is_correct_connector =
+					strcmp(port->connector_path,
+					       path_blob->data) == 0;
+				drmModeFreePropertyBlob(path_blob);
+				if (is_correct_connector)
+					return connector;
+			}
 		}
 
 		drmModeFreeConnector(connector);
@@ -413,11 +416,8 @@ chamelium_reprobe_connector(igt_display_t *display,
 	/* If we still have a connector, let's make sure that igt_display and
 	   the port are up to date too */
 	output = igt_output_from_connector(display, connector);
-	if (output)
-	{
-		output->force_reprobe = true;
-		igt_output_refresh(output);
-	}
+	output->force_reprobe = true;
+	igt_output_refresh(output);
 
 	drmModeFreeConnector(connector);
 	return connection_status;
@@ -2886,7 +2886,7 @@ error:
  *
  * Returns: A newly initialized chamelium struct, or NULL on error
  */
-struct chamelium *chamelium_init(int drm_fd)
+struct chamelium *chamelium_init(int drm_fd, igt_display_t *display)
 {
 	struct chamelium *chamelium = chamelium_init_rpc_only();
 	bool mismatching_ports_found = false;
@@ -2951,6 +2951,12 @@ struct chamelium *chamelium_init(int drm_fd)
 		       "If you want to proceed with this this configuration, set the "
 		       "port mapping manually in .igtrc with AdapterAllowed=1. See "
 		       "docs/chamelium.txt for more information.\n");
+
+	/* After a Chamelium init, all ports are now connected, and MST
+	 * connectors are now known to the kernel. MST connectors would spawn
+	 * new connectors that were previously unknown to the kernel. Refresh
+	 * the outputs to grab all supported connectors.*/
+	igt_display_reset_outputs(display);
 
 	return chamelium;
 error:

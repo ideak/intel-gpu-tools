@@ -70,10 +70,11 @@ typedef struct {
 
 } data_t;
 
-void basic_test(data_t *data, drmEventContext *drm_event, struct pollfd *pfd);
+void basic_test(data_t *data, drmEventContext *drm_event, struct pollfd *pfd,
+		igt_display_t *display);
 
 #ifdef HAVE_CHAMELIUM
-static void test_with_chamelium(data_t *data);
+static void test_with_chamelium(data_t *data, igt_display_t *display);
 #endif
 
 static int drm_property_is_tile(drmModePropertyPtr prop)
@@ -388,13 +389,13 @@ static bool got_all_page_flips(data_t *data)
 }
 
 #ifdef HAVE_CHAMELIUM
-static void test_with_chamelium(data_t *data)
+static void test_with_chamelium(data_t *data, igt_display_t *display)
 {
 	int i, count = 0;
 	uint8_t htile = 2, vtile = 1;
 	struct edid **edid;
 
-	data->chamelium = chamelium_init(data->drm_fd);
+	data->chamelium = chamelium_init(data->drm_fd, display);
 	igt_require(data->chamelium);
 	data->ports = chamelium_get_ports
 		(data->chamelium, &data->port_count);
@@ -427,7 +428,8 @@ static void test_with_chamelium(data_t *data)
 }
 #endif
 
-void basic_test(data_t *data, drmEventContext *drm_event, struct pollfd *pfd)
+void basic_test(data_t *data, drmEventContext *drm_event, struct pollfd *pfd,
+		igt_display_t *display)
 {
 		int ret;
 
@@ -476,7 +478,7 @@ igt_main
 	igt_describe("Make sure the Tiled CRTCs are synchronized and we get "
 		     "page flips for all tiled CRTCs in one vblank.");
 	igt_subtest("basic-test-pattern") {
-		basic_test(&data, &drm_event, &pfd);
+		basic_test(&data, &drm_event, &pfd, &display);
 		test_cleanup(&data);
 	}
 
@@ -486,8 +488,8 @@ igt_main
 	igt_subtest_f("basic-test-pattern-with-chamelium") {
 		int i;
 
-		test_with_chamelium(&data);
-		basic_test(&data, &drm_event, &pfd);
+		test_with_chamelium(&data, &display);
+		basic_test(&data, &drm_event, &pfd, &display);
 		test_cleanup(&data);
 		for (i = 0; i < data.port_count; i++)
 			chamelium_reset_state(data.display, data.chamelium,

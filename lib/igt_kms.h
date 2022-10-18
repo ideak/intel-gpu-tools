@@ -173,6 +173,7 @@ struct kmstest_connector_config {
 
 	int pipe;
 	unsigned valid_crtc_idx_mask;
+	char *connector_path;
 };
 
 struct kmstest_plane {
@@ -451,6 +452,7 @@ typedef struct {
 	uint16_t tile_h_size, tile_v_size;
 } igt_tile_info_t;
 
+void igt_display_reset_outputs(igt_display_t *display);
 void igt_display_require(igt_display_t *display, int drm_fd);
 void igt_display_fini(igt_display_t *display);
 void igt_display_reset(igt_display_t *display);

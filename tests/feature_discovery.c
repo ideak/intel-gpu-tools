@@ -97,7 +97,8 @@ igt_main {
 #ifdef HAVE_CHAMELIUM
 		igt_describe("Make sure that Chamelium is configured and reachable.");
 		igt_subtest("chamelium") {
-			struct chamelium *chamelium = chamelium_init(fd);
+			struct chamelium *chamelium =
+				chamelium_init(fd, &display);
 			igt_require(chamelium);
 			chamelium_deinit(chamelium);
 		}

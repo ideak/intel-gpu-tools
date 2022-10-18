@@ -1698,6 +1698,7 @@ static bool _kmstest_connector_config(int drm_fd, uint32_t connector_id,
 {
 	drmModeRes *resources;
 	drmModeConnector *connector;
+	drmModePropertyBlobPtr path_blob;
 
 	config->pipe = PIPE_NONE;
 
@@ -1720,6 +1721,13 @@ static bool _kmstest_connector_config(int drm_fd, uint32_t connector_id,
 		igt_warn("connector id doesn't match (%d != %d)\n",
 			 connector->connector_id, connector_id);
 		goto err3;
+	}
+
+	/* Set connector path for MST connectors. */
+	path_blob = kmstest_get_path_blob(drm_fd, connector_id);
+	if (path_blob) {
+		config->connector_path = strdup(path_blob->data);
+		drmModeFreePropertyBlob(path_blob);
 	}
 
 	/*
@@ -2349,14 +2357,117 @@ static bool igt_pipe_has_valid_output(igt_display_t *display, enum pipe pipe)
 
 /**
  * igt_display_require:
+ * @display: a pointer to an initialized #igt_display_t structure
+ *
+ * Initialize @display outputs with their connectors and pipes.
+ * This function clears any previously allocated outputs.
+ */
+void igt_display_reset_outputs(igt_display_t *display)
+{
+	int i;
+	drmModeRes *resources;
+
+	/* Clear any existing outputs*/
+	if (display->n_outputs) {
+		for (i = 0; i < display->n_outputs; i++) {
+			struct kmstest_connector_config *config =
+				&display->outputs[i].config;
+			drmModeFreeConnector(config->connector);
+			drmModeFreeEncoder(config->encoder);
+			drmModeFreeCrtc(config->crtc);
+			free(config->connector_path);
+		}
+		free(display->outputs);
+	}
+
+	resources = drmModeGetResources(display->drm_fd);
+	if (!resources)
+		return;
+
+	display->n_outputs = resources->count_connectors;
+	display->outputs = calloc(display->n_outputs, sizeof(igt_output_t));
+	igt_assert_f(display->outputs,
+		     "Failed to allocate memory for %d outputs\n",
+		     display->n_outputs);
+
+	for (i = 0; i < display->n_outputs; i++) {
+		igt_output_t *output = &display->outputs[i];
+		drmModeConnector *connector;
+
+		/*
+		 * We don't assign each output a pipe unless
+		 * a pipe is set with igt_output_set_pipe().
+		 */
+		output->pending_pipe = PIPE_NONE;
+		output->id = resources->connectors[i];
+		output->display = display;
+
+		igt_output_refresh(output);
+
+		connector = output->config.connector;
+		if (connector &&
+		    (!connector->count_modes ||
+		     connector->connection == DRM_MODE_UNKNOWNCONNECTION)) {
+			output->force_reprobe = true;
+			igt_output_refresh(output);
+		}
+	}
+
+	/* Set reasonable default values for every object in the
+	 * display. */
+	igt_display_reset(display);
+
+	for_each_pipe(display, i) {
+		igt_pipe_t *pipe = &display->pipes[i];
+		igt_output_t *output;
+
+		if (!igt_pipe_has_valid_output(display, i))
+			continue;
+
+		output = igt_get_single_output_for_pipe(display, i);
+
+		if (pipe->num_primary_planes > 1) {
+			igt_plane_t *primary =
+				&pipe->planes[pipe->plane_primary];
+			igt_plane_t *assigned_primary =
+				igt_get_assigned_primary(output, pipe);
+			int assigned_primary_index = assigned_primary->index;
+
+			/*
+			 * If the driver-assigned primary plane isn't at
+			 * the pipe->plane_primary index, swap it with
+			 * the plane that's currently at the
+			 * plane_primary index and update plane->index
+			 * accordingly.
+			 *
+			 * This way, we can preserve pipe->plane_primary
+			 * as 0 so that tests that assume
+			 * pipe->plane_primary is always 0 won't break.
+			 */
+			if (assigned_primary_index != pipe->plane_primary) {
+				assigned_primary->index = pipe->plane_primary;
+				primary->index = assigned_primary_index;
+
+				igt_swap(pipe->planes[assigned_primary_index],
+					 pipe->planes[pipe->plane_primary]);
+			}
+		}
+	}
+
+	drmModeFreeResources(resources);
+}
+
+/**
+ * igt_display_require:
  * @display: a pointer to an #igt_display_t structure
  * @drm_fd: a drm file descriptor
  *
  * Initialize @display and allocate the various resources required. Use
- * #igt_display_fini to release the resources when they are no longer required.
+ * #igt_display_fini to release the resources when they are no longer
+ * required.
  *
- * This function automatically skips if the kernel driver doesn't support any
- * CRTC or outputs.
+ * This function automatically skips if the kernel driver doesn't
+ * support any CRTC or outputs.
  */
 void igt_display_require(igt_display_t *display, int drm_fd)
 {
@@ -2458,6 +2569,8 @@ void igt_display_require(igt_display_t *display, int drm_fd)
 		 */
 	}
 
+	drmModeFreePlaneResources(plane_resources);
+
 	for_each_pipe(display, i) {
 		igt_pipe_t *pipe = &display->pipes[i];
 		igt_plane_t *plane;
@@ -2556,78 +2669,11 @@ void igt_display_require(igt_display_t *display, int drm_fd)
 		pipe->n_planes = n_planes;
 	}
 
-	igt_fill_display_format_mod(display);
-
-	/*
-	 * The number of connectors is set, so we just initialize the outputs
-	 * array in _init(). This may change when we need dynamic connectors
-	 * (say DisplayPort MST).
-	 */
-	display->n_outputs = resources->count_connectors;
-	display->outputs = calloc(display->n_outputs, sizeof(igt_output_t));
-	igt_assert_f(display->outputs, "Failed to allocate memory for %d outputs\n", display->n_outputs);
-
-	for (i = 0; i < display->n_outputs; i++) {
-		igt_output_t *output = &display->outputs[i];
-		drmModeConnector *connector;
-
-		/*
-		 * We don't assign each output a pipe unless
-		 * a pipe is set with igt_output_set_pipe().
-		 */
-		output->pending_pipe = PIPE_NONE;
-		output->id = resources->connectors[i];
-		output->display = display;
-
-		igt_output_refresh(output);
-
-		connector = output->config.connector;
-		if (connector && (!connector->count_modes ||
-		    connector->connection == DRM_MODE_UNKNOWNCONNECTION)) {
-			output->force_reprobe = true;
-			igt_output_refresh(output);
-		}
-	}
-
-	drmModeFreePlaneResources(plane_resources);
 	drmModeFreeResources(resources);
 
-	/* Set reasonable default values for every object in the display. */
-	igt_display_reset(display);
+	igt_fill_display_format_mod(display);
 
-	for_each_pipe(display, i) {
-		igt_pipe_t *pipe = &display->pipes[i];
-		igt_output_t *output;
-
-		if (!igt_pipe_has_valid_output(display, i))
-			continue;
-
-		output = igt_get_single_output_for_pipe(display, i);
-
-		if (pipe->num_primary_planes > 1) {
-			igt_plane_t *primary = &pipe->planes[pipe->plane_primary];
-			igt_plane_t *assigned_primary = igt_get_assigned_primary(output, pipe);
-			int assigned_primary_index = assigned_primary->index;
-
-			/*
-			 * If the driver-assigned primary plane isn't at the
-			 * pipe->plane_primary index, swap it with the plane
-			 * that's currently at the plane_primary index and
-			 * update plane->index accordingly.
-			 *
-			 * This way, we can preserve pipe->plane_primary as 0
-			 * so that tests that assume pipe->plane_primary is always 0
-			 * won't break.
-			 */
-			if (assigned_primary_index != pipe->plane_primary) {
-				assigned_primary->index = pipe->plane_primary;
-				primary->index = assigned_primary_index;
-
-				igt_swap(pipe->planes[assigned_primary_index],
-						pipe->planes[pipe->plane_primary]);
-			}
-		}
-	}
+	igt_display_reset_outputs(display);
 
 out:
 	LOG_UNINDENT(display);
@@ -2695,17 +2741,36 @@ void igt_display_require_output_on_pipe(igt_display_t *display, enum pipe pipe)
 igt_output_t *igt_output_from_connector(igt_display_t *display,
 					drmModeConnector *connector)
 {
-	igt_output_t *output, *found = NULL;
 	int i;
+	igt_output_t *found = NULL;
 
 	for (i = 0; i < display->n_outputs; i++) {
-		output = &display->outputs[i];
+		igt_output_t *output = &display->outputs[i];
+		bool is_mst = !!output->config.connector_path;
 
-		if (output->config.connector &&
-		    output->config.connector->connector_id ==
-		    connector->connector_id) {
-			found = output;
-			break;
+		if (is_mst) {
+			drmModePropertyBlobPtr path_blob =
+				kmstest_get_path_blob(display->drm_fd,
+						      connector->connector_id);
+			if (path_blob) {
+				bool is_same_connector =
+					strcmp(output->config.connector_path,
+					       path_blob->data) == 0;
+				drmModeFreePropertyBlob(path_blob);
+				if (is_same_connector) {
+					output->id = connector->connector_id;
+					found = output;
+					break;
+				}
+			}
+
+		} else {
+			if (output->config.connector &&
+			    output->config.connector->connector_id ==
+				    connector->connector_id) {
+				found = output;
+				break;
+			}
 		}
 	}
 
