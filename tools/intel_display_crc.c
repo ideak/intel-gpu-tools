@@ -32,6 +32,7 @@
 #include "igt_core.h"
 #include "igt_debugfs.h"
 #include "igt_kms.h"
+#include "igt_pipe_crc.h"
 
 typedef struct {
 	int fd;

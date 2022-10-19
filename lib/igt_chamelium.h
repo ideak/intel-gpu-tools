@@ -36,6 +36,7 @@
 
 struct igt_fb;
 struct edid;
+typedef struct _igt_crc igt_crc_t;
 
 struct chamelium;
 struct chamelium_port;

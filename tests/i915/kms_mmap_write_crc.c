@@ -33,6 +33,7 @@
 #include "drmtest.h"
 #include "igt_debugfs.h"
 #include "igt_kms.h"
+#include "igt_pipe_crc.h"
 #include "intel_chipset.h"
 #include "ioctl_wrappers.h"
 #include "igt_aux.h"

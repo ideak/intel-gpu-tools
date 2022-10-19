@@ -41,6 +41,7 @@
 #include "igt_debugfs.h"
 
 struct buf_ops;
+typedef struct _igt_crc igt_crc_t;
 
 /*
  * Internal format to denote a buffer compatible with pixman's
