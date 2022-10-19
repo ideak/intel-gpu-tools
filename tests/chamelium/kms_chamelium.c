@@ -446,8 +446,7 @@ static void
 igt_custom_edid_type_read(data_t *data, struct chamelium_port *port, enum igt_custom_edid_type edid)
 {
 	drmModePropertyBlobPtr edid_blob = NULL;
-	drmModeConnector *connector = chamelium_port_get_connector(
-	    data->chamelium, port, false);
+	drmModeConnector *connector;
 	size_t raw_edid_size;
 	const struct edid *raw_edid;
 	uint64_t edid_blob_id;
@@ -463,6 +462,7 @@ igt_custom_edid_type_read(data_t *data, struct chamelium_port *port, enum igt_cu
 
 	igt_skip_on(check_analog_bridge(data, port));
 
+	connector = chamelium_port_get_connector(data->chamelium, port, true);
 	igt_assert(kmstest_get_property(data->drm_fd, connector->connector_id,
 					DRM_MODE_OBJECT_CONNECTOR, "EDID", NULL,
 					&edid_blob_id, NULL));
