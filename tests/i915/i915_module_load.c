@@ -226,13 +226,13 @@ inject_fault(const char *module_name, const char *opt, int fault)
 
 static void gem_sanitycheck(void)
 {
-	struct drm_i915_gem_caching args = {};
+	struct drm_i915_gem_busy args = {};
 	int i915 = __drm_open_driver(DRIVER_INTEL);
 	int expected = gem_has_lmem(i915) ? -ENODEV : -ENOENT;
 	int err;
 
 	err = 0;
-	if (ioctl(i915, DRM_IOCTL_I915_GEM_SET_CACHING, &args))
+	if (ioctl(i915,DRM_IOCTL_I915_GEM_BUSY, &args))
 		err = -errno;
 	if (err == expected)
 		store_all(i915);
