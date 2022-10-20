@@ -169,6 +169,11 @@ static void test_cursor_pos(data_t *data, int x, int y, unsigned int flags)
 	igt_plane_set_position(data->cursor, x, y);
 	igt_display_commit_atomic(&data->display, 0, NULL);
 
+	/* Wait for one more vblank since cursor updates are not
+	 * synchronized to the same frame on AMD hw */
+	if(is_amdgpu_device(data->drm_fd))
+		igt_wait_for_vblank_count(data->drm_fd, data->display.pipes[data->pipe_id].crtc_offset, 1);
+
 	igt_pipe_crc_get_current(data->drm_fd, data->pipe_crc, &test_crc);
 	igt_pipe_crc_stop(data->pipe_crc);
 
