@@ -493,11 +493,9 @@ static void independent(int i915, const intel_ctx_t *base_ctx,
 	param.ctx_id = gem_context_create(i915);
 	gem_context_set_param(i915, &param);
 
-	if (!gem_has_lmem(i915))
-		gem_set_caching(i915, results.handle, I915_CACHING_CACHED);
-	map = gem_mmap__cpu(i915, results.handle, 0, 4096, PROT_READ);
+	map = gem_mmap__device_coherent(i915, results.handle, 0, 4096, PROT_READ);
 	gem_set_domain(i915, results.handle,
-		       I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
+		       I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
 
 	for (int i = 0; i < I915_EXEC_RING_MASK + 1; i++) {
 		struct drm_i915_gem_exec_object2 obj[2] = {
@@ -515,8 +513,7 @@ static void independent(int i915, const intel_ctx_t *base_ctx,
 		uint32_t *cs;
 		int j = 0;
 
-		cs = gem_mmap__cpu(i915, obj[1].handle, 0, 4096, PROT_WRITE);
-
+		cs = gem_mmap__device_coherent(i915, obj[1].handle, 0, 4096, PROT_WRITE);
 		cs[j] = 0x24 << 23 | 1; /* SRM */
 		if (has_64bit_reloc)
 			cs[j]++;
