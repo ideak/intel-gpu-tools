@@ -41,6 +41,7 @@
 #include "i915/gem.h"
 #include "i915/perf.h"
 #include "igt.h"
+#include "igt_perf.h"
 #include "igt_sysfs.h"
 #include "drm.h"
 
@@ -4968,6 +4969,19 @@ static int i915_perf_revision(int fd)
 	return value;
 }
 
+static bool has_class_instance(int i915, uint16_t class, uint16_t instance)
+{
+	int fd;
+
+	fd = perf_i915_open(i915, I915_PMU_ENGINE_BUSY(class, instance));
+	if (fd >= 0) {
+		close(fd);
+		return true;
+	}
+
+	return false;
+}
+
 igt_main
 {
 	igt_fixture {
@@ -5012,7 +5026,8 @@ igt_main
 
 		gt_max_freq_mhz = sysfs_read(RPS_RP0_FREQ_MHZ);
 
-		render_copy = igt_get_render_copyfunc(devid);
+		if (has_class_instance(drm_fd, I915_ENGINE_CLASS_RENDER, 0))
+			render_copy = igt_get_render_copyfunc(devid);
 	}
 
 	igt_subtest("non-system-wide-paranoid")
