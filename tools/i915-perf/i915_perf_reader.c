@@ -252,6 +252,13 @@ main(int argc, char *argv[])
 		intel_perf_read_record_timestamp(reader.perf,
 						 reader.metric_set,
 						 reader.records[reader.n_records - 1]));
+	fprintf(stdout, "OA raw data timestamp range:           0x%016"PRIx64"-0x%016"PRIx64"\n",
+		intel_perf_read_record_timestamp_raw(reader.perf,
+						     reader.metric_set,
+						     reader.records[0]),
+		intel_perf_read_record_timestamp_raw(reader.perf,
+						     reader.metric_set,
+						     reader.records[reader.n_records - 1]));
 
 	if (strcmp(reader.metric_set_uuid, reader.metric_set->hw_config_guid)) {
 		fprintf(stdout,

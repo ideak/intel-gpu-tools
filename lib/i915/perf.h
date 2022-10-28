@@ -344,6 +344,10 @@ uint64_t intel_perf_read_record_timestamp(const struct intel_perf *perf,
 					  const struct intel_perf_metric_set *metric_set,
 					  const struct drm_i915_perf_record_header *record);
 
+uint64_t intel_perf_read_record_timestamp_raw(const struct intel_perf *perf,
+					      const struct intel_perf_metric_set *metric_set,
+					      const struct drm_i915_perf_record_header *record);
+
 #ifdef __cplusplus
 };
 #endif

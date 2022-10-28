@@ -881,3 +881,24 @@ uint64_t intel_perf_read_record_timestamp(const struct intel_perf *perf,
 
        return ts;
 }
+
+uint64_t intel_perf_read_record_timestamp_raw(const struct intel_perf *perf,
+					  const struct intel_perf_metric_set *metric_set,
+					  const struct drm_i915_perf_record_header *record)
+{
+       const uint32_t *report32 = (const uint32_t *)(record + 1);
+       uint64_t ts;
+
+       switch (metric_set->perf_oa_format) {
+       case I915_OA_FORMAT_A24u40_A14u32_B8_C8:
+       case I915_OA_FORMAT_A32u40_A4u32_B8_C8:
+       case I915_OA_FORMAT_A45_B8_C8:
+               ts = report32[1];
+               break;
+
+       default:
+               assert(0);
+       }
+
+       return ts;
+}
