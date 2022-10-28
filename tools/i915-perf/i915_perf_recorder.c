@@ -1144,6 +1144,11 @@ main(int argc, char *argv[])
 
 	fprintf(stdout, "Exiting...\n");
 
+	if (!write_i915_perf_data(ctx.output_stream, ctx.perf_fd)) {
+		fprintf(stderr, "Failed to write i915-perf data: %s\n",
+			strerror(errno));
+	}
+
 	if (!write_correlation_timestamps(ctx.output_stream, ctx.drm_fd)) {
 		fprintf(stderr,
 			"Failed to write final i915 timestamp correlation data: %s\n",
