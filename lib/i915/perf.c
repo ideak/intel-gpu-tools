@@ -511,6 +511,35 @@ open_master_sysfs_dir(int drm_fd)
 	return sysfs;
 }
 
+typedef enum {
+	RPS_MIN_FREQ_MHZ,
+	RPS_MAX_FREQ_MHZ,
+
+	RPS_MAX_ATTR,
+} intel_sysfs_attr_id;
+
+static const char *intel_sysfs_attr_name[2][RPS_MAX_ATTR] =
+{
+	{
+		"gt_min_freq_mhz",
+		"gt_max_freq_mhz",
+	},
+	{
+		"gt/gt0/rps_min_freq_mhz",
+		"gt/gt0/rps_max_freq_mhz",
+	},
+};
+
+static const char *
+intel_sysfs_attr_id_to_name(int sysfs_dirfd, intel_sysfs_attr_id id)
+{
+	assert(id < RPS_MAX_ATTR);
+
+	return !faccessat(sysfs_dirfd, "gt", O_RDONLY, 0) ?
+		intel_sysfs_attr_name[1][id] :
+		intel_sysfs_attr_name[0][id];
+}
+
 struct intel_perf *
 intel_perf_for_fd(int drm_fd)
 {
@@ -526,8 +555,11 @@ intel_perf_for_fd(int drm_fd)
 	if (sysfs_dir_fd < 0)
 		return NULL;
 
-	if (!read_sysfs(sysfs_dir_fd, "gt_min_freq_mhz", &gt_min_freq) ||
-	    !read_sysfs(sysfs_dir_fd, "gt_max_freq_mhz", &gt_max_freq)) {
+#define read_sysfs_rps(fd, id, value) \
+	read_sysfs(fd, intel_sysfs_attr_id_to_name(fd, id), value)
+
+	if (!read_sysfs_rps(sysfs_dir_fd, RPS_MIN_FREQ_MHZ, &gt_min_freq) ||
+	    !read_sysfs_rps(sysfs_dir_fd, RPS_MAX_FREQ_MHZ, &gt_max_freq)) {
 		close(sysfs_dir_fd);
 		return NULL;
 	}

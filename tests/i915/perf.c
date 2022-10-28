@@ -345,11 +345,11 @@ try_sysfs_read_u64(const char *path, uint64_t *val)
 }
 
 static unsigned long
-sysfs_read(const char *path)
+sysfs_read(enum i915_attr_id id)
 {
 	unsigned long value;
 
-	igt_assert(igt_sysfs_scanf(sysfs, path, "%lu", &value) == 1);
+	igt_assert(igt_sysfs_rps_scanf(sysfs, id, "%lu", &value) == 1);
 
 	return value;
 }
@@ -4177,7 +4177,7 @@ gen12_test_single_ctx_render_target_writes_a_counter(void)
 
 static unsigned long rc6_residency_ms(void)
 {
-	return sysfs_read("power/rc6_residency_ms");
+	return sysfs_read(RC6_RESIDENCY_MS);
 }
 
 static void
@@ -4200,7 +4200,7 @@ test_rc6_disable(void)
 	unsigned long rc6_start, rc6_end, rc6_enabled;
 
 	rc6_enabled = 0;
-	igt_sysfs_scanf(sysfs, "power/rc6_enable", "%lu", &rc6_enabled);
+	igt_sysfs_rps_scanf(sysfs, RC6_ENABLE, "%lu", &rc6_enabled);
 	igt_require(rc6_enabled);
 
 	/* Verify rc6 is functional by measuring residency while idle */
@@ -4837,6 +4837,19 @@ done:
 	return ref_count;
 }
 
+static int perf_sysfs_open(int i915)
+{
+	int dirfd, gt;
+
+	/* use the first available sysfs interface */
+	for_each_sysfs_gt_dirfd(i915, dirfd, gt)
+		break;
+
+	igt_assert(dirfd != -1);
+
+	return dirfd;
+}
+
 /* check that an open i915 perf stream holds a reference on the drm i915 module
  * including in the corner case where the original drm fd has been closed.
  */
@@ -4872,7 +4885,7 @@ test_i915_ref_count(void)
 	drm_fd = __drm_open_driver(DRIVER_INTEL);
 	igt_require_intel(drm_fd);
 	devid = intel_get_drm_devid(drm_fd);
-	sysfs = igt_sysfs_open(drm_fd);
+	sysfs = perf_sysfs_open(drm_fd);
 
 	/* Note: these global variables are only initialized after calling
 	 * init_sys_info()...
@@ -4974,14 +4987,14 @@ igt_main
 		igt_require_gem(drm_fd);
 
 		devid = intel_get_drm_devid(drm_fd);
-		sysfs = igt_sysfs_open(drm_fd);
+		sysfs = perf_sysfs_open(drm_fd);
 
 		igt_require(init_sys_info());
 
 		write_u64_file("/proc/sys/dev/i915/perf_stream_paranoid", 1);
 		write_u64_file("/proc/sys/dev/i915/oa_max_sample_rate", 100000);
 
-		gt_max_freq_mhz = sysfs_read("gt_boost_freq_mhz");
+		gt_max_freq_mhz = sysfs_read(RPS_RP0_FREQ_MHZ);
 
 		render_copy = igt_get_render_copyfunc(devid);
 		igt_require_f(render_copy, "no render-copy function\n");
