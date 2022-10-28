@@ -328,7 +328,7 @@ perf_ioctl(int fd, unsigned long request, void *arg)
 }
 
 static uint64_t
-get_device_timestamp_frequency(const struct intel_device_info *devinfo, int drm_fd)
+get_device_cs_timestamp_frequency(const struct intel_device_info *devinfo, int drm_fd)
 {
 	drm_i915_getparam_t gp;
 	int timestamp_frequency;
@@ -352,12 +352,44 @@ get_device_timestamp_frequency(const struct intel_device_info *devinfo, int drm_
 	return 12000000;
 }
 
+static uint64_t
+get_device_oa_timestamp_frequency(const struct intel_device_info *devinfo, int drm_fd)
+{
+	drm_i915_getparam_t gp;
+	int timestamp_frequency;
+
+	gp.param = I915_PARAM_OA_TIMESTAMP_FREQUENCY;
+	gp.value = &timestamp_frequency;
+	if (perf_ioctl(drm_fd, DRM_IOCTL_I915_GETPARAM, &gp) == 0)
+		return timestamp_frequency;
+
+	gp.param = I915_PARAM_CS_TIMESTAMP_FREQUENCY;
+	gp.value = &timestamp_frequency;
+	if (perf_ioctl(drm_fd, DRM_IOCTL_I915_GETPARAM, &gp) == 0)
+		return timestamp_frequency;
+
+
+	if (devinfo->graphics_ver > 9) {
+		fprintf(stderr, "Unable to query timestamp frequency from i915, please update kernel.\n");
+		return 0;
+	}
+
+	fprintf(stderr, "Warning: unable to query timestamp frequency from i915, guessing values...\n");
+
+	if (devinfo->graphics_ver <= 8)
+		return 12500000;
+	if (devinfo->is_broxton)
+		return 19200000;
+	return 12000000;
+}
+
 struct recording_context {
 	int drm_fd;
 	int perf_fd;
 
 	uint32_t devid;
-	uint64_t timestamp_frequency;
+	uint64_t oa_timestamp_frequency;
+	uint64_t cs_timestamp_frequency;
 
 	const struct intel_device_info *devinfo;
 
@@ -459,7 +491,7 @@ static bool
 write_header(FILE *output, struct recording_context *ctx)
 {
 	struct intel_perf_record_device_info info = {
-		.timestamp_frequency = ctx->timestamp_frequency,
+		.timestamp_frequency = ctx->oa_timestamp_frequency,
 		.device_id = ctx->perf->devinfo.devid,
 		.device_revision = ctx->perf->devinfo.revision,
 		.gt_min_frequency = ctx->perf->devinfo.gt_min_freq,
@@ -964,7 +996,8 @@ main(int argc, char *argv[])
 
 	intel_perf_load_perf_configs(ctx.perf, ctx.drm_fd);
 
-	ctx.timestamp_frequency = get_device_timestamp_frequency(ctx.devinfo, ctx.drm_fd);
+	ctx.oa_timestamp_frequency = get_device_oa_timestamp_frequency(ctx.devinfo, ctx.drm_fd);
+	ctx.cs_timestamp_frequency = get_device_cs_timestamp_frequency(ctx.devinfo, ctx.drm_fd);
 
 	signal(SIGINT, sigint_handler);
 
@@ -1036,7 +1069,7 @@ main(int argc, char *argv[])
 		goto fail;
 	}
 
-	ctx.oa_exponent = oa_exponent_for_period(ctx.timestamp_frequency, perf_period);
+	ctx.oa_exponent = oa_exponent_for_period(ctx.oa_timestamp_frequency, perf_period);
 	fprintf(stdout, "Opening perf stream with metric_id=%"PRIu64" oa_exponent=%u oa_format=%u\n",
 		ctx.metric_set->perf_oa_metrics_set, ctx.oa_exponent,
 		ctx.metric_set->perf_oa_format);
