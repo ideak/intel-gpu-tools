@@ -86,7 +86,8 @@ static bool test(int drm_fd, uint32_t connector_id)
 
 		igt_assert(ret == sizeof(buf) ||
 			   errno == ETIMEDOUT ||
-			   (errno == EIO && is_mst_connector(drm_fd, connector_id)));
+			   (errno == EIO && (is_mst_connector(drm_fd, connector_id) ||
+			    is_amdgpu_device(drm_fd))));
 
 		close(fd);
 
