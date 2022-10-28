@@ -127,6 +127,19 @@ def generate_metric_sets(args, gen):
                 metric_set->perfcnt_offset = metric_set->c_offset + 8;
 
             """))
+        elif gen.chipset.startswith("acm"):
+            c(textwrap.dedent("""\
+                metric_set->perf_oa_format = I915_OA_FORMAT_A24u40_A14u32_B8_C8;
+
+                metric_set->perf_raw_size = 256;
+                metric_set->gpu_time_offset = 0;
+                metric_set->gpu_clock_offset = 1;
+                metric_set->a_offset = 2;
+                metric_set->b_offset = metric_set->a_offset + 38;
+                metric_set->c_offset = metric_set->b_offset + 8;
+                metric_set->perfcnt_offset = metric_set->c_offset + 8;
+
+            """))
         else:
             c(textwrap.dedent("""\
                 metric_set->perf_oa_format = I915_OA_FORMAT_A32u40_A4u32_B8_C8;
