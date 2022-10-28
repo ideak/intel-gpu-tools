@@ -902,3 +902,57 @@ uint64_t intel_perf_read_record_timestamp_raw(const struct intel_perf *perf,
 
        return ts;
 }
+
+const char *intel_perf_read_report_reason(const struct intel_perf *perf,
+					  const struct drm_i915_perf_record_header *record)
+{
+	const uint32_t *report = (const uint32_t *) (record + 1);
+
+	/* Not really documented on Gfx7/7.5*/
+	if (perf->devinfo.graphics_ver < 8)
+		return "timer";
+
+	/* Gfx8-11 */
+	if (perf->devinfo.graphics_ver < 12) {
+		uint32_t reason = report[0] >> 19;
+		if (reason & (1u << 0))
+			return "timer";
+		if (reason & (1u << 1))
+			return "trigger1";
+		if (reason & (1u << 2))
+			return "trigger2";
+		if (reason & (1u << 3))
+			return "context-switch";
+		if (reason & (1u << 4))
+			return "go-transition";
+
+		if (perf->devinfo.graphics_ver >= 9 &&
+		    reason & (1u << 5))
+			return "clock-ratio-change";
+
+		return "unknown";
+	}
+
+	/* Gfx12 */
+	if (perf->devinfo.graphics_ver <= 12) {
+		uint32_t reason = report[0] >> 19;
+		if (reason & (1u << 0))
+			return "timer";
+		if (reason & (1u << 1))
+			return "trigger1";
+		if (reason & (1u << 2))
+			return "trigger2";
+		if (reason & (1u << 3))
+			return "context-switch";
+		if (reason & (1u << 4))
+			return "go-transition";
+		if (reason & (1u << 5))
+			return "clock-ratio-change";
+		if (reason & (1u << 6))
+			return "mmio-trigger";
+
+		return "unknown";
+	}
+
+	return "unknown";
+}
