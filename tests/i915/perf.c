@@ -5112,6 +5112,7 @@ igt_main
 	igt_subtest_group {
 		igt_fixture {
 			igt_require(i915_perf_revision(drm_fd) >= 4);
+			igt_require(intel_graphics_ver(devid) < IP_VER(12, 50));
 		}
 
 		igt_describe("Verify invalid SSEU opening parameters");
