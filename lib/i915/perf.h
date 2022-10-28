@@ -56,6 +56,21 @@ struct intel_perf_devinfo {
 	uint32_t devid;
 	uint32_t graphics_ver;
 	uint32_t revision;
+	/**
+	 * Bit shifting required to put OA report timestamps into
+	 * timestamp_frequency (some HW generations can shift
+	 * timestamp values to the right by a number of bits).
+	 */
+	int32_t  oa_timestamp_shift;
+	/**
+	 * On some platforms only part of the timestamp bits are valid
+	 * (on previous platforms we would get full 32bits, newer
+	 * platforms can have fewer). It's important to know when
+	 * correlating the full 36bits timestamps to the OA report
+	 * timestamps.
+	 */
+	uint64_t  oa_timestamp_mask;
+	/* Frequency of the timestamps in Hz */
 	uint64_t timestamp_frequency;
 	uint64_t gt_min_freq;
 	uint64_t gt_max_freq;
@@ -320,7 +335,8 @@ void intel_perf_add_metric_set(struct intel_perf *perf,
 void intel_perf_load_perf_configs(struct intel_perf *perf, int drm_fd);
 
 void intel_perf_accumulate_reports(struct intel_perf_accumulator *acc,
-				   int oa_format,
+				   const struct intel_perf *perf,
+				   const struct intel_perf_metric_set *metric_set,
 				   const struct drm_i915_perf_record_header *record0,
 				   const struct drm_i915_perf_record_header *record1);
 

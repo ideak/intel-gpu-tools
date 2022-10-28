@@ -299,6 +299,10 @@ intel_perf_for_devinfo(uint32_t device_id,
 	/* Valid on most generations except Gen9LP. */
 	perf->devinfo.eu_threads_count = 7;
 
+	/* Most platforms have full 32bit timestamps. */
+	perf->devinfo.oa_timestamp_mask = 0xffffffff;
+	perf->devinfo.oa_timestamp_shift = 0;
+
 	if (devinfo->is_haswell) {
 		intel_perf_load_metrics_hsw(perf);
 	} else if (devinfo->is_broadwell) {
@@ -765,7 +769,8 @@ accumulate_uint40(int a_index,
 }
 
 void intel_perf_accumulate_reports(struct intel_perf_accumulator *acc,
-				   int oa_format,
+				   const struct intel_perf *perf,
+				   const struct intel_perf_metric_set *metric_set,
 				   const struct drm_i915_perf_record_header *record0,
 				   const struct drm_i915_perf_record_header *record1)
 {
@@ -777,9 +782,13 @@ void intel_perf_accumulate_reports(struct intel_perf_accumulator *acc,
 
 	memset(acc, 0, sizeof(*acc));
 
-	switch (oa_format) {
+	switch (metric_set->perf_oa_format) {
 	case I915_OA_FORMAT_A24u40_A14u32_B8_C8:
-		accumulate_uint32(start + 1, end + 1, deltas + idx++); /* timestamp */
+		/* timestamp */
+		if (perf->devinfo.oa_timestamp_shift >= 0)
+			deltas[idx++] += (end[1] - start[1]) << perf->devinfo.oa_timestamp_shift;
+		else
+			deltas[idx++] += (end[1] - start[1]) >> (-perf->devinfo.oa_timestamp_shift);
 		accumulate_uint32(start + 3, end + 3, deltas + idx++); /* clock */
 
 		/* 4x 32bit A0-3 counters... */
@@ -812,7 +821,10 @@ void intel_perf_accumulate_reports(struct intel_perf_accumulator *acc,
 
 	case I915_OAR_FORMAT_A32u40_A4u32_B8_C8:
 	case I915_OA_FORMAT_A32u40_A4u32_B8_C8:
-		accumulate_uint32(start + 1, end + 1, deltas + idx++); /* timestamp */
+		if (perf->devinfo.oa_timestamp_shift >= 0)
+			deltas[idx++] += (end[1] - start[1]) << perf->devinfo.oa_timestamp_shift;
+		else
+			deltas[idx++] += (end[1] - start[1]) >> (-perf->devinfo.oa_timestamp_shift);
 		accumulate_uint32(start + 3, end + 3, deltas + idx++); /* clock */
 
 		/* 32x 40bit A counters... */
@@ -829,7 +841,11 @@ void intel_perf_accumulate_reports(struct intel_perf_accumulator *acc,
 		break;
 
 	case I915_OA_FORMAT_A45_B8_C8:
-		accumulate_uint32(start + 1, end + 1, deltas); /* timestamp */
+		/* timestamp */
+		if (perf->devinfo.oa_timestamp_shift >= 0)
+			deltas[0] += (end[1] - start[1]) << perf->devinfo.oa_timestamp_shift;
+		else
+			deltas[0] += (end[1] - start[1]) >> (-perf->devinfo.oa_timestamp_shift);
 
 		for (i = 0; i < 61; i++)
 			accumulate_uint32(start + 3 + i, end + 3 + i, deltas + 1 + i);
@@ -857,6 +873,11 @@ uint64_t intel_perf_read_record_timestamp(const struct intel_perf *perf,
        default:
                assert(0);
        }
+
+       if (perf->devinfo.oa_timestamp_shift >= 0)
+	       ts <<= perf->devinfo.oa_timestamp_shift;
+       else
+	       ts >>= -perf->devinfo.oa_timestamp_shift;
 
        return ts;
 }

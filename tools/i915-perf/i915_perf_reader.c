@@ -271,7 +271,8 @@ main(int argc, char *argv[])
 		fprintf(stdout, "hw_id=0x%x %s\n",
 			item->hw_id, item->hw_id == 0xffffffff ? "(idle)" : "");
 
-		intel_perf_accumulate_reports(&accu, reader.metric_set->perf_oa_format,
+		intel_perf_accumulate_reports(&accu,
+					      reader.perf, reader.metric_set,
 					      i915_report0, i915_report1);
 
 		for (uint32_t c = 0; c < n_counters; c++) {

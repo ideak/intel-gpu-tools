@@ -209,7 +209,7 @@ correlate_gpu_timestamp(struct intel_perf_data_reader *reader,
 	 * Try to figure what portion of the correlation data the
 	 * 32bit timestamp belongs to.
 	 */
-	uint64_t mask = 0xffffffff;
+	uint64_t mask = reader->perf->devinfo.oa_timestamp_mask;
 	int corr_idx = -1;
 
 	for (uint32_t i = 0; i < reader->n_correlation_chunks; i++) {
