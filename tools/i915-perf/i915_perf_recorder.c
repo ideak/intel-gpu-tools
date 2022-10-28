@@ -588,6 +588,17 @@ static uint64_t timespec_diff(struct timespec *begin,
 
 static clock_t correlation_clock_id = CLOCK_MONOTONIC;
 
+static const char *
+get_correlation_clock_name(clock_t clock_id)
+{
+  switch (clock_id) {
+  case CLOCK_BOOTTIME:      return "bootime";
+  case CLOCK_MONOTONIC:     return "monotonic";
+  case CLOCK_MONOTONIC_RAW: return "monotonic_raw";
+  default:                  return "*unknown*";
+  }
+}
+
 static bool
 get_correlation_timestamps(struct intel_perf_record_timestamp_correlation *corr, int drm_fd)
 {
@@ -1068,6 +1079,9 @@ main(int argc, char *argv[])
 			"   sysctl dev.i915.perf_stream_paranoid=0\n");
 		goto fail;
 	}
+
+	fprintf(stdout, "Using correlation clock: %s\n",
+		get_correlation_clock_name(correlation_clock_id));
 
 	ctx.oa_exponent = oa_exponent_for_period(ctx.oa_timestamp_frequency, perf_period);
 	fprintf(stdout, "Opening perf stream with metric_id=%"PRIu64" oa_exponent=%u oa_format=%u\n",
