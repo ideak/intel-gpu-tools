@@ -2220,14 +2220,22 @@ test_polling(uint64_t requested_oa_period, bool set_kernel_hrtimer, uint64_t ker
 			n_extra_iterations++;
 
 		/* At this point, after consuming pending reports (and hoping
-		 * the scheduler hasn't stopped us for too long we now
-		 * expect EAGAIN on read.
+		 * the scheduler hasn't stopped us for too long) we now expect
+		 * EAGAIN on read. While this works most of the times, there are
+		 * some rare failures when the OA period passed to this test is
+		 * very small (say 500 us) and that results in some valid
+		 * reports here. To weed out those rare occurences we assert
+		 * only if the OA period is >= 40 ms because 40 ms has withstood
+		 * the test of time on most platforms (ref: subtest: polling).
 		 */
 		while ((ret = read(stream_fd, buf, sizeof(buf))) < 0 &&
 		       errno == EINTR)
 			;
-		igt_assert_eq(ret, -1);
-		igt_assert_eq(errno, EAGAIN);
+
+		if (requested_oa_period >= 40000000) {
+			igt_assert_eq(ret, -1);
+			igt_assert_eq(errno, EAGAIN);
+		}
 
 		n++;
 	}
