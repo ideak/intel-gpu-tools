@@ -337,8 +337,8 @@ bool
 intel_perf_data_reader_init(struct intel_perf_data_reader *reader,
 			    int perf_file_fd)
 {
-        struct stat st;
-        if (fstat(perf_file_fd, &st) != 0) {
+	struct stat st;
+	if (fstat(perf_file_fd, &st) != 0) {
 		snprintf(reader->error_msg, sizeof(reader->error_msg),
 			 "Unable to access file (%s)", strerror(errno));
 		return false;
