@@ -2522,6 +2522,9 @@ test_buffer_fill(void)
 						first_timestamp = report[1];
 					last_timestamp = report[1];
 
+					if (((last_timestamp - first_timestamp) * oa_period) < (fill_duration / 2))
+						break;
+
 					if (oa_report_is_periodic(oa_exponent, report)) {
 						memcpy(last_periodic_report, report,
 						       sizeof(last_periodic_report));
@@ -2536,6 +2539,8 @@ test_buffer_fill(void)
 		}
 
 		do_ioctl(stream_fd, I915_PERF_IOCTL_DISABLE, 0);
+
+		igt_debug("first ts = %u, last ts = %u\n", first_timestamp, last_timestamp);
 
 		igt_debug("%f < %zu < %f\n",
 			  report_size * n_full_oa_reports * 0.45,
@@ -2732,6 +2737,9 @@ test_enable_disable(void)
 						  oa_report_is_periodic(oa_exponent, report),
 						  oa_report_get_ctx_id(report));
 
+					if (((last_timestamp - first_timestamp) * oa_period) < (fill_duration / 2))
+						break;
+
 					if (oa_report_is_periodic(oa_exponent, report)) {
 						memcpy(last_periodic_report, report,
 						       sizeof(last_periodic_report));
@@ -2754,6 +2762,8 @@ test_enable_disable(void)
 		}
 
 		do_ioctl(stream_fd, I915_PERF_IOCTL_DISABLE, 0);
+
+		igt_debug("first ts = %u, last ts = %u\n", first_timestamp, last_timestamp);
 
 		igt_debug("%f < %zu < %f\n",
 			  report_size * n_full_oa_reports * 0.45,
