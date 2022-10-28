@@ -324,6 +324,10 @@ void intel_perf_accumulate_reports(struct intel_perf_accumulator *acc,
 				   const struct drm_i915_perf_record_header *record0,
 				   const struct drm_i915_perf_record_header *record1);
 
+uint64_t intel_perf_read_record_timestamp(const struct intel_perf *perf,
+					  const struct intel_perf_metric_set *metric_set,
+					  const struct drm_i915_perf_record_header *record);
+
 #ifdef __cplusplus
 };
 #endif

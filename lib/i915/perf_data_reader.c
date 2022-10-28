@@ -65,12 +65,6 @@ oa_report_ctx_id(const struct intel_perf_devinfo *devinfo, const uint8_t *report
 	return ((const uint32_t *) report)[2];
 }
 
-static inline uint64_t
-oa_report_timestamp(const uint8_t *report)
-{
-	return ((const uint32_t *)report)[1];
-}
-
 static void
 append_record(struct intel_perf_data_reader *reader,
 	      const struct drm_i915_perf_record_header *header)
@@ -298,8 +292,12 @@ generate_cpu_events(struct intel_perf_data_reader *reader)
 		last_ctx_id = oa_report_ctx_id(&reader->devinfo, start_report);
 		current_ctx_id = oa_report_ctx_id(&reader->devinfo, end_report);
 
-		gpu_ts_start = oa_report_timestamp(start_report);
-		gpu_ts_end = oa_report_timestamp(end_report);
+		gpu_ts_start = intel_perf_read_record_timestamp(reader->perf,
+								reader->metric_set,
+								last_header);
+		gpu_ts_end = intel_perf_read_record_timestamp(reader->perf,
+							      reader->metric_set,
+							      current_header);
 
 		if (last_ctx_id == current_ctx_id)
 			continue;

@@ -230,6 +230,26 @@ main(int argc, char *argv[])
 	fprintf(stdout, "Context switches: %u\n", reader.n_timelines);
 	fprintf(stdout, "Timestamp correlation points: %u\n", reader.n_correlations);
 
+	if (reader.n_correlations < 2) {
+		fprintf(stderr, "Less than 2 CPU/GPU timestamp correlation points.\n");
+		return EXIT_FAILURE;
+	}
+
+	fprintf(stdout, "Timestamp correlation CPU range: 0x%016"PRIx64"-0x%016"PRIx64"\n",
+		reader.correlations[0]->cpu_timestamp,
+		reader.correlations[reader.n_correlations - 1]->cpu_timestamp);
+	fprintf(stdout, "Timestamp correlation GPU range: 0x%016"PRIx64"-0x%016"PRIx64"\n",
+		reader.correlations[0]->gpu_timestamp,
+		reader.correlations[reader.n_correlations - 1]->gpu_timestamp);
+
+	fprintf(stdout, "OA data timestamp range: 0x%016"PRIx64"-0x%016"PRIx64"\n",
+		intel_perf_read_record_timestamp(reader.perf,
+						 reader.metric_set,
+						 reader.records[0]),
+		intel_perf_read_record_timestamp(reader.perf,
+						 reader.metric_set,
+						 reader.records[reader.n_records - 1]));
+
 	if (strcmp(reader.metric_set_uuid, reader.metric_set->hw_config_guid)) {
 		fprintf(stdout,
 			"WARNING: Recording used a different HW configuration.\n"
