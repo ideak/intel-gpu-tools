@@ -2853,8 +2853,13 @@ test_short_reads(void)
 
 	/* A read that can't return a single record because it would result
 	 * in a fault on buffer overrun should result in an EFAULT error...
+	 *
+	 * Make sure to weed out all report lost errors before verifying EFAULT.
 	 */
-	ret = read(stream_fd, pages + page_size - 16, page_size);
+	header = (void *)(pages + page_size - 16);
+	do {
+		ret = read(stream_fd, header, page_size);
+	} while (ret > 0 && header->type == DRM_I915_PERF_RECORD_OA_REPORT_LOST);
 	igt_assert_eq(ret, -1);
 	igt_assert_eq(errno, EFAULT);
 
