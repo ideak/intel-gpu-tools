@@ -389,19 +389,16 @@ intel_perf_for_devinfo(uint32_t device_id,
 	return perf;
 }
 
-static uint32_t
-getparam(int drm_fd, uint32_t param)
+static int
+getparam(int drm_fd, uint32_t param, uint32_t *val)
 {
-        struct drm_i915_getparam gp;
-        int val = -1;
+	struct drm_i915_getparam gp;
 
-        memset(&gp, 0, sizeof(gp));
-        gp.param = param;
-        gp.value = &val;
+	memset(&gp, 0, sizeof(gp));
+	gp.param = param;
+	gp.value = (int *)val;
 
-	perf_ioctl(drm_fd, DRM_IOCTL_I915_GETPARAM, &gp);
-
-        return val;
+	return perf_ioctl(drm_fd, DRM_IOCTL_I915_GETPARAM, &gp);
 }
 
 static bool
@@ -517,9 +514,9 @@ open_master_sysfs_dir(int drm_fd)
 struct intel_perf *
 intel_perf_for_fd(int drm_fd)
 {
-	uint32_t device_id = getparam(drm_fd, I915_PARAM_CHIPSET_ID);
-	uint32_t device_revision = getparam(drm_fd, I915_PARAM_REVISION);
-	uint32_t timestamp_frequency = getparam(drm_fd, I915_PARAM_CS_TIMESTAMP_FREQUENCY);
+	uint32_t device_id;
+	uint32_t device_revision;
+	uint32_t timestamp_frequency;
 	uint64_t gt_min_freq;
 	uint64_t gt_max_freq;
 	struct drm_i915_query_topology_info *topology;
@@ -535,6 +532,11 @@ intel_perf_for_fd(int drm_fd)
 		return NULL;
 	}
 	close(sysfs_dir_fd);
+
+	if (getparam(drm_fd, I915_PARAM_CHIPSET_ID, &device_id) ||
+	    getparam(drm_fd, I915_PARAM_REVISION, &device_revision) ||
+	    getparam(drm_fd, I915_PARAM_CS_TIMESTAMP_FREQUENCY, &timestamp_frequency))
+		return NULL;
 
 	topology = query_topology(drm_fd);
 	if (!topology)
