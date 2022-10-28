@@ -778,6 +778,39 @@ void intel_perf_accumulate_reports(struct intel_perf_accumulator *acc,
 	memset(acc, 0, sizeof(*acc));
 
 	switch (oa_format) {
+	case I915_OA_FORMAT_A24u40_A14u32_B8_C8:
+		accumulate_uint32(start + 1, end + 1, deltas + idx++); /* timestamp */
+		accumulate_uint32(start + 3, end + 3, deltas + idx++); /* clock */
+
+		/* 4x 32bit A0-3 counters... */
+		for (i = 0; i < 4; i++)
+			accumulate_uint32(start + 4 + i, end + 4 + i, deltas + idx++);
+
+		/* 20x 40bit A4-23 counters... */
+		for (i = 0; i < 20; i++)
+			accumulate_uint40(i + 4, start, end, deltas + idx++);
+
+		/* 4x 32bit A24-27 counters... */
+		for (i = 0; i < 4; i++)
+			accumulate_uint32(start + 28 + i, end + 28 + i, deltas + idx++);
+
+		/* 4x 40bit A28-31 counters... */
+		for (i = 0; i < 4; i++)
+			accumulate_uint40(i + 28, start, end, deltas + idx++);
+
+		/* 5x 32bit A32-36 counters... */
+		for (i = 0; i < 5; i++)
+			accumulate_uint32(start + 36 + i, end + 36 + i, deltas + idx++);
+
+		/* 1x 32bit A37 counter... */
+		accumulate_uint32(start + 46, end + 46, deltas + idx++);
+
+		/* 8x 32bit B counters + 8x 32bit C counters... */
+		for (i = 0; i < 16; i++)
+			accumulate_uint32(start + 48 + i, end + 48 + i, deltas + idx++);
+		break;
+
+	case I915_OAR_FORMAT_A32u40_A4u32_B8_C8:
 	case I915_OA_FORMAT_A32u40_A4u32_B8_C8:
 		accumulate_uint32(start + 1, end + 1, deltas + idx++); /* timestamp */
 		accumulate_uint32(start + 3, end + 3, deltas + idx++); /* clock */
