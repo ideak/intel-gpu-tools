@@ -95,6 +95,13 @@ struct accumulator {
 	uint64_t deltas[MAX_RAW_OA_COUNTERS];
 };
 
+enum {
+	OAG,
+	OAR,
+
+	MAX_OA_TYPE,
+};
+
 struct oa_format {
 	const char *name;
 	size_t size;
@@ -108,6 +115,7 @@ struct oa_format {
 	int n_b;
 	int c_off;
 	int n_c;
+	int oa_type;
 };
 
 static struct oa_format hsw_oa_formats[I915_OA_FORMAT_MAX] = {
@@ -1481,6 +1489,9 @@ test_oa_formats(void)
 		uint32_t oa_report1[64];
 
 		if (!format.name) /* sparse, indexed by ID */
+			continue;
+
+		if (format.oa_type != OAG) /* sparse, indexed by ID */
 			continue;
 
 		igt_debug("Checking OA format %s\n", format.name);
