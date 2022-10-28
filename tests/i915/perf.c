@@ -442,6 +442,29 @@ gen8_read_report_reason(const uint32_t *report)
 		return "unknown";
 }
 
+static uint32_t
+cs_timestamp_frequency(int fd)
+{
+	struct drm_i915_getparam gp = {};
+	static uint32_t value = 0;
+
+	if (value)
+		return value;
+
+	gp.param = I915_PARAM_CS_TIMESTAMP_FREQUENCY;
+	gp.value = (int *)(&value);
+
+	igt_assert_eq(igt_ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp), 0);
+
+	return value;
+}
+
+static uint64_t
+cs_timebase_scale(uint32_t u32_delta)
+{
+	return ((uint64_t)u32_delta * NSEC_PER_SEC) / cs_timestamp_frequency(drm_fd);
+}
+
 static uint64_t
 timebase_scale(uint32_t u32_delta)
 {
@@ -4142,7 +4165,7 @@ static void gen12_single_ctx_helper(void)
 	/* Sanity check that we can pass the delta to timebase_scale */
 	igt_assert(delta_ts64 < UINT32_MAX);
 	delta_oa32_ns = timebase_scale(delta_oa32);
-	delta_ts64_ns = timebase_scale(delta_ts64);
+	delta_ts64_ns = cs_timebase_scale(delta_ts64);
 
 	igt_debug("oa32 delta = %u, = %uns\n",
 			delta_oa32, (unsigned)delta_oa32_ns);

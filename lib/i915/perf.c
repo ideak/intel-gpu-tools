@@ -566,7 +566,11 @@ intel_perf_for_fd(int drm_fd)
 	close(sysfs_dir_fd);
 
 	if (getparam(drm_fd, I915_PARAM_CHIPSET_ID, &device_id) ||
-	    getparam(drm_fd, I915_PARAM_REVISION, &device_revision) ||
+	    getparam(drm_fd, I915_PARAM_REVISION, &device_revision))
+		return NULL;
+
+	/* if OA_TIMESTAMP_FREQUENCY is not supported, fall back to CS_TIMESTAMP_FREQUENCY */
+	if (getparam(drm_fd, I915_PARAM_OA_TIMESTAMP_FREQUENCY, &timestamp_frequency) &&
 	    getparam(drm_fd, I915_PARAM_CS_TIMESTAMP_FREQUENCY, &timestamp_frequency))
 		return NULL;
 
