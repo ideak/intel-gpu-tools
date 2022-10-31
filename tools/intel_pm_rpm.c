@@ -197,10 +197,9 @@ int main(int argc, char *argv[])
 		goto exit;
 	}
 
-	data.debugfs_fd = igt_debugfs_dir(data.drm_fd);
-
 	data.res = drmModeGetResources(data.drm_fd);
 	if (data.res) {
+		data.debugfs_fd = igt_debugfs_dir(data.drm_fd);
 		kmstest_set_vt_graphics_mode();
 		igt_display_require(&data.display, data.drm_fd);
 
@@ -240,7 +239,8 @@ exit:
 	if (data.res)
 		igt_display_fini(&data.display);
 
-	close(data.debugfs_fd);
+	if (data.debugfs_fd)
+		close(data.debugfs_fd);
 	close(data.drm_fd);
 	igt_devices_free();
 
