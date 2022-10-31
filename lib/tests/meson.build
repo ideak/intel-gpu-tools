@@ -14,6 +14,7 @@ lib_tests = [
 	'igt_invalid_subtest_name',
 	'igt_nesting',
 	'igt_no_exit',
+	'igt_runnercomms_packets',
 	'igt_segfault',
 	'igt_simulation',
 	'igt_stats',
