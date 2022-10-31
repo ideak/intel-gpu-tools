@@ -79,7 +79,7 @@ static void set_timeslice(int engine, unsigned int value)
 {
 	unsigned int delay;
 
-	igt_sysfs_printf(engine, ATTR, "%u", value);
+	igt_assert_lte(0, igt_sysfs_printf(engine, ATTR, "%u", value));
 	igt_sysfs_scanf(engine, ATTR, "%u", &delay);
 	igt_assert_eq(delay, value);
 }
@@ -93,7 +93,7 @@ static int wait_for_reset(int fence)
 
 static void test_idempotent(int i915, int engine)
 {
-	const unsigned int delays[] = { 0, 1, 1234, 654321 };
+	const unsigned int delays[] = { 0, 1, 1234, 54321 };
 	unsigned int saved;
 
 	/* Quick test to verify the kernel reports the same values as we write */

@@ -68,7 +68,7 @@ static void set_preempt_timeout(int engine, unsigned int value)
 {
 	unsigned int delay;
 
-	igt_sysfs_printf(engine, ATTR, "%u", value);
+	igt_assert_lte(0, igt_sysfs_printf(engine, ATTR, "%u", value));
 	igt_sysfs_scanf(engine, ATTR, "%u", &delay);
 	igt_assert_eq(delay, value);
 }
@@ -82,7 +82,7 @@ static int wait_for_reset(int fence)
 
 static void test_idempotent(int i915, int engine)
 {
-	unsigned int delays[] = { 0, 1, 1000, 1234, 654321 };
+	unsigned int delays[] = { 0, 1, 1000, 1234, 54321 };
 	unsigned int saved;
 
 	/* Quick test that store/show reports the same values */
