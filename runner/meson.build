@@ -10,6 +10,7 @@ runnerlib_sources = [ 'settings.c',
 runner_sources = [ 'runner.c' ]
 resume_sources = [ 'resume.c' ]
 results_sources = [ 'results.c' ]
+decoder_sources = [ 'decoder.c' ]
 runner_test_sources = [ 'runner_tests.c' ]
 runner_json_test_sources = [ 'runner_json_tests.c' ]
 
@@ -50,6 +51,13 @@ if jsonc.found()
 			    dependencies : igt_deps)
 
 	results = executable('igt_results', results_sources,
+			     link_with : runnerlib,
+			     install : true,
+			     install_dir : bindir,
+			     install_rpath : bindir_rpathdir,
+			     dependencies : igt_deps)
+
+	decoder = executable('igt_comms_decoder', decoder_sources,
 			     link_with : runnerlib,
 			     install : true,
 			     install_dir : bindir,
