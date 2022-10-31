@@ -22,6 +22,7 @@ enum {
 	_F_OUT,
 	_F_ERR,
 	_F_DMESG,
+	_F_SOCKET,
 	_F_LAST,
 };
 

@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/mman.h>
@@ -12,6 +13,7 @@
 
 #include "igt_aux.h"
 #include "igt_core.h"
+#include "runnercomms.h"
 #include "resultgen.h"
 #include "settings.h"
 #include "executor.h"
@@ -147,7 +149,7 @@ static const char *next_line(const char *line, const char *bufend)
 		return NULL;
 }
 
-static void append_line(char **buf, size_t *buflen, char *line)
+static void append_line(char **buf, size_t *buflen, const char *line)
 {
 	size_t linelen = strlen(line);
 
@@ -1228,6 +1230,606 @@ static void fill_from_journal(int fd,
 	fclose(f);
 }
 
+typedef enum comms_state {
+	STATE_INITIAL = 0,
+	STATE_AFTER_EXEC,
+	STATE_SUBTEST_STARTED,
+	STATE_DYNAMIC_SUBTEST_STARTED,
+	STATE_BETWEEN_DYNAMIC_SUBTESTS,
+	STATE_BETWEEN_SUBTESTS,
+	STATE_EXITED,
+} comms_state_t;
+
+struct comms_context
+{
+	comms_state_t state;
+
+	struct json_object *binaryruntimeobj;
+	struct json_object *current_test;
+	struct json_object *current_dynamic_subtest;
+	char *current_subtest_name;
+	char *current_dynamic_subtest_name;
+
+	char *outbuf, *errbuf;
+	size_t outbuflen, errbuflen;
+	size_t outidx, nextoutidx;
+	size_t erridx, nexterridx;
+	size_t dynoutidx, nextdynoutidx;
+	size_t dynerridx, nextdynerridx;
+
+	char *igt_version;
+
+	char *subtestresult;
+	char *dynamicsubtestresult;
+
+	char *cmdline;
+	int exitcode;
+
+	struct subtest_list *subtests;
+	struct subtest *subtest;
+	struct results *results;
+	struct job_list_entry *entry;
+	const char *binary;
+};
+
+static void comms_free_context(struct comms_context *context)
+{
+	free(context->current_subtest_name);
+	free(context->current_dynamic_subtest_name);
+	free(context->outbuf);
+	free(context->errbuf);
+	free(context->igt_version);
+	free(context->subtestresult);
+	free(context->dynamicsubtestresult);
+	free(context->cmdline);
+}
+
+static void comms_inject_subtest_start_log(struct comms_context *context,
+					   const char *prefix,
+					   const char *subtestname)
+{
+	char msg[512];
+
+	snprintf(msg, sizeof(msg), "%s%s\n", prefix, subtestname);
+	append_line(&context->outbuf, &context->outbuflen, msg);
+	append_line(&context->errbuf, &context->errbuflen, msg);
+}
+
+static void comms_inject_subtest_end_log(struct comms_context *context,
+					 const char *prefix,
+					 const char *subtestname,
+					 const char *subtestresult,
+					 const char *timeused)
+{
+	char msg[512];
+
+	snprintf(msg, sizeof(msg), "%s%s: %s (%ss)\n", prefix, subtestname, subtestresult, timeused);
+	append_line(&context->outbuf, &context->outbuflen, msg);
+	append_line(&context->errbuf, &context->errbuflen, msg);
+}
+
+static void comms_finish_subtest(struct comms_context *context)
+{
+	json_object_object_add(context->current_test, "out",
+			       new_escaped_json_string(context->outbuf + context->outidx, context->outbuflen - context->outidx));
+	json_object_object_add(context->current_test, "err",
+			       new_escaped_json_string(context->errbuf + context->outidx, context->errbuflen - context->erridx));
+
+	if (context->igt_version)
+		add_igt_version(context->current_test, context->igt_version, strlen(context->igt_version));
+
+	if (context->subtestresult == NULL)
+		context->subtestresult = strdup("incomplete");
+	set_result(context->current_test, context->subtestresult);
+
+	free(context->subtestresult);
+	context->subtestresult = NULL;
+	context->current_test = NULL;
+
+	context->outidx = context->nextoutidx;
+	context->erridx = context->nexterridx;
+}
+
+static void comms_finish_dynamic_subtest(struct comms_context *context)
+{
+	json_object_object_add(context->current_dynamic_subtest, "out",
+			       new_escaped_json_string(context->outbuf + context->dynoutidx, context->outbuflen - context->dynoutidx));
+	json_object_object_add(context->current_dynamic_subtest, "err",
+			       new_escaped_json_string(context->errbuf + context->dynerridx, context->errbuflen - context->dynerridx));
+
+	if (context->igt_version)
+		add_igt_version(context->current_dynamic_subtest, context->igt_version, strlen(context->igt_version));
+
+	if (context->dynamicsubtestresult == NULL)
+		context->dynamicsubtestresult = strdup("incomplete");
+	set_result(context->current_dynamic_subtest, context->dynamicsubtestresult);
+
+	free(context->dynamicsubtestresult);
+	context->dynamicsubtestresult = NULL;
+	context->current_dynamic_subtest = NULL;
+
+	context->dynoutidx = context->nextdynoutidx;
+	context->dynerridx = context->nextdynerridx;
+}
+
+static void comms_add_new_subtest(struct comms_context *context,
+				  const char *subtestname)
+{
+	char piglit_name[256];
+
+	add_subtest(context->subtests, strdup(subtestname));
+	context->subtest = &context->subtests->subs[context->subtests->size - 1];
+	generate_piglit_name(context->binary, subtestname, piglit_name, sizeof(piglit_name));
+	context->current_test = get_or_create_json_object(context->results->tests, piglit_name);
+	free(context->current_subtest_name);
+	context->current_subtest_name = strdup(subtestname);
+}
+
+static void comms_add_new_dynamic_subtest(struct comms_context *context,
+					  const char *dynamic_name)
+{
+	char piglit_name[256];
+	char dynamic_piglit_name[256];
+
+	add_dynamic_subtest(context->subtest, strdup(dynamic_name));
+	generate_piglit_name(context->binary, context->current_subtest_name, piglit_name, sizeof(piglit_name));
+	generate_piglit_name_for_dynamic(piglit_name, dynamic_name, dynamic_piglit_name, sizeof(dynamic_piglit_name));
+	context->current_dynamic_subtest = get_or_create_json_object(context->results->tests, dynamic_piglit_name);
+	free(context->current_dynamic_subtest_name);
+	context->current_dynamic_subtest_name = strdup(dynamic_name);
+}
+
+static bool comms_handle_log(const struct runnerpacket *packet,
+			     runnerpacket_read_helper helper,
+			     void *userdata)
+{
+	struct comms_context *context = userdata;
+	char **textbuf;
+	size_t *textlen;
+
+	if (helper.log.stream == STDOUT_FILENO) {
+		textbuf = &context->outbuf;
+		textlen = &context->outbuflen;
+	} else {
+		textbuf = &context->errbuf;
+		textlen = &context->errbuflen;
+	}
+	append_line(textbuf, textlen, helper.log.text);
+
+	return true;
+}
+
+static bool comms_handle_exec(const struct runnerpacket *packet,
+			      runnerpacket_read_helper helper,
+			      void *userdata)
+{
+	struct comms_context *context = userdata;
+
+	switch (context->state) {
+	case STATE_INITIAL:
+		break;
+
+	case STATE_AFTER_EXEC:
+		/*
+		 * Resume after an exec that didn't involve any
+		 * subtests. Resumes can only happen for tests with
+		 * subtests, so while we might have logs already
+		 * collected, we have nowhere to put them. The joblist
+		 * doesn't help, because the ordering is up to the
+		 * test.
+		 */
+		printf("Warning: Need to discard %zd bytes of logs, no subtest data\n", context->outbuflen + context->errbuflen);
+		context->outbuflen = context->errbuflen = 0;
+		context->outidx = context->erridx = 0;
+		context->nextoutidx = context->nexterridx = 0;
+		break;
+
+	case STATE_SUBTEST_STARTED:
+	case STATE_DYNAMIC_SUBTEST_STARTED:
+	case STATE_BETWEEN_DYNAMIC_SUBTESTS:
+	case STATE_BETWEEN_SUBTESTS:
+	case STATE_EXITED:
+		/* A resume exec, so we're already collecting data. */
+		assert(context->current_test != NULL);
+		comms_finish_subtest(context);
+		break;
+	default:
+		assert(false); /* unreachable */
+	}
+
+	free(context->cmdline);
+	context->cmdline = strdup(helper.exec.cmdline);
+
+	context->state = STATE_AFTER_EXEC;
+
+	return true;
+}
+
+static bool comms_handle_exit(const struct runnerpacket *packet,
+			      runnerpacket_read_helper helper,
+			      void *userdata)
+{
+	struct comms_context *context = userdata;
+	char piglit_name[256];
+
+	if (context->state == STATE_AFTER_EXEC) {
+		/*
+		 * Exit after exec, so we didn't get any
+		 * subtests. Check if there's supposed to be any,
+		 * otherwise stuff logs into the binary's result.
+		 */
+
+		char *subtestname = NULL;
+
+		if (context->entry->subtest_count > 0) {
+			subtestname = context->entry->subtests[0];
+			add_subtest(context->subtests, strdup(subtestname));
+		}
+		generate_piglit_name(context->binary, subtestname, piglit_name, sizeof(piglit_name));
+		context->current_test = get_or_create_json_object(context->results->tests, piglit_name);
+
+		/* Get result from exitcode unless we have an override already */
+		if (context->subtestresult == NULL)
+			context->subtestresult = strdup(result_from_exitcode(helper.exit.exitcode));
+	} else if (helper.exit.exitcode == IGT_EXIT_ABORT || helper.exit.exitcode == GRACEFUL_EXITCODE) {
+		/*
+		 * If we did get subtests, we need to assign the
+		 * special exitcode results to the last subtest,
+		 * normal and dynamic
+		 */
+		const char *result = helper.exit.exitcode == IGT_EXIT_ABORT ? "abort" : "notrun";
+
+		free(context->subtestresult);
+		context->subtestresult = strdup(result);
+		free(context->dynamicsubtestresult);
+		context->dynamicsubtestresult = strdup(result);
+	}
+
+	context->exitcode = helper.exit.exitcode;
+	add_runtime(context->binaryruntimeobj, strtod(helper.exit.timeused, NULL));
+
+	context->state = STATE_EXITED;
+
+	return true;
+}
+
+static bool comms_handle_subtest_start(const struct runnerpacket *packet,
+				       runnerpacket_read_helper helper,
+				       void *userdata)
+{
+	struct comms_context *context = userdata;
+	char errmsg[512];
+
+	switch (context->state) {
+	case STATE_INITIAL:
+	case STATE_EXITED:
+		/* Subtest starts when we're not even running? (Before exec or after exit) */
+		fprintf(stderr, "Error: Unexpected subtest start (binary wasn't running)\n");
+		return false;
+	case STATE_SUBTEST_STARTED:
+	case STATE_DYNAMIC_SUBTEST_STARTED:
+	case STATE_BETWEEN_DYNAMIC_SUBTESTS:
+		/*
+		 * Subtest starts when the previous one was still
+		 * running. Text-based parsing would figure that a
+		 * resume happened, but we know the real deal with
+		 * socket comms.
+		 */
+		snprintf(errmsg, sizeof(errmsg),
+			 "\nrunner: Subtest %s already running when subtest %s starts. This is a test bug.\n",
+			 context->current_subtest_name,
+			 helper.subteststart.name);
+		append_line(&context->errbuf, &context->errbuflen, errmsg);
+
+		if (context->state == STATE_DYNAMIC_SUBTEST_STARTED ||
+		    context->state == STATE_BETWEEN_DYNAMIC_SUBTESTS)
+			comms_finish_dynamic_subtest(context);
+
+		/* fallthrough */
+	case STATE_BETWEEN_SUBTESTS:
+		/* Already collecting for a subtest, finish it up */
+		if (context->current_dynamic_subtest)
+			comms_finish_dynamic_subtest(context);
+
+		comms_finish_subtest(context);
+
+		/* fallthrough */
+	case STATE_AFTER_EXEC:
+		comms_add_new_subtest(context, helper.subteststart.name);
+
+		/* Subtest starting message is not in logs with socket comms, inject it manually */
+		comms_inject_subtest_start_log(context, STARTING_SUBTEST, helper.subteststart.name);
+
+		break;
+	default:
+		assert(false); /* unreachable */
+	}
+
+	context->state = STATE_SUBTEST_STARTED;
+
+	return true;
+}
+
+static bool comms_handle_subtest_result(const struct runnerpacket *packet,
+					runnerpacket_read_helper helper,
+					void *userdata)
+{
+	struct comms_context *context = userdata;
+	char errmsg[512];
+
+	switch (context->state) {
+	case STATE_INITIAL:
+	case STATE_EXITED:
+		/* Subtest result when we're not even running? (Before exec or after exit) */
+		fprintf(stderr, "Error: Unexpected subtest result (binary wasn't running)\n");
+		return false;
+	case STATE_DYNAMIC_SUBTEST_STARTED:
+		/*
+		 * Subtest result when dynamic subtest is still
+		 * running. Text-based parsing would consider that an
+		 * incomplete, we're able to inject a warning.
+		 */
+		snprintf(errmsg, sizeof(errmsg),
+			 "\nrunner: Dynamic subtest %s still running when subtest %s ended. This is a test bug.\n",
+			 context->current_dynamic_subtest_name,
+			 helper.subtestresult.name);
+		append_line(&context->errbuf, &context->errbuflen, errmsg);
+		comms_finish_dynamic_subtest(context);
+		break;
+	case STATE_BETWEEN_SUBTESTS:
+		/* Subtest result without starting it, and we're already collecting logs for a previous test */
+		comms_finish_subtest(context);
+		comms_add_new_subtest(context, helper.subtestresult.name);
+		break;
+	case STATE_AFTER_EXEC:
+		/* Subtest result without starting it, so comes from a fixture. We're not yet collecting logs for anything. */
+		comms_add_new_subtest(context, helper.subtestresult.name);
+		break;
+	case STATE_SUBTEST_STARTED:
+	case STATE_BETWEEN_DYNAMIC_SUBTESTS:
+		/* Normal flow */
+		break;
+	default:
+		assert(false); /* unreachable */
+	}
+
+	comms_inject_subtest_end_log(context,
+				     SUBTEST_RESULT,
+				     helper.subtestresult.name,
+				     helper.subtestresult.result,
+				     helper.subtestresult.timeused);
+
+	/* Next subtest, if any, will begin its logs right after that result line */
+	context->nextoutidx = context->outbuflen;
+	context->nexterridx = context->errbuflen;
+
+	/*
+	 * Only store the actual result from the packet if we don't
+	 * already have one. If we do, it's from an override.
+	 */
+	if (context->subtestresult == NULL) {
+		const char *mappedresult;
+
+		parse_result_string(helper.subtestresult.result,
+				    strlen(helper.subtestresult.result),
+				    &mappedresult, NULL);
+		context->subtestresult = strdup(mappedresult);
+	}
+
+	context->state = STATE_BETWEEN_SUBTESTS;
+
+	return true;
+}
+
+static bool comms_handle_dynamic_subtest_start(const struct runnerpacket *packet,
+					       runnerpacket_read_helper helper,
+					       void *userdata)
+{
+	struct comms_context *context = userdata;
+	char errmsg[512];
+
+	switch (context->state) {
+	case STATE_INITIAL:
+	case STATE_EXITED:
+		/* Dynamic subtest starts when we're not even running? (Before exec or after exit) */
+		fprintf(stderr, "Error: Unexpected dynamic subtest start (binary wasn't running)\n");
+		return false;
+	case STATE_AFTER_EXEC:
+		/* Binary was running but a subtest wasn't. We don't know where to inject an error message. */
+		fprintf(stderr, "Error: Unexpected dynamic subtest start (subtest wasn't running)\n");
+		return false;
+	case STATE_BETWEEN_SUBTESTS:
+		/*
+		 * Dynamic subtest starts when a subtest is not
+		 * running. We can't know which subtest this dynamic
+		 * subtest was supposed to be in. But we can inject a
+		 * warn into the previous subtest.
+		 */
+		snprintf(errmsg, sizeof(errmsg),
+			 "\nrunner: Dynamic subtest %s started when not inside a subtest. This is a test bug.\n",
+			 helper.dynamicsubteststart.name);
+		append_line(&context->errbuf, &context->errbuflen, errmsg);
+
+		/* Leave the state as is and hope for the best */
+		return true;
+	case STATE_DYNAMIC_SUBTEST_STARTED:
+		snprintf(errmsg, sizeof(errmsg),
+			 "\nrunner: Dynamic subtest %s already running when dynamic subtest %s starts. This is a test bug.\n",
+			 context->current_dynamic_subtest_name,
+			 helper.dynamicsubteststart.name);
+		append_line(&context->errbuf, &context->errbuflen, errmsg);
+
+		/* fallthrough */
+	case STATE_BETWEEN_DYNAMIC_SUBTESTS:
+		comms_finish_dynamic_subtest(context);
+		/* fallthrough */
+	case STATE_SUBTEST_STARTED:
+		comms_add_new_dynamic_subtest(context, helper.dynamicsubteststart.name);
+
+		/* Dynamic subtest starting message is not in logs with socket comms, inject it manually */
+		comms_inject_subtest_start_log(context, STARTING_DYNAMIC_SUBTEST, helper.dynamicsubteststart.name);
+
+		break;
+	default:
+		assert(false); /* unreachable */
+	}
+
+	context->state = STATE_DYNAMIC_SUBTEST_STARTED;
+
+	return true;
+}
+
+static bool comms_handle_dynamic_subtest_result(const struct runnerpacket *packet,
+						runnerpacket_read_helper helper,
+						void *userdata)
+{
+	struct comms_context *context = userdata;
+	char errmsg[512];
+
+	switch (context->state) {
+	case STATE_INITIAL:
+	case STATE_EXITED:
+		/* Dynamic subtest result when we're not even running? (Before exec or after exit) */
+		fprintf(stderr, "Error: Unexpected dynamic subtest result (binary wasn't running)\n");
+		return false;
+	case STATE_AFTER_EXEC:
+		/* Binary was running but a subtest wasn't. We don't know where to inject an error message. */
+		fprintf(stderr, "Error: Unexpected dynamic subtest result (subtest wasn't running)\n");
+		return false;
+	case STATE_BETWEEN_SUBTESTS:
+		/*
+		 * Dynamic subtest result when a subtest is not
+		 * running. We can't know which subtest this dynamic
+		 * subtest was supposed to be in. But we can inject a
+		 * warn into the previous subtest.
+		 */
+		snprintf(errmsg, sizeof(errmsg),
+			 "\nrunner: Dynamic subtest %s result when not inside a subtest. This is a test bug.\n",
+			 helper.dynamicsubtestresult.name);
+		append_line(&context->errbuf, &context->errbuflen, errmsg);
+
+		/* Leave the state as is and hope for the best */
+		return true;
+	case STATE_BETWEEN_DYNAMIC_SUBTESTS:
+		/*
+		 * Result without starting. There's no
+		 * skip_subtests_henceforth equivalent for dynamic
+		 * subtests so this shouldn't happen, but we can
+		 * handle it nevertheless.
+		 */
+		comms_finish_dynamic_subtest(context);
+		/* fallthrough */
+	case STATE_SUBTEST_STARTED:
+		/* Result without starting, but we aren't collecting for a dynamic subtest yet */
+		comms_add_new_dynamic_subtest(context, helper.dynamicsubtestresult.name);
+		break;
+	case STATE_DYNAMIC_SUBTEST_STARTED:
+		/* Normal flow */
+		break;
+	default:
+		assert(false); /* unreachable */
+	}
+
+	comms_inject_subtest_end_log(context,
+				     DYNAMIC_SUBTEST_RESULT,
+				     helper.dynamicsubtestresult.name,
+				     helper.dynamicsubtestresult.result,
+				     helper.dynamicsubtestresult.timeused);
+
+	/* Next dynamic subtest, if any, will begin its logs right after that result line */
+	context->nextdynoutidx = context->outbuflen;
+	context->nextdynerridx = context->errbuflen;
+
+	/*
+	 * Only store the actual result from the packet if we don't
+	 * already have one. If we do, it's from an override.
+	 */
+	if (context->dynamicsubtestresult == NULL) {
+		const char *mappedresult;
+
+		parse_result_string(helper.dynamicsubtestresult.result,
+				    strlen(helper.dynamicsubtestresult.result),
+				    &mappedresult, NULL);
+		context->dynamicsubtestresult = strdup(mappedresult);
+	}
+
+	context->state = STATE_BETWEEN_DYNAMIC_SUBTESTS;
+
+	return true;
+}
+
+static bool comms_handle_versionstring(const struct runnerpacket *packet,
+				       runnerpacket_read_helper helper,
+				       void *userdata)
+{
+	struct comms_context *context = userdata;
+
+	free(context->igt_version);
+	context->igt_version = strdup(helper.versionstring.text);
+
+	return true;
+}
+
+static bool comms_handle_result_override(const struct runnerpacket *packet,
+					 runnerpacket_read_helper helper,
+					 void *userdata)
+{
+	struct comms_context *context = userdata;
+
+	if (context->current_dynamic_subtest) {
+		free(context->dynamicsubtestresult);
+		context->dynamicsubtestresult = strdup(helper.resultoverride.result);
+	}
+
+	free(context->subtestresult);
+	context->subtestresult = strdup(helper.resultoverride.result);
+
+	return true;
+}
+
+static int fill_from_comms(int fd,
+			   struct job_list_entry *entry,
+			   struct subtest_list *subtests,
+			   struct results *results)
+{
+	struct comms_context context = {};
+	struct comms_visitor visitor = {
+		.log = comms_handle_log,
+		.exec = comms_handle_exec,
+		.exit = comms_handle_exit,
+		.subtest_start = comms_handle_subtest_start,
+		.subtest_result = comms_handle_subtest_result,
+		.dynamic_subtest_start = comms_handle_dynamic_subtest_start,
+		.dynamic_subtest_result = comms_handle_dynamic_subtest_result,
+		.versionstring = comms_handle_versionstring,
+		.result_override = comms_handle_result_override,
+
+		.userdata = &context,
+	};
+	char piglit_name[256];
+	int ret = COMMSPARSE_EMPTY;
+
+	if (fd < 0)
+		return COMMSPARSE_EMPTY;
+
+	context.entry = entry;
+	context.binary = entry->binary;
+	generate_piglit_name(entry->binary, NULL, piglit_name, sizeof(piglit_name));
+	context.binaryruntimeobj = get_or_create_json_object(results->runtimes, piglit_name);
+	context.results = results;
+	context.subtests = subtests;
+
+	ret = comms_read_dump(fd, &visitor);
+
+	if (context.current_dynamic_subtest != NULL)
+		comms_finish_dynamic_subtest(&context);
+	if (context.current_test != NULL)
+		comms_finish_subtest(&context);
+	comms_free_context(&context);
+
+	return ret;
+}
+
 static bool result_is_requested(struct job_list_entry *entry,
 				const char *subtestname,
 				const char *dynamic_name)
@@ -1505,6 +2107,7 @@ static bool parse_test_directory(int dirfd,
 	int fds[_F_LAST];
 	struct subtest_list subtests = {};
 	bool status = true;
+	int commsparsed;
 
 	if (!open_output_files(dirfd, fds, false)) {
 		fprintf(stderr, "Error opening output files\n");
@@ -1517,10 +2120,28 @@ static bool parse_test_directory(int dirfd,
 	 */
 	fill_from_journal(fds[_F_JOURNAL], entry, &subtests, results);
 
-	if (!fill_from_output(fds[_F_OUT], entry->binary, "out", &subtests, results->tests) ||
-	    !fill_from_output(fds[_F_ERR], entry->binary, "err", &subtests, results->tests) ||
-	    !fill_from_dmesg(fds[_F_DMESG], settings, entry->binary, &subtests, results->tests)) {
-		fprintf(stderr, "Error parsing output files\n");
+	/*
+	 * Get test output from socket comms if it exists, otherwise
+	 * parse stdout/stderr
+	 */
+	commsparsed = fill_from_comms(fds[_F_SOCKET], entry, &subtests, results);
+	if (commsparsed == COMMSPARSE_ERROR) {
+		fprintf(stderr, "Error parsing output files (comms)\n");
+		status = false;
+		goto parse_output_end;
+	}
+
+	if (commsparsed == COMMSPARSE_EMPTY) {
+		if (!fill_from_output(fds[_F_OUT], entry->binary, "out", &subtests, results->tests) ||
+		    !fill_from_output(fds[_F_ERR], entry->binary, "err", &subtests, results->tests)) {
+			fprintf(stderr, "Error parsing output files (out.txt, err.txt)\n");
+			status = false;
+			goto parse_output_end;
+		}
+	}
+
+	if (!fill_from_dmesg(fds[_F_DMESG], settings, entry->binary, &subtests, results->tests)) {
+		fprintf(stderr, "Error parsing output files (dmesg.txt)\n");
 		status = false;
 		goto parse_output_end;
 	}

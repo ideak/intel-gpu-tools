@@ -14,9 +14,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <sys/mman.h>
 #include <sys/select.h>
 #include <sys/poll.h>
 #include <sys/signalfd.h>
+#include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -31,6 +33,7 @@
 #include "igt_taints.h"
 #include "executor.h"
 #include "output_strings.h"
+#include "runnercomms.h"
 
 #define KMSG_HEADER "[IGT] "
 #define KMSG_WARN 4
@@ -367,7 +370,7 @@ static char *need_to_abort(const struct settings* settings)
 	return NULL;
 }
 
-static void prune_subtest(struct job_list_entry *entry, char *subtest)
+static void prune_subtest(struct job_list_entry *entry, const char *subtest)
 {
 	char *excl;
 
@@ -444,11 +447,77 @@ static bool prune_from_journal(struct job_list_entry *entry, int fd)
 	return pruned > 0;
 }
 
+struct prune_comms_data
+{
+	struct job_list_entry *entry;
+	int pruned;
+	bool got_exit;
+};
+
+static bool prune_handle_subtest_start(const struct runnerpacket *packet,
+				       runnerpacket_read_helper helper,
+				       void *userdata)
+{
+	struct prune_comms_data *data = userdata;
+
+	prune_subtest(data->entry, helper.subteststart.name);
+	data->pruned++;
+
+	return true;
+}
+
+static bool prune_handle_exit(const struct runnerpacket *packet,
+			      runnerpacket_read_helper helper,
+			      void *userdata)
+{
+	struct prune_comms_data *data = userdata;
+
+	data->got_exit = true;
+
+	return true;
+}
+
+static bool prune_from_comms(struct job_list_entry *entry, int fd)
+{
+	struct prune_comms_data data = {
+		.entry = entry,
+		.pruned = 0,
+		.got_exit = false,
+	};
+	struct comms_visitor visitor = {
+		.subtest_start = prune_handle_subtest_start,
+		.exit = prune_handle_exit,
+
+		.userdata = &data,
+	};
+	size_t old_count = entry->subtest_count;
+
+	if (comms_read_dump(fd, &visitor) == COMMSPARSE_ERROR)
+		return false;
+
+	/*
+	 * If we know the subtests we originally wanted to run, check
+	 * if we got an equal amount already.
+	 */
+	if (old_count > 0 && data.pruned >= old_count)
+		entry->binary[0] = '\0';
+
+	/*
+	 * If we don't know how many subtests there should be but we
+	 * got an exit, also consider the test fully finished.
+	 */
+	if (data.got_exit)
+		entry->binary[0] = '\0';
+
+	return data.pruned > 0;
+}
+
 static const char *filenames[_F_LAST] = {
 	[_F_JOURNAL] = "journal.txt",
 	[_F_OUT] = "out.txt",
 	[_F_ERR] = "err.txt",
 	[_F_DMESG] = "dmesg.txt",
+	[_F_SOCKET] = "comms",
 };
 
 static int open_at_end(int dirfd, const char *name)
@@ -480,6 +549,9 @@ bool open_output_files(int dirfd, int *fds, bool write)
 
 	for (i = 0; i < _F_LAST; i++) {
 		if ((fds[i] = openfunc(dirfd, filenames[i])) < 0) {
+			/* Ignore failure to open socket comms for reading */
+			if (i == _F_SOCKET && !write) continue;
+
 			while (--i >= 0)
 				close(fds[i]);
 			return false;
@@ -760,6 +832,16 @@ static int next_kill_signal(int killed)
 	}
 }
 
+static void write_packet_with_canary(int fd, struct runnerpacket *packet, bool sync)
+{
+	uint32_t canary = socket_dump_canary();
+
+	write(fd, &canary, sizeof(canary));
+	write(fd, packet, packet->size);
+	if (sync)
+		fdatasync(fd);
+}
+
 /*
  * Returns:
  *  =0 - Success
@@ -767,7 +849,8 @@ static int next_kill_signal(int killed)
  *  >0 - Timeout happened, need to recreate from journal
  */
 static int monitor_output(pid_t child,
-			  int outfd, int errfd, int kmsgfd, int sigfd,
+			  int outfd, int errfd, int socketfd,
+			  int kmsgfd, int sigfd,
 			  int *outputs,
 			  double *time_spent,
 			  struct settings *settings,
@@ -789,12 +872,15 @@ static int monitor_output(pid_t child,
 	unsigned long taints = 0;
 	bool aborting = false;
 	size_t disk_usage = 0;
+	bool socket_comms_used = false; /* whether the test actually uses comms */
 
 	igt_gettime(&time_beg);
 	time_last_activity = time_last_subtest = time_killed = time_beg;
 
 	if (errfd > nfds)
 		nfds = errfd;
+	if (socketfd > nfds)
+		nfds = socketfd;
 	if (kmsgfd > nfds)
 		nfds = kmsgfd;
 	if (sigfd > nfds)
@@ -833,6 +919,8 @@ static int monitor_output(pid_t child,
 			FD_SET(outfd, &set);
 		if (errfd >= 0)
 			FD_SET(errfd, &set);
+		if (socketfd >= 0)
+			FD_SET(socketfd, &set);
 		if (kmsgfd >= 0)
 			FD_SET(kmsgfd, &set);
 		if (sigfd >= 0)
@@ -965,6 +1053,99 @@ static int monitor_output(pid_t child,
 			}
 		}
 
+		if (socketfd >= 0 && FD_ISSET(socketfd, &set)) {
+			struct runnerpacket *packet;
+
+			time_last_activity = time_now;
+
+			/* Fully drain everything */
+			while (true) {
+				s = recv(socketfd, buf, sizeof(buf), MSG_DONTWAIT);
+
+				if (s < 0) {
+					if (errno == EAGAIN)
+						break;
+
+					errf("Error reading from communication socket: %m\n");
+
+					close(socketfd);
+					socketfd = -1;
+					goto socket_end;
+				}
+
+				packet = (struct runnerpacket *)buf;
+				if (s < sizeof(*packet) || s != packet->size) {
+					errf("Socket communication error: Received %zd bytes, expected %zd\n",
+					     s, s >= sizeof(packet->size) ? packet->size : sizeof(*packet));
+					close(socketfd);
+					socketfd = -1;
+					goto socket_end;
+				}
+
+				write_packet_with_canary(outputs[_F_SOCKET], packet, settings->sync);
+				disk_usage += packet->size;
+
+				/*
+				 * runner sends EXEC itself before executing
+				 * the test, other types indicate the test
+				 * really uses socket comms
+				 */
+				if (packet->type != PACKETTYPE_EXEC)
+					socket_comms_used = true;
+
+				if (packet->type == PACKETTYPE_SUBTEST_START ||
+				    packet->type == PACKETTYPE_DYNAMIC_SUBTEST_START)
+					time_last_subtest = time_now;
+
+				if (settings->log_level >= LOG_LEVEL_VERBOSE) {
+					runnerpacket_read_helper helper = {};
+					const char *time;
+
+					if (packet->type == PACKETTYPE_SUBTEST_START ||
+					    packet->type == PACKETTYPE_SUBTEST_RESULT ||
+					    packet->type == PACKETTYPE_DYNAMIC_SUBTEST_START ||
+					    packet->type == PACKETTYPE_DYNAMIC_SUBTEST_RESULT)
+						helper = read_runnerpacket(packet);
+
+					switch (helper.type) {
+					case PACKETTYPE_SUBTEST_START:
+						if (helper.subteststart.name)
+							outf("Starting subtest: %s\n", helper.subteststart.name);
+						break;
+					case PACKETTYPE_SUBTEST_RESULT:
+						if (helper.subtestresult.name && helper.subtestresult.result) {
+							time = "<unknown>";
+							if (helper.subtestresult.timeused)
+								time = helper.subtestresult.timeused;
+							outf("Subtest %s: %s (%ss)\n",
+							     helper.subtestresult.name,
+							     helper.subtestresult.result,
+							     time);
+						}
+						break;
+					case PACKETTYPE_DYNAMIC_SUBTEST_START:
+						if (helper.dynamicsubteststart.name)
+							outf("Starting dynamic subtest: %s\n", helper.dynamicsubteststart.name);
+						break;
+					case PACKETTYPE_DYNAMIC_SUBTEST_RESULT:
+						if (helper.dynamicsubtestresult.name && helper.dynamicsubtestresult.result) {
+							time = "<unknown>";
+							if (helper.dynamicsubtestresult.timeused)
+								time = helper.dynamicsubtestresult.timeused;
+							outf("Dynamic subtest %s: %s (%ss)\n",
+							     helper.dynamicsubtestresult.name,
+							     helper.dynamicsubtestresult.result,
+							     time);
+						}
+						break;
+					default:
+						break;
+					}
+				}
+			}
+		}
+	socket_end:
+
 		if (kmsgfd >= 0 && FD_ISSET(kmsgfd, &set)) {
 			long dmesgwritten;
 
@@ -1034,11 +1215,23 @@ static int monitor_output(pid_t child,
 					if (settings->log_level >= LOG_LEVEL_NORMAL)
 						outf("Exiting gracefully, currently running test will have a 'notrun' result\n");
 
-					dprintf(outputs[_F_JOURNAL], "%s%d (%.3fs)\n",
-						EXECUTOR_EXIT,
-						-SIGHUP, 0.0);
-					if (settings->sync)
-						fdatasync(outputs[_F_JOURNAL]);
+					if (socket_comms_used) {
+						struct runnerpacket *message, *override;
+
+						message = runnerpacket_log(STDOUT_FILENO, "runner: Exiting gracefully, overriding this test's result to be notrun\n");
+						write_packet_with_canary(outputs[_F_SOCKET], message, false); /* possible sync after the override packet */
+						free(message);
+
+						override = runnerpacket_resultoverride("notrun");
+						write_packet_with_canary(outputs[_F_SOCKET], override, settings->sync);
+						free(override);
+					} else {
+						dprintf(outputs[_F_JOURNAL], "%s%d (%.3fs)\n",
+							EXECUTOR_EXIT,
+							-SIGHUP, 0.0);
+						if (settings->sync)
+							fdatasync(outputs[_F_JOURNAL]);
+					}
 				}
 
 				aborting = true;
@@ -1055,9 +1248,10 @@ static int monitor_output(pid_t child,
 				time = 0.0;
 
 			if (!aborting) {
-				const char *exitline;
+				bool timeoutresult = false;
 
-				exitline = killed ? EXECUTOR_TIMEOUT : EXECUTOR_EXIT;
+				if (killed)
+					timeoutresult = true;
 
 				/* If we're stopping because we killed
 				 * the test for tainting, let's not
@@ -1071,7 +1265,7 @@ static int monitor_output(pid_t child,
 				 * journaling a timeout here.
 				 */
 				if (killed && is_tainted(taints)) {
-					exitline = EXECUTOR_EXIT;
+					timeoutresult = false;
 
 					/*
 					 * Also inject a message to
@@ -1084,11 +1278,22 @@ static int monitor_output(pid_t child,
 					 * have newlines on both ends
 					 * of this injection though.
 					 */
-					dprintf(outputs[_F_OUT],
-						"\nrunner: This test was killed due to a kernel taint (0x%lx).\n",
-						taints);
-					if (settings->sync)
-						fdatasync(outputs[_F_OUT]);
+					if (socket_comms_used) {
+						struct runnerpacket *message;
+						char killmsg[256];
+
+						snprintf(killmsg, sizeof(killmsg),
+							 "runner: This test was killed due to a kernel taint (0x%lx).\n", taints);
+						message = runnerpacket_log(STDOUT_FILENO, killmsg);
+						write_packet_with_canary(outputs[_F_SOCKET], message, settings->sync);
+						free(message);
+					} else {
+						dprintf(outputs[_F_OUT],
+							"\nrunner: This test was killed due to a kernel taint (0x%lx).\n",
+							taints);
+						if (settings->sync)
+							fdatasync(outputs[_F_OUT]);
+					}
 				}
 
 				/*
@@ -1096,21 +1301,58 @@ static int monitor_output(pid_t child,
 				 * exceeded the disk usage limit.
 				 */
 				if (killed && disk_usage_limit_exceeded(settings, disk_usage)) {
-					exitline = EXECUTOR_EXIT;
-					dprintf(outputs[_F_OUT],
-						"\nrunner: This test was killed due to exceeding disk usage limit. "
-						"(Used %zd bytes, limit %zd)\n",
-						disk_usage,
-						settings->disk_usage_limit);
-					if (settings->sync)
-						fdatasync(outputs[_F_OUT]);
+					timeoutresult = false;
+
+					if (socket_comms_used) {
+						struct runnerpacket *message;
+						char killmsg[256];
+
+						snprintf(killmsg, sizeof(killmsg),
+							 "runner: This test was killed due to exceeding disk usage limit. "
+							 "(Used %zd bytes, limit %zd)\n",
+							 disk_usage,
+							 settings->disk_usage_limit);
+						message = runnerpacket_log(STDOUT_FILENO, killmsg);
+						write_packet_with_canary(outputs[_F_SOCKET], message, settings->sync);
+						free(message);
+					} else {
+						dprintf(outputs[_F_OUT],
+							"\nrunner: This test was killed due to exceeding disk usage limit. "
+							"(Used %zd bytes, limit %zd)\n",
+							disk_usage,
+							settings->disk_usage_limit);
+						if (settings->sync)
+							fdatasync(outputs[_F_OUT]);
+					}
 				}
 
-				dprintf(outputs[_F_JOURNAL], "%s%d (%.3fs)\n",
-					exitline,
-					status, time);
-				if (settings->sync) {
-					fdatasync(outputs[_F_JOURNAL]);
+				if (socket_comms_used) {
+					struct runnerpacket *exitpacket;
+					char timestr[32];
+
+					snprintf(timestr, sizeof(timestr), "%.3f", time);
+
+					if (timeoutresult) {
+						struct runnerpacket *override;
+
+						override = runnerpacket_resultoverride("timeout");
+						write_packet_with_canary(outputs[_F_SOCKET], override, false); /* sync after exitpacket */
+						free(override);
+					}
+
+					exitpacket = runnerpacket_exit(status, timestr);
+					write_packet_with_canary(outputs[_F_SOCKET], exitpacket, settings->sync);
+					free(exitpacket);
+				} else {
+					const char *exitline;
+
+					exitline = timeoutresult ? EXECUTOR_TIMEOUT : EXECUTOR_EXIT;
+					dprintf(outputs[_F_JOURNAL], "%s%d (%.3fs)\n",
+						exitline,
+						status, time);
+					if (settings->sync) {
+						fdatasync(outputs[_F_JOURNAL]);
+					}
 				}
 
 				if (status == IGT_EXIT_ABORT) {
@@ -1155,6 +1397,7 @@ static int monitor_output(pid_t child,
 				free(outbuf);
 				close(outfd);
 				close(errfd);
+				close(socketfd);
 				close(kmsgfd);
 				return -1;
 			}
@@ -1178,6 +1421,7 @@ static int monitor_output(pid_t child,
 	free(outbuf);
 	close(outfd);
 	close(errfd);
+	close(socketfd);
 	close(kmsgfd);
 
 	if (aborting)
@@ -1187,7 +1431,7 @@ static int monitor_output(pid_t child,
 }
 
 static void __attribute__((noreturn))
-execute_test_process(int outfd, int errfd,
+execute_test_process(int outfd, int errfd, int socketfd,
 		     struct settings *settings,
 		     struct job_list_entry *entry)
 {
@@ -1237,6 +1481,13 @@ execute_test_process(int outfd, int errfd,
 			strcpy(argv[2] + argsize + 1, sub);
 			argsize += sublen + 1;
 		}
+	}
+
+	if (socketfd >= 0) {
+		struct runnerpacket *packet;
+
+		packet = runnerpacket_exec(argv);
+		write(socketfd, packet, packet->size);
 	}
 
 	execv(argv[0], argv);
@@ -1320,7 +1571,8 @@ static int execute_next_entry(struct execute_state *state,
 	int kmsgfd;
 	int outpipe[2] = { -1, -1 };
 	int errpipe[2] = { -1, -1 };
-	int outfd, errfd;
+	int socket[2] = { -1, -1 };
+	int outfd, errfd, socketfd;
 	char name[32];
 	pid_t child;
 	int result;
@@ -1346,6 +1598,12 @@ static int execute_next_entry(struct execute_state *state,
 
 	if (pipe(outpipe) || pipe(errpipe)) {
 		errf("Error creating pipes: %m\n");
+		result = -1;
+		goto out_pipe;
+	}
+
+	if (socketpair(AF_UNIX, SOCK_DGRAM, 0, socket)) {
+		errf("Error creating sockets: %m\n");
 		result = -1;
 		goto out_pipe;
 	}
@@ -1390,27 +1648,39 @@ static int execute_next_entry(struct execute_state *state,
 		result = -1;
 		goto out_kmsgfd;
 	} else if (child == 0) {
+		char envstring[16];
+
 		outfd = outpipe[1];
 		errfd = errpipe[1];
+		socketfd = socket[1];
 		close(outpipe[0]);
 		close(errpipe[0]);
+		close(socket[0]);
 
 		sigprocmask(SIG_UNBLOCK, sigmask, NULL);
 
+		if (socketfd >= 0 && !getenv("IGT_RUNNER_DISABLE_SOCKET_COMMUNICATION")) {
+			snprintf(envstring, sizeof(envstring), "%d", socketfd);
+			setenv("IGT_RUNNER_SOCKET_FD", envstring, 1);
+		}
 		setenv("IGT_SENTINEL_ON_STDERR", "1", 1);
 
-		execute_test_process(outfd, errfd, settings, entry);
+		execute_test_process(outfd, errfd, socketfd, settings, entry);
 		/* unreachable */
 	}
 
 	outfd = outpipe[0];
 	errfd = errpipe[0];
+	socketfd = socket[0];
 	close(outpipe[1]);
 	close(errpipe[1]);
-	outpipe[1] = errpipe[1] = -1;
+	close(socket[1]);
+	outpipe[1] = errpipe[1] = socket[1] = -1;
 
-	result = monitor_output(child, outfd, errfd, kmsgfd, sigfd,
-				outputs, time_spent, settings, abortreason);
+	result = monitor_output(child, outfd, errfd, socketfd,
+				kmsgfd, sigfd,
+				outputs, time_spent, settings,
+				abortreason);
 
 out_kmsgfd:
 	close(kmsgfd);
@@ -1582,6 +1852,22 @@ bool initialize_execute_state_from_resume(int dirfd,
 
 	entry = &list->entries[i];
 	state->next = i;
+
+	if ((fd = openat(resdirfd, filenames[_F_SOCKET], O_RDONLY)) >= 0) {
+		if (!prune_from_comms(entry, fd)) {
+			/*
+			 * No subtests, or incomplete before the first
+			 * subtest. Not suitable to re-run.
+			 */
+			state->next = i + 1;
+		} else if (entry->binary[0] == '\0') {
+			/* Full completed */
+			state->next = i + 1;
+		}
+
+		close (fd);
+	}
+
 	if ((fd = openat(resdirfd, filenames[_F_JOURNAL], O_RDONLY)) >= 0) {
 		if (!prune_from_journal(entry, fd)) {
 			/*
