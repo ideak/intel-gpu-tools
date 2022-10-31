@@ -40,7 +40,6 @@
 typedef struct {
 	int drm_fd;
 	int debugfs_fd;
-	uint32_t devid;
 	drmModeResPtr res;
 	igt_display_t display;
 } data_t;
@@ -199,7 +198,6 @@ int main(int argc, char *argv[])
 	}
 
 	data.debugfs_fd = igt_debugfs_dir(data.drm_fd);
-	data.devid = intel_get_drm_devid(data.drm_fd);
 
 	data.res = drmModeGetResources(data.drm_fd);
 	if (data.res) {
