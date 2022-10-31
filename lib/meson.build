@@ -67,6 +67,7 @@ lib_sources = [
 	'rendercopy_gen7.c',
 	'rendercopy_gen8.c',
 	'rendercopy_gen9.c',
+	'runnercomms.c',
 	'sw_sync.c',
 	'intel_aux_pgtable.c',
 	'intel_reg_map.c',
