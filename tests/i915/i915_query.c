@@ -625,10 +625,14 @@ static void upload(int fd, struct igt_list_head *handles, uint32_t num_handles)
 		      sizeof(struct drm_i915_gem_exec_object2));
 
 	i = 0;
-	igt_list_for_each_entry(iter, handles, link)
-		exec[i++].handle = iter->handle;
+	igt_list_for_each_entry(iter, handles, link) {
+		exec[i].handle = iter->handle;
+		exec[i].flags = EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
+		i++;
+	}
 
 	exec[i].handle = batch_create_size(fd, 4096);
+	exec[i].flags = EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 
 	execbuf.buffers_ptr = to_user_pointer(exec);
 	execbuf.buffer_count = num_handles + 1;
