@@ -1659,7 +1659,14 @@ static int execute_next_entry(struct execute_state *state,
 
 		sigprocmask(SIG_UNBLOCK, sigmask, NULL);
 
-		if (socketfd >= 0 && !getenv("IGT_RUNNER_DISABLE_SOCKET_COMMUNICATION")) {
+		if (socketfd >= 0 && !getenv("IGT_RUNNER_DISABLE_SOCKET_COMMUNICATION") &&
+		    getenv("IGT_RUNNER_ENABLE_SOCKET_COMMUNICATION_FIXME")) {
+			/*
+			 * The variable for enabling socket comms is
+			 * temporary. Do not use unless you really
+			 * know what you're doing. Requiring it will
+			 * go away later.
+			 */
 			snprintf(envstring, sizeof(envstring), "%d", socketfd);
 			setenv("IGT_RUNNER_SOCKET_FD", envstring, 1);
 		}
