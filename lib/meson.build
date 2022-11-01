@@ -166,8 +166,8 @@ endif
 
 if chamelium.found()
 	lib_deps += chamelium
-	lib_sources += 'igt_chamelium.c'
-	lib_sources += 'igt_chamelium_stream.c'
+	lib_sources += [ 'igt_chamelium.c', 'igt_chamelium_stream.c' ]
+	lib_sources += 'monitor_edids/monitor_edids_helper.c'
 endif
 
 if get_option('srcdir') != ''

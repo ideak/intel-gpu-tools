@@ -92,14 +92,6 @@
  */
 #define CHAMELIUM_HOTPLUG_DETECTION_DELAY 10
 
-struct chamelium_edid {
-	struct chamelium *chamelium;
-	struct edid *base;
-	struct edid *raw[CHAMELIUM_MAX_PORTS];
-	int ids[CHAMELIUM_MAX_PORTS];
-	struct igt_list_head link;
-};
-
 struct chamelium_port {
 	unsigned int type;
 	int id;
@@ -689,7 +681,7 @@ static xmlrpc_value *chamelium_rpc(struct chamelium *chamelium,
 		va_end(va_args);
 	}
 	igt_assert_f(!chamelium->env.fault_occurred,
-		     "Chamelium RPC call failed: %s\n",
+		     "Chamelium RPC call[%s] failed: %s\n", method_name,
 		     chamelium->env.fault_string);
 
 	return res;

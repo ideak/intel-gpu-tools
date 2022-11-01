@@ -29,10 +29,12 @@
 #include "config.h"
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <xf86drmMode.h>
 
 #include "igt_debugfs.h"
 #include "igt_kms.h"
+#include "igt_list.h"
 
 struct igt_fb;
 struct edid;
@@ -81,12 +83,11 @@ struct chamelium_infoframe {
 	uint8_t *payload;
 };
 
-struct chamelium_edid;
-
 /**
  * CHAMELIUM_MAX_PORTS: the maximum number of ports supported by igt_chamelium.
  *
- * For now, we have 1 VGA, 1 HDMI and 2 DisplayPort ports.
+ * On V2: 1 VGA, 1 HDMI and 2 DisplayPort ports.
+ * On V3: 2 HDMI and 2 DisplayPort ports.
  */
 #define CHAMELIUM_MAX_PORTS 4
 
@@ -105,6 +106,22 @@ struct chamelium_edid;
 extern bool igt_chamelium_allow_fsm_handling;
 
 #define CHAMELIUM_HOTPLUG_TIMEOUT 20 /* seconds */
+
+/**
+ * chamelium_edid:
+ * @chamelium: instance of the chamelium where the EDID will be applied
+ * @base: Unaltered EDID that would be used for all ports. Matches what you
+ * would get from a real monitor.
+ * @raw: EDID to be applied for each port.
+ * @ids: The ID received from Chamelium after it's created for specific ports.
+ */
+struct chamelium_edid {
+	struct chamelium *chamelium;
+	struct edid *base;
+	struct edid *raw[CHAMELIUM_MAX_PORTS];
+	int ids[CHAMELIUM_MAX_PORTS];
+	struct igt_list_head link;
+};
 
 void chamelium_deinit_rpc_only(struct chamelium *chamelium);
 struct chamelium *chamelium_init_rpc_only(void);

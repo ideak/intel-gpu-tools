@@ -30,11 +30,16 @@
 #include "igt_edid.h"
 #include "igt_eld.h"
 #include "igt_infoframe.h"
+#include "monitor_edids/dp_edids.h"
+#include "monitor_edids/monitor_edids_helper.h"
 
 #include <fcntl.h>
 #include <pthread.h>
 #include <string.h>
 #include <stdatomic.h>
+// #include <stdio.h>
+
+// struct chamelium_edid;
 
 enum test_modeset_mode {
 	TEST_MODESET_ON,
@@ -2541,6 +2546,71 @@ test_hpd_storm_disable(data_t *data, struct chamelium_port *port, int width)
 	igt_hpd_storm_reset(data->drm_fd);
 }
 
+static const char igt_edid_stress_resolution_desc[] =
+	"Stress test the DUT by testing multiple EDIDs, one right after the other,"
+	"and ensure their validity by check the real screen resolution vs the"
+	"advertised mode resultion.";
+static void edid_stress_resolution(data_t *data, struct chamelium_port *port,
+				   monitor_edid edids_list[],
+				   size_t edids_list_len)
+{
+	int i;
+	struct chamelium *chamelium = data->chamelium;
+	struct udev_monitor *mon = igt_watch_uevents();
+
+	for (i = 0; i < edids_list_len; ++i) {
+		struct chamelium_edid *chamelium_edid;
+		drmModeModeInfo mode;
+		struct igt_fb fb = { 0 };
+		igt_output_t *output;
+		enum pipe pipe;
+		bool is_video_stable;
+		int screen_res_w, screen_res_h;
+
+		monitor_edid *monitor_edid = &edids_list[i];
+		igt_info("Testing out the EDID for %s\n",
+			 monitor_edid_get_name(monitor_edid));
+
+		/* Getting and Setting the EDID on Chamelium. */
+		chamelium_edid = get_chameleon_edid_from_monitor_edid(
+			chamelium, monitor_edid);
+		chamelium_port_set_edid(data->chamelium, port, chamelium_edid);
+		free_chamelium_edid_from_monitor_edid(chamelium_edid);
+
+		igt_flush_uevents(mon);
+		chamelium_plug(chamelium, port);
+		wait_for_connector_after_hotplug(data, mon, port,
+						 DRM_MODE_CONNECTED);
+		igt_flush_uevents(mon);
+
+		/* Setting an output on the screen to turn it on. */
+		mode = get_mode_for_port(chamelium, port);
+		create_fb_for_mode(data, &fb, &mode);
+		output = get_output_for_port(data, port);
+		pipe = get_pipe_for_output(&data->display, output);
+		igt_output_set_pipe(output, pipe);
+		enable_output(data, port, output, &mode, &fb);
+
+		/* Capture the screen resolution and verify. */
+		is_video_stable = chamelium_port_wait_video_input_stable(
+			chamelium, port, 5);
+		igt_assert(is_video_stable);
+
+		chamelium_port_get_resolution(chamelium, port, &screen_res_w,
+					      &screen_res_h);
+		igt_assert(screen_res_w == fb.width);
+		igt_assert(screen_res_h == fb.height);
+
+		// Clean up
+		igt_remove_fb(data->drm_fd, &fb);
+		igt_modeset_disable_all_outputs(&data->display);
+		chamelium_unplug(chamelium, port);
+	}
+
+	chamelium_reset_state(&data->display, data->chamelium, port,
+			      data->ports, data->port_count);
+}
+
 #define for_each_port(p, port)            \
 	for (p = 0, port = data.ports[p]; \
 	     p < data.port_count;         \
@@ -2631,6 +2701,11 @@ igt_main
 			igt_custom_edid_type_read(&data, port, IGT_CUSTOM_EDID_BASE);
 			igt_custom_edid_type_read(&data, port, IGT_CUSTOM_EDID_ALT);
 		}
+
+		igt_describe(igt_edid_stress_resolution_desc);
+		connector_subtest("dp-edid-stress-resolution", DisplayPort)
+			edid_stress_resolution(&data, port, DP_EDIDS,
+					       ARRAY_SIZE(DP_EDIDS));
 
 		igt_describe(test_suspend_resume_hpd_desc);
 		connector_subtest("dp-hpd-after-suspend", DisplayPort)
