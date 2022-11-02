@@ -228,7 +228,7 @@ static void gem_sanitycheck(void)
 {
 	struct drm_i915_gem_busy args = {};
 	int i915 = __drm_open_driver(DRIVER_INTEL);
-	int expected = gem_has_lmem(i915) ? -ENODEV : -ENOENT;
+	int expected = -ENOENT;
 	int err;
 
 	err = 0;
