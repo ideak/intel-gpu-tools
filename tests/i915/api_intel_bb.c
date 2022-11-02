@@ -40,11 +40,15 @@
 #include "intel_bufops.h"
 #include "i915/gem_vm.h"
 #include "i915/i915_crc.h"
+#include "i915/i915_blt.h"
 
 #define PAGE_SIZE 4096
 
-#define WIDTH 64
-#define HEIGHT 64
+#define WIDTH	64
+#define HEIGHT	64
+#define STRIDE	(WIDTH * 4)
+#define SIZE	(HEIGHT * STRIDE)
+
 #define COLOR_00	0x00
 #define COLOR_33	0x33
 #define COLOR_77	0x77
@@ -1209,6 +1213,62 @@ static void full_batch(struct buf_ops *bops)
 	intel_bb_destroy(ibb);
 }
 
+static void misplaced_blitter(struct buf_ops *bops)
+{
+	int i915 = buf_ops_get_fd(bops), i;
+	struct intel_bb *ibb;
+	struct intel_buf *src, *dst;
+	uint64_t value, *psrc, *pdst;
+	int cmp;
+
+	/* Use custom configuration with blitter at index 0 */
+	const intel_ctx_cfg_t cfg = (intel_ctx_cfg_t) {
+			.num_engines = 2,
+			.engines = {
+				{ .engine_class = I915_ENGINE_CLASS_COPY,
+				  .engine_instance = 0
+				},
+				{ .engine_class = I915_ENGINE_CLASS_RENDER,
+				  .engine_instance = 0
+				},
+			},
+		};
+
+	const intel_ctx_t *ctx = intel_ctx_create(i915, &cfg);
+
+	ibb = intel_bb_create_with_context(i915, ctx->id, &ctx->cfg, PAGE_SIZE);
+
+	/* Prepare for blitter copy, done to verify we found the blitter engine */
+	src = intel_buf_create(bops, WIDTH, HEIGHT, 32, 0, I915_TILING_NONE,
+			       I915_COMPRESSION_NONE);
+	dst = intel_buf_create(bops, WIDTH, HEIGHT, 32, 0, I915_TILING_NONE,
+			       I915_COMPRESSION_NONE);
+	psrc = intel_buf_device_map(src, true);
+	pdst = intel_buf_device_map(dst, true);
+
+	/* Populate src with dummy values */
+	memset(&value, COLOR_33, 8);
+	for (i = 0; i < SIZE / sizeof(value); i++)
+		memset(&psrc[i], value, 8);
+
+	intel_bb_copy_intel_buf(ibb, src, dst, SIZE);
+	intel_bb_flush_blit(ibb);
+	intel_bb_sync(ibb);
+
+	cmp = memcmp(pdst, psrc, SIZE);
+
+	intel_buf_unmap(src);
+	intel_buf_unmap(dst);
+	intel_buf_destroy(src);
+	intel_buf_destroy(dst);
+
+	intel_bb_destroy(ibb);
+	intel_ctx_destroy(i915, ctx);
+
+	/* Expect to see a successful copy */
+	igt_assert_eq(cmp, 0);
+}
+
 static int render(struct buf_ops *bops, uint32_t tiling, bool do_reloc,
 		  uint32_t width, uint32_t height)
 {
@@ -1580,6 +1640,12 @@ igt_main_args("dpibc:", NULL, help_str, opt_handler, NULL)
 
 	igt_subtest("full-batch")
 		full_batch(bops);
+
+	igt_describe("Execute intel_bb with set of engines provided by userspace");
+	igt_subtest("misplaced-blitter") {
+		gem_require_contexts(i915);
+		misplaced_blitter(bops);
+	}
 
 	igt_subtest_with_dynamic("render") {
 		for (i = 0; i < ARRAY_SIZE(tests); i++) {
