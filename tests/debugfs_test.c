@@ -24,12 +24,13 @@
 
 #include "i915/gem.h"
 #include "igt.h"
+#include "igt_hwmon.h"
 #include "igt_sysfs.h"
 #include <fcntl.h>
 #include <sys/types.h>
 #include <dirent.h>
 
-IGT_TEST_DESCRIPTION("Read entries from debugfs and sysfs paths.");
+IGT_TEST_DESCRIPTION("Read entries from debugfs, hwmon and sysfs paths.");
 
 static void read_and_discard_sysfs_entries(int path_fd, int indent)
 {
@@ -178,7 +179,7 @@ retry:
 
 igt_main
 {
-	int fd = -1, debugfs, sysfs;
+	int fd = -1, debugfs, sysfs, hwmon_fd;
 
 	igt_fixture {
 		fd = drm_open_driver_master(DRIVER_INTEL);
@@ -195,6 +196,15 @@ igt_main
 	igt_describe("Read all entries from debugfs path.");
 	igt_subtest("read_all_entries")
 		read_and_discard_sysfs_entries(debugfs, 0);
+
+	igt_describe("Read all entries from hwmon path");
+	igt_subtest("basic-hwmon") {
+		igt_require_f(gem_has_lmem(fd), "Test applicable only for dgfx\n");
+		hwmon_fd = igt_hwmon_open(fd);
+		igt_assert(hwmon_fd >= 0);
+		read_and_discard_sysfs_entries(hwmon_fd, 0);
+		close(hwmon_fd);
+	}
 
 	igt_describe("Read all debugfs entries with display on/off.");
 	igt_subtest_group
