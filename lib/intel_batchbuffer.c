@@ -1495,6 +1495,28 @@ static bool aux_needs_softpin(int i915)
 	return intel_gen(intel_get_drm_devid(i915)) >= 12;
 }
 
+static bool has_ctx_cfg(struct intel_bb *ibb)
+{
+	return ibb->cfg && ibb->cfg->num_engines > 0;
+}
+
+static uint32_t find_engine(struct intel_bb *ibb, unsigned int class)
+{
+	intel_ctx_cfg_t *cfg;
+	unsigned int i;
+	uint32_t engine_id = -1;
+
+	cfg = ibb->cfg;
+	for (i = 0; i < cfg->num_engines; i++) {
+		if (cfg->engines[i].engine_class == class)
+			engine_id = i;
+	}
+
+	igt_assert_f(engine_id != -1, "Requested engine not found!\n");
+
+	return engine_id;
+}
+
 /**
  * intel_bb_create:
  * @i915: drm fd
@@ -2799,34 +2821,44 @@ void intel_bb_flush(struct intel_bb *ibb, uint32_t ring)
  * intel_bb_flush_render:
  * @ibb: batchbuffer
  *
- * If batch is not empty emit batch buffer end, execute on render ring
- * and reset the batch. Context used to execute is batch context.
+ * If batch is not empty emit batch buffer end, find the render engine id,
+ * execute on the ring and reset the batch. Context used to execute
+ * is batch context.
  */
 void intel_bb_flush_render(struct intel_bb *ibb)
 {
+	uint32_t ring;
+
 	if (intel_bb_emit_flush_common(ibb) == 0)
 		return;
 
-	intel_bb_exec_with_ring(ibb, I915_EXEC_RENDER);
+	if (has_ctx_cfg(ibb))
+		ring = find_engine(ibb, I915_ENGINE_CLASS_RENDER);
+	else
+		ring = I915_EXEC_RENDER;
+
+	intel_bb_exec_with_ring(ibb, ring);
 }
 
 /*
  * intel_bb_flush_blit:
  * @ibb: batchbuffer
  *
- * If batch is not empty emit batch buffer end, execute on default/blit ring
- * (depends on gen) and reset the batch.
+ * If batch is not empty emit batch buffer end, find a suitable ring
+ * (depending on gen and context configuration) and reset the batch.
  * Context used to execute is batch context.
  */
 void intel_bb_flush_blit(struct intel_bb *ibb)
 {
-	uint32_t ring = I915_EXEC_DEFAULT;
+	uint32_t ring;
 
 	if (intel_bb_emit_flush_common(ibb) == 0)
 		return;
 
-	if (HAS_BLT_RING(ibb->devid))
-		ring = I915_EXEC_BLT;
+	if (has_ctx_cfg(ibb))
+		ring = find_engine(ibb, I915_ENGINE_CLASS_COPY);
+	else
+		ring = HAS_BLT_RING(ibb->devid) ? I915_EXEC_BLT : I915_EXEC_DEFAULT;
 
 	intel_bb_exec_with_ring(ibb, ring);
 }
