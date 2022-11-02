@@ -4,6 +4,7 @@ igt@i915_module_load@load
 # Keep alphabetically sorted by default
 igt@core_auth@basic-auth
 igt@debugfs_test@read_all_entries
+igt@debugfs_test@basic-hwmon
 igt@fbdev@eof
 igt@fbdev@info
 igt@fbdev@nullptr
