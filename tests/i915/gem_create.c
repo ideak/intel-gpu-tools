@@ -271,7 +271,7 @@ static void always_clear(int i915, const struct gem_memory_region *r, int timeou
 	struct thread_clear arg = {
 		.i915 = i915,
 		.region = r->ci,
-		.max = r->size / 2 >> 12, /* in pages */
+		.max = r->cpu_size / 2 >> 12, /* in pages */
 		.timeout = timeout,
 	};
 	const int ncpus = sysconf(_SC_NPROCESSORS_ONLN);
