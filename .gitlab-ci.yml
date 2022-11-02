@@ -228,22 +228,23 @@ test:ninja-test-minimal:
 #       - build
 #     when: on_failure
 
-test:ninja-test-mips:
-  tags:
-    - gstreamer
-  retry: 2
-  image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-mips:commit-$CI_COMMIT_SHA
-  dependencies:
-    - build:tests-debian-meson-mips
-  stage: test
-  script:
-    - export PKG_CONFIG_PATH=/usr/lib/mips-linux-gnu/pkgconfig/
-    - env > build/envdump.txt
-    - meson test -C build --num-processes ${FDO_CI_CONCURRENT:-4}
-  artifacts:
-    paths:
-      - build
-    when: on_failure
+# mips testing temporarily disabled
+# test:ninja-test-mips:
+#   tags:
+#     - gstreamer
+#   retry: 2
+#   image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-mips:commit-$CI_COMMIT_SHA
+#   dependencies:
+#     - build:tests-debian-meson-mips
+#   stage: test
+#   script:
+#     - export PKG_CONFIG_PATH=/usr/lib/mips-linux-gnu/pkgconfig/
+#     - env > build/envdump.txt
+#     - meson test -C build --num-processes ${FDO_CI_CONCURRENT:-4}
+#   artifacts:
+#     paths:
+#       - build
+#     when: on_failure
 
 test:list-undocumented-tests:
   dependencies:
