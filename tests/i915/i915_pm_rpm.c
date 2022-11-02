@@ -1559,14 +1559,19 @@ static bool device_in_pci_d3(struct pci_device *pci_dev)
 
 static void pci_d3_state_subtest(void)
 {
-	struct pci_device *pci_dev;
+	struct pci_device *pci_dev, *bridge_pci_dev;
 
 	igt_require(has_runtime_pm);
 
 	pci_dev = igt_device_get_pci_device(drm_fd);
+	bridge_pci_dev = pci_device_get_parent_bridge(pci_dev);
 
 	disable_all_screens_and_wait(&ms_data);
 	igt_assert(igt_wait(device_in_pci_d3(pci_dev), 2000, 100));
+
+	if (gem_has_lmem(drm_fd))
+		igt_require_f(pci_device_has_kernel_driver(bridge_pci_dev),
+			      "pci bridge device does not bind with pcieport driver\n");
 
 	enable_one_screen_or_forcewake_get_and_wait(&ms_data);
 	igt_assert(!device_in_pci_d3(pci_dev));
