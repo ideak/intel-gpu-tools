@@ -1662,7 +1662,7 @@ static void load_helper_init(void)
 	lh.context_id = gem_context_create(drm_fd);
 	igt_assert_neq(lh.context_id, 0xffffffff);
 
-	lh.ibb = intel_bb_create_with_context(drm_fd, lh.context_id, BATCH_SZ);
+	lh.ibb = intel_bb_create_with_context(drm_fd, lh.context_id, NULL, BATCH_SZ);
 
 	scratch_buf_init(lh.bops, &lh.dst, 1920, 1080, 0);
 	scratch_buf_init(lh.bops, &lh.src, 1920, 1080, 0);
@@ -3116,7 +3116,7 @@ gen12_test_mi_rpc(void)
 	igt_assert_neq(ctx_id, INVALID_CTX_ID);
 	properties[1] = ctx_id;
 
-	ibb = intel_bb_create_with_context(drm_fd, ctx_id, BATCH_SZ);
+	ibb = intel_bb_create_with_context(drm_fd, ctx_id, NULL, BATCH_SZ);
 	buf = intel_buf_create(bops, 4096, 1, 8, 64,
 			       I915_TILING_NONE, I915_COMPRESSION_NONE);
 
@@ -3195,7 +3195,7 @@ test_mi_rpc(void)
 
 	ctx_id = gem_context_create(drm_fd);
 
-	ibb = intel_bb_create_with_context(drm_fd, ctx_id, BATCH_SZ);
+	ibb = intel_bb_create_with_context(drm_fd, ctx_id, NULL, BATCH_SZ);
 	buf = intel_buf_create(bops, 4096, 1, 8, 64,
 			       I915_TILING_NONE, I915_COMPRESSION_NONE);
 
@@ -3322,8 +3322,8 @@ hsw_test_single_ctx_counters(void)
 		 */
 		context0_id = gem_context_create(drm_fd);
 		context1_id = gem_context_create(drm_fd);
-		ibb0 = intel_bb_create_with_context(drm_fd, context0_id, BATCH_SZ);
-		ibb1 = intel_bb_create_with_context(drm_fd, context1_id,  BATCH_SZ);
+		ibb0 = intel_bb_create_with_context(drm_fd, context0_id, NULL, BATCH_SZ);
+		ibb1 = intel_bb_create_with_context(drm_fd, context1_id, NULL, BATCH_SZ);
 
 		igt_debug("submitting warm up render_copy\n");
 
@@ -3566,8 +3566,8 @@ gen8_test_single_ctx_render_target_writes_a_counter(void)
 
 			context0_id = gem_context_create(drm_fd);
 			context1_id = gem_context_create(drm_fd);
-			ibb0 = intel_bb_create_with_context(drm_fd, context0_id, BATCH_SZ);
-			ibb1 = intel_bb_create_with_context(drm_fd, context1_id, BATCH_SZ);
+			ibb0 = intel_bb_create_with_context(drm_fd, context0_id, NULL, BATCH_SZ);
+			ibb1 = intel_bb_create_with_context(drm_fd, context1_id, NULL, BATCH_SZ);
 
 			igt_debug("submitting warm up render_copy\n");
 
@@ -3972,8 +3972,8 @@ static void gen12_single_ctx_helper(void)
 
 	context0_id = gem_context_create(drm_fd);
 	context1_id = gem_context_create(drm_fd);
-	ibb0 = intel_bb_create_with_context(drm_fd, context0_id, BATCH_SZ);
-	ibb1 = intel_bb_create_with_context(drm_fd, context1_id, BATCH_SZ);
+	ibb0 = intel_bb_create_with_context(drm_fd, context0_id, NULL, BATCH_SZ);
+	ibb1 = intel_bb_create_with_context(drm_fd, context1_id, NULL, BATCH_SZ);
 
 	igt_debug("submitting warm up render_copy\n");
 

@@ -309,7 +309,7 @@ __gen11_media_vme_func(int i915,
 	struct intel_bb *ibb;
 	uint32_t curbe_buffer, interface_descriptor;
 
-	ibb = intel_bb_create_with_context(i915, ctx, PAGE_SIZE);
+	ibb = intel_bb_create_with_context(i915, ctx, NULL, PAGE_SIZE);
 	intel_bb_add_intel_buf(ibb, dst, true);
 	intel_bb_add_intel_buf(ibb, src, false);
 

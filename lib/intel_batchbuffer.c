@@ -1304,7 +1304,8 @@ static inline uint64_t __intel_bb_get_offset(struct intel_bb *ibb,
 /**
  * __intel_bb_create:
  * @i915: drm fd
- * @ctx: context
+ * @ctx: context id
+ * @cfg: intel_ctx configuration, NULL for default context or legacy mode
  * @size: size of the batchbuffer
  * @do_relocs: use relocations or allocator
  * @allocator_type: allocator type, must be INTEL_ALLOCATOR_NONE for relocations
@@ -1338,12 +1339,17 @@ static inline uint64_t __intel_bb_get_offset(struct intel_bb *ibb,
  *
  * If we do reset with purging caches allocator entries are freed as well.
  *
+ * __intel_bb_create checks if a context configuration for intel_ctx_t was
+ * passed in. If this is the case, it copies the information over to the
+ * newly created batch buffer.
+ *
  * Returns:
  *
  * Pointer the intel_bb, asserts on failure.
  */
 static struct intel_bb *
-__intel_bb_create(int i915, uint32_t ctx, uint32_t size, bool do_relocs,
+__intel_bb_create(int i915, uint32_t ctx, const intel_ctx_cfg_t *cfg,
+		  uint32_t size, bool do_relocs,
 		  uint64_t start, uint64_t end,
 		  uint8_t allocator_type, enum allocator_strategy strategy)
 {
@@ -1399,6 +1405,13 @@ __intel_bb_create(int i915, uint32_t ctx, uint32_t size, bool do_relocs,
 	ibb->ptr = ibb->batch;
 	ibb->fence = -1;
 
+	/* Cache context configuration */
+	if (cfg) {
+		ibb->cfg = malloc(sizeof(*cfg));
+		igt_assert(ibb->cfg);
+		memcpy(ibb->cfg, cfg, sizeof(*cfg));
+	}
+
 	ibb->gtt_size = gem_aperture_size(i915);
 	if ((ibb->gtt_size - 1) >> 32)
 		ibb->supports_48b_address = true;
@@ -1425,6 +1438,7 @@ __intel_bb_create(int i915, uint32_t ctx, uint32_t size, bool do_relocs,
  * intel_bb_create_full:
  * @i915: drm fd
  * @ctx: context
+ * @cfg: intel_ctx configuration, NULL for default context or legacy mode
  * @size: size of the batchbuffer
  * @start: allocator vm start address
  * @end: allocator vm start address
@@ -1441,12 +1455,13 @@ __intel_bb_create(int i915, uint32_t ctx, uint32_t size, bool do_relocs,
  *
  * Pointer the intel_bb, asserts on failure.
  */
-struct intel_bb *intel_bb_create_full(int i915, uint32_t ctx, uint32_t size,
+struct intel_bb *intel_bb_create_full(int i915, uint32_t ctx,
+				      const intel_ctx_cfg_t *cfg, uint32_t size,
 				      uint64_t start, uint64_t end,
 				      uint8_t allocator_type,
 				      enum allocator_strategy strategy)
 {
-	return __intel_bb_create(i915, ctx, size, false, start, end,
+	return __intel_bb_create(i915, ctx, cfg, size, false, start, end,
 				 allocator_type, strategy);
 }
 
@@ -1454,6 +1469,7 @@ struct intel_bb *intel_bb_create_full(int i915, uint32_t ctx, uint32_t size,
  * intel_bb_create_with_allocator:
  * @i915: drm fd
  * @ctx: context
+ * @cfg: intel_ctx configuration, NULL for default context or legacy mode
  * @size: size of the batchbuffer
  * @allocator_type: allocator type, SIMPLE, RANDOM, ...
  *
@@ -1466,10 +1482,11 @@ struct intel_bb *intel_bb_create_full(int i915, uint32_t ctx, uint32_t size,
  * Pointer the intel_bb, asserts on failure.
  */
 struct intel_bb *intel_bb_create_with_allocator(int i915, uint32_t ctx,
+						const intel_ctx_cfg_t *cfg,
 						uint32_t size,
 						uint8_t allocator_type)
 {
-	return __intel_bb_create(i915, ctx, size, false, 0, 0,
+	return __intel_bb_create(i915, ctx, cfg, size, false, 0, 0,
 				 allocator_type, ALLOC_STRATEGY_HIGH_TO_LOW);
 }
 
@@ -1502,7 +1519,7 @@ struct intel_bb *intel_bb_create(int i915, uint32_t size)
 {
 	bool relocs = gem_has_relocations(i915);
 
-	return __intel_bb_create(i915, 0, size,
+	return __intel_bb_create(i915, 0, NULL, size,
 				 relocs && !aux_needs_softpin(i915), 0, 0,
 				 INTEL_ALLOCATOR_SIMPLE,
 				 ALLOC_STRATEGY_HIGH_TO_LOW);
@@ -1511,21 +1528,24 @@ struct intel_bb *intel_bb_create(int i915, uint32_t size)
 /**
  * intel_bb_create_with_context:
  * @i915: drm fd
- * @ctx: context
+ * @ctx: context id
+ * @cfg: intel_ctx configuration, NULL for default context or legacy mode
  * @size: size of the batchbuffer
  *
- * Creates bb with context passed in @ctx.
+ * Creates bb with context passed in @ctx and @cfg configuration (when
+ * working with custom engines layout).
  *
  * Returns:
  *
  * Pointer the intel_bb, asserts on failure.
  */
 struct intel_bb *
-intel_bb_create_with_context(int i915, uint32_t ctx, uint32_t size)
+intel_bb_create_with_context(int i915, uint32_t ctx,
+			     const intel_ctx_cfg_t *cfg, uint32_t size)
 {
 	bool relocs = gem_has_relocations(i915);
 
-	return __intel_bb_create(i915, ctx, size,
+	return __intel_bb_create(i915, ctx, cfg, size,
 				 relocs && !aux_needs_softpin(i915), 0, 0,
 				 INTEL_ALLOCATOR_SIMPLE,
 				 ALLOC_STRATEGY_HIGH_TO_LOW);
@@ -1547,7 +1567,7 @@ struct intel_bb *intel_bb_create_with_relocs(int i915, uint32_t size)
 {
 	igt_require(gem_has_relocations(i915));
 
-	return __intel_bb_create(i915, 0, size, true, 0, 0,
+	return __intel_bb_create(i915, 0, NULL, size, true, 0, 0,
 				 INTEL_ALLOCATOR_NONE, ALLOC_STRATEGY_NONE);
 }
 
@@ -1555,6 +1575,7 @@ struct intel_bb *intel_bb_create_with_relocs(int i915, uint32_t size)
  * intel_bb_create_with_relocs_and_context:
  * @i915: drm fd
  * @ctx: context
+ * @cfg: intel_ctx configuration, NULL for default context or legacy mode
  * @size: size of the batchbuffer
  *
  * Creates bb with default context which will disable passing addresses.
@@ -1565,11 +1586,13 @@ struct intel_bb *intel_bb_create_with_relocs(int i915, uint32_t size)
  * Pointer the intel_bb, asserts on failure.
  */
 struct intel_bb *
-intel_bb_create_with_relocs_and_context(int i915, uint32_t ctx, uint32_t size)
+intel_bb_create_with_relocs_and_context(int i915, uint32_t ctx,
+					const intel_ctx_cfg_t *cfg,
+					uint32_t size)
 {
 	igt_require(gem_has_relocations(i915));
 
-	return __intel_bb_create(i915, ctx, size, true, 0, 0,
+	return __intel_bb_create(i915, ctx, cfg, size, true, 0, 0,
 				 INTEL_ALLOCATOR_NONE, ALLOC_STRATEGY_NONE);
 }
 
@@ -1589,7 +1612,7 @@ struct intel_bb *intel_bb_create_no_relocs(int i915, uint32_t size)
 {
 	igt_require(gem_uses_full_ppgtt(i915));
 
-	return __intel_bb_create(i915, 0, size, false, 0, 0,
+	return __intel_bb_create(i915, 0, NULL, size, false, 0, 0,
 				 INTEL_ALLOCATOR_SIMPLE,
 				 ALLOC_STRATEGY_HIGH_TO_LOW);
 }
@@ -1670,6 +1693,7 @@ void intel_bb_destroy(struct intel_bb *ibb)
 		close(ibb->fence);
 
 	free(ibb->batch);
+	free(ibb->cfg);
 	free(ibb);
 }
 
