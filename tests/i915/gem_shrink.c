@@ -455,6 +455,7 @@ igt_main
 		igt_info("Using %d processes and %'"PRIu64"MiB per process\n",
 			 num_processes, alloc_size);
 
+		alloc_size <<= 20;
 		igt_require_memory(num_processes, alloc_size,
 				   CHECK_SWAP | CHECK_RAM);
 
