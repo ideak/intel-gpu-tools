@@ -2567,13 +2567,13 @@ static void edid_stress_resolution(data_t *data, struct chamelium_port *port,
 		bool is_video_stable;
 		int screen_res_w, screen_res_h;
 
-		monitor_edid *monitor_edid = &edids_list[i];
+		monitor_edid *edid = &edids_list[i];
 		igt_info("Testing out the EDID for %s\n",
-			 monitor_edid_get_name(monitor_edid));
+			 monitor_edid_get_name(edid));
 
 		/* Getting and Setting the EDID on Chamelium. */
 		chamelium_edid = get_chameleon_edid_from_monitor_edid(
-			chamelium, monitor_edid);
+			chamelium, edid);
 		chamelium_port_set_edid(data->chamelium, port, chamelium_edid);
 		free_chamelium_edid_from_monitor_edid(chamelium_edid);
 
