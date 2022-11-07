@@ -536,7 +536,7 @@ static void test_blt_interleaved(int vgem, int i915)
 	foreign = vgem_mmap(vgem, &scratch, PROT_WRITE);
 	local = gem_mmap__device_coherent(i915, native, 0, scratch.size, PROT_WRITE);
 
-	for (i = 0; i < scratch.height; i++) {
+	for (i = 0; i < SLOW_QUICK(scratch.height, 64); i++) {
 		local[scratch.pitch * i / sizeof(*local)] = i;
 		igt_blitter_src_copy(i915, ahnd, 0, native, 0, scratch.pitch,
 				     I915_TILING_NONE, 0, i, scratch.size,
