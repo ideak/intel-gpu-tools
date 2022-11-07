@@ -1545,12 +1545,12 @@ static void reg_read_ioctl_subtest(void)
 	igt_assert(wait_for_suspended());
 }
 
-static bool device_in_pci_d3(void)
+static bool device_in_pci_d3(struct pci_device *pci_dev)
 {
 	uint16_t val;
 	int rc;
 
-	rc = pci_device_cfg_read_u16(igt_device_get_pci_device(drm_fd), &val, 0xd4);
+	rc = pci_device_cfg_read_u16(pci_dev, &val, 0xd4);
 	igt_assert_eq(rc, 0);
 
 	igt_debug("%s: PCI D3 state=%d\n", __func__, val & 0x3);
@@ -1559,13 +1559,17 @@ static bool device_in_pci_d3(void)
 
 static void pci_d3_state_subtest(void)
 {
+	struct pci_device *pci_dev;
+
 	igt_require(has_runtime_pm);
 
+	pci_dev = igt_device_get_pci_device(drm_fd);
+
 	disable_all_screens_and_wait(&ms_data);
-	igt_assert(igt_wait(device_in_pci_d3(), 2000, 100));
+	igt_assert(igt_wait(device_in_pci_d3(pci_dev), 2000, 100));
 
 	enable_one_screen_or_forcewake_get_and_wait(&ms_data);
-	igt_assert(!device_in_pci_d3());
+	igt_assert(!device_in_pci_d3(pci_dev));
 	forcewake_put(&ms_data);
 }
 
@@ -2250,6 +2254,8 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 	}
 
 	igt_subtest("module-reload") {
+		struct pci_device *pci_dev;
+
 		igt_debug("Reload w/o display\n");
 		igt_i915_driver_unload();
 
@@ -2257,7 +2263,8 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 		igt_assert_eq(igt_i915_driver_load("disable_display=1 mmio_debug=-1"), 0);
 
 		igt_assert(setup_environment(false));
-		igt_assert(igt_wait(device_in_pci_d3(), 2000, 100));
+		pci_dev = igt_device_get_pci_device(drm_fd);
+		igt_assert(igt_wait(device_in_pci_d3(pci_dev), 2000, 100));
 		teardown_environment(false);
 
 		igt_debug("Reload as normal\n");
@@ -2267,7 +2274,8 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 		igt_assert_eq(igt_i915_driver_load("mmio_debug=-1"), 0);
 
 		igt_assert(setup_environment(true));
-		igt_assert(igt_wait(device_in_pci_d3(), 2000, 100));
+		pci_dev = igt_device_get_pci_device(drm_fd);
+		igt_assert(igt_wait(device_in_pci_d3(pci_dev), 2000, 100));
 		if (enable_one_screen_with_type(&ms_data, SCREEN_TYPE_ANY))
 			drm_resources_equal_subtest();
 		teardown_environment(true);
