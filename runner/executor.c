@@ -1082,10 +1082,21 @@ static int monitor_output(pid_t child,
 
 				packet = (struct runnerpacket *)buf;
 				if (s < sizeof(*packet) || s != packet->size) {
+					struct runnerpacket *message, *override;
+
 					errf("Socket communication error: Received %zd bytes, expected %zd\n",
 					     s, s >= sizeof(packet->size) ? packet->size : sizeof(*packet));
-					close(socketfd);
-					socketfd = -1;
+					message = runnerpacket_log(STDOUT_FILENO,
+								   "\nrunner: Socket communication error, invalid packet size. "
+								   "Packet is discarded, test result and logs might be incorrect.\n");
+					write_packet_with_canary(outputs[_F_SOCKET], message, false);
+					free(message);
+
+					override = runnerpacket_resultoverride("warn");
+					write_packet_with_canary(outputs[_F_SOCKET], override, settings->sync);
+					free(override);
+
+					/* Continue using socket comms, hope for the best. */
 					goto socket_end;
 				}
 
