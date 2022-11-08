@@ -461,7 +461,7 @@ static bool test_pipe_ctm(data_t *data,
 		0.0, 1.0, 0.0,
 		0.0, 0.0, 1.0
 	};
-	gamma_lut_t *degamma_linear, *gamma_linear;
+	gamma_lut_t *degamma_linear = NULL, *gamma_linear = NULL;
 	igt_output_t *output = data->output;
 	bool ret = true;
 	igt_display_t *display = &data->display;
@@ -471,9 +471,6 @@ static bool test_pipe_ctm(data_t *data,
 	int fb_id, fb_modeset_id;
 
 	igt_require(igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_CTM));
-
-	degamma_linear = generate_table(data->degamma_lut_size, 1.0);
-	gamma_linear = generate_table(data->gamma_lut_size, 1.0);
 
 	igt_output_set_pipe(output, primary->pipe->pipe);
 	igt_output_override_mode(output, mode);
@@ -502,6 +499,12 @@ static bool test_pipe_ctm(data_t *data,
 	 * rounding issues and inaccuracies leading to crc mismatch.
 	 */
 	if (memcmp(before, after, sizeof(color_t))) {
+		igt_require(igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_DEGAMMA_LUT));
+		igt_require(igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_GAMMA_LUT));
+
+		degamma_linear = generate_table(data->degamma_lut_size, 1.0);
+		gamma_linear = generate_table(data->gamma_lut_size, 1.0);
+
 		set_degamma(data, primary->pipe, degamma_linear);
 		set_gamma(data, primary->pipe, gamma_linear);
 	} else {
