@@ -515,7 +515,7 @@ int comms_read_dump(int fd, struct comms_visitor *visitor)
 		return COMMSPARSE_ERROR;
 
 	if (statbuf.st_size == 0)
-		return COMMSPARSE_ERROR;
+		return COMMSPARSE_EMPTY;
 
 	buf = mmap(NULL, statbuf.st_size, PROT_READ, MAP_SHARED, fd, 0);
 	if (buf == MAP_FAILED)
