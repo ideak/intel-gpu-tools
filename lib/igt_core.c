@@ -2268,8 +2268,8 @@ void igt_exit(void)
 				result = "FAIL";
 		}
 
-		printf("%s (%.3fs)\n",
-		       result, igt_time_elapsed(&subtest_time, &now));
+		_log_line_fprintf(stdout, "%s (%.3fs)\n",
+				  result, igt_time_elapsed(&subtest_time, &now));
 	}
 
 	exit(igt_exitcode);
