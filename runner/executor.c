@@ -842,6 +842,9 @@ static void write_packet_with_canary(int fd, struct runnerpacket *packet, bool s
 		fdatasync(fd);
 }
 
+/* TODO: Refactor this macro from here and from various tests to lib */
+#define KB(x) ((x) * 1024)
+
 /*
  * Returns:
  *  =0 - Success
@@ -857,7 +860,8 @@ static int monitor_output(pid_t child,
 			  char **abortreason)
 {
 	fd_set set;
-	char buf[2048];
+	char *buf;
+	size_t bufsize;
 	char *outbuf = NULL;
 	size_t outbufsize = 0;
 	char current_subtest[256] = {};
@@ -910,6 +914,9 @@ static int monitor_output(pid_t child,
 		}
 	}
 
+	bufsize = KB(256);
+	buf = malloc(bufsize);
+
 	while (outfd >= 0 || errfd >= 0 || sigfd >= 0) {
 		const char *timeout_reason;
 		struct timeval tv = { .tv_sec = interval_length };
@@ -942,7 +949,7 @@ static int monitor_output(pid_t child,
 
 			time_last_activity = time_now;
 
-			s = read(outfd, buf, sizeof(buf));
+			s = read(outfd, buf, bufsize);
 			if (s <= 0) {
 				if (s < 0) {
 					errf("Error reading test's stdout: %m\n");
@@ -1037,7 +1044,7 @@ static int monitor_output(pid_t child,
 		if (errfd >= 0 && FD_ISSET(errfd, &set)) {
 			time_last_activity = time_now;
 
-			s = read(errfd, buf, sizeof(buf));
+			s = read(errfd, buf, bufsize);
 			if (s <= 0) {
 				if (s < 0) {
 					errf("Error reading test's stderr: %m\n");
@@ -1060,7 +1067,7 @@ static int monitor_output(pid_t child,
 
 			/* Fully drain everything */
 			while (true) {
-				s = recv(socketfd, buf, sizeof(buf), MSG_DONTWAIT);
+				s = recv(socketfd, buf, bufsize, MSG_DONTWAIT);
 
 				if (s < 0) {
 					if (errno == EAGAIN)
@@ -1394,6 +1401,7 @@ static int monitor_output(pid_t child,
 					fdatasync(outputs[_F_DMESG]);
 
 				close_watchdogs(settings);
+				free(buf);
 				free(outbuf);
 				close(outfd);
 				close(errfd);
@@ -1418,6 +1426,7 @@ static int monitor_output(pid_t child,
 	if (settings->sync)
 		fdatasync(outputs[_F_DMESG]);
 
+	free(buf);
 	free(outbuf);
 	close(outfd);
 	close(errfd);
