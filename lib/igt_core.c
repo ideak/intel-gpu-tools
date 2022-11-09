@@ -457,6 +457,31 @@ static void _igt_log_buffer_reset(void)
 	pthread_mutex_unlock(&log_buffer_mutex);
 }
 
+static void _log_to_runner_split(int stream, const char *str)
+{
+	size_t limit = 4096;
+	size_t len;
+	char *buf = NULL;
+
+	len = strlen(str);
+
+	while (len > limit) {
+		if (!buf)
+			buf = malloc(limit + 1);
+
+		strncpy(buf, str, limit);
+		buf[limit] = '\0';
+
+		send_to_runner(runnerpacket_log(stream, buf));
+
+		str += limit;
+		len -= limit;
+	}
+
+	send_to_runner(runnerpacket_log(stream, str));
+	free(buf);
+}
+
 __attribute__((format(printf, 2, 3)))
 static void _log_line_fprintf(FILE* stream, const char *format, ...)
 {
@@ -467,7 +492,7 @@ static void _log_line_fprintf(FILE* stream, const char *format, ...)
 
 	if (runner_connected()) {
 		vasprintf(&str, format, ap);
-		send_to_runner(runnerpacket_log(fileno(stream), str));
+		_log_to_runner_split(fileno(stream), str);
 		free(str);
 	} else {
 		vfprintf(stream, format, ap);
