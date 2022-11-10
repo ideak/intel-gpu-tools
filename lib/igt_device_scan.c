@@ -120,6 +120,15 @@
  *
  *   It selects the second one.
  *
+ *   |[<!-- language="plain" -->
+ *   pci:vendor=8086,device=1234,card=all
+ *   pci:vendor=8086,device=1234,card=*
+ *   ]|
+ *
+ *   This will add 0..N card selectors, where 0 <= N <= 63. At least one
+ *   filter will be added with card=0 and all incrementally matched ones
+ *   up to max numbered 63 (max total 64).
+ *
  *   We may use device codename or pseudo-codename (integrated/discrete)
  *   instead of pci device id:
  *
@@ -1753,6 +1762,8 @@ static bool is_filter_valid(const char *fstr)
 	return true;
 }
 
+#define MAX_PCI_CARDS 64
+
 /**
  * igt_device_filter_add
  * @filters: filter(s) to be stored in filter array
@@ -1776,14 +1787,43 @@ int igt_device_filter_add(const char *filters)
 	while ((filter = strsep(&dup, ";"))) {
 		bool is_valid = is_filter_valid(filter);
 		struct device_filter *df;
+		char *multi;
+
 		igt_warn_on(!is_valid);
 		if (!is_valid)
 			continue;
 
-		df = malloc(sizeof(*df));
-		strncpy(df->filter, filter, sizeof(df->filter)-1);
-		igt_list_add_tail(&df->link, &device_filters);
-		count++;
+		if (!strncmp(filter, "sriov:", 6)) {
+			multi = NULL;
+		} else {
+			multi = strstr(filter, "card=all");
+			if (!multi)
+				multi = strstr(filter, "card=*");
+		}
+
+		if (!multi) {
+			df = malloc(sizeof(*df));
+			strncpy(df->filter, filter, sizeof(df->filter)-1);
+			igt_list_add_tail(&df->link, &device_filters);
+			count++;
+		} else {
+			multi[5] = 0;
+			for (int i = 0; i < MAX_PCI_CARDS; ++i) {
+				df = malloc(sizeof(*df));
+				snprintf(df->filter, sizeof(df->filter)-1, "%s%d", filter, i);
+				if (i) { /* add at least card=0 */
+					struct igt_device_card card;
+
+					if (!igt_device_card_match(df->filter, &card)) {
+						free(df);
+						break;
+					}
+				}
+
+				igt_list_add_tail(&df->link, &device_filters);
+				count++;
+			}
+		}
 	}
 
 	free(dup_orig);
