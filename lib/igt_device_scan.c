@@ -1775,13 +1775,15 @@ int igt_device_filter_add(const char *filters)
 
 	while ((filter = strsep(&dup, ";"))) {
 		bool is_valid = is_filter_valid(filter);
+		struct device_filter *df;
 		igt_warn_on(!is_valid);
-		if (is_valid) {
-			struct device_filter *df = malloc(sizeof(*df));
-			strncpy(df->filter, filter, sizeof(df->filter)-1);
-			igt_list_add_tail(&df->link, &device_filters);
-			count++;
-		}
+		if (!is_valid)
+			continue;
+
+		df = malloc(sizeof(*df));
+		strncpy(df->filter, filter, sizeof(df->filter)-1);
+		igt_list_add_tail(&df->link, &device_filters);
+		count++;
 	}
 
 	free(dup_orig);
