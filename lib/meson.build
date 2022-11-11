@@ -140,7 +140,8 @@ if libdrm_amdgpu.found()
 		'amdgpu/amd_gfx_v8_0.c',
 		'amdgpu/amd_gfx_v9_0.c',
 		'amdgpu/amd_dispatch_helpers.c',
-		'amdgpu/amd_dispatch.c'
+		'amdgpu/amd_dispatch.c',
+		'amdgpu/amd_deadlock_helpers.c'
 	]
 endif
 
