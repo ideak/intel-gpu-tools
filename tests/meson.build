@@ -79,14 +79,6 @@ test_progs = [
 	'syncobj_timeline',
 	'template',
 	'tools_test',
-	'vc4_create_bo',
-	'vc4_dmabuf_poll',
-	'vc4_label_bo',
-	'vc4_lookup_fail',
-	'vc4_purgeable_bo',
-	'vc4_tiling',
-	'vc4_wait_bo',
-	'vc4_wait_seqno',
 	'vgem_basic',
 	'vgem_slow',
 ]
@@ -452,6 +444,8 @@ test_list += 'sw_sync'
 subdir('amdgpu')
 
 subdir('v3d')
+
+subdir('vc4')
 
 gen_testlist = find_program('generate_testlist.sh')
 test_list_target = custom_target('testlist',
