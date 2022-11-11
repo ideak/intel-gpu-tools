@@ -58,6 +58,18 @@ amdgpu_deadlock_sdma(amdgpu_device_handle device_handle)
 	amdgpu_wait_memory_helper(device_handle, AMDGPU_HW_IP_DMA);
 }
 
+static void
+amdgpu_gfx_illegal_reg_access(amdgpu_device_handle device_handle)
+{
+	bad_access_helper(device_handle, 1, AMDGPU_HW_IP_GFX);
+}
+
+static void
+amdgpu_gfx_illegal_mem_access(amdgpu_device_handle device_handle)
+{
+	bad_access_helper(device_handle, 0, AMDGPU_HW_IP_GFX);
+}
+
 igt_main
 {
 	amdgpu_device_handle device;
@@ -85,6 +97,12 @@ igt_main
 	}
 	igt_subtest("amdgpu_deadlock_sdma")
 	amdgpu_deadlock_sdma(device);
+
+	igt_subtest("amdgpu_gfx_illegal_reg_access")
+	amdgpu_gfx_illegal_reg_access(device);
+
+	igt_subtest("amdgpu_gfx_illegal_mem_access")
+	amdgpu_gfx_illegal_mem_access(device);
 
 	igt_subtest("amdgpu_deadlock_gfx")
 	amdgpu_deadlock_gfx(device);
