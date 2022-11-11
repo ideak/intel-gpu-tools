@@ -47,7 +47,7 @@ igt_main
 		fd = drm_open_driver(DRIVER_VC4);
 
 	igt_subtest("set-label") {
-		int handle = igt_vc4_create_bo(fd, 4096);
+		int handle = igt_vc4_create_bo(fd, PAGE_SIZE);
 		set_label(fd, handle, "a test label", 0);
 		set_label(fd, handle, "a new test label", 0);
 		gem_close(fd, handle);
@@ -58,7 +58,7 @@ igt_main
 	}
 
 	igt_subtest("set-bad-name") {
-		int handle = igt_vc4_create_bo(fd, 4096);
+		int handle = igt_vc4_create_bo(fd, PAGE_SIZE);
 
 		struct drm_vc4_label_bo label = {
 			.handle = handle,
@@ -72,7 +72,7 @@ igt_main
 	}
 
 	igt_subtest("set-kernel-name") {
-		int handle = igt_vc4_create_bo(fd, 4096);
+		int handle = igt_vc4_create_bo(fd, PAGE_SIZE);
 		set_label(fd, handle, "BCL", 0);
 		set_label(fd, handle, "a test label", 0);
 		set_label(fd, handle, "BCL", 0);

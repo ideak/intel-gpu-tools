@@ -22,7 +22,7 @@
  */
 
 #include "igt.h"
-#include "vc4_drm.h"
+#include "igt_vc4.h"
 #include "vc4_packet.h"
 
 igt_main
@@ -33,7 +33,7 @@ igt_main
 		fd = drm_open_driver(DRIVER_VC4);
 
 	igt_subtest("bad-color-write") {
-		uint32_t size = 4096;
+		uint32_t size = PAGE_SIZE;
 		/* A single row will be a page. */
 		uint32_t width = 1024;
 		uint32_t height = size / (width * 4);

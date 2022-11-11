@@ -47,7 +47,7 @@ igt_main
 	}
 
 	igt_subtest("get-bad-flags") {
-		int bo = igt_vc4_create_bo(fd, 4096);
+		int bo = igt_vc4_create_bo(fd, PAGE_SIZE);
 		struct drm_vc4_get_tiling get = {
 			.handle = bo,
 			.flags = 0xd0d0d0d0,
@@ -57,7 +57,7 @@ igt_main
 	}
 
 	igt_subtest("set-bad-flags") {
-		int bo = igt_vc4_create_bo(fd, 4096);
+		int bo = igt_vc4_create_bo(fd, PAGE_SIZE);
 		struct drm_vc4_set_tiling set = {
 			.handle = bo,
 			.flags = 0xd0d0d0d0,
@@ -68,7 +68,7 @@ igt_main
 	}
 
 	igt_subtest("get-bad-modifier") {
-		int bo = igt_vc4_create_bo(fd, 4096);
+		int bo = igt_vc4_create_bo(fd, PAGE_SIZE);
 		struct drm_vc4_get_tiling get = {
 			.handle = bo,
 			.modifier = 0xd0d0d0d0,
@@ -78,7 +78,7 @@ igt_main
 	}
 
 	igt_subtest("set-bad-modifier") {
-		int bo = igt_vc4_create_bo(fd, 4096);
+		int bo = igt_vc4_create_bo(fd, PAGE_SIZE);
 		struct drm_vc4_set_tiling set = {
 			.handle = bo,
 			.modifier = 0xd0d0d0d0,
@@ -88,7 +88,7 @@ igt_main
 	}
 
 	igt_subtest("set-get") {
-		int bo = igt_vc4_create_bo(fd, 4096);
+		int bo = igt_vc4_create_bo(fd, PAGE_SIZE);
 
 		/* Default is untiled. */
 		igt_assert(igt_vc4_get_tiling(fd, bo) == DRM_FORMAT_MOD_LINEAR);
@@ -109,7 +109,7 @@ igt_main
 		/* Some size that probably nobody else is using, to
 		 * encourage getting the same BO back from the cache.
 		 */
-		int size = 91 * 4096;
+		int size = 91 * PAGE_SIZE;
 		int bo;
 
 		bo = igt_vc4_create_bo(fd, size);
