@@ -212,4 +212,7 @@
 		 * 1 - pfp
 		 * 2 - ce
 		 */
+/* GMC registers */
+#define mmVM_CONTEXT0_PAGE_TABLE_BASE_ADDR                   0x54f
+
 #endif

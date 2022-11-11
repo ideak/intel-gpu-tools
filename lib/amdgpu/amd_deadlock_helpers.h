@@ -27,5 +27,8 @@
 void
 amdgpu_wait_memory_helper(amdgpu_device_handle device_handle, unsigned ip_type);
 
+void
+bad_access_helper(amdgpu_device_handle device_handle, int reg_access, unsigned ip_type);
+
 #endif
 
