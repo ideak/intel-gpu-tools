@@ -36,6 +36,10 @@ bool igt_vc4_purgeable_bo(int fd, int handle, bool purgeable);
 bool igt_vc4_is_tiled(uint64_t modifier);
 bool igt_vc4_is_v3d(int fd);
 
+uint32_t igt_vc4_perfmon_create(int fd, uint32_t ncounters, uint8_t *events);
+void igt_vc4_perfmon_get_values(int fd, uint32_t id);
+void igt_vc4_perfmon_destroy(int fd, uint32_t id);
+
 void igt_vc4_set_tiling(int fd, uint32_t handle, uint64_t modifier);
 uint64_t igt_vc4_get_tiling(int fd, uint32_t handle);
 

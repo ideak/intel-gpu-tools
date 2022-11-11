@@ -193,6 +193,40 @@ bool igt_vc4_purgeable_bo(int fd, int handle, bool purgeable)
 	return arg.retained;
 }
 
+uint32_t igt_vc4_perfmon_create(int fd, uint32_t ncounters, uint8_t *events)
+{
+	struct drm_vc4_perfmon_create create = {
+		.ncounters = ncounters,
+	};
+
+	memcpy(create.events, events, ncounters * sizeof(*events));
+
+	do_ioctl(fd, DRM_IOCTL_VC4_PERFMON_CREATE, &create);
+	igt_assert_neq(create.id, 0);
+
+	return create.id;
+}
+
+void igt_vc4_perfmon_get_values(int fd, uint32_t id)
+{
+	uint64_t *values = calloc(DRM_VC4_MAX_PERF_COUNTERS, sizeof(*values));
+	struct drm_vc4_perfmon_get_values get = {
+		.id = id,
+		.values_ptr = to_user_pointer(values),
+	};
+
+	do_ioctl(fd, DRM_IOCTL_VC4_PERFMON_GET_VALUES, &get);
+	free(values);
+}
+
+void igt_vc4_perfmon_destroy(int fd, uint32_t id)
+{
+	struct drm_vc4_perfmon_destroy destroy = {
+		.id = id,
+	};
+
+	do_ioctl(fd, DRM_IOCTL_VC4_PERFMON_DESTROY, &destroy);
+}
 
 /* Calculate the t-tile width so that size = width * height * bpp / 8. */
 #define VC4_T_TILE_W(size, height, bpp) ((size) / (height) / ((bpp) / 8))

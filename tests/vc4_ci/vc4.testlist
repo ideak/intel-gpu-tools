@@ -8,6 +8,16 @@ igt@vc4/vc4_label_bo@set-bad-handle
 igt@vc4/vc4_label_bo@set-bad-name
 igt@vc4/vc4_label_bo@set-kernel-name
 igt@vc4/vc4_lookup_fail@bad-color-write
+igt@vc4/vc4_perfmon@create-perfmon-0
+igt@vc4/vc4_perfmon@create-perfmon-exceed
+igt@vc4/vc4_perfmon@create-perfmon-invalid-events
+igt@vc4/vc4_perfmon@create-single-perfmon
+igt@vc4/vc4_perfmon@create-two-perfmon
+igt@vc4/vc4_perfmon@get-values-invalid-perfmon
+igt@vc4/vc4_perfmon@get-values-invalid-pointer
+igt@vc4/vc4_perfmon@get-values-valid-perfmon
+igt@vc4/vc4_perfmon@destroy-invalid-perfmon
+igt@vc4/vc4_perfmon@destroy-valid-perfmon
 igt@vc4/vc4_purgeable_bo@mark-willneed
 igt@vc4/vc4_purgeable_bo@mark-purgeable
 igt@vc4/vc4_purgeable_bo@mark-purgeable-twice
