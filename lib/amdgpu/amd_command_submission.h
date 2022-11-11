@@ -1,4 +1,4 @@
-/*
+/* SPDX-License-Identifier: MIT
  * Copyright 2012 Advanced Micro Devices, Inc.
  * Copyright 2022 Advanced Micro Devices, Inc.
  *
