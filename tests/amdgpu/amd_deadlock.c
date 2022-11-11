@@ -26,6 +26,7 @@
 #include "lib/amdgpu/amd_memory.h"
 #include "lib/amdgpu/amd_command_submission.h"
 #include "lib/amdgpu/amd_dispatch.h"
+#include "lib/amdgpu/amd_deadlock_helpers.h"
 
 static void
 amdgpu_dispatch_hang_slow_gfx(amdgpu_device_handle device_handle)
@@ -37,6 +38,24 @@ static void
 amdgpu_dispatch_hang_slow_compute(amdgpu_device_handle device_handle)
 {
 	amdgpu_dispatch_hang_slow_helper(device_handle, AMDGPU_HW_IP_COMPUTE);
+}
+
+static void
+amdgpu_deadlock_gfx(amdgpu_device_handle device_handle)
+{
+	amdgpu_wait_memory_helper(device_handle, AMDGPU_HW_IP_GFX);
+}
+
+static void
+amdgpu_deadlock_compute(amdgpu_device_handle device_handle)
+{
+	amdgpu_wait_memory_helper(device_handle, AMDGPU_HW_IP_COMPUTE);
+}
+
+static void
+amdgpu_deadlock_sdma(amdgpu_device_handle device_handle)
+{
+	amdgpu_wait_memory_helper(device_handle, AMDGPU_HW_IP_DMA);
 }
 
 igt_main
@@ -64,6 +83,14 @@ igt_main
 		igt_assert_eq(r, 0);
 
 	}
+	igt_subtest("amdgpu_deadlock_sdma")
+	amdgpu_deadlock_sdma(device);
+
+	igt_subtest("amdgpu_deadlock_gfx")
+	amdgpu_deadlock_gfx(device);
+
+	igt_subtest("amdgpu_deadlock_compute")
+	amdgpu_deadlock_compute(device);
 
 	igt_subtest("dispatch_hang_slow_compute")
 	amdgpu_dispatch_hang_slow_compute(device);
