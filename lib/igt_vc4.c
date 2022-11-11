@@ -21,25 +21,11 @@
  * IN THE SOFTWARE.
  */
 
-#include <assert.h>
-#include <string.h>
-#include <signal.h>
-#include <errno.h>
-#include <sys/mman.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/ioctl.h>
-#include <fcntl.h>
-
 #include "drmtest.h"
 #include "igt_aux.h"
-#include "igt_core.h"
 #include "igt_fb.h"
 #include "igt_vc4.h"
 #include "ioctl_wrappers.h"
-#include "intel_reg.h"
-#include "intel_chipset.h"
-#include "vc4_drm.h"
 #include "vc4_packet.h"
 
 #if NEW_CONTEXT_PARAM_NO_ERROR_CAPTURE_API

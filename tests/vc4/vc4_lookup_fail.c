@@ -22,16 +22,6 @@
  */
 
 #include "igt.h"
-#include <assert.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <fcntl.h>
-#include <inttypes.h>
-#include <errno.h>
-#include <sys/stat.h>
-#include <sys/ioctl.h>
 #include "vc4_drm.h"
 #include "vc4_packet.h"
 

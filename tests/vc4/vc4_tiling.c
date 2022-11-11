@@ -23,17 +23,6 @@
 
 #include "igt.h"
 #include "igt_vc4.h"
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <fcntl.h>
-#include <inttypes.h>
-#include <errno.h>
-#include <sys/stat.h>
-#include <sys/ioctl.h>
-#include <poll.h>
-#include "vc4_drm.h"
 
 igt_main
 {
