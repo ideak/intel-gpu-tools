@@ -133,7 +133,7 @@ static uint32_t create_bo(int i915,
 
 retry:
 	ret = __gem_create_in_memory_region_list(i915, &handle, size, 0, region, 1);
-	if (do_oom_test && ret == -ENOMEM)
+	if (do_oom_test && (ret == -ENOMEM || ret == -ENXIO))
 		goto retry;
 	igt_assert_eq(ret, 0);
 	return handle;
