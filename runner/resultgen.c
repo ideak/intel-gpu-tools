@@ -1902,17 +1902,22 @@ static bool stderr_contains_warnings(const char *beg, const char *end)
 	};
 	struct matches matches;
 	size_t i = 0;
+	bool found = false;
 
 	matches = find_matches(beg, end, needles);
 
 	while (i < matches.size) {
-		if (matches.items[i].where != beg)
-			return true;
+		if (matches.items[i].where != beg) {
+			found = true;
+			break;
+		}
 		beg = next_line(beg, end);
 		i++;
 	}
 
-	return false;
+	free_matches(&matches);
+
+	return found;
 }
 
 static bool json_field_has_data(struct json_object *obj, const char *key)
