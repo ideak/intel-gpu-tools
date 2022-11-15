@@ -456,9 +456,6 @@ igt_main
 			 num_processes, alloc_size);
 
 		alloc_size <<= 20;
-		igt_require_memory(num_processes, alloc_size,
-				   CHECK_SWAP | CHECK_RAM);
-
 		close(fd);
 	}
 
@@ -467,9 +464,12 @@ igt_main
 
 	for(const struct test *t = tests; t->name; t++) {
 		for(const struct mode *m = modes; m->suffix; m++) {
-			igt_subtest_f("%s%s", t->name, m->suffix)
+			igt_subtest_f("%s%s", t->name, m->suffix) {
+				igt_require_memory(num_processes, alloc_size,
+						   CHECK_SWAP | CHECK_RAM);
 				run_test(num_processes, alloc_size,
 					 t->func, m->flags);
+			}
 		}
 	}
 }
