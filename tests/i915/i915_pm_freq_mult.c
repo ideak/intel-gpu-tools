@@ -102,7 +102,7 @@ static void media_freq(int gt, int dir)
 	igt_require(igt_sysfs_has_attr(dir, "media_freq_factor"));
 
 	igt_sysfs_scanf(dir, "media_freq_factor.scale", "%g", &scale);
-	igt_assert_eq(scale, FREQ_SCALE_FACTOR);
+	igt_assert_eq_double(scale, FREQ_SCALE_FACTOR);
 
 	setup_freq(gt, dir);
 
