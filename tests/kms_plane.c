@@ -342,13 +342,13 @@ test_plane_panning_with_output(data_t *data,
 	drmModeModeInfo *mode;
 	igt_crc_t crc;
 
-	igt_info("Testing connector %s using pipe %s\n",
-		 igt_output_name(output), kmstest_pipe_name(pipe));
-
 	igt_output_set_pipe(output, pipe);
 
 	mode = igt_output_get_mode(output);
 	primary = igt_output_get_plane(output, 0);
+
+	igt_info("Testing connector %s using pipe %s, mode %s\n",
+		 igt_output_name(output), kmstest_pipe_name(pipe), mode->name);
 
 	create_fb_for_mode_panning(data, mode, &primary_fb);
 	igt_plane_set_fb(primary, &primary_fb);
@@ -381,6 +381,8 @@ test_plane_panning_with_output(data_t *data,
 static void
 test_plane_panning(data_t *data, enum pipe pipe)
 {
+	bool mode_found = false;
+	uint64_t mem_size = 0;
 	igt_output_t *output;
 	igt_crc_t ref_crc;
 
@@ -388,6 +390,26 @@ test_plane_panning(data_t *data, enum pipe pipe)
 	igt_require(output);
 
 	test_init(data, pipe);
+
+	for_each_memory_region(r, data->drm_fd)
+		if (r->ci.memory_class == I915_MEMORY_CLASS_DEVICE)
+			mem_size = r->cpu_size;
+
+	for_each_connector_mode(output) {
+		drmModeModeInfo *m = &output->config.connector->modes[j__];
+		uint32_t fb_size = m->hdisplay * m->vdisplay * 4;
+
+		/* test allocates 2 double-dim fbs, add one more, to be safe */
+		if (mem_size && 3 * 4 * fb_size > mem_size) {
+			igt_debug("Skipping mode %s due to low memory\n", m->name);
+			continue;
+		}
+
+		igt_output_override_mode(output, m);
+		mode_found = true;
+		break;
+	}
+	igt_require(mode_found);
 
 	if (data->flags & TEST_PANNING_TOP_LEFT)
 		test_grab_crc(data, output, pipe, &red, data->flags, &ref_crc);
