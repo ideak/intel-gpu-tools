@@ -2612,6 +2612,67 @@ static void edid_stress_resolution(data_t *data, struct chamelium_port *port,
 			      data->ports, data->port_count);
 }
 
+static const char igt_edid_resolution_list_desc[] =
+	"Get an EDID with many modes of different configurations, set them on the screen and check the"
+	" screen resolution matches the mode resolution.";
+
+static void edid_resolution_list(data_t *data, struct chamelium_port *port)
+{
+	struct chamelium *chamelium = data->chamelium;
+	struct udev_monitor *mon = igt_watch_uevents();
+	drmModeConnector *connector;
+	drmModeModeInfoPtr modes;
+	int count_modes;
+	int i;
+	igt_output_t *output;
+	enum pipe pipe;
+
+	chamelium_unplug(chamelium, port);
+	set_edid(data, port, IGT_CUSTOM_EDID_FULL);
+
+	igt_flush_uevents(mon);
+	chamelium_plug(chamelium, port);
+	wait_for_connector_after_hotplug(data, mon, port, DRM_MODE_CONNECTED);
+	igt_flush_uevents(mon);
+
+	connector = chamelium_port_get_connector(chamelium, port, true);
+	modes = connector->modes;
+	count_modes = connector->count_modes;
+
+	output = get_output_for_port(data, port);
+	pipe = get_pipe_for_output(&data->display, output);
+	igt_output_set_pipe(output, pipe);
+
+	for (i = 0; i < count_modes; ++i)
+		igt_debug("#%d %s %uHz\n", i, modes[i].name, modes[i].vrefresh);
+
+	for (i = 0; i < count_modes; ++i) {
+		struct igt_fb fb = { 0 };
+		bool is_video_stable;
+		int screen_res_w, screen_res_h;
+
+		igt_info("Testing #%d %s %uHz\n", i, modes[i].name,
+			 modes[i].vrefresh);
+
+		/* Set the screen mode with the one we chose. */
+		create_fb_for_mode(data, &fb, &modes[i]);
+		enable_output(data, port, output, &modes[i], &fb);
+		is_video_stable = chamelium_port_wait_video_input_stable(
+			chamelium, port, 10);
+		igt_assert(is_video_stable);
+
+		chamelium_port_get_resolution(chamelium, port, &screen_res_w,
+					      &screen_res_h);
+		igt_assert_eq(screen_res_w, modes[i].hdisplay);
+		igt_assert_eq(screen_res_h, modes[i].vdisplay);
+
+		igt_remove_fb(data->drm_fd, &fb);
+	}
+
+	igt_modeset_disable_all_outputs(&data->display);
+	drmModeFreeConnector(connector);
+}
+
 #define for_each_port(p, port)            \
 	for (p = 0, port = data.ports[p]; \
 	     p < data.port_count;         \
@@ -2713,6 +2774,10 @@ igt_main
 				  DisplayPort)
 			edid_stress_resolution(&data, port, DP_EDIDS_NON_4K,
 					       ARRAY_SIZE(DP_EDIDS_NON_4K));
+
+		igt_describe(igt_edid_resolution_list_desc);
+		connector_subtest("dp-edid-resolution-list", DisplayPort)
+			edid_resolution_list(&data, port);
 
 		igt_describe(test_suspend_resume_hpd_desc);
 		connector_subtest("dp-hpd-after-suspend", DisplayPort)

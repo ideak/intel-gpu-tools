@@ -82,6 +82,7 @@ enum port {
  *
  * Enum used for the helper function igt_custom_edid_type
  * @IGT_CUSTOM_EDID_BASE: Returns base edid
+ * @IGT_CUSTOM_EDID_FULL: Returns edid with full list of standard timings.
  * @IGT_CUSTOM_EDID_ALT: Returns alternate edid
  * @IGT_CUSTOM_EDID_HDMI_AUDIO: Returns edid with HDMI audio block
  * @IGT_CUSTOM_EDID_DP_AUDIO: Returns edid with DP audio block
@@ -89,12 +90,13 @@ enum port {
  */
 enum igt_custom_edid_type {
 	IGT_CUSTOM_EDID_BASE,
+	IGT_CUSTOM_EDID_FULL,
 	IGT_CUSTOM_EDID_ALT,
 	IGT_CUSTOM_EDID_HDMI_AUDIO,
 	IGT_CUSTOM_EDID_DP_AUDIO,
 	IGT_CUSTOM_EDID_ASPECT_RATIO,
 };
-#define IGT_CUSTOM_EDID_COUNT 5
+#define IGT_CUSTOM_EDID_COUNT 6
 
 /**
  * kmstest_port_name:
@@ -865,6 +867,7 @@ void igt_reset_connectors(void);
 uint32_t kmstest_get_vbl_flag(int crtc_offset);
 
 const struct edid *igt_kms_get_base_edid(void);
+const struct edid *igt_kms_get_full_edid(void);
 const struct edid *igt_kms_get_base_tile_edid(void);
 const struct edid *igt_kms_get_alt_edid(void);
 const struct edid *igt_kms_get_hdmi_audio_edid(void);

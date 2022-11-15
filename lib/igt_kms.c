@@ -133,6 +133,36 @@ const struct edid *igt_kms_get_base_edid(void)
 	return &edid;
 }
 
+const struct edid *igt_kms_get_full_edid(void)
+{
+	static struct edid edid;
+	drmModeModeInfo mode = {};
+
+	mode.clock = 148500;
+	mode.hdisplay = 2288;
+	mode.hsync_start = 2008;
+	mode.hsync_end = 2052;
+	mode.htotal = 2200;
+	mode.vdisplay = 1287;
+	mode.vsync_start = 1084;
+	mode.vsync_end = 1089;
+	mode.vtotal = 1125;
+	mode.vrefresh = 144;
+	edid_init_with_mode(&edid, &mode);
+
+	std_timing_set(&edid.standard_timings[0], 256, 60, STD_TIMING_16_10);
+	std_timing_set(&edid.standard_timings[1], 510, 69, STD_TIMING_4_3);
+	std_timing_set(&edid.standard_timings[2], 764, 78, STD_TIMING_5_4);
+	std_timing_set(&edid.standard_timings[3], 1018, 87, STD_TIMING_16_9);
+	std_timing_set(&edid.standard_timings[4], 1526, 96, STD_TIMING_16_10);
+	std_timing_set(&edid.standard_timings[5], 1780, 105, STD_TIMING_4_3);
+	std_timing_set(&edid.standard_timings[6], 2034, 114, STD_TIMING_5_4);
+	std_timing_set(&edid.standard_timings[7], 2288, 123, STD_TIMING_16_9);
+
+	edid_update_checksum(&edid);
+	return &edid;
+}
+
 const struct edid *igt_kms_get_base_tile_edid(void)
 {
 	static struct edid edid;
@@ -548,6 +578,8 @@ const struct edid *igt_kms_get_custom_edid(enum igt_custom_edid_type edid)
 	switch (edid) {
 	case IGT_CUSTOM_EDID_BASE:
 		return igt_kms_get_base_edid();
+	case IGT_CUSTOM_EDID_FULL:
+		return igt_kms_get_full_edid();
 	case IGT_CUSTOM_EDID_ALT:
 		return igt_kms_get_alt_edid();
 	case IGT_CUSTOM_EDID_HDMI_AUDIO:

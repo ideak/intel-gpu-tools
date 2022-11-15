@@ -379,6 +379,8 @@ size_t edid_get_size(const struct edid *edid);
 void edid_get_mfg(const struct edid *edid, char out[static 3]);
 uint8_t edid_get_deep_color_from_vsdb(const struct edid *edid);
 uint8_t edid_get_bit_depth_from_vid(const struct edid *edid);
+void std_timing_set(struct std_timing *st, int hsize, int vfreq,
+		    enum std_timing_aspect aspect);
 void detailed_timing_set_mode(struct detailed_timing *dt, drmModeModeInfo *mode,
 			      int width_mm, int height_mm);
 void detailed_timing_set_monitor_range_mode(struct detailed_timing *dt,

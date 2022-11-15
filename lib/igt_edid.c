@@ -60,8 +60,11 @@ static const char monitor_range_padding[] = {
 
 const uint8_t hdmi_ieee_oui[3] = {0x03, 0x0C, 0x00};
 
-/* vfreq is in Hz */
-static void std_timing_set(struct std_timing *st, int hsize, int vfreq,
+/**
+ * std_timing_set: Sets the EDID standard timing for a given @hsize, @vfreq
+ * in Hz and @aspect ratio
+ */
+ void std_timing_set(struct std_timing *st, int hsize, int vfreq,
 			   enum std_timing_aspect aspect)
 {
 	assert(hsize >= 256 && hsize <= 2288);
