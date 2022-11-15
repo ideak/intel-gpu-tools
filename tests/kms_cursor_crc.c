@@ -720,7 +720,7 @@ static void run_size_tests(data_t *data, int w, int h)
 			"Check the rapid update of given-size cursor movements." },
 	};
 	int i;
-	char name[16];
+	char name[32];
 
 	if (w == 0 && h == 0) {
 		w = data->cursor_max_w;
