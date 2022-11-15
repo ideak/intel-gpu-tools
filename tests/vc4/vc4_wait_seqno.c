@@ -28,8 +28,10 @@ igt_main
 {
 	int fd;
 
-	igt_fixture
+	igt_fixture {
 		fd = drm_open_driver(DRIVER_VC4);
+		igt_require(igt_vc4_is_v3d(fd));
+	}
 
 	/* A 64-bit seqno should never hit the maximum value over the
 	 * lifetime of the system.  (A submit per 1000 cycles at 1Ghz

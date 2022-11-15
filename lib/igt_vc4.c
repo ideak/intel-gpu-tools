@@ -59,6 +59,18 @@ bool igt_vc4_is_tiled(uint64_t modifier)
 	}
 }
 
+bool igt_vc4_is_v3d(int fd)
+{
+	uint64_t value;
+
+	/*
+	 * vc5 doesn't have syncobj capabilities, only vc4.
+	 */
+	if (drmGetCap(fd, DRM_CAP_SYNCOBJ, &value))
+		return false;
+	return value;
+}
+
 /**
  * igt_vc4_get_cleared_bo:
  * @fd: device file descriptor

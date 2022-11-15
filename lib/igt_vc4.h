@@ -34,6 +34,7 @@ void *igt_vc4_mmap_bo(int fd, uint32_t handle, uint32_t size, unsigned prot);
 int igt_vc4_get_param(int fd, uint32_t param, uint64_t *val);
 bool igt_vc4_purgeable_bo(int fd, int handle, bool purgeable);
 bool igt_vc4_is_tiled(uint64_t modifier);
+bool igt_vc4_is_v3d(int fd);
 
 void igt_vc4_set_tiling(int fd, uint32_t handle, uint64_t modifier);
 uint64_t igt_vc4_get_tiling(int fd, uint32_t handle);

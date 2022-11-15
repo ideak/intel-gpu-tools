@@ -59,8 +59,10 @@ igt_main
 {
 	int fd;
 
-	igt_fixture
+	igt_fixture {
 		fd = drm_open_driver(DRIVER_VC4);
+		igt_require(igt_vc4_is_v3d(fd));
+	}
 
 	igt_subtest("poll-write-waits-until-write-done") {
 		poll_write_bo_test(fd, POLLOUT);
