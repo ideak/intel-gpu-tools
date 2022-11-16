@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0 */
+/* SPDX-License-Identifier: MIT */
 /*
  * A helper library for parsing and making use of real EDID data from monitors
  * and make them compatible with IGT and Chamelium.
@@ -16,11 +16,11 @@
 #include "igt_chamelium.h"
 
 /* Max Length can be increased as needed, when new EDIDs are added. */
-#define EDID_NAME_MAX_LEN 25
+#define EDID_NAME_MAX_LEN 28
 #define EDID_HEX_STR_MAX_LEN 512
 
 typedef struct monitor_edid {
-	char name[EDID_NAME_MAX_LEN];
+	char name[EDID_NAME_MAX_LEN + 1];
 	char edid[EDID_HEX_STR_MAX_LEN + 1];
 } monitor_edid;
 

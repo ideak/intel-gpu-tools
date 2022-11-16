@@ -31,6 +31,7 @@
 #include "igt_eld.h"
 #include "igt_infoframe.h"
 #include "monitor_edids/dp_edids.h"
+#include "monitor_edids/hdmi_edids.h"
 #include "monitor_edids/monitor_edids_helper.h"
 
 #include <fcntl.h>
@@ -2572,8 +2573,8 @@ static void edid_stress_resolution(data_t *data, struct chamelium_port *port,
 			 monitor_edid_get_name(edid));
 
 		/* Getting and Setting the EDID on Chamelium. */
-		chamelium_edid = get_chameleon_edid_from_monitor_edid(
-			chamelium, edid);
+		chamelium_edid =
+			get_chameleon_edid_from_monitor_edid(chamelium, edid);
 		chamelium_port_set_edid(data->chamelium, port, chamelium_edid);
 		free_chamelium_edid_from_monitor_edid(chamelium_edid);
 
@@ -2703,9 +2704,15 @@ igt_main
 		}
 
 		igt_describe(igt_edid_stress_resolution_desc);
-		connector_subtest("dp-edid-stress-resolution", DisplayPort)
-			edid_stress_resolution(&data, port, DP_EDIDS,
-					       ARRAY_SIZE(DP_EDIDS));
+		connector_subtest("dp-edid-stress-resolution-4k", DisplayPort)
+			edid_stress_resolution(&data, port, DP_EDIDS_4K,
+					       ARRAY_SIZE(DP_EDIDS_4K));
+
+		igt_describe(igt_edid_stress_resolution_desc);
+		connector_subtest("dp-edid-stress-resolution-non-4k",
+				  DisplayPort)
+			edid_stress_resolution(&data, port, DP_EDIDS_NON_4K,
+					       ARRAY_SIZE(DP_EDIDS_NON_4K));
 
 		igt_describe(test_suspend_resume_hpd_desc);
 		connector_subtest("dp-hpd-after-suspend", DisplayPort)
@@ -2819,6 +2826,16 @@ igt_main
 			igt_custom_edid_type_read(&data, port, IGT_CUSTOM_EDID_BASE);
 			igt_custom_edid_type_read(&data, port, IGT_CUSTOM_EDID_ALT);
 		}
+
+		igt_describe(igt_edid_stress_resolution_desc);
+		connector_subtest("hdmi-edid-stress-resolution-4k", HDMIA)
+			edid_stress_resolution(&data, port, HDMI_EDIDS_4K,
+					       ARRAY_SIZE(HDMI_EDIDS_4K));
+
+		igt_describe(igt_edid_stress_resolution_desc);
+		connector_subtest("hdmi-edid-stress-resolution-non-4k", HDMIA)
+			edid_stress_resolution(&data, port, HDMI_EDIDS_NON_4K,
+					       ARRAY_SIZE(HDMI_EDIDS_NON_4K));
 
 		igt_describe(test_suspend_resume_hpd_desc);
 		connector_subtest("hdmi-hpd-after-suspend", HDMIA)
