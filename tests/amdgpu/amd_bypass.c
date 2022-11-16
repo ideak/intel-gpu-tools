@@ -316,6 +316,13 @@ static void bypass_8bpc_test(data_t *data)
 
 	test_init(data);
 
+	/*
+	 * CRC source cannot be select without an DP/eDP connector
+	 */
+	igt_skip_on_f(data->output->config.connector->connector_type != DRM_MODE_CONNECTOR_DisplayPort &&
+			data->output->config.connector->connector_type != DRM_MODE_CONNECTOR_eDP,
+			"no DisplayPort connector found\n");
+
 	/**
 	 * 8bpc bypass only makes sense without DSC.
 	 * DSC is visually lossless but actually still loss exists and any bypass mode
