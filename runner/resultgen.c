@@ -2120,12 +2120,6 @@ static bool parse_test_directory(int dirfd,
 	}
 
 	/*
-	 * fill_from_journal fills the subtests struct and adds
-	 * timeout results where applicable.
-	 */
-	fill_from_journal(fds[_F_JOURNAL], entry, &subtests, results);
-
-	/*
 	 * Get test output from socket comms if it exists, otherwise
 	 * parse stdout/stderr
 	 */
@@ -2137,6 +2131,12 @@ static bool parse_test_directory(int dirfd,
 	}
 
 	if (commsparsed == COMMSPARSE_EMPTY) {
+		/*
+		 * fill_from_journal fills the subtests struct and
+		 * adds timeout results where applicable.
+		 */
+		fill_from_journal(fds[_F_JOURNAL], entry, &subtests, results);
+
 		if (!fill_from_output(fds[_F_OUT], entry->binary, "out", &subtests, results->tests) ||
 		    !fill_from_output(fds[_F_ERR], entry->binary, "err", &subtests, results->tests)) {
 			fprintf(stderr, "Error parsing output files (out.txt, err.txt)\n");
