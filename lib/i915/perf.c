@@ -366,7 +366,7 @@ intel_perf_for_devinfo(uint32_t device_id,
 			intel_perf_load_metrics_tglgt2(perf);
 			break;
 		default:
-			unsupported_i915_perf_platform(perf);
+			return unsupported_i915_perf_platform(perf);
 		}
 	} else if (devinfo->is_rocketlake) {
 		intel_perf_load_metrics_rkl(perf);
@@ -391,7 +391,7 @@ intel_perf_for_devinfo(uint32_t device_id,
 		else if (is_acm_gt3(&perf->devinfo))
 			intel_perf_load_metrics_acmgt3(perf);
 		else
-			unsupported_i915_perf_platform(perf);
+			return unsupported_i915_perf_platform(perf);
 	} else {
 		return unsupported_i915_perf_platform(perf);
 	}
