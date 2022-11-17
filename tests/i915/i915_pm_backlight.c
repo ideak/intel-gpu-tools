@@ -44,6 +44,12 @@ struct context {
 	char path[PATH_MAX];
 };
 
+enum {
+	TEST_NONE = 0,
+	TEST_DPMS,
+	TEST_SUSPEND,
+};
+
 #define TOLERANCE 5 /* percent */
 #define BACKLIGHT_PATH "/sys/class/backlight"
 
@@ -161,7 +167,7 @@ static void test_fade(struct context *context)
 }
 
 static void
-test_fade_with_dpms(struct context *context, igt_output_t *output)
+check_dpms(igt_output_t *output)
 {
 	igt_require(igt_setup_runtime_pm(output->display->drm_fd));
 
@@ -174,16 +180,12 @@ test_fade_with_dpms(struct context *context, igt_output_t *output)
 				   output->config.connector,
 				   DRM_MODE_DPMS_ON);
 	igt_assert(igt_wait_for_pm_status(IGT_RUNTIME_PM_STATUS_ACTIVE));
-
-	test_fade(context);
 }
 
 static void
-test_fade_with_suspend(struct context *context, igt_output_t *output)
+check_suspend(igt_output_t *output)
 {
 	igt_system_suspend_autoresume(SUSPEND_STATE_MEM, SUSPEND_TEST_NONE);
-
-	test_fade(context);
 }
 
 static void test_cleanup(igt_display_t *display, igt_output_t *output)
@@ -232,6 +234,18 @@ igt_main
 	char file_path_n[PATH_MAX] = "";
 	bool dual_edp = false;
 	struct context contexts[NUM_EDP_OUTPUTS];
+	struct {
+		const char *name;
+		const char *desc;
+		void (*test_t) (struct context *);
+		int flags;
+	} tests[] = {
+		{ "basic-brightness", "test the basic brightness.", test_brightness, TEST_NONE },
+		{ "bad-brightness", "test the bad brightness.", test_bad_brightness, TEST_NONE },
+		{ "fade", "test basic fade.", test_fade, TEST_NONE },
+		{ "fade-with-dpms", "test the fade with DPMS.", test_fade, TEST_DPMS },
+		{ "fade-with-suspend", "test the fade with suspend.", test_fade, TEST_SUSPEND },
+	};
 
 	igt_fixture {
 		bool found = false;
@@ -291,44 +305,23 @@ igt_main
 		igt_require_f(found, "No valid output found.\n");
 	}
 
-	igt_subtest("basic-brightness") {
-		for (i = 0; i < (dual_edp ? 2 : 1); i++) {
-			test_setup(display, &contexts->output[i]);
-			test_brightness(&contexts[i]);
-			test_cleanup(&display, output);
-		}
-	}
+	for (i = 0; i < ARRAY_SIZE(tests); i++) {
+		igt_describe(tests[i].desc);
+		igt_subtest(tests[i].name) {
+			for (int j = 0; j < (dual_edp ? 2 : 1); j++) {
+				test_setup(display, &contexts->output[j]);
 
-	igt_subtest("bad-brightness") {
-		for (i = 0; i < (dual_edp ? 2 : 1); i++) {
-			test_setup(display, &contexts->output[i]);
-			test_bad_brightness(&contexts[i]);
-			test_cleanup(&display, output);
-		}
-	}
-	igt_subtest("fade") {
-		for (i = 0; i < (dual_edp ? 2 : 1); i++) {
-			test_setup(display, &contexts->output[i]);
-			test_fade(&contexts[i]);
-			test_cleanup(&display, output);
-		}
-	}
-	igt_subtest("fade_with_dpms") {
-		for (i = 0; i < (dual_edp ? 2 : 1); i++) {
-			test_setup(display, &contexts->output[i]);
-			test_fade_with_dpms(&contexts[i], output);
-			test_cleanup(&display, output);
-		}
-	}
-	igt_subtest("fade_with_suspend") {
-		for (i = 0; i < (dual_edp ? 2 : 1); i++) {
-			test_setup(display, &contexts->output[i]);
-			test_fade_with_suspend(&contexts[i], output);
-			test_cleanup(&display, output);
-		}
-	}
+				if (tests[i].flags == TEST_DPMS)
+					check_dpms(contexts[j].output);
 
+				if (tests[i].flags == TEST_SUSPEND)
+					check_suspend(contexts[j].output);
 
+				tests[i].test_t(&contexts[j]);
+				test_cleanup(&display, contexts[j].output);
+			}
+		}
+	}
 
 	igt_fixture {
 		/* Restore old brightness */
