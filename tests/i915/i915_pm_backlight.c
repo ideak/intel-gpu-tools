@@ -307,7 +307,7 @@ igt_main
 
 	for (i = 0; i < ARRAY_SIZE(tests); i++) {
 		igt_describe(tests[i].desc);
-		igt_subtest(tests[i].name) {
+		igt_subtest_with_dynamic(tests[i].name) {
 			for (int j = 0; j < (dual_edp ? 2 : 1); j++) {
 				test_setup(display, &contexts->output[j]);
 
@@ -317,8 +317,10 @@ igt_main
 				if (tests[i].flags == TEST_SUSPEND)
 					check_suspend(contexts[j].output);
 
-				tests[i].test_t(&contexts[j]);
-				test_cleanup(&display, contexts[j].output);
+				igt_dynamic_f("%s", igt_output_name(contexts[j].output)) {
+					tests[i].test_t(&contexts[j]);
+					test_cleanup(&display, contexts[j].output);
+				}
 			}
 		}
 	}
