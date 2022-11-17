@@ -96,6 +96,11 @@ static uint64_t get_phys(uint32_t pt_offset)
 	return (phys | pae) & ~0xfff;
 }
 
+static int get_pte_size(void)
+{
+	return intel_gen(devid) < 8 ? 4 : 8;
+}
+
 static void pte_dump(int size, uint32_t offset) {
 	int pte_size;
 	int entries;
@@ -105,11 +110,7 @@ static void pte_dump(int size, uint32_t offset) {
 	if (size % 16)
 		size = (size + 16) & ~0xffff;
 
-	if (intel_gen(devid) < 8)
-		pte_size = 4;
-	else
-		pte_size = 8;
-
+	pte_size = get_pte_size();
 	entries = size / pte_size;
 
 	printf("GTT offset   |                 %d PTEs (%d MB)\n", entries,
@@ -139,7 +140,8 @@ static void pte_dump(int size, uint32_t offset) {
 int main(int argc, char **argv)
 {
 	struct pci_device *pci_dev;
-	unsigned int start, gtt_size;
+	unsigned gtt_size;
+	uint64_t start, gtt_max_addr;
 	int flag[] = {
 		PCI_DEV_MAP_FLAG_WRITE_COMBINE,
 		PCI_DEV_MAP_FLAG_WRITABLE,
@@ -190,14 +192,15 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-	for (start = 0; start < gtt_size; start += KB(4)) {
-		uint64_t start_phys = get_phys(start);
-		uint32_t end;
+	gtt_max_addr = (gtt_size / get_pte_size()) * KB(4ull);
+
+	for (start = 0; start < gtt_max_addr; start += KB(4)) {
+		uint64_t end, start_phys = get_phys(start);
 		int constant_length = 0;
 		int linear_length = 0;
 
 		/* Check if it's a linear sequence */
-		for (end = start + KB(4); end < gtt_size; end += KB(4)) {
+		for (end = start + KB(4); end < gtt_max_addr; end += KB(4)) {
 			uint64_t end_phys = get_phys(end);
 			if (end_phys == start_phys + (end - start))
 				linear_length++;
@@ -205,7 +208,7 @@ int main(int argc, char **argv)
 				break;
 		}
 		if (linear_length > 0) {
-			printf("0x%08x - 0x%08x: linear from "
+			printf("0x%08" PRIx64 "- 0x%08" PRIx64 ": linear from "
 			       "0x%" PRIx64 " to 0x%" PRIx64 "\n",
 			       start, end - KB(4),
 			       start_phys, start_phys + (end - start) - KB(4));
@@ -214,7 +217,7 @@ int main(int argc, char **argv)
 		}
 
 		/* Check if it's a constant sequence */
-		for (end = start + KB(4); end < gtt_size; end += KB(4)) {
+		for (end = start + KB(4); end < gtt_max_addr; end += KB(4)) {
 			uint64_t end_phys = get_phys(end);
 			if (end_phys == start_phys)
 				constant_length++;
@@ -222,13 +225,14 @@ int main(int argc, char **argv)
 				break;
 		}
 		if (constant_length > 0) {
-			printf("0x%08x - 0x%08x: constant 0x%" PRIx64 "\n",
+			printf("0x%08" PRIx64 " - 0x%08" PRIx64
+				": constant 0x%" PRIx64 "\n",
 			       start, end - KB(4), start_phys);
 			start = end - KB(4);
 			continue;
 		}
 
-		printf("0x%08x: 0x%" PRIx64 "\n", start, start_phys);
+		printf("0x%08" PRIx64 ": 0x%" PRIx64 "\n", start, start_phys);
 	}
 
 	return 0;
