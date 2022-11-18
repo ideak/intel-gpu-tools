@@ -3019,6 +3019,17 @@ bool chamelium_plug_all(struct chamelium *chamelium)
 	if (port_count <= 0)
 		return false;
 
+	/*
+	 * A temporary workaround for Chamelium V3: Currently, Cv3 doesn't allow
+	 * all ports to be plugged in at the same time. Cv3 first port has an ID
+	 * of 0 while Cv2 has first port ID as 1.
+	 * TODO(markyacoub): Remove this workaround when V3 is fixed.
+	 */
+	if (port_ids[0] == 0) {
+		igt_debug("This should be Cv3. Skipping plugging all ports\n");
+		return true;
+	}
+
 	for (int i = 0; i < port_count; ++i) {
 		v = __chamelium_rpc(chamelium, NULL, "Plug", "(i)", port_ids[i]);
 
