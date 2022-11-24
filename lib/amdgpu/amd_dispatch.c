@@ -520,11 +520,8 @@ amdgpu_dispatch_hang_slow_helper(amdgpu_device_handle device_handle,
 		amdgpu_memcpy_dispatch_test(device_handle, ip_type,
 					    ring_id,  version, 0);
 		amdgpu_memcpy_dispatch_hang_slow_test(device_handle, ip_type,
-						      ring_id, version,
-						      ip_type == AMDGPU_HW_IP_GFX ?
-				AMDGPU_CTX_UNKNOWN_RESET:AMDGPU_CTX_NO_RESET);
+						      ring_id, version, AMDGPU_CTX_NO_RESET);
 
-		/* TODO Why reset status is differant? */
 		amdgpu_memcpy_dispatch_test(device_handle, ip_type, ring_id,
 					    version, 0);
 	}
