@@ -439,6 +439,15 @@ static const struct intel_device_info intel_ats_m_info = {
 	.has_flatccs = true,
 };
 
+static const struct intel_device_info intel_meteorlake_info = {
+	.graphics_ver = 12,
+	.graphics_rel = 70,
+	.display_ver = 14,
+	.has_4tile = true,
+	.is_meteorlake = true,
+	.codename = "meteorlake"
+};
+
 static const struct pci_id_match intel_device_match[] = {
 	INTEL_I810_IDS(&intel_i810_info),
 	INTEL_I815_IDS(&intel_i815_info),
@@ -537,6 +546,8 @@ static const struct pci_id_match intel_device_match[] = {
 	INTEL_ADLN_IDS(&intel_alderlake_n_info),
 
 	INTEL_ATS_M_IDS(&intel_ats_m_info),
+
+	INTEL_MTL_IDS(&intel_meteorlake_info),
 
 	INTEL_VGA_DEVICE(PCI_MATCH_ANY, &intel_generic_info),
 };
