@@ -23,18 +23,6 @@
 
 #include "igt.h"
 #include "igt_v3d.h"
-#include <unistd.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <fcntl.h>
-#include <inttypes.h>
-#include <errno.h>
-#include <sys/stat.h>
-#include <sys/ioctl.h>
-#include <poll.h>
-#include "v3d_drm.h"
-#include "igt_v3d.h"
 
 igt_main
 {

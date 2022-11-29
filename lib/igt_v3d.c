@@ -36,9 +36,6 @@
 #include "igt_core.h"
 #include "igt_v3d.h"
 #include "ioctl_wrappers.h"
-#include "intel_reg.h"
-#include "intel_chipset.h"
-#include "v3d_drm.h"
 
 /**
  * SECTION:igt_v3d
