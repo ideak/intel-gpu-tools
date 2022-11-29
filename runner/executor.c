@@ -1101,7 +1101,6 @@ static int monitor_output(pid_t child,
 				}
 
 				write_packet_with_canary(outputs[_F_SOCKET], packet, settings->sync);
-				disk_usage += packet->size;
 
 				/*
 				 * runner sends EXEC itself before executing
@@ -1112,8 +1111,12 @@ static int monitor_output(pid_t child,
 					socket_comms_used = true;
 
 				if (packet->type == PACKETTYPE_SUBTEST_START ||
-				    packet->type == PACKETTYPE_DYNAMIC_SUBTEST_START)
+				    packet->type == PACKETTYPE_DYNAMIC_SUBTEST_START) {
 					time_last_subtest = time_now;
+					disk_usage = 0;
+				}
+
+				disk_usage += packet->size;
 
 				if (settings->log_level >= LOG_LEVEL_VERBOSE) {
 					runnerpacket_read_helper helper = {};
