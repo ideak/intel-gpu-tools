@@ -24,6 +24,8 @@
 #include "igt.h"
 #include "igt_v3d.h"
 
+IGT_TEST_DESCRIPTION("Tests for the V3D's get params IOCTL");
+
 igt_main
 {
 	int fd;
@@ -31,6 +33,7 @@ igt_main
 	igt_fixture
 		fd = drm_open_driver(DRIVER_V3D);
 
+	igt_describe("Sanity check for getting existent params.");
 	igt_subtest("base-params") {
 		enum drm_v3d_param last_base_param =
 			DRM_V3D_PARAM_V3D_CORE0_IDENT2;
@@ -48,6 +51,7 @@ igt_main
 			      0x443356 /* "V3D" */);
 	}
 
+	igt_describe("Make sure that getting params fails for non-existent params identifiers.");
 	igt_subtest("get-bad-param") {
 		struct drm_v3d_get_param get = {
 			.param = 0xd0d0d0d0,
@@ -55,6 +59,7 @@ igt_main
 		do_ioctl_err(fd, DRM_IOCTL_V3D_GET_PARAM, &get, EINVAL);
 	}
 
+	igt_describe("Make sure that getting params fails for non-zero pad.");
 	igt_subtest("get-bad-flags") {
 		struct drm_v3d_get_param get = {
 			.param = DRM_V3D_PARAM_V3D_HUB_IDENT1,

@@ -24,6 +24,8 @@
 #include "igt.h"
 #include "igt_v3d.h"
 
+IGT_TEST_DESCRIPTION("Tests for the V3D's get BO offset IOCTL");
+
 igt_main
 {
 	int fd;
@@ -31,6 +33,8 @@ igt_main
 	igt_fixture
 		fd = drm_open_driver(DRIVER_V3D);
 
+	igt_describe("Make sure the offset returned by the creation of the BO is "
+		     "the same as the offset returned by the IOCTL");
 	igt_subtest("create-get-offsets") {
 		struct v3d_bo *bos[2] = {
 			igt_v3d_create_bo(fd, 4096),
@@ -54,6 +58,7 @@ igt_main
 		igt_v3d_free_bo(fd, bos[1]);
 	}
 
+	igt_describe("Make sure an offset cannot be returned for an invalid BO handle.");
 	igt_subtest("get-bad-handle") {
 		struct drm_v3d_get_bo_offset get = {
 			.handle = 0xd0d0d0d0,

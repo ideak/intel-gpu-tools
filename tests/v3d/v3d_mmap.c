@@ -24,6 +24,8 @@
 #include "igt.h"
 #include "igt_v3d.h"
 
+IGT_TEST_DESCRIPTION("Tests for the V3D's mmap IOCTL");
+
 igt_main
 {
 	int fd;
@@ -31,6 +33,7 @@ igt_main
 	igt_fixture
 		fd = drm_open_driver(DRIVER_V3D);
 
+	igt_describe("Make sure an invalid BO cannot be mapped.");
 	igt_subtest("mmap-bad-handle") {
 		struct drm_v3d_mmap_bo get = {
 			.handle = 0xd0d0d0d0,
