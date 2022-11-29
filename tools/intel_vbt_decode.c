@@ -460,7 +460,7 @@ static struct bdb_block *find_section(const struct context *context, int section
 
 	data = find_raw_section(context, section_id);
 	if (!data && section_id == BDB_LVDS_LFP_DATA_PTRS) {
-		printf("Generating LVDS data table pointers\n");
+		fprintf(stderr, "Generating LVDS data table pointers\n");
 		temp_block = generate_lvds_data_ptrs(context);
 		if (temp_block)
 			data = temp_block + 3;
