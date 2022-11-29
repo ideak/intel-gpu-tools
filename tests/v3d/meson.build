@@ -1,4 +1,5 @@
 v3d_progs = [
+	'v3d_create_bo',
 	'v3d_get_bo_offset',
 	'v3d_get_param',
 	'v3d_mmap',
