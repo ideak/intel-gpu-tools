@@ -2049,8 +2049,12 @@ static const uint8_t *mipi_dump_gpio(const uint8_t *data, uint8_t seq_version)
 		number = *data++;
 		flags = *data++;
 
-		printf("\t\t\tGPIO index %u, number %u, set %d (0x%02x)\n",
-		       index, number, flags & 1, flags);
+		if (seq_version >= 4)
+			printf("\t\t\tGPIO index %u, number %u, native %d, set %d (0x%02x)\n",
+			       index, number, !(flags & 2), flags & 1, flags);
+		else
+			printf("\t\t\tGPIO index %u, number %u, set %d (0x%02x)\n",
+			       index, number, flags & 1, flags);
 	} else {
 		index = *data++;
 		flags = *data++;
