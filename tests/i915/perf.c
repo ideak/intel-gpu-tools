@@ -258,7 +258,7 @@ get_oa_format(enum drm_i915_oa_format format)
 {
 	if (IS_HASWELL(devid))
 		return hsw_oa_formats[format];
-	else if (IS_DG2(devid))
+	else if (IS_DG2(devid) || IS_METEORLAKE(devid))
 		return dg2_oa_formats[format];
 	else if (IS_GEN12(devid))
 		return gen12_oa_formats[format];
@@ -558,7 +558,7 @@ oa_report_get_ctx_id(uint32_t *report)
 static int
 oar_unit_default_format(void)
 {
-	if (IS_DG2(devid))
+	if (IS_DG2(devid) || IS_METEORLAKE(devid))
 		return I915_OAR_FORMAT_A32u40_A4u32_B8_C8;
 
 	return test_set->perf_oa_format;
@@ -4847,9 +4847,11 @@ test_whitelisted_registers_userspace_config(void)
 		mux_regs[i++] = 0;
 		mux_regs[i++] = 0xD2C;
 		mux_regs[i++] = 0;
-		/* WAIT_FOR_RC6_EXIT */
-		mux_regs[i++] = 0x20CC;
-		mux_regs[i++] = 0;
+		if (!IS_METEORLAKE(devid)) {
+			/* WAIT_FOR_RC6_EXIT */
+			mux_regs[i++] = 0x20CC;
+			mux_regs[i++] = 0;
+		}
 	}
 
 	if (IS_CHERRYVIEW(devid)) {
