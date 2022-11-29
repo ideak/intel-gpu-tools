@@ -80,9 +80,6 @@ test_progs = [
 	'syncobj_timeline',
 	'template',
 	'tools_test',
-	'v3d_get_bo_offset',
-	'v3d_get_param',
-	'v3d_mmap',
 	'vc4_create_bo',
 	'vc4_dmabuf_poll',
 	'vc4_label_bo',
@@ -453,6 +450,8 @@ test_executables += executable('sw_sync', 'sw_sync.c',
 test_list += 'sw_sync'
 
 subdir('amdgpu')
+
+subdir('v3d')
 
 gen_testlist = find_program('generate_testlist.sh')
 test_list_target = custom_target('testlist',
