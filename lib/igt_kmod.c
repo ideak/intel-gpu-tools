@@ -420,7 +420,7 @@ igt_i915_driver_load(const char *opts)
 
 	ret = igt_kmod_load("i915", opts);
 	if (ret) {
-		igt_warn("Could not load i915\n");
+		igt_debug("Could not load i915\n");
 		return ret;
 	}
 
