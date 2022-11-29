@@ -391,9 +391,12 @@ test_plane_panning(data_t *data, enum pipe pipe)
 
 	test_init(data, pipe);
 
-	for_each_memory_region(r, data->drm_fd)
-		if (r->ci.memory_class == I915_MEMORY_CLASS_DEVICE)
-			mem_size = r->cpu_size;
+	if (is_i915_device(data->drm_fd)) {
+		for_each_memory_region(r, data->drm_fd)
+			if (r->ci.memory_class == I915_MEMORY_CLASS_DEVICE)
+				mem_size = r->cpu_size;
+
+	}
 
 	for_each_connector_mode(output) {
 		drmModeModeInfo *m = &output->config.connector->modes[j__];
