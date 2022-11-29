@@ -3,6 +3,7 @@ v3d_progs = [
 	'v3d_get_bo_offset',
 	'v3d_get_param',
 	'v3d_mmap',
+	'v3d_perfmon',
 ]
 
 foreach prog : v3d_progs

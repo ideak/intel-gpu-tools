@@ -121,3 +121,39 @@ void igt_v3d_bo_mmap(int fd, struct v3d_bo *bo)
 				  PROT_READ | PROT_WRITE);
 	igt_assert(bo->map);
 }
+
+uint32_t igt_v3d_perfmon_create(int fd, uint32_t ncounters, uint8_t *counters)
+{
+	struct drm_v3d_perfmon_create create = {
+		.ncounters = ncounters,
+	};
+
+	memcpy(create.counters, counters, ncounters * sizeof(*counters));
+
+	do_ioctl(fd, DRM_IOCTL_V3D_PERFMON_CREATE, &create);
+	igt_assert_neq(create.id, 0);
+
+	return create.id;
+}
+
+void igt_v3d_perfmon_get_values(int fd, uint32_t id)
+{
+	uint64_t *values = calloc(DRM_V3D_MAX_PERF_COUNTERS, sizeof(*values));
+	struct drm_v3d_perfmon_get_values get = {
+		.id = id,
+		.values_ptr = to_user_pointer(values)
+	};
+
+	do_ioctl(fd, DRM_IOCTL_V3D_PERFMON_GET_VALUES, &get);
+
+	free(values);
+}
+
+void igt_v3d_perfmon_destroy(int fd, uint32_t id)
+{
+	struct drm_v3d_perfmon_destroy destroy = {
+		.id = id,
+	};
+
+	do_ioctl(fd, DRM_IOCTL_V3D_PERFMON_DESTROY, &destroy);
+}
