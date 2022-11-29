@@ -159,6 +159,7 @@ is_acm_gt1(const struct intel_perf_devinfo *devinfo)
 #define INTEL_VGA_DEVICE(_id, _info) _id
 	static const uint32_t devids[] = {
 		INTEL_DG2_G11_IDS(NULL),
+		INTEL_ATS_M75_IDS(NULL),
 	};
 #undef INTEL_VGA_DEVICE
 	for (uint32_t i = 0; i < ARRAY_SIZE(devids); i++) {
@@ -193,6 +194,7 @@ is_acm_gt3(const struct intel_perf_devinfo *devinfo)
 #define INTEL_VGA_DEVICE(_id, _info) _id
 	static const uint32_t devids[] = {
 		INTEL_DG2_G10_IDS(NULL),
+		INTEL_ATS_M150_IDS(NULL),
 	};
 #undef INTEL_VGA_DEVICE
 	for (uint32_t i = 0; i < ARRAY_SIZE(devids); i++) {
