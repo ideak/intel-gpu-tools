@@ -26,6 +26,8 @@
 
 #include "v3d_drm.h"
 
+#define PAGE_SIZE 4096
+
 struct v3d_bo {
 	int handle;
 	uint32_t offset;

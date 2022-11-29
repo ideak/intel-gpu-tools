@@ -37,8 +37,8 @@ igt_main
 		     "the same as the offset returned by the IOCTL");
 	igt_subtest("create-get-offsets") {
 		struct v3d_bo *bos[2] = {
-			igt_v3d_create_bo(fd, 4096),
-			igt_v3d_create_bo(fd, 4096),
+			igt_v3d_create_bo(fd, PAGE_SIZE),
+			igt_v3d_create_bo(fd, PAGE_SIZE),
 		};
 		uint32_t offsets[2] = {
 			igt_v3d_get_bo_offset(fd, bos[0]->handle),
