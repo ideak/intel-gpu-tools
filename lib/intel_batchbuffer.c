@@ -1500,13 +1500,11 @@ static bool has_ctx_cfg(struct intel_bb *ibb)
 	return ibb->cfg && ibb->cfg->num_engines > 0;
 }
 
-static uint32_t find_engine(struct intel_bb *ibb, unsigned int class)
+static uint32_t find_engine(const intel_ctx_cfg_t *cfg, unsigned int class)
 {
-	intel_ctx_cfg_t *cfg;
 	unsigned int i;
 	uint32_t engine_id = -1;
 
-	cfg = ibb->cfg;
 	for (i = 0; i < cfg->num_engines; i++) {
 		if (cfg->engines[i].engine_class == class)
 			engine_id = i;
@@ -2833,7 +2831,7 @@ void intel_bb_flush_render(struct intel_bb *ibb)
 		return;
 
 	if (has_ctx_cfg(ibb))
-		ring = find_engine(ibb, I915_ENGINE_CLASS_RENDER);
+		ring = find_engine(ibb->cfg, I915_ENGINE_CLASS_RENDER);
 	else
 		ring = I915_EXEC_RENDER;
 
@@ -2856,7 +2854,7 @@ void intel_bb_flush_blit(struct intel_bb *ibb)
 		return;
 
 	if (has_ctx_cfg(ibb))
-		ring = find_engine(ibb, I915_ENGINE_CLASS_COPY);
+		ring = find_engine(ibb->cfg, I915_ENGINE_CLASS_COPY);
 	else
 		ring = HAS_BLT_RING(ibb->devid) ? I915_EXEC_BLT : I915_EXEC_DEFAULT;
 
