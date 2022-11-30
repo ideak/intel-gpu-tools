@@ -712,14 +712,37 @@ fill_object(struct drm_i915_gem_exec_object2 *obj,
 	obj->relocs_ptr = to_user_pointer(relocs);
 }
 
-static void exec_blit(int fd,
-		      struct drm_i915_gem_exec_object2 *objs, uint32_t count,
-		      unsigned int gen, uint32_t ctx)
+static uint32_t find_engine(const intel_ctx_cfg_t *cfg, unsigned int class)
 {
-	struct drm_i915_gem_execbuffer2 exec = {
+	unsigned int i;
+	uint32_t engine_id = -1;
+
+	for (i = 0; i < cfg->num_engines; i++) {
+		if (cfg->engines[i].engine_class == class)
+			engine_id = i;
+	}
+
+	igt_assert_f(engine_id != -1, "Requested engine not found!\n");
+
+	return engine_id;
+}
+
+static void exec_blit(int fd,
+		      struct drm_i915_gem_exec_object2 *objs,
+		      uint32_t count, unsigned int gen,
+		      uint32_t ctx, const intel_ctx_cfg_t *cfg)
+{
+	struct drm_i915_gem_execbuffer2 exec;
+	uint32_t devid = intel_get_drm_devid(fd);
+	uint32_t blt_id = HAS_BLT_RING(devid) ? I915_EXEC_BLT : I915_EXEC_DEFAULT;
+
+	if (cfg)
+		blt_id = find_engine(cfg, I915_ENGINE_CLASS_COPY);
+
+	exec = (struct drm_i915_gem_execbuffer2) {
 		.buffers_ptr = to_user_pointer(objs),
 		.buffer_count = count,
-		.flags = gen >= 6 ? I915_EXEC_BLT : 0 | I915_EXEC_NO_RELOC,
+		.flags = blt_id | I915_EXEC_NO_RELOC,
 		.rsvd1 = ctx,
 	};
 
@@ -772,6 +795,7 @@ static uint32_t src_copy_dword1(uint32_t dst_pitch, uint32_t bpp)
  * @fd: file descriptor of the i915 driver
  * @ahnd: handle to an allocator
  * @ctx: context within which execute copy blit
+ * @cfg: intel_ctx configuration, NULL for default context or legacy mode
  * @src_handle: GEM handle of the source buffer
  * @src_delta: offset into the source GEM bo, in bytes
  * @src_stride: Stride (in bytes) of the source buffer
@@ -795,6 +819,7 @@ static uint32_t src_copy_dword1(uint32_t dst_pitch, uint32_t bpp)
 void igt_blitter_src_copy(int fd,
 			  uint64_t ahnd,
 			  uint32_t ctx,
+			  const intel_ctx_cfg_t *cfg,
 			  /* src */
 			  uint32_t src_handle,
 			  uint32_t src_delta,
@@ -932,7 +957,7 @@ void igt_blitter_src_copy(int fd,
 		objs[2].flags |= EXEC_OBJECT_PINNED | EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 	}
 
-	exec_blit(fd, objs, 3, gen, ctx);
+	exec_blit(fd, objs, 3, gen, ctx, cfg);
 
 	gem_close(fd, batch_handle);
 }
@@ -942,6 +967,7 @@ void igt_blitter_src_copy(int fd,
  * @fd: file descriptor of the i915 driver
  * @ahnd: handle to an allocator
  * @ctx: context within which execute copy blit
+ * @cfg: intel_ctx configuration, NULL for default context or legacy mode
  * @src_handle: GEM handle of the source buffer
  * @src_delta: offset into the source GEM bo, in bytes
  * @src_stride: Stride (in bytes) of the source buffer
@@ -965,6 +991,7 @@ void igt_blitter_src_copy(int fd,
 void igt_blitter_fast_copy__raw(int fd,
 				uint64_t ahnd,
 				uint32_t ctx,
+				const intel_ctx_cfg_t *cfg,
 				/* src */
 				uint32_t src_handle,
 				unsigned int src_delta,
@@ -1052,7 +1079,7 @@ void igt_blitter_fast_copy__raw(int fd,
 		objs[2].flags |= EXEC_OBJECT_PINNED;
 	}
 
-	exec_blit(fd, objs, 3, intel_gen(intel_get_drm_devid(fd)), ctx);
+	exec_blit(fd, objs, 3, intel_gen(intel_get_drm_devid(fd)), ctx, cfg);
 
 	gem_close(fd, batch_handle);
 }
@@ -1498,21 +1525,6 @@ static bool aux_needs_softpin(int i915)
 static bool has_ctx_cfg(struct intel_bb *ibb)
 {
 	return ibb->cfg && ibb->cfg->num_engines > 0;
-}
-
-static uint32_t find_engine(const intel_ctx_cfg_t *cfg, unsigned int class)
-{
-	unsigned int i;
-	uint32_t engine_id = -1;
-
-	for (i = 0; i < cfg->num_engines; i++) {
-		if (cfg->engines[i].engine_class == class)
-			engine_id = i;
-	}
-
-	igt_assert_f(engine_id != -1, "Requested engine not found!\n");
-
-	return engine_id;
 }
 
 /**

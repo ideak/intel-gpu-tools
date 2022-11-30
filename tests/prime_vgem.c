@@ -225,7 +225,7 @@ static void test_fence_blt(int i915, int vgem)
 		write(master[1], &child, sizeof(child));
 		read(slave[0], &child, sizeof(child));
 
-		igt_blitter_src_copy(i915, ahnd, 0, prime, 0, scratch.pitch,
+		igt_blitter_src_copy(i915, ahnd, 0, NULL, prime, 0, scratch.pitch,
 				     I915_TILING_NONE, 0, 0, scratch.size,
 				     scratch.width, scratch.height, scratch.bpp,
 				     native, 0, scratch.pitch,
@@ -398,7 +398,7 @@ static void test_blt(int vgem, int i915)
 		ptr[scratch.pitch * i / sizeof(*ptr)] = i;
 	munmap(ptr, scratch.size);
 
-	igt_blitter_src_copy(i915, ahnd, 0, native, 0, scratch.pitch,
+	igt_blitter_src_copy(i915, ahnd, 0, NULL, native, 0, scratch.pitch,
 			     I915_TILING_NONE, 0, 0, scratch.size,
 			     scratch.width, scratch.height, scratch.bpp,
 			     prime, 0, scratch.pitch, I915_TILING_NONE, 0, 0,
@@ -414,7 +414,7 @@ static void test_blt(int vgem, int i915)
 	}
 	munmap(ptr, scratch.size);
 
-	igt_blitter_src_copy(i915, ahnd, 0, prime, 0, scratch.pitch,
+	igt_blitter_src_copy(i915, ahnd, 0, NULL, prime, 0, scratch.pitch,
 			     I915_TILING_NONE, 0, 0, scratch.size,
 			     scratch.width, scratch.height, scratch.bpp,
 			     native, 0, scratch.pitch, I915_TILING_NONE, 0, 0,
@@ -538,9 +538,9 @@ static void test_blt_interleaved(int vgem, int i915)
 
 	for (i = 0; i < SLOW_QUICK(scratch.height, 64); i++) {
 		local[scratch.pitch * i / sizeof(*local)] = i;
-		igt_blitter_src_copy(i915, ahnd, 0, native, 0, scratch.pitch,
-				     I915_TILING_NONE, 0, i, scratch.size,
-				     scratch.width, 1,
+		igt_blitter_src_copy(i915, ahnd, 0, NULL, native, 0,
+				     scratch.pitch, I915_TILING_NONE, 0, i,
+				     scratch.size, scratch.width, 1,
 				     scratch.bpp, prime, 0, scratch.pitch,
 				     I915_TILING_NONE, 0, i, scratch.size);
 		prime_sync_start(dmabuf, true);
@@ -549,7 +549,7 @@ static void test_blt_interleaved(int vgem, int i915)
 		prime_sync_end(dmabuf, true);
 
 		foreign[scratch.pitch * i / sizeof(*foreign)] = ~i;
-		igt_blitter_src_copy(i915, ahnd, 0, prime, 0, scratch.pitch,
+		igt_blitter_src_copy(i915, ahnd, 0, NULL, prime, 0, scratch.pitch,
 				     I915_TILING_NONE, 0, i, scratch.size,
 				     scratch.width, 1,
 				     scratch.bpp, native, 0, scratch.pitch,

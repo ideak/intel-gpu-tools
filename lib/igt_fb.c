@@ -2710,7 +2710,7 @@ static void blitcopy(const struct igt_fb *dst_fb,
 		 */
 		if (fast_blit_ok(src_fb) && fast_blit_ok(dst_fb)) {
 			igt_blitter_fast_copy__raw(dst_fb->fd,
-						   ahnd, ctx,
+						   ahnd, ctx, NULL,
 						   src_fb->gem_handle,
 						   src_fb->offsets[i],
 						   src_fb->strides[i],
@@ -2728,7 +2728,7 @@ static void blitcopy(const struct igt_fb *dst_fb,
 						   dst_fb->size);
 		} else {
 			igt_blitter_src_copy(dst_fb->fd,
-					     ahnd, ctx,
+					     ahnd, ctx, NULL,
 					     src_fb->gem_handle,
 					     src_fb->offsets[i],
 					     src_fb->strides[i],

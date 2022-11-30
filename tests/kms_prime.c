@@ -165,8 +165,10 @@ static void import_fb(int importer_fd, struct igt_fb *fb,
 								       fb->drm_format, fb->modifier, pitch, &fb_size, NULL, NULL);
 			igt_assert(fb->gem_handle > 0);
 
-			igt_blitter_src_copy(importer_fd, ahnd, 0, temp_buf_handle, 0, pitch, fb->modifier, 0, 0, fb_size,
-					     fb->width, fb->height, 32, fb->gem_handle, 0, pitch, fb->modifier, 0, 0, fb_size);
+			igt_blitter_src_copy(importer_fd, ahnd, 0, NULL, temp_buf_handle,
+					     0, pitch, fb->modifier, 0, 0, fb_size, fb->width,
+					     fb->height, 32, fb->gem_handle, 0, pitch, fb->modifier,
+					     0, 0, fb_size);
 
 			gem_sync(importer_fd, fb->gem_handle);
 			gem_close(importer_fd, temp_buf_handle);
