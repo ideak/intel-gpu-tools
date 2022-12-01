@@ -27,7 +27,8 @@
 #include "igt_dummyload.h"
 #include "igt_types.h"
 
-#define MAX_REG 0x200000
+/* MAX_REG must be greater than the maximum register address. */
+#define MAX_REG 0x400000
 #define NUM_REGS (MAX_REG / sizeof(uint32_t))
 
 #define PAGE_ALIGN(x) ALIGN(x, 4096)
