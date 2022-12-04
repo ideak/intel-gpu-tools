@@ -28,11 +28,22 @@
 
 #define PAGE_SIZE 4096
 
+struct v3d_cl;
+
 struct v3d_bo {
 	int handle;
 	uint32_t offset;
 	uint32_t size;
 	void *map;
+};
+
+struct v3d_cl_job {
+	struct drm_v3d_submit_cl *submit;
+	struct v3d_cl *bcl;
+	struct v3d_cl *rcl;
+	struct v3d_cl *icl;
+	struct v3d_bo *tile_alloc;
+	struct v3d_bo *tile_state;
 };
 
 struct v3d_bo *igt_v3d_create_bo(int fd, size_t size);
