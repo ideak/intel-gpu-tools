@@ -185,6 +185,14 @@ void igt_v3d_perfmon_destroy(int fd, uint32_t id)
 	do_ioctl(fd, DRM_IOCTL_V3D_PERFMON_DESTROY, &destroy);
 }
 
+void igt_v3d_set_multisync(struct drm_v3d_multi_sync *ms, enum v3d_queue wait_stage)
+{
+	ms->base.next = to_user_pointer(NULL);
+	ms->base.id = DRM_V3D_EXT_ID_MULTI_SYNC;
+	ms->base.flags = 0;
+	ms->wait_stage = wait_stage;
+}
+
 static void v3d_cl_init(int fd, struct v3d_cl **cl)
 {
 	struct v3d_bo *bo = igt_v3d_create_bo(fd, PAGE_SIZE);

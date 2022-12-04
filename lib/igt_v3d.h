@@ -62,6 +62,8 @@ uint32_t igt_v3d_perfmon_create(int fd, uint32_t ncounters, uint8_t *counters);
 void igt_v3d_perfmon_get_values(int fd, uint32_t id);
 void igt_v3d_perfmon_destroy(int fd, uint32_t id);
 
+void igt_v3d_set_multisync(struct drm_v3d_multi_sync *ms, enum v3d_queue wait_stage);
+
 struct v3d_cl_job *igt_v3d_noop_job(int fd);
 void igt_v3d_free_cl_job(int fd, struct v3d_cl_job *job);
 
