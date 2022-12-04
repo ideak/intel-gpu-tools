@@ -21,3 +21,12 @@ igt@v3d/v3d_perfmon@get-values-invalid-pointer
 igt@v3d/v3d_perfmon@get-values-valid-perfmon
 igt@v3d/v3d_perfmon@destroy-invalid-perfmon
 igt@v3d/v3d_perfmon@destroy-valid-perfmon
+igt@v3d/v3d_wait_bo@bad-bo
+igt@v3d/v3d_wait_bo@bad-pad
+igt@v3d/v3d_wait_bo@unused-bo-0ns
+igt@v3d/v3d_wait_bo@unused-bo-1ns
+igt@v3d/v3d_wait_bo@map-bo-0ns
+igt@v3d/v3d_wait_bo@map-bo-1ns
+igt@v3d/v3d_wait_bo@used-bo-0ns
+igt@v3d/v3d_wait_bo@used-bo-1ns
+igt@v3d/v3d_wait_bo@used-bo

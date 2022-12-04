@@ -56,6 +56,8 @@ void *igt_v3d_mmap_bo(int fd, uint32_t handle, uint32_t size, unsigned prot);
 
 void igt_v3d_bo_mmap(int fd, struct v3d_bo *bo);
 
+void igt_v3d_wait_bo(int fd, struct v3d_bo *bo, uint64_t timeout_ns);
+
 uint32_t igt_v3d_perfmon_create(int fd, uint32_t ncounters, uint8_t *counters);
 void igt_v3d_perfmon_get_values(int fd, uint32_t id);
 void igt_v3d_perfmon_destroy(int fd, uint32_t id);

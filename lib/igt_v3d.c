@@ -140,6 +140,15 @@ void igt_v3d_bo_mmap(int fd, struct v3d_bo *bo)
 	igt_assert(bo->map);
 }
 
+void igt_v3d_wait_bo(int fd, struct v3d_bo *bo, uint64_t timeout_ns)
+{
+	struct drm_v3d_wait_bo arg = {
+		.handle = bo->handle,
+		.timeout_ns = timeout_ns
+	};
+	do_ioctl(fd, DRM_IOCTL_V3D_WAIT_BO, &arg);
+}
+
 uint32_t igt_v3d_perfmon_create(int fd, uint32_t ncounters, uint8_t *counters)
 {
 	struct drm_v3d_perfmon_create create = {

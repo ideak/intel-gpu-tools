@@ -4,6 +4,7 @@ v3d_progs = [
 	'v3d_get_param',
 	'v3d_mmap',
 	'v3d_perfmon',
+	'v3d_wait_bo',
 ]
 
 foreach prog : v3d_progs
