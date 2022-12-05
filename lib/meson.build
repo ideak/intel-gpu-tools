@@ -273,6 +273,7 @@ i915_perf_hardware = [
   'icl', 'ehl',
   'tglgt1', 'tglgt2', 'rkl', 'dg1', 'adl',
   'acmgt1', 'acmgt2', 'acmgt3',
+  'mtlgt2', 'mtlgt3',
 ]
 
 i915_xml_files = []

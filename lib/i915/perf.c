@@ -65,6 +65,8 @@
 #include "i915_perf_metrics_acmgt1.h"
 #include "i915_perf_metrics_acmgt2.h"
 #include "i915_perf_metrics_acmgt3.h"
+#include "i915_perf_metrics_mtlgt2.h"
+#include "i915_perf_metrics_mtlgt3.h"
 
 #define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
 
@@ -195,6 +197,41 @@ is_acm_gt3(const struct intel_perf_devinfo *devinfo)
 	static const uint32_t devids[] = {
 		INTEL_DG2_G10_IDS(NULL),
 		INTEL_ATS_M150_IDS(NULL),
+	};
+#undef INTEL_VGA_DEVICE
+	for (uint32_t i = 0; i < ARRAY_SIZE(devids); i++) {
+		if (devids[i] == devinfo->devid)
+			return true;
+	}
+
+	return false;
+}
+
+static bool
+is_mtl_gt2(const struct intel_perf_devinfo *devinfo)
+{
+#undef INTEL_VGA_DEVICE
+#define INTEL_VGA_DEVICE(_id, _info) _id
+	static const uint32_t devids[] = {
+		INTEL_MTL_M_IDS(NULL),
+		INTEL_MTL_P_GT2_IDS(NULL),
+	};
+#undef INTEL_VGA_DEVICE
+	for (uint32_t i = 0; i < ARRAY_SIZE(devids); i++) {
+		if (devids[i] == devinfo->devid)
+			return true;
+	}
+
+	return false;
+}
+
+static bool
+is_mtl_gt3(const struct intel_perf_devinfo *devinfo)
+{
+#undef INTEL_VGA_DEVICE
+#define INTEL_VGA_DEVICE(_id, _info) _id
+	static const uint32_t devids[] = {
+		INTEL_MTL_P_GT3_IDS(NULL),
 	};
 #undef INTEL_VGA_DEVICE
 	for (uint32_t i = 0; i < ARRAY_SIZE(devids); i++) {
@@ -392,6 +429,13 @@ intel_perf_for_devinfo(uint32_t device_id,
 			intel_perf_load_metrics_acmgt2(perf);
 		else if (is_acm_gt3(&perf->devinfo))
 			intel_perf_load_metrics_acmgt3(perf);
+		else
+			return unsupported_i915_perf_platform(perf);
+	} else if (devinfo->is_meteorlake) {
+		if (is_mtl_gt2(&perf->devinfo))
+			intel_perf_load_metrics_mtlgt2(perf);
+		else if (is_mtl_gt3(&perf->devinfo))
+			intel_perf_load_metrics_mtlgt3(perf);
 		else
 			return unsupported_i915_perf_platform(perf);
 	} else {

@@ -150,9 +150,10 @@ chipsets = {
     'DG1': gen8_11_chipset_params,
     'ADL': gen8_11_chipset_params,
     'ACM': xehpsdv_chipset_params,
+    'MTL': xehpsdv_chipset_params,
 }
 
-xehp_plus = ( 'ACM', )
+xehp_plus = ( 'ACM', 'MTL' )
 
 register_types = { 'OA', 'NOA', 'FLEX', 'PM' }
 
