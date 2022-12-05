@@ -769,12 +769,6 @@ igt_main
 	igt_subtest_f("reserve-simple")
 		reserve_simple(fd);
 
-	igt_subtest_f("reuse")
-		reuse(fd, INTEL_ALLOCATOR_SIMPLE);
-
-	igt_subtest_f("reserve")
-		reserve(fd, INTEL_ALLOCATOR_SIMPLE);
-
 	igt_describe("For simple allocator check does default alignment is "
 		     "properly handled in open and alloc functions");
 	igt_subtest_f("default-alignment")
