@@ -179,9 +179,6 @@ static void basic_alloc(int fd, int cnt, uint8_t type)
 	for (i = 0; i < cnt; i++) {
 		igt_progress("check overlapping: ", i, cnt);
 
-		if (type == INTEL_ALLOCATOR_RANDOM)
-			continue;
-
 		for (j = 0; j < cnt; j++) {
 			if (j == i)
 				continue;
@@ -307,8 +304,8 @@ static void parallel_one(int fd, uint8_t type)
 
 	/* Check if all objects are allocated */
 	for (i = 0; i < count; i++) {
-		/* Reloc + random allocators don't have state. */
-		if (type == INTEL_ALLOCATOR_RELOC || type == INTEL_ALLOCATOR_RANDOM)
+		/* Reloc don't have state. */
+		if (type == INTEL_ALLOCATOR_RELOC)
 			break;
 
 		igt_assert_eq(offsets[i],
@@ -752,7 +749,6 @@ struct allocators {
 } als[] = {
 	{"simple", INTEL_ALLOCATOR_SIMPLE},
 	{"reloc",  INTEL_ALLOCATOR_RELOC},
-	{"random", INTEL_ALLOCATOR_RANDOM},
 	{NULL, 0},
 };
 

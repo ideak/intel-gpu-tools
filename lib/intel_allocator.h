@@ -213,8 +213,7 @@ void intel_allocator_print(uint64_t allocator_handle);
 #define ALLOC_INVALID_ADDRESS (-1ull)
 #define INTEL_ALLOCATOR_NONE   0
 #define INTEL_ALLOCATOR_RELOC  1
-#define INTEL_ALLOCATOR_RANDOM 2
-#define INTEL_ALLOCATOR_SIMPLE 3
+#define INTEL_ALLOCATOR_SIMPLE 2
 
 #define GEN8_GTT_ADDRESS_WIDTH 48
 

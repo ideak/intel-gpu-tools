@@ -47,7 +47,6 @@ lib_sources = [
 	'instdone.c',
 	'intel_allocator.c',
 	'intel_allocator_msgchannel.c',
-	'intel_allocator_random.c',
 	'intel_allocator_reloc.c',
 	'intel_allocator_simple.c',
 	'intel_batchbuffer.c',

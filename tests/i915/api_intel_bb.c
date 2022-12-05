@@ -1620,23 +1620,11 @@ igt_main_args("dpibc:", NULL, help_str, opt_handler, NULL)
 	igt_subtest("object-noreloc-keep-cache-simple")
 		object_noreloc(bops, KEEP_CACHE, INTEL_ALLOCATOR_SIMPLE);
 
-	igt_subtest("object-noreloc-purge-cache-random")
-		object_noreloc(bops, PURGE_CACHE, INTEL_ALLOCATOR_RANDOM);
-
-	igt_subtest("object-noreloc-keep-cache-random")
-		object_noreloc(bops, KEEP_CACHE, INTEL_ALLOCATOR_RANDOM);
-
 	igt_subtest("blit-reloc-purge-cache")
 		blit(bops, RELOC, PURGE_CACHE, INTEL_ALLOCATOR_SIMPLE);
 
 	igt_subtest("blit-reloc-keep-cache")
 		blit(bops, RELOC, KEEP_CACHE, INTEL_ALLOCATOR_SIMPLE);
-
-	igt_subtest("blit-noreloc-keep-cache-random")
-		blit(bops, NORELOC, KEEP_CACHE, INTEL_ALLOCATOR_RANDOM);
-
-	igt_subtest("blit-noreloc-purge-cache-random")
-		blit(bops, NORELOC, PURGE_CACHE, INTEL_ALLOCATOR_RANDOM);
 
 	igt_subtest("blit-noreloc-keep-cache")
 		blit(bops, NORELOC, KEEP_CACHE, INTEL_ALLOCATOR_SIMPLE);

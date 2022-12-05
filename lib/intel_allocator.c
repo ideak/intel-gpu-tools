@@ -305,9 +305,6 @@ static struct intel_allocator *intel_allocator_create(int fd,
 	case INTEL_ALLOCATOR_RELOC:
 		ial = intel_allocator_reloc_create(fd, start, end);
 		break;
-	case INTEL_ALLOCATOR_RANDOM:
-		ial = intel_allocator_random_create(fd, start, end);
-		break;
 	case INTEL_ALLOCATOR_SIMPLE:
 		ial = intel_allocator_simple_create(fd, start, end,
 						    allocator_strategy);
