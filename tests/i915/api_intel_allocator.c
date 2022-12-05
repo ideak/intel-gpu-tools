@@ -195,6 +195,7 @@ static void basic_alloc(int fd, int cnt, uint8_t type)
 	igt_assert_eq(intel_allocator_close(ahnd), true);
 }
 
+#define NUM_OBJS 128
 static void reuse(int fd, uint8_t type)
 {
 	struct test_obj obj[128], tmp;
@@ -204,15 +205,15 @@ static void reuse(int fd, uint8_t type)
 
 	ahnd = intel_allocator_open(fd, 0, type);
 
-	for (i = 0; i < 128; i++) {
+	for (i = 0; i < NUM_OBJS; i++) {
 		obj[i].handle = gem_handle_gen();
 		obj[i].size = OBJ_SIZE;
 		obj[i].offset = intel_allocator_alloc(ahnd, obj[i].handle,
 						      obj[i].size, align);
 	}
 
-	/* check simple reuse */
-	for (i = 0; i < 128; i++) {
+	/* check reuse */
+	for (i = 0; i < NUM_OBJS; i++) {
 		prev_offset = obj[i].offset;
 		obj[i].offset = intel_allocator_alloc(ahnd, obj[i].handle,
 						      obj[i].size, 0);
@@ -225,7 +226,13 @@ static void reuse(int fd, uint8_t type)
 	/* alloc different buffer to fill freed hole */
 	tmp.handle = gem_handle_gen();
 	tmp.offset = intel_allocator_alloc(ahnd, tmp.handle, OBJ_SIZE, align);
-	igt_assert(prev_offset == tmp.offset);
+
+	/* Simple will return previously returned offset if fits */
+	if (type == INTEL_ALLOCATOR_SIMPLE)
+		igt_assert(prev_offset == tmp.offset);
+	/* Reloc is moving forward for new allocations */
+	else if (type == INTEL_ALLOCATOR_RELOC)
+		igt_assert(prev_offset != tmp.offset);
 
 	obj[i].offset = intel_allocator_alloc(ahnd, obj[i].handle,
 					      obj[i].size, 0);
@@ -785,10 +792,10 @@ igt_main
 			igt_dynamic("print")
 				basic_alloc(fd, 1UL << 2, a->type);
 
-			if (a->type == INTEL_ALLOCATOR_SIMPLE) {
-				igt_dynamic("reuse")
-					reuse(fd, a->type);
+			igt_dynamic("reuse")
+				reuse(fd, a->type);
 
+			if (a->type == INTEL_ALLOCATOR_SIMPLE) {
 				igt_dynamic("reserve")
 					reserve(fd, a->type);
 			}
