@@ -75,7 +75,7 @@ static void *thread(void *data)
 	struct drm_i915_gem_relocation_entry reloc;
 	struct drm_i915_gem_execbuffer2 execbuf;
 	const intel_ctx_t *tmp_ctx = NULL;
-	uint64_t offset;
+	uint64_t offset, bb_offset;
 	uint32_t batch[16];
 	uint16_t used;
 	int fd, i;
@@ -136,6 +136,18 @@ static void *thread(void *data)
 		execbuf.rsvd1 = t->ctx->id;
 	}
 
+	/*
+	 * For FDS we have new drm fd, what means gem_create() for bb returns
+	 * handle == 1. As we're using objects from other fd it would overlap,
+	 * thus we need to acquire offset for bb from last handle + 1.
+	 * Other cases are within same fd, so obj[1].handle will be distinguish
+	 * anyway.
+	 */
+	if (t->flags & FDS)
+		bb_offset = get_offset(t->ahnd, t->scratch[NUMOBJ - 1] + 1, 4096, 0);
+	else
+		bb_offset = get_offset(t->ahnd, obj[1].handle, 4096, 0);
+
 	used = 0;
 	igt_until_timeout(1) {
 		unsigned int x = rand() % NUMOBJ;
@@ -154,7 +166,7 @@ static void *thread(void *data)
 			obj[0].offset = offset;
 			obj[0].flags |= EXEC_OBJECT_PINNED | EXEC_OBJECT_WRITE |
 					EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
-			obj[1].offset = get_offset(t->ahnd, obj[1].handle, 4096, 0);
+			obj[1].offset = bb_offset;
 			obj[1].flags |= EXEC_OBJECT_PINNED | EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 			gem_write(fd, obj[1].handle, 0, batch, sizeof(batch));
 		}
