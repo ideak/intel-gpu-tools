@@ -581,7 +581,7 @@ static void test_evict(int i915,
 	struct params params;
 
 	if (flags & TEST_CCS)
-		igt_require(IS_DG2(intel_get_drm_devid(i915)));
+		igt_require(HAS_FLATCCS(intel_get_drm_devid(i915)));
 
 	fill_params(i915, &params, region, flags, nproc, false);
 
