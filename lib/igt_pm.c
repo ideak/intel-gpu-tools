@@ -863,6 +863,20 @@ bool i915_output_is_lpsp_capable(int drm_fd, igt_output_t *output)
 	return strstr(buf, "LPSP: capable");
 }
 
+static int igt_pm_open_pci_firmware_node(struct pci_device *pci_dev)
+{
+	char name[PATH_MAX];
+	int dir;
+
+	snprintf(name, PATH_MAX,
+		 "/sys/bus/pci/devices/%04x:%02x:%02x.%01x/firmware_node",
+		 pci_dev->domain, pci_dev->bus, pci_dev->dev, pci_dev->func);
+
+	dir = open(name, O_RDONLY);
+
+	return dir;
+}
+
 /**
  * igt_pm_acpi_d3cold_supported:
  * @pci_dev: root port pci_dev.
@@ -873,23 +887,23 @@ bool i915_output_is_lpsp_capable(int drm_fd, igt_output_t *output)
  */
 bool igt_pm_acpi_d3cold_supported(struct pci_device *pci_dev)
 {
-	char name[PATH_MAX];
-	int dir, fd;
+	int firmware_node_fd, fd;
 
-	snprintf(name, PATH_MAX,
-		 "/sys/bus/pci/devices/%04x:%02x:%02x.%01x/firmware_node",
-		 pci_dev->domain, pci_dev->bus, pci_dev->dev, pci_dev->func);
-
-	dir = open(name, O_RDONLY);
-	igt_require(dir > 0);
-
-	/* BIOS need to enable ACPI D3Cold Support.*/
-	fd = openat(dir, "real_power_state", O_RDONLY);
-	if (fd < 0 && errno == ENOENT)
+	firmware_node_fd = igt_pm_open_pci_firmware_node(pci_dev);
+	if (firmware_node_fd < 0)
 		return false;
 
-	igt_require(fd > 0);
+	/* BIOS need to enable ACPI D3Cold Support.*/
+	fd = openat(firmware_node_fd, "real_power_state", O_RDONLY);
+	if (fd < 0 && errno == ENOENT) {
+		close(firmware_node_fd);
+		return false;
+	}
 
+	igt_assert_f(fd > 0, "failed to open real_power_state, errno=%d\n", errno);
+
+	close(firmware_node_fd);
+	close(fd);
 	return true;
 }
 
