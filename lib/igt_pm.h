@@ -73,6 +73,7 @@ bool igt_wait_for_pm_status(enum igt_runtime_pm_status status);
 bool igt_pm_dmc_loaded(int debugfs);
 bool igt_pm_pc8_plus_residencies_enabled(int msr_fd);
 bool i915_output_is_lpsp_capable(int drm_fd, igt_output_t *output);
+int igt_pm_get_pcie_acpihp_slot(struct pci_device *pci_dev);
 bool igt_pm_acpi_d3cold_supported(struct pci_device *pci_dev);
 enum igt_acpi_d_state
 igt_pm_get_acpi_real_d_state(struct pci_device *pci_dev);

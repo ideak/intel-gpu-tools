@@ -878,6 +878,47 @@ static int igt_pm_open_pci_firmware_node(struct pci_device *pci_dev)
 }
 
 /**
+ * igt_pm_get_pcie_acpihp_slot:
+ * @pci_dev: pci bridge device.
+ * Get pci bridge acpi hotplug slot number, if bridge's ACPI firmware_node
+ * handle supports _SUN method.
+ *
+ * Returns:
+ * PCIe bridge Slot number.
+ * Returns -ENOENT number in case firmware_node/sun is not supported by the
+ * bridge.
+ */
+int igt_pm_get_pcie_acpihp_slot(struct pci_device *pci_dev)
+{
+	int firmware_node_fd, fd, n_read;
+	char sun[8];
+
+	firmware_node_fd = igt_pm_open_pci_firmware_node(pci_dev);
+
+	if (firmware_node_fd < 0 && errno == ENOENT)
+		return -ENOENT;
+
+	igt_require(firmware_node_fd > 0);
+
+	fd = openat(firmware_node_fd, "sun", O_RDONLY);
+	if (fd < 0 && errno == ENOENT) {
+		close(firmware_node_fd);
+		return -ENOENT;
+	}
+
+	igt_assert_f(fd > 0, "failed to open real_power_state, errno=%d\n", errno);
+
+	n_read = read(fd, sun, sizeof(sun));
+
+	close(firmware_node_fd);
+	close(fd);
+	igt_assert(n_read > 0 && n_read < sizeof(sun));
+	sun[n_read] = '\0';
+
+	return strtol(sun, NULL, 10);
+}
+
+/**
  * igt_pm_acpi_d3cold_supported:
  * @pci_dev: root port pci_dev.
  * Check ACPI D3Cold support.
