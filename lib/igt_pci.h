@@ -20,6 +20,9 @@ enum pci_cap_id {
 	PCI_EXPRESS_CAP_ID = 0x10
 };
 
+#define PCI_SLOT_CAP_OFFSET 0x14
+#define  PCI_SLOT_PWR_CTRL_PRESENT (1 << 1)
+
 int find_pci_cap_offset(struct pci_device *dev, enum pci_cap_id cap_id);
 
 #endif
