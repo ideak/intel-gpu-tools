@@ -1173,6 +1173,14 @@ static void many_contexts(int i915, const intel_ctx_cfg_t *cfg)
 	gem_sync(i915, spin->handle);
 	igt_spin_reset(spin);
 
+	for_each_ctx_cfg_engine(i915, cfg, e) {
+		int t = 0;
+
+		gem_engine_property_scanf(i915, e->name,
+					  "preempt_timeout_ms", "%d", &t);
+		timeout = max_t(int64_t, timeout, 2000000ll * t);
+	}
+
 	igt_until_timeout(30) {
 		for_each_ctx_cfg_engine(i915, cfg, e) {
 			const intel_ctx_t *ctx;
