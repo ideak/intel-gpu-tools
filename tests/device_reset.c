@@ -19,6 +19,11 @@ IGT_TEST_DESCRIPTION("Examine behavior of a driver on device sysfs reset");
 #define DEV_PATH_LEN 80
 #define DEV_BUS_ADDR_LEN 13 /* addr has form 0000:00:00.0 */
 
+enum reset {
+	COLD_RESET,
+	FLR_RESET
+};
+
 /**
  * Helper structure containing file descriptors
  * and bus address related to tested device
@@ -222,10 +227,13 @@ static void driver_bind(struct device_fds *dev)
 }
 
 /* Initiate device reset */
-static void initiate_device_reset(struct device_fds *dev)
+static void initiate_device_reset(struct device_fds *dev, enum reset type)
 {
 	igt_debug("reset device\n");
-	igt_assert(igt_sysfs_set(dev->fds.dev_dir, "reset", "1"));
+
+	if (type == FLR_RESET)
+		igt_assert(igt_sysfs_set(dev->fds.dev_dir, "reset", "1"));
+
 }
 
 static bool is_i915_wedged(int i915)
@@ -274,14 +282,14 @@ static void set_device_filter(const char* dev_path)
 	igt_assert_eq(igt_device_filter_add(filter), 1);
 }
 
-static void unbind_reset_rebind(struct device_fds *dev)
+static void unbind_reset_rebind(struct device_fds *dev, enum reset type)
 {
 	igt_debug("close the device\n");
 	close_if_opened(&dev->fds.dev);
 
 	driver_unbind(dev);
 
-	initiate_device_reset(dev);
+	initiate_device_reset(dev, type);
 
 	driver_bind(dev);
 }
@@ -306,13 +314,13 @@ igt_main
 	igt_describe("Unbinds driver from device, initiates reset"
 		     " then rebinds driver to device");
 	igt_subtest("unbind-reset-rebind") {
-		unbind_reset_rebind(&dev);
+		unbind_reset_rebind(&dev, FLR_RESET);
 		healthcheck(&dev);
 	}
 
 	igt_describe("Resets device with bound driver");
 	igt_subtest("reset-bound") {
-		initiate_device_reset(&dev);
+		initiate_device_reset(&dev, FLR_RESET);
 		healthcheck(&dev);
 	}
 
