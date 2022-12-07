@@ -27,6 +27,7 @@
 #include <sys/signal.h>
 #include <poll.h>
 
+#include "dmabuf_sync_file.h"
 #include "i915/gem.h"
 #include "i915/gem_engine_topology.h"
 #include "i915/gem_create.h"
@@ -2856,6 +2857,7 @@ static void logical_sort_siblings(int i915,
 #define PARALLEL_SUBMIT_FENCE		(0x1 << 3)
 #define PARALLEL_CONTEXTS		(0x1 << 4)
 #define PARALLEL_VIRTUAL		(0x1 << 5)
+#define PARALLEL_OUT_FENCE_DMABUF	(0x1 << 6)
 
 static void parallel_thread(int i915, unsigned int flags,
 			    struct i915_engine_class_instance *siblings,
@@ -2871,6 +2873,8 @@ static void parallel_thread(int i915, unsigned int flags,
 	uint32_t target_bo_idx = 0;
 	uint32_t first_bb_idx = 1;
 	intel_ctx_cfg_t cfg;
+	uint32_t dmabuf_handle;
+	int dmabuf;
 
 	igt_assert(bb_per_execbuf < 32);
 
@@ -2924,11 +2928,20 @@ static void parallel_thread(int i915, unsigned int flags,
 	execbuf.buffers_ptr = to_user_pointer(obj);
 	execbuf.rsvd1 = ctx->id;
 
+	if (flags & PARALLEL_OUT_FENCE_DMABUF) {
+		dmabuf_handle = gem_create(i915, 4096);
+		dmabuf = prime_handle_to_fd(i915, dmabuf_handle);
+	}
+
 	for (n = 0; n < PARALLEL_BB_LOOP_COUNT; ++n) {
 		execbuf.flags &= ~0x3full;
 		gem_execbuf_wr(i915, &execbuf);
 
 		if (flags & PARALLEL_OUT_FENCE) {
+			if (flags & PARALLEL_OUT_FENCE_DMABUF)
+				dmabuf_import_sync_file(dmabuf, DMA_BUF_SYNC_WRITE,
+							execbuf.rsvd2 >> 32);
+
 			igt_assert_eq(sync_fence_wait(execbuf.rsvd2 >> 32,
 						      1000), 0);
 			igt_assert_eq(sync_fence_status(execbuf.rsvd2 >> 32), 1);
@@ -2958,6 +2971,11 @@ static void parallel_thread(int i915, unsigned int flags,
 	}
 	if (fence)
 		close(fence);
+
+	if (flags & PARALLEL_OUT_FENCE_DMABUF) {
+		gem_close(i915, dmabuf_handle);
+		close(dmabuf);
+	}
 
 	check_bo(i915, obj[target_bo_idx].handle,
 		 bb_per_execbuf * PARALLEL_BB_LOOP_COUNT, true);
@@ -3419,6 +3437,11 @@ igt_main
 
 		igt_subtest("parallel-out-fence")
 			parallel(i915, PARALLEL_OUT_FENCE);
+
+		igt_describe("Regression test to check that dmabuf imported sync file can handle fence array");
+		igt_subtest("parallel-dmabuf-import-out-fence")
+			parallel(i915, PARALLEL_OUT_FENCE |
+				 PARALLEL_OUT_FENCE_DMABUF);
 
 		igt_subtest("parallel-keep-in-fence")
 			parallel(i915, PARALLEL_OUT_FENCE | PARALLEL_IN_FENCE);
