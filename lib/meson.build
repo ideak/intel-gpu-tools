@@ -1,5 +1,6 @@
 lib_sources = [
 	'drmtest.c',
+	'dmabuf_sync_file.c',
 	'huc_copy.c',
 	'i915/gem.c',
 	'i915/gem_context.c',

@@ -1,139 +1,14 @@
 // SPDX-License-Identifier: MIT
+/*
+ * Copyright © 2022 Intel Corporation
+ */
 
 #include "igt.h"
 #include "igt_vgem.h"
 #include "sw_sync.h"
-
-#include <linux/dma-buf.h>
-#include <sys/poll.h>
+#include "dmabuf_sync_file.h"
 
 IGT_TEST_DESCRIPTION("Tests for sync_file support in dma-buf");
-
-struct igt_dma_buf_sync_file {
-	__u32 flags;
-	__s32 fd;
-};
-
-#define IGT_DMA_BUF_IOCTL_EXPORT_SYNC_FILE _IOWR(DMA_BUF_BASE, 2, struct igt_dma_buf_sync_file)
-#define IGT_DMA_BUF_IOCTL_IMPORT_SYNC_FILE _IOW(DMA_BUF_BASE, 3, struct igt_dma_buf_sync_file)
-
-static bool has_dmabuf_export_sync_file(int fd)
-{
-	struct vgem_bo bo;
-	int dmabuf, ret;
-	struct igt_dma_buf_sync_file arg;
-
-	bo.width = 1;
-	bo.height = 1;
-	bo.bpp = 32;
-	vgem_create(fd, &bo);
-
-	dmabuf = prime_handle_to_fd(fd, bo.handle);
-	gem_close(fd, bo.handle);
-
-	arg.flags = DMA_BUF_SYNC_WRITE;
-	arg.fd = -1;
-
-	ret = igt_ioctl(dmabuf, IGT_DMA_BUF_IOCTL_EXPORT_SYNC_FILE, &arg);
-	close(dmabuf);
-	igt_assert(ret == 0 || errno == ENOTTY);
-
-	return ret == 0;
-}
-
-static int dmabuf_export_sync_file(int dmabuf, uint32_t flags)
-{
-	struct igt_dma_buf_sync_file arg;
-
-	arg.flags = flags;
-	arg.fd = -1;
-	do_ioctl(dmabuf, IGT_DMA_BUF_IOCTL_EXPORT_SYNC_FILE, &arg);
-
-	return arg.fd;
-}
-
-static bool has_dmabuf_import_sync_file(int fd)
-{
-	struct vgem_bo bo;
-	int dmabuf, timeline, fence, ret;
-	struct igt_dma_buf_sync_file arg;
-
-	bo.width = 1;
-	bo.height = 1;
-	bo.bpp = 32;
-	vgem_create(fd, &bo);
-
-	dmabuf = prime_handle_to_fd(fd, bo.handle);
-	gem_close(fd, bo.handle);
-
-	timeline = sw_sync_timeline_create();
-	fence = sw_sync_timeline_create_fence(timeline, 1);
-	sw_sync_timeline_inc(timeline, 1);
-
-	arg.flags = DMA_BUF_SYNC_RW;
-	arg.fd = fence;
-
-	ret = igt_ioctl(dmabuf, IGT_DMA_BUF_IOCTL_IMPORT_SYNC_FILE, &arg);
-	close(dmabuf);
-	close(fence);
-	igt_assert(ret == 0 || errno == ENOTTY);
-
-	return ret == 0;
-}
-
-static void dmabuf_import_sync_file(int dmabuf, uint32_t flags, int sync_fd)
-{
-	struct igt_dma_buf_sync_file arg;
-
-	arg.flags = flags;
-	arg.fd = sync_fd;
-	do_ioctl(dmabuf, IGT_DMA_BUF_IOCTL_IMPORT_SYNC_FILE, &arg);
-}
-
-static void
-dmabuf_import_timeline_fence(int dmabuf, uint32_t flags,
-			     int timeline, uint32_t seqno)
-{
-	int fence;
-
-	fence = sw_sync_timeline_create_fence(timeline, seqno);
-	dmabuf_import_sync_file(dmabuf, flags, fence);
-	close(fence);
-}
-
-static bool dmabuf_busy(int dmabuf, uint32_t flags)
-{
-	struct pollfd pfd = { .fd = dmabuf };
-
-	/* If DMA_BUF_SYNC_WRITE is set, we don't want to set POLLIN or
-	 * else poll() may return a non-zero value if there are only read
-	 * fences because POLLIN is ready even if POLLOUT isn't.
-	 */
-	if (flags & DMA_BUF_SYNC_WRITE)
-		pfd.events |= POLLOUT;
-	else if (flags & DMA_BUF_SYNC_READ)
-		pfd.events |= POLLIN;
-
-	return poll(&pfd, 1, 0) == 0;
-}
-
-static bool sync_file_busy(int sync_file)
-{
-	struct pollfd pfd = { .fd = sync_file, .events = POLLIN };
-	return poll(&pfd, 1, 0) == 0;
-}
-
-static bool dmabuf_sync_file_busy(int dmabuf, uint32_t flags)
-{
-	int sync_file;
-	bool busy;
-
-	sync_file = dmabuf_export_sync_file(dmabuf, flags);
-	busy = sync_file_busy(sync_file);
-	close(sync_file);
-
-	return busy;
-}
 
 static void test_export_basic(int fd)
 {
