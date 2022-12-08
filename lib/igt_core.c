@@ -310,6 +310,12 @@ int num_test_children;
 int test_children_sz;
 bool test_child;
 
+/* fork dynamic support state */
+pid_t *test_multi_fork_children;
+int num_test_multi_fork_children;
+int test_multi_fork_children_sz;
+bool test_multi_fork_child;
+
 /* For allocator purposes */
 pid_t child_pid  = -1;
 __thread pid_t child_tid  = -1;
@@ -1560,6 +1566,16 @@ bool __igt_enter_dynamic_container(void)
 	return true;
 }
 
+static void kill_and_wait(pid_t *pids, int size, int signum)
+{
+	for (int c = 0; c < size; c++) {
+		if (pids[c] > 0) {
+			kill(pids[c], signum);
+			waitpid(pids[c], NULL, 0); /* don't leave zombies! */
+		}
+	}
+}
+
 __noreturn static void exit_subtest(const char *result)
 {
 	struct timespec now;
@@ -1569,11 +1585,13 @@ __noreturn static void exit_subtest(const char *result)
 
 	igt_gettime(&now);
 
+	if (test_multi_fork_child)
+		__igt_plain_output = true;
+
 	_subtest_result_message(in_dynamic_subtest ? _SUBTEST_TYPE_DYNAMIC : _SUBTEST_TYPE_NORMAL,
 				*subtest_name,
 				result,
 				igt_time_elapsed(thentime, &now));
-
 	igt_terminate_spins();
 
 	/* If the subtest aborted, it may have left children behind */
@@ -1584,6 +1602,10 @@ __noreturn static void exit_subtest(const char *result)
 		}
 	}
 	num_test_children = 0;
+	if (!test_multi_fork_child && num_test_multi_fork_children > 0)
+		kill_and_wait(test_multi_fork_children, num_test_multi_fork_children, SIGKILL);
+
+	num_test_multi_fork_children = 0;
 
 	/*
 	 * When test completes - mostly in fail state it can leave allocated
@@ -1605,9 +1627,10 @@ __noreturn static void exit_subtest(const char *result)
 
 	/*
 	 * Don't keep the above text in the log if exiting a dynamic
-	 * subsubtest, the subtest would print it again otherwise
+	 * subsubtest, the subtest would print it again otherwise.
+	 * Also don't keep it if called from multi_fork.
 	 */
-	if (in_dynamic_subtest)
+	if (in_dynamic_subtest || test_multi_fork_child)
 		_igt_log_buffer_reset();
 
 	*subtest_name = NULL;
@@ -1636,6 +1659,8 @@ void igt_skip(const char *f, ...)
 
 	internal_assert(!test_child,
 			"skips are not allowed in forks\n");
+	internal_assert(!test_multi_fork_child,
+			"skips are not allowed in multi_fork\n");
 
 	if (!igt_only_list_subtests()) {
 		va_start(args, f);
@@ -1791,6 +1816,9 @@ void igt_fail(int exitcode)
 		exit(exitcode);
 
 	_igt_log_buffer_dump();
+
+	if (test_multi_fork_child)
+		exit(exitcode);
 
 	if (in_subtest) {
 		exit_subtest("FAIL");
@@ -2156,6 +2184,11 @@ void igt_kill_children(int signal)
 		if (test_children[c] > 0)
 			kill(test_children[c], signal);
 	}
+
+	for (int c = 0; c < num_test_multi_fork_children; c++) {
+		if (test_multi_fork_children[c] > 0)
+			kill(test_multi_fork_children[c], signal);
+	}
 }
 
 void __igt_abort(const char *domain, const char *file, const int line,
@@ -2241,13 +2274,17 @@ void igt_exit(void)
 			igt_exitcode = IGT_EXIT_SKIP;
 	}
 
-	if (command_str)
-		igt_kmsg(KMSG_INFO "%s: exiting, ret=%d\n",
-			 command_str, igt_exitcode);
-	igt_debug("Exiting with status code %d\n", igt_exitcode);
+	if (!test_multi_fork_child) {
+		/* parent will do the yelling */
+		if (command_str)
+			igt_kmsg(KMSG_INFO "%s: exiting, ret=%d\n",
+				 command_str, igt_exitcode);
+		igt_debug("Exiting with status code %d\n", igt_exitcode);
+	}
 
 	igt_kill_children(SIGKILL);
 	assert(!num_test_children);
+	assert(!num_test_multi_fork_children);
 
 	assert(waitpid(-1, &tmp, WNOHANG) == -1 && errno == ECHILD);
 
@@ -2268,8 +2305,13 @@ void igt_exit(void)
 				result = "FAIL";
 		}
 
-		_log_line_fprintf(stdout, "%s (%.3fs)\n",
-				  result, igt_time_elapsed(&subtest_time, &now));
+		if (test_multi_fork_child) /* parent will do the yelling */
+			_log_line_fprintf(stdout, "dyn_child pid:%d (%.3fs) ends with err=%d\n",
+					  getpid(), igt_time_elapsed(&subtest_time, &now),
+					  igt_exitcode);
+		else
+			_log_line_fprintf(stdout, "%s (%.3fs)\n",
+					  result, igt_time_elapsed(&subtest_time, &now));
 	}
 
 	exit(igt_exitcode);
@@ -2468,6 +2510,64 @@ bool __igt_fork(void)
 
 }
 
+static void dyn_children_exit_handler(int sig)
+{
+	int status;
+
+	/* The exit handler can be called from a fatal signal, so play safe */
+	while (num_test_multi_fork_children-- && wait(&status))
+		;
+}
+
+bool __igt_multi_fork(void)
+{
+	internal_assert(!test_with_subtests || in_subtest,
+			"multi-forking is only allowed in subtests or igt_simple_main\n");
+	internal_assert(!test_child,
+			"multi-forking is not allowed from already forked children\n");
+	internal_assert(!test_multi_fork_child,
+			"multi-forking is not allowed from already multi-forked children\n");
+
+	if (!num_test_multi_fork_children)
+		igt_install_exit_handler(dyn_children_exit_handler);
+
+	if (num_test_multi_fork_children >= test_multi_fork_children_sz) {
+		if (!test_multi_fork_children_sz)
+			test_multi_fork_children_sz = 4;
+		else
+			test_multi_fork_children_sz *= 2;
+
+		test_multi_fork_children = realloc(test_multi_fork_children,
+					sizeof(pid_t)*test_multi_fork_children_sz);
+		igt_assert(test_multi_fork_children);
+	}
+
+	/* ensure any buffers are flushed before fork */
+	fflush(NULL);
+
+	switch (test_multi_fork_children[num_test_multi_fork_children++] = fork()) {
+	case -1:
+		num_test_multi_fork_children--; /* so we won't kill(-1) during cleanup */
+		igt_assert(0);
+	case 0:
+		test_multi_fork_child = true;
+		snprintf(log_prefix, LOG_PREFIX_SIZE, "<g:%d> ", num_test_multi_fork_children - 1);
+		num_test_multi_fork_children = 0; /* only parent should care */
+		pthread_mutex_init(&print_mutex, NULL);
+		child_pid = getpid(); /* for allocator */
+		child_tid = -1; /* for allocator */
+		exit_handler_count = 0;
+		reset_helper_process_list();
+		oom_adjust_for_doom();
+		igt_unshare_spins();
+
+		return true;
+	default:
+		return false;
+	}
+
+}
+
 int __igt_waitchildren(void)
 {
 	int err = 0;
@@ -2537,9 +2637,80 @@ int __igt_waitchildren(void)
  */
 void igt_waitchildren(void)
 {
-	int err = __igt_waitchildren();
+	int err;
+
+	if (num_test_multi_fork_children)
+		err = __igt_multi_wait();
+	else
+		err = __igt_waitchildren();
+
 	if (err)
 		igt_fail(err);
+}
+
+int __igt_multi_wait(void)
+{
+	int err = 0;
+	int count;
+	bool was_killed = false;
+
+	assert(!test_multi_fork_child);
+	count = 0;
+	while (count < num_test_multi_fork_children) {
+		int status = -1;
+		int last = 0;
+		pid_t pid;
+		int c;
+
+		pid = wait(&status);
+		if (pid == -1) {
+			if (errno == EINTR)
+				continue;
+
+			igt_debug("wait(multi_fork children running:%d) failed with %m\n",
+				  num_test_multi_fork_children - count);
+			return IGT_EXIT_FAILURE;
+		}
+
+		for (c = 0; c < num_test_multi_fork_children; c++)
+			if (pid == test_multi_fork_children[c])
+				break;
+		if (c == num_test_multi_fork_children)
+			continue;
+
+		if (status != 0) {
+			if (WIFEXITED(status)) {
+				printf("dynamic child %i pid:%d failed with exit status %i\n",
+				       c, pid, WEXITSTATUS(status));
+				last = WEXITSTATUS(status);
+				test_multi_fork_children[c] = -1;
+			} else if (WIFSIGNALED(status)) {
+				printf("dynamic child %i pid:%d died with signal %i, %s\n",
+				       c, pid, WTERMSIG(status),
+				       strsignal(WTERMSIG(status)));
+				last = 128 + WTERMSIG(status);
+				test_multi_fork_children[c] = -1;
+			} else {
+				printf("Unhandled failure [%d] in dynamic child %i pid:%d\n",
+				       status, c, pid);
+				last = 256;
+			}
+
+			/* we don't want to overwrite error with skip */
+			if (err == 0 || err == IGT_EXIT_SKIP)
+				err = last;
+			if (err && err != IGT_EXIT_SKIP && !was_killed) {
+				igt_kill_children(SIGKILL); // if non-skip happen
+				was_killed = true;
+			}
+		}
+
+		count++;
+	}
+
+	num_test_multi_fork_children = 0;
+
+	return err;
 }
 
 static void igt_alarm_killchildren(int signal)
@@ -2571,7 +2742,10 @@ void igt_waitchildren_timeout(int seconds, const char *reason)
 
 	alarm(seconds);
 
-	ret = __igt_waitchildren();
+	if (num_test_multi_fork_children)
+		ret = __igt_multi_wait();
+	else
+		ret = __igt_waitchildren();
 	igt_reset_timeout();
 	if (ret)
 		igt_fail(ret);
@@ -2901,13 +3075,8 @@ void igt_vlog(const char *domain, enum igt_log_level level, const char *format, 
 	program_name = command_str;
 #endif
 
-
-	if (igt_thread_is_main()) {
-		thread_id = strdup("");
-	} else {
-		if (asprintf(&thread_id, "[thread:%d] ", gettid()) == -1)
-			thread_id = NULL;
-	}
+	if (asprintf(&thread_id, "[thread:%d] ", gettid()) == -1)
+		thread_id = NULL;
 
 	if (!thread_id)
 		return;

@@ -1114,6 +1114,27 @@ void igt_waitchildren(void);
 void igt_waitchildren_timeout(int seconds, const char *reason);
 void igt_kill_children(int signal);
 
+bool __igt_multi_fork(void);
+/**
+ * igt_multi_fork:
+ * @child: name of the int variable with the child number
+ * @num_children: number of children to fork
+ *
+ * This is a magic control flow block which spawns parallel processes
+ * with fork() expecting there will runs without skips.
+ *
+ * The test children execute in parallel to the main test process.
+ * Joining all test threads should be done with igt_waitchildren.
+ * After multi_fork one can use igt_fork once to run more children.
+ *
+ * Like in igt_fork() any igt_skip() will cause test fail.
+ */
+#define igt_multi_fork(child, num_children) \
+	for (int child = 0; child < (num_children); child++) \
+		for (; __igt_multi_fork(); exit(0))
+
+int __igt_multi_wait(void);
+
 /**
  * igt_helper_process:
  * @running: indicates whether the process is currently running
