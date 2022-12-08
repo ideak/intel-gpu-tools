@@ -40,6 +40,7 @@
 #include "i915/gem_create.h"
 #include "igt.h"
 #include "igt_types.h"
+#include "lib/igt_device_scan.h"
 
 IGT_TEST_DESCRIPTION("Tests basic gem_create and gem_close IOCTLs");
 
@@ -83,9 +84,12 @@ test_create_fd_close(int fd)
 igt_main
 {
 	igt_fd_t(fd);
+	int gpu_count;
 
-	igt_fixture
+	igt_fixture {
 		fd = drm_open_driver(DRIVER_INTEL);
+		gpu_count = igt_device_filter_count();
+	}
 
 	igt_describe("Verify that gem_close fails with bad params.");
 	igt_subtest("bad-close")
@@ -94,6 +98,21 @@ igt_main
 	igt_describe("Verify basic functionality of gem_create and gem_close.");
 	igt_subtest("create-close")
 		test_create_close(fd);
+
+	igt_describe("Verify basic functionality of gem_create and gem_close on multi-GPU.");
+	igt_subtest("multigpu-create-close") {
+		igt_require(gpu_count > 1);
+		igt_multi_fork(child, gpu_count) {
+			int gpu_fd;
+
+			gpu_fd = __drm_open_driver_another(child, DRIVER_INTEL);
+			igt_assert_f(gpu_fd > 0, "cannot open gpu-%d, errno=%d\n", child, errno);
+			test_create_close(gpu_fd);
+			close(gpu_fd);
+		}
+
+		igt_waitchildren();
+	}
 
 	igt_describe("Verify that closing drm driver is possible with opened gem object.");
 	igt_subtest("create-fd-close")
