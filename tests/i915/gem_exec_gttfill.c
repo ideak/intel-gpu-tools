@@ -24,6 +24,7 @@
 #include "i915/gem.h"
 #include "i915/gem_create.h"
 #include "igt.h"
+#include "igt_device_scan.h"
 #include "igt_rand.h"
 
 IGT_TEST_DESCRIPTION("Fill the GTT with batches.");
@@ -226,7 +227,7 @@ igt_main
 {
 	const struct intel_execution_engine2 *e;
 	const intel_ctx_t *ctx;
-	int i915 = -1;
+	int i915 = -1, gpu_count;
 
 	igt_fixture {
 		i915 = drm_open_driver(DRIVER_INTEL);
@@ -258,9 +259,34 @@ igt_main
 		fillgtt(i915, ctx, ALL_ENGINES, 20);
 
 	igt_fixture {
-		intel_allocator_multiprocess_stop();
 		igt_stop_hang_detector();
 		intel_ctx_destroy(i915, ctx);
+		// prepare multigpu tests
+		gpu_count = igt_device_filter_count();
+	}
+
+	igt_subtest("multigpu-basic") { /* run on two or more discrete cards */
+		igt_require(gpu_count > 1);
+		igt_multi_fork(child, gpu_count) {
+			int g_fd;
+			// prepare
+			g_fd = __drm_open_driver_another(child, DRIVER_INTEL);
+			igt_assert(g_fd >= 0);
+			ctx = intel_ctx_create_all_physical(g_fd);
+			igt_fork_hang_detector(g_fd);
+			// subtest
+			fillgtt(g_fd, ctx, ALL_ENGINES, 1);
+			// release resources
+			igt_stop_hang_detector();
+			intel_ctx_destroy(g_fd, ctx);
+			close(g_fd);
+		}
+
+		igt_waitchildren();
+	}
+
+	igt_fixture {
+		intel_allocator_multiprocess_stop();
 		close(i915);
 	}
 }
