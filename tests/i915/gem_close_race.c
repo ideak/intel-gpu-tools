@@ -47,6 +47,7 @@
 #include "i915/gem_mman.h"
 #include "igt.h"
 #include "igt_aux.h"
+#include "igt_device_scan.h"
 
 #define OBJECT_SIZE (256 * 1024)
 
@@ -254,6 +255,31 @@ static void thread(int fd, struct drm_gem_open name,
 	free(history);
 }
 
+static void multigpu_threads(int timeout, unsigned int flags, int gpu_count)
+{
+	int size = sysconf(_SC_NPROCESSORS_ONLN);
+
+	size /= gpu_count;
+	if (size < 1)
+		size = 1;
+
+	igt_multi_fork(gpu, gpu_count) {
+		struct drm_gem_open name;
+		int fd = __drm_open_driver_another(gpu, DRIVER_INTEL);
+
+		igt_assert(fd > 0);
+
+		igt_fork(child, size)
+			thread(fd, name, timeout, flags);
+
+		igt_waitchildren();
+		gem_quiescent_gpu(fd);
+		close(fd);
+	}
+
+	igt_waitchildren();
+}
+
 static void threads(int timeout, unsigned int flags)
 {
 	struct drm_gem_open name;
@@ -272,6 +298,8 @@ static void threads(int timeout, unsigned int flags)
 
 igt_main
 {
+	int gpu_count;
+
 	igt_fixture {
 		int fd;
 
@@ -285,6 +313,8 @@ igt_main
 		data_addr = gem_detect_safe_alignment(fd);
 		exec_addr = max_t(exec_addr, exec_addr, data_addr);
 		data_addr += exec_addr;
+
+		gpu_count = igt_device_filter_count();
 
 		igt_fork_hang_detector(fd);
 		close(fd);
@@ -302,10 +332,32 @@ igt_main
 		close(fd);
 	}
 
+	igt_describe("Basic workload submission on multi-GPU machine.");
+	igt_subtest("multigpu-basic-process") {
+		igt_require(gpu_count > 1);
+
+		igt_multi_fork(child, gpu_count) {
+			int fd = __drm_open_driver_another(child, DRIVER_INTEL);
+
+			igt_assert(fd > 0);
+			process(fd, child);
+			gem_quiescent_gpu(fd);
+			close(fd);
+		}
+
+		igt_waitchildren();
+	}
+
 	igt_describe("Share buffer handle across different drm fd's and trying to race "
 		     " gem_close against continuous workload with minimum timeout.");
 	igt_subtest("basic-threads")
 		threads(1, 0);
+
+	igt_describe("Run basic-threads race on multi-GPU machine.");
+	igt_subtest("multigpu-basic-threads") {
+		igt_require(gpu_count > 1);
+		multigpu_threads(1, 0, gpu_count);
+	}
 
 	igt_describe("Test try to race gem_close against submission of continuous"
 		     " workload.");
