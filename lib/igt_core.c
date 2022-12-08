@@ -348,6 +348,8 @@ static struct {
 	uint8_t start, end;
 } log_buffer;
 static pthread_mutex_t log_buffer_mutex = PTHREAD_MUTEX_INITIALIZER;
+#define LOG_PREFIX_SIZE 32
+char log_prefix[LOG_PREFIX_SIZE] = { 0 };
 
 GKeyFile *igt_key_file;
 
@@ -3075,8 +3077,12 @@ void igt_vlog(const char *domain, enum igt_log_level level, const char *format, 
 	program_name = command_str;
 #endif
 
-	if (asprintf(&thread_id, "[thread:%d] ", gettid()) == -1)
-		thread_id = NULL;
+	if (igt_thread_is_main()) {
+		thread_id = strdup(log_prefix);
+	} else {
+		if (asprintf(&thread_id, "%s[thread:%d] ", log_prefix, gettid()) == -1)
+			thread_id = NULL;
+	}
 
 	if (!thread_id)
 		return;
