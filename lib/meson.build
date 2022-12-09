@@ -34,6 +34,7 @@ lib_sources = [
 	'igt_pipe_crc.c',
 	'igt_power.c',
 	'igt_primes.c',
+	'igt_pci.c',
 	'igt_rand.c',
 	'igt_stats.c',
 	'igt_syncobj.c',
