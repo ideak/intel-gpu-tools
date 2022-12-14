@@ -119,7 +119,6 @@ struct data {
 	uint64_t modifier;
 	uint32_t devid;
 	struct buf_ops *bops;
-	drm_intel_bufmgr *bufmgr;
 	drmModeModeInfo *last_mode[IGT_MAX_PIPES];
 	struct igt_fb fb[IGT_MAX_PIPES * MAX_PLANES];
 	struct igt_fb cursor_fb[IGT_MAX_PIPES];
