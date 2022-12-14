@@ -11,14 +11,11 @@
 #include "xf86drm.h"
 #include <xf86drmMode.h>
 
-#include "intel_bufmgr.h"
+#include "i915/gem_create.h"
 
 IGT_TEST_DESCRIPTION("Basic set of prime tests between Intel and DisplayLink");
 
 int intel_fd = -1, udl_fd = -1;
-drm_intel_bufmgr *bufmgr;
-uint32_t devid;
-struct intel_batchbuffer *intel_batch;
 
 #define BO_SIZE (640*480*2)
 
@@ -78,57 +75,50 @@ static int dumb_bo_destroy(int fd, uint32_t handle)
 /*
  * simple share and import
  */
-static int test1(void)
+static void test1(void)
 {
-	drm_intel_bo *test_intel_bo;
+	uint32_t intel_handle, udl_handle;
 	int prime_fd;
-	int ret;
-	uint32_t udl_handle;
 
-	test_intel_bo = drm_intel_bo_alloc(bufmgr, "test bo", BO_SIZE, 4096);
+	intel_handle = gem_create(intel_fd, BO_SIZE);
 
-	drm_intel_bo_gem_export_to_prime(test_intel_bo, &prime_fd);
+	prime_fd = prime_handle_to_fd(intel_fd, intel_handle);
+	igt_assert(prime_fd >= 0);
 
-	ret = drmPrimeFDToHandle(udl_fd, prime_fd, &udl_handle);
+	udl_handle = prime_fd_to_handle(udl_fd, prime_fd);
+	igt_assert(udl_handle > 0);
 
 	dumb_bo_destroy(udl_fd, udl_handle);
-	drm_intel_bo_unreference(test_intel_bo);
-	return ret;
+	gem_close(intel_fd, intel_handle);
 }
 
-static int test2(void)
+static void test2(void)
 {
-	drm_intel_bo *test_intel_bo;
+	uint32_t intel_handle, udl_handle;
 	uint32_t fb_id;
 	drmModeClip clip;
 	int prime_fd;
-	uint32_t udl_handle;
 	int ret;
 
-	test_intel_bo = drm_intel_bo_alloc(bufmgr, "test bo", BO_SIZE, 4096);
+	intel_handle = gem_create(intel_fd, BO_SIZE);
 
-	drm_intel_bo_gem_export_to_prime(test_intel_bo, &prime_fd);
+	prime_fd = prime_handle_to_fd(intel_fd, intel_handle);
+	igt_assert(prime_fd >= 0);
 
-	ret = drmPrimeFDToHandle(udl_fd, prime_fd, &udl_handle);
-	if (ret)
-		goto out;
+	udl_handle = prime_fd_to_handle(udl_fd, prime_fd);
 
 	ret = drmModeAddFB(udl_fd, 640, 480, 16, 16, 640, udl_handle, &fb_id);
-	if (ret)
-		goto out;
+	igt_assert(ret == 0);
 
 	clip.x1 = 0;
 	clip.y1 = 0;
 	clip.x2 = 10;
 	clip.y2 = 10;
 	ret = drmModeDirtyFB(udl_fd, fb_id, &clip, 1);
-	if (ret) {
-		return ret;
-	}
-out:
+	igt_assert(ret == 0);
+
 	dumb_bo_destroy(udl_fd, udl_handle);
-	drm_intel_bo_unreference(test_intel_bo);
-	return ret;
+	gem_close(intel_fd, intel_handle);
 }
 
 igt_simple_main
@@ -138,22 +128,10 @@ igt_simple_main
 	igt_skip_on(udl_fd == -1);
 	igt_skip_on(intel_fd == -1);
 
-	/* set up intel bufmgr */
-	bufmgr = drm_intel_bufmgr_gem_init(intel_fd, 4096);
-	drm_intel_bufmgr_gem_enable_reuse(bufmgr);
-
-	/* set up an intel batch buffer */
-	devid = intel_get_drm_devid(intel_fd);
-	intel_batch = intel_batchbuffer_alloc(bufmgr, devid);
-
 	/* create an object on the i915 */
-	igt_assert(test1() == 0);
+	test1();
 
-	igt_assert(test2() == 0);
-
-	intel_batchbuffer_free(intel_batch);
-
-	drm_intel_bufmgr_destroy(bufmgr);
+	test2();
 
 	close(intel_fd);
 	close(udl_fd);
