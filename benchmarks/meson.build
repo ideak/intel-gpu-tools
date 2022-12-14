@@ -13,19 +13,14 @@ benchmark_progs = [
 	'gem_syslatency',
 	'gem_userptr_benchmark',
 	'gem_wsim',
+	'intel_upload_blit_large',
+	'intel_upload_blit_large_gtt',
+	'intel_upload_blit_large_map',
+	'intel_upload_blit_small',
 	'kms_vblank',
 	'prime_lookup',
 	'vgem_mmap',
 ]
-
-if libdrm_intel.found()
-	benchmark_progs += [
-		'intel_upload_blit_large',
-		'intel_upload_blit_large_gtt',
-		'intel_upload_blit_large_map',
-		'intel_upload_blit_small',
-	]
-endif
 
 benchmarksdir = join_paths(libexecdir, 'benchmarks')
 
