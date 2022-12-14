@@ -92,37 +92,6 @@
 int (*igt_ioctl)(int fd, unsigned long request, void *arg) = drmIoctl;
 
 
-/**
- * gem_handle_to_libdrm_bo:
- * @bufmgr: libdrm buffer manager instance
- * @fd: open i915 drm file descriptor
- * @name: buffer name in libdrm
- * @handle: gem buffer object handle
- *
- * This helper function imports a raw gem buffer handle into the libdrm buffer
- * manager.
- *
- * Returns: The imported libdrm buffer manager object.
- */
-drm_intel_bo *
-gem_handle_to_libdrm_bo(drm_intel_bufmgr *bufmgr, int fd, const char *name, uint32_t handle)
-{
-	struct drm_gem_flink flink;
-	int ret;
-	drm_intel_bo *bo;
-
-	memset(&flink, 0, sizeof(handle));
-	flink.handle = handle;
-	ret = ioctl(fd, DRM_IOCTL_GEM_FLINK, &flink);
-	igt_assert(ret == 0);
-	errno = 0;
-
-	bo = drm_intel_bo_gem_create_from_name(bufmgr, name, flink.name);
-	igt_assert(bo);
-
-	return bo;
-}
-
 static int
 __gem_get_tiling(int fd, struct drm_i915_gem_get_tiling *arg)
 {

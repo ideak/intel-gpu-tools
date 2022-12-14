@@ -33,7 +33,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <sys/mman.h>
-#include <intel_bufmgr.h>
 #include <i915_drm.h>
 
 #include "i915/gem_context.h"
@@ -50,10 +49,6 @@
  * blocks like #igt_while_interruptible.
  */
 extern int (*igt_ioctl)(int fd, unsigned long request, void *arg);
-
-/* libdrm interfacing */
-drm_intel_bo * gem_handle_to_libdrm_bo(drm_intel_bufmgr *bufmgr, int fd,
-				       const char *name, uint32_t handle);
 
 /* ioctl_wrappers.c:
  *
