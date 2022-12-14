@@ -115,13 +115,6 @@ lib_deps = [
 	zlib
 ]
 
-if libdrm_intel.found()
-	lib_deps += libdrm_intel
-else
-	lib_sources += 'stubs/drm/intel_bufmgr.c'
-	inc = [ inc, include_directories('stubs/drm') ]
-endif
-
 if libdrm_nouveau.found()
 	lib_deps += libdrm_nouveau
 	lib_sources += [
