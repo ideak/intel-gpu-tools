@@ -1519,6 +1519,8 @@ static void test_crc32(int i915, const intel_ctx_t *ctx,
 			  "gpu crc: 0x%08x (time: %.3f) [ %s ]\n",
 			  (long long) size, cpu_crc, cpu_time, gpu_crc, gpu_time,
 			  cpu_crc == gpu_crc ? "EQUAL" : "DIFFERENT");
+
+		put_offset(ahnd, data);
 		gem_close(i915, data);
 		igt_assert(cpu_crc == gpu_crc);
 	}
