@@ -141,6 +141,7 @@ static void destroy_object(int i915, struct blt_copy_object *obj)
 		munmap(obj->ptr, obj->size);
 
 	gem_close(i915, obj->handle);
+	free(obj);
 }
 
 static void set_blt_object(struct blt_copy_object *obj,
