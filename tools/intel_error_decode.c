@@ -49,7 +49,6 @@
 #include <sys/stat.h>
 #include <err.h>
 #include <assert.h>
-#include <intel_bufmgr.h>
 #include <zlib.h>
 #include <ctype.h>
 
@@ -58,6 +57,7 @@
 #include "instdone.h"
 #include "intel_reg.h"
 #include "drmtest.h"
+#include "i915/intel_decode.h"
 
 static uint32_t
 print_head(unsigned int reg)
@@ -445,7 +445,7 @@ static bool maybe_ascii(const void *data, int check)
 	return true;
 }
 
-static void decode(struct drm_intel_decode *ctx,
+static void decode(struct intel_decode *ctx,
 		   const char *buffer_name,
 		   const char *ring_name,
 		   uint64_t gtt_offset,
@@ -466,9 +466,9 @@ static void decode(struct drm_intel_decode *ctx,
 	printf("\n");
 
 	if (decode && ctx) {
-		drm_intel_decode_set_batch_pointer(ctx, data, gtt_offset,
+		intel_decode_set_batch_pointer(ctx, data, gtt_offset,
 						   *count);
-		drm_intel_decode(ctx);
+		intel_decode(ctx);
 	} else if (maybe_ascii(data, 16)) {
 		printf("%*s\n", 4 * *count, (char *)data);
 	} else {
@@ -566,7 +566,7 @@ static int ascii85_decode(const char *in, uint32_t **out, bool inflate)
 static void
 read_data_file(FILE *file)
 {
-	struct drm_intel_decode *decode_ctx = NULL;
+	struct intel_decode *decode_ctx = NULL;
 	uint32_t devid = PCI_CHIP_I855_GM;
 	uint32_t *data = NULL;
 	uint32_t head[MAX_RINGS];
@@ -692,7 +692,7 @@ read_data_file(FILE *file)
 				printf("Detected GEN%i chipset\n",
 						intel_gen(devid));
 
-				decode_ctx = drm_intel_decode_context_alloc(devid);
+				decode_ctx = intel_decode_context_alloc(devid);
 			}
 
 			matched = sscanf(line, "  CTL: 0x%08x\n", &reg);
@@ -708,7 +708,7 @@ read_data_file(FILE *file)
 			if (matched == 1) {
 				print_acthd(reg, ring_length);
 				if (decode_ctx)
-					drm_intel_decode_set_head_tail(decode_ctx,
+					intel_decode_set_head_tail(decode_ctx,
 								       reg,
 								       0xffffffff);
 			}

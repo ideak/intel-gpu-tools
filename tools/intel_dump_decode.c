@@ -34,9 +34,9 @@
 #include <fcntl.h>
 #include <getopt.h>
 
-#include <intel_bufmgr.h>
+#include "i915/intel_decode.h"
 
-struct drm_intel_decode *ctx;
+struct intel_decode *ctx;
 
 static void
 read_bin_file(const char * filename)
@@ -54,12 +54,12 @@ read_bin_file(const char * filename)
 		exit (1);
 	}
 
-	drm_intel_decode_set_dump_past_end(ctx, 1);
+	intel_decode_set_dump_past_end(ctx, 1);
 
 	offset = 0;
 	while ((ret = read (fd, buf, sizeof(buf))) > 0) {
-		drm_intel_decode_set_batch_pointer(ctx, buf, offset, ret/4);
-		drm_intel_decode(ctx);
+		intel_decode_set_batch_pointer(ctx, buf, offset, ret/4);
+		intel_decode(ctx);
 		offset += ret;
 	}
 	close (fd);
@@ -112,8 +112,8 @@ read_data_file(const char * filename)
     }
 
     if (count) {
-	drm_intel_decode_set_batch_pointer(ctx, data, gtt_offset, count);
-	drm_intel_decode(ctx);
+	intel_decode_set_batch_pointer(ctx, data, gtt_offset, count);
+	intel_decode(ctx);
     }
 
     free (data);
@@ -192,7 +192,7 @@ main (int argc, char *argv[])
 	if (devid_str)
 		devid = strtoul(devid_str, NULL, 0);
 
-	ctx = drm_intel_decode_context_alloc(devid);
+	ctx = intel_decode_context_alloc(devid);
 
 	if (optind == argc) {
 		fprintf(stderr, "no input file given\n");
