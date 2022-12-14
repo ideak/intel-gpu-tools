@@ -11,6 +11,7 @@ lib_sources = [
 	'i915/gem_ring.c',
 	'i915/gem_mman.c',
 	'i915/gem_vm.c',
+	'i915/intel_decode.c',
 	'i915/intel_memory_region.c',
 	'i915/intel_mocs.c',
 	'i915/i915_blt.c',
