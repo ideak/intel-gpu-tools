@@ -23,15 +23,13 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 
-#include "intel_bufmgr.h"
+#include "i915/gem_create.h"
 #include "nouveau.h"
 
 int intel_fd = -1, nouveau_fd = -1;
-drm_intel_bufmgr *bufmgr;
+struct buf_ops *bops;
 struct nouveau_device *ndev;
 struct nouveau_client *nclient;
-uint32_t devid;
-struct intel_batchbuffer *intel_batch;
 
 #define BO_SIZE (256*1024)
 
@@ -83,20 +81,18 @@ static int find_and_open_devices(void)
  */
 static void test_i915_nv_sharing(void)
 {
-	drm_intel_bo *test_intel_bo;
+	uint32_t intel_handle;
 	int prime_fd;
 	struct nouveau_bo *nvbo;
 
-	test_intel_bo = drm_intel_bo_alloc(bufmgr, "test bo", BO_SIZE, 4096);
-	igt_assert(test_intel_bo);
-
-	drm_intel_bo_gem_export_to_prime(test_intel_bo, &prime_fd);
+	intel_handle = gem_create(intel_fd, BO_SIZE);
+	prime_fd = prime_handle_to_fd(intel_fd, intel_handle);
 
 	igt_assert(nouveau_bo_prime_handle_ref(ndev, prime_fd, &nvbo) == 0);
 	close(prime_fd);
 
 	nouveau_bo_ref(NULL, &nvbo);
-	drm_intel_bo_unreference(test_intel_bo);
+	gem_close(intel_fd, intel_handle);
 }
 
 /*
@@ -109,7 +105,7 @@ static void test_i915_nv_sharing(void)
  */
 static void test_nv_i915_sharing(void)
 {
-	drm_intel_bo *test_intel_bo;
+	uint32_t intel_handle;
 	int prime_fd;
 	struct nouveau_bo *nvbo;
 
@@ -117,12 +113,11 @@ static void test_nv_i915_sharing(void)
 				  0, BO_SIZE, NULL, &nvbo) == 0);
 	igt_assert(nouveau_bo_set_prime(nvbo, &prime_fd) == 0);
 
-	test_intel_bo = drm_intel_bo_gem_create_from_prime(bufmgr, prime_fd, BO_SIZE);
+	intel_handle = prime_fd_to_handle(intel_fd, prime_fd);
 	close(prime_fd);
-	igt_assert(test_intel_bo);
 
 	nouveau_bo_ref(NULL, &nvbo);
-	drm_intel_bo_unreference(test_intel_bo);
+	gem_close(intel_fd, intel_handle);
 }
 
 /*
@@ -131,14 +126,13 @@ static void test_nv_i915_sharing(void)
  */
 static void test_nv_write_i915_cpu_mmap_read(void)
 {
-	drm_intel_bo *test_intel_bo;
+	uint32_t intel_handle;
 	int prime_fd;
 	struct nouveau_bo *nvbo = NULL;
 	uint32_t *ptr;
 
-	test_intel_bo = drm_intel_bo_alloc(bufmgr, "test bo", BO_SIZE, 4096);
-
-	drm_intel_bo_gem_export_to_prime(test_intel_bo, &prime_fd);
+	intel_handle = gem_create(intel_fd, BO_SIZE);
+	prime_fd = prime_handle_to_fd(intel_fd, intel_handle);
 
 	igt_assert(nouveau_bo_prime_handle_ref(ndev, prime_fd, &nvbo) == 0);
 	close(prime_fd);
@@ -147,13 +141,12 @@ static void test_nv_write_i915_cpu_mmap_read(void)
 	ptr = nvbo->map;
 	*ptr = 0xdeadbeef;
 
-	drm_intel_bo_map(test_intel_bo, 1);
-	ptr = test_intel_bo->virtual;
-	igt_assert(ptr);
+	ptr = gem_mmap__cpu(intel_fd, intel_handle, 0, BO_SIZE, PROT_READ | PROT_WRITE);
 
 	igt_assert(*ptr == 0xdeadbeef);
 	nouveau_bo_ref(NULL, &nvbo);
-	drm_intel_bo_unreference(test_intel_bo);
+	gem_munmap(ptr, BO_SIZE);
+	gem_close(intel_fd, intel_handle);
 }
 
 /*
@@ -162,14 +155,13 @@ static void test_nv_write_i915_cpu_mmap_read(void)
  */
 static void test_nv_write_i915_gtt_mmap_read(void)
 {
-	drm_intel_bo *test_intel_bo;
+	uint32_t intel_handle;
 	int prime_fd;
 	struct nouveau_bo *nvbo = NULL;
 	uint32_t *ptr;
 
-	test_intel_bo = drm_intel_bo_alloc(bufmgr, "test bo", BO_SIZE, 4096);
-
-	drm_intel_bo_gem_export_to_prime(test_intel_bo, &prime_fd);
+	intel_handle = gem_create(intel_fd, BO_SIZE);
+	prime_fd = prime_handle_to_fd(intel_fd, intel_handle);
 
 	igt_assert(nouveau_bo_prime_handle_ref(ndev, prime_fd, &nvbo) == 0);
 	close(prime_fd);
@@ -177,14 +169,13 @@ static void test_nv_write_i915_gtt_mmap_read(void)
 	ptr = nvbo->map;
 	*ptr = 0xdeadbeef;
 
-	drm_intel_gem_bo_map_gtt(test_intel_bo);
-	ptr = test_intel_bo->virtual;
-	igt_assert(ptr);
+	ptr = gem_mmap__gtt(intel_fd, intel_handle, BO_SIZE, PROT_READ | PROT_WRITE);
 
 	igt_assert(*ptr == 0xdeadbeef);
 
 	nouveau_bo_ref(NULL, &nvbo);
-	drm_intel_bo_unreference(test_intel_bo);
+	gem_munmap(ptr, BO_SIZE);
+	gem_close(intel_fd, intel_handle);
 }
 
 /* test drm_intel_bo_map doesn't work properly,
@@ -192,7 +183,7 @@ static void test_nv_write_i915_gtt_mmap_read(void)
    for these objects */
 __noreturn static void test_i915_import_cpu_mmap(void)
 {
-	drm_intel_bo *test_intel_bo;
+	uint32_t intel_handle;
 	int prime_fd;
 	struct nouveau_bo *nvbo;
 	uint32_t *ptr;
@@ -202,22 +193,20 @@ __noreturn static void test_i915_import_cpu_mmap(void)
 	igt_assert(nouveau_bo_new(ndev, NOUVEAU_BO_GART | NOUVEAU_BO_MAP,
 				  0, BO_SIZE, NULL, &nvbo) == 0);
 	igt_assert(nouveau_bo_set_prime(nvbo, &prime_fd) == 0);
-	test_intel_bo = drm_intel_bo_gem_create_from_prime(bufmgr, prime_fd, BO_SIZE);
+	intel_handle = prime_fd_to_handle(intel_fd, prime_fd);
 	close(prime_fd);
-	igt_assert(test_intel_bo);
 
 	igt_assert(nouveau_bo_map(nvbo, NOUVEAU_BO_RDWR, nclient) == 0);
 
 	ptr = nvbo->map;
 	*ptr = 0xdeadbeef;
 
-	igt_assert(drm_intel_bo_map(test_intel_bo, 0) == 0);
-	igt_assert(test_intel_bo->virtual);
-	ptr = test_intel_bo->virtual;
+	ptr = gem_mmap__cpu(intel_fd, intel_handle, 0, BO_SIZE, PROT_READ);
 
 	igt_assert(*ptr == 0xdeadbeef);
 	nouveau_bo_ref(NULL, &nvbo);
-	drm_intel_bo_unreference(test_intel_bo);
+	gem_munmap(ptr, BO_SIZE);
+	gem_close(intel_fd, intel_handle);
 }
 
 /* test drm_intel_bo_map_gtt works properly,
@@ -225,7 +214,7 @@ __noreturn static void test_i915_import_cpu_mmap(void)
    for these objects */
 static void test_i915_import_gtt_mmap(void)
 {
-	drm_intel_bo *test_intel_bo;
+	uint32_t intel_handle;
 	int prime_fd;
 	struct nouveau_bo *nvbo;
 	uint32_t *ptr;
@@ -234,9 +223,8 @@ static void test_i915_import_gtt_mmap(void)
 				  0, BO_SIZE, NULL, &nvbo) == 0);
 	igt_assert(nouveau_bo_set_prime(nvbo, &prime_fd) == 0);
 
-	test_intel_bo = drm_intel_bo_gem_create_from_prime(bufmgr, prime_fd, BO_SIZE);
+	intel_handle = prime_fd_to_handle(intel_fd, prime_fd);
 	close(prime_fd);
-	igt_assert(test_intel_bo);
 
 	igt_assert(nouveau_bo_map(nvbo, NOUVEAU_BO_RDWR, nclient) == 0);
 
@@ -244,19 +232,18 @@ static void test_i915_import_gtt_mmap(void)
 	*ptr = 0xdeadbeef;
 	*(ptr + 1) = 0xa55a55;
 
-	igt_assert(drm_intel_gem_bo_map_gtt(test_intel_bo) == 0);
-	igt_assert(test_intel_bo->virtual);
-	ptr = test_intel_bo->virtual;
+	ptr = gem_mmap__gtt(intel_fd, intel_handle, BO_SIZE, PROT_READ | PROT_WRITE);
 
 	igt_assert(*ptr == 0xdeadbeef);
 	nouveau_bo_ref(NULL, &nvbo);
-	drm_intel_bo_unreference(test_intel_bo);
+	gem_munmap(ptr, BO_SIZE);
+	gem_close(intel_fd, intel_handle);
 }
 
 /* test 7 - import from nouveau into intel, test pread/pwrite fail */
 static void test_i915_import_pread_pwrite(void)
 {
-	drm_intel_bo *test_intel_bo;
+	uint32_t intel_handle;
 	int prime_fd;
 	struct nouveau_bo *nvbo;
 	uint32_t *ptr;
@@ -266,85 +253,90 @@ static void test_i915_import_pread_pwrite(void)
 				  0, BO_SIZE, NULL, &nvbo) == 0);
 	igt_assert(nouveau_bo_set_prime(nvbo, &prime_fd) == 0);
 
-	test_intel_bo = drm_intel_bo_gem_create_from_prime(bufmgr, prime_fd, BO_SIZE);
+	intel_handle = prime_fd_to_handle(intel_fd, prime_fd);
 	close(prime_fd);
-	igt_assert(test_intel_bo);
 
 	igt_assert(nouveau_bo_map(nvbo, NOUVEAU_BO_RDWR, nclient) == 0);
 
 	ptr = nvbo->map;
 	*ptr = 0xdeadbeef;
 
-	gem_read(intel_fd, test_intel_bo->handle, 0, buf, 256);
+	gem_read(intel_fd, intel_handle, 0, buf, 256);
 	igt_assert(buf[0] == 0xdeadbeef);
 	buf[0] = 0xabcdef55;
 
-	gem_write(intel_fd, test_intel_bo->handle, 0, buf, 4);
+	gem_write(intel_fd, intel_handle, 0, buf, 4);
 
 	igt_assert(*ptr == 0xabcdef55);
 
 	nouveau_bo_ref(NULL, &nvbo);
-	drm_intel_bo_unreference(test_intel_bo);
+	gem_close(intel_fd, intel_handle);
 }
 
-static void
-set_bo(drm_intel_bo *bo, uint32_t val, int width, int height)
+static uint32_t create_bo(uint32_t val, int width, int height)
 {
-        int size = width * height;
-        uint32_t *vaddr;
+	uint32_t intel_handle;
+	int size = width * height;
+	uint32_t *ptr, *currptr;
 
-        drm_intel_gem_bo_start_gtt_access(bo, true);
-        vaddr = bo->virtual;
-        while (size--)
-                *vaddr++ = val;
-}
-
-static drm_intel_bo *
-create_bo(drm_intel_bufmgr *ibufmgr, uint32_t val, int width, int height)
-{
-        drm_intel_bo *bo;
-
-        bo = drm_intel_bo_alloc(ibufmgr, "bo", 4*width*height, 0);
-        igt_assert(bo);
+	intel_handle = gem_create(intel_fd, 4*width*height);
+	igt_assert(intel_handle);
 
         /* gtt map doesn't have a write parameter, so just keep the mapping
          * around (to avoid the set_domain with the gtt write domain set) and
          * manually tell the kernel when we start access the gtt. */
-        drm_intel_gem_bo_map_gtt(bo);
+	ptr = gem_mmap__gtt(intel_fd, intel_handle, size, PROT_READ | PROT_WRITE);
+	gem_set_domain(intel_fd, intel_handle, I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
 
-        set_bo(bo, val, width, height);
+	currptr = ptr;
+	while (size--)
+		*currptr++ = val;
 
-        return bo;
+	gem_munmap(ptr, size);
+
+	return intel_handle;
 }
 
 /* use intel hw to fill the BO with a blit from another BO,
    then readback from the nouveau bo, check value is correct */
 static void test_i915_blt_fill_nv_read(void)
 {
-	drm_intel_bo *test_intel_bo, *src_bo;
+	uint32_t dst_handle, src_handle;
 	int prime_fd;
 	struct nouveau_bo *nvbo = NULL;
 	uint32_t *ptr;
+	struct intel_bb *ibb;
+	struct intel_buf src, dst;
+	int w = 256;
+	int h = 4; /* for intel_bb_copy size requirement % 4096 */
 
-	src_bo = create_bo(bufmgr, 0xaa55aa55, 256, 1);
+	ibb = intel_bb_create(intel_fd, 4096);
 
-	test_intel_bo = drm_intel_bo_alloc(bufmgr, "test bo", BO_SIZE, 4096);
+	src_handle = create_bo(0xaa55aa55, w, h);
+	dst_handle = gem_create(intel_fd, BO_SIZE);
 
-	drm_intel_bo_gem_export_to_prime(test_intel_bo, &prime_fd);
+	prime_fd = prime_handle_to_fd(intel_fd, dst_handle);
 
 	igt_assert(nouveau_bo_prime_handle_ref(ndev, prime_fd, &nvbo) == 0);
 	close(prime_fd);
 
-	intel_copy_bo(intel_batch, test_intel_bo, src_bo, BO_SIZE);
+	intel_buf_init_using_handle(bops, src_handle, &src, w, h, 32, 0,
+				    I915_TILING_NONE, I915_COMPRESSION_NONE);
+	intel_buf_init_using_handle(bops, dst_handle, &dst, w, 256, 32, 0,
+				    I915_TILING_NONE, I915_COMPRESSION_NONE);
+	intel_bb_copy_intel_buf(ibb, &dst, &src, w * h * 4);
 
 	igt_assert(nouveau_bo_map(nvbo, NOUVEAU_BO_RDWR, nclient) == 0);
-
-	drm_intel_bo_map(test_intel_bo, 0);
 
 	ptr = nvbo->map;
 	igt_assert(*ptr == 0xaa55aa55);
 	nouveau_bo_ref(NULL, &nvbo);
-	drm_intel_bo_unreference(test_intel_bo);
+
+	intel_buf_destroy(&src);
+	intel_buf_destroy(&dst);
+	intel_bb_destroy(ibb);
+	gem_close(intel_fd, dst_handle);
+	gem_close(intel_fd, src_handle);
 }
 
 /* test 8 use nouveau to do blit */
@@ -358,20 +350,12 @@ igt_main
 
 		igt_require(nouveau_fd != -1);
 		igt_require(intel_fd != -1);
-
-		/* set up intel bufmgr */
-		bufmgr = drm_intel_bufmgr_gem_init(intel_fd, 4096);
-		igt_assert(bufmgr);
-		/* Do not enable reuse, we share (almost) all buffers. */
-		//drm_intel_bufmgr_gem_enable_reuse(bufmgr);
+		bops = buf_ops_create(intel_fd);
 
 		/* set up nouveau bufmgr */
 		igt_assert(nouveau_device_wrap(nouveau_fd, 0, &ndev) == 0);
 		igt_assert(nouveau_client_new(ndev, &nclient) == 0);
 
-		/* set up an intel batch buffer */
-		devid = intel_get_drm_devid(intel_fd);
-		intel_batch = intel_batchbuffer_alloc(bufmgr, devid);
 	}
 
 #define xtest(name) \
@@ -388,11 +372,9 @@ igt_main
 	xtest(i915_blt_fill_nv_read);
 
 	igt_fixture {
-		intel_batchbuffer_free(intel_batch);
-
 		nouveau_device_del(&ndev);
-		drm_intel_bufmgr_destroy(bufmgr);
 
+		buf_ops_destroy(bops);
 		close(intel_fd);
 		close(nouveau_fd);
 	}

@@ -25,15 +25,12 @@
 #include <sys/ioctl.h>
 #include <errno.h>
 
-#include "intel_bufmgr.h"
+#include "i915/gem_create.h"
 #include "nouveau.h"
 
 static int intel_fd = -1, nouveau_fd = -1;
-static drm_intel_bufmgr *bufmgr;
 static struct nouveau_device *ndev;
 static struct nouveau_client *nclient;
-static uint32_t devid;
-static struct intel_batchbuffer *batch;
 static struct nouveau_object *nchannel, *pcopy;
 static struct nouveau_bufctx *nbufctx;
 static struct nouveau_pushbuf *npush;
@@ -161,16 +158,17 @@ BEGIN_NVXX(struct nouveau_pushbuf *push, int subc, int mthd, int size)
 }
 
 static void
-noop_intel(drm_intel_bo *bo)
+noop_intel(uint32_t bo_handle)
 {
-	BEGIN_BATCH(3, 1);
-	OUT_BATCH(MI_NOOP);
-	OUT_BATCH(MI_BATCH_BUFFER_END);
-	OUT_RELOC(bo, I915_GEM_DOMAIN_RENDER,
-			I915_GEM_DOMAIN_RENDER, 0);
-	ADVANCE_BATCH();
+	struct intel_bb *ibb;
 
-	intel_batchbuffer_flush(batch);
+	ibb = intel_bb_create(intel_fd, 4096);
+	intel_bb_out(ibb, MI_NOOP);
+	intel_bb_out(ibb, MI_BATCH_BUFFER_END);
+	intel_bb_emit_reloc(ibb, bo_handle, I915_GEM_DOMAIN_RENDER,
+			    I915_GEM_DOMAIN_RENDER, 0, 0);
+	intel_bb_flush_blit(ibb);
+	intel_bb_destroy(ibb);
 }
 
 static void find_and_open_devices(void)
@@ -548,25 +546,25 @@ static void test1_micro(void)
 	uint32_t dst_x = 0, dst_y = 0;
 	uint32_t x, y, w = 256, h = 64;
 
-	drm_intel_bo *test_intel_bo;
+	uint32_t intel_handle;
+	uint8_t *gtt_map;
 	int prime_fd;
 
-	test_intel_bo = drm_intel_bo_alloc(bufmgr, "test bo", w * h, 4096);
-	igt_assert(test_intel_bo);
-	drm_intel_bo_set_tiling(test_intel_bo, &tiling, w);
-	igt_assert(tiling == I915_TILING_Y);
-	igt_assert(drm_intel_gem_bo_map_gtt(test_intel_bo) == 0);
+	intel_handle = gem_create(intel_fd, w * h);
+	gem_set_tiling(intel_fd, intel_handle, tiling, w);
 
-	drm_intel_bo_gem_export_to_prime(test_intel_bo, &prime_fd);
-	igt_assert_lte(0, prime_fd);
-	noop_intel(test_intel_bo);
+	gtt_map = gem_mmap__gtt(intel_fd, intel_handle, w * h, PROT_READ | PROT_WRITE);
+
+	prime_fd = prime_handle_to_fd(intel_fd, intel_handle);
+
+	noop_intel(intel_handle);
 
 	nv_bo_alloc(&bo_intel, &intel, w, h, tile_intel_y, prime_fd, 0);
 	nv_bo_alloc(&bo_nvidia, &nvidia, w, h, 0x10, -1, NOUVEAU_BO_VRAM);
 	nv_bo_alloc(&bo_linear, &linear, w, h, 0, -1, NOUVEAU_BO_GART);
 
 	for (y = 0; y < linear.h; ++y) {
-		uint8_t *map = bo_linear->map;
+		uint8_t *map = gtt_map;
 		map += y * linear.pitch;
 		for (x = 0; x < linear.pitch; ++x) {
 			uint8_t pos = x & 0x3f;
@@ -584,15 +582,16 @@ static void test1_micro(void)
 	if (pcopy)
 		perform_copy(bo_intel, &intel, dst_x, dst_y, bo_nvidia, &nvidia, src_x, src_y, w, h);
 	else
-		swtile_y(test_intel_bo->virtual, bo_linear->map, w, h);
+		swtile_y(gtt_map, bo_linear->map, w, h);
 
-	noop_intel(test_intel_bo);
-	check1_micro(test_intel_bo->virtual, intel.pitch, intel.h, dst_x, dst_y, w, h);
+	noop_intel(intel_handle);
+	check1_micro(gtt_map, intel.pitch, intel.h, dst_x, dst_y, w, h);
 
 	nouveau_bo_ref(NULL, &bo_linear);
 	nouveau_bo_ref(NULL, &bo_nvidia);
 	nouveau_bo_ref(NULL, &bo_intel);
-	drm_intel_bo_unreference(test_intel_bo);
+	gem_munmap(gtt_map, w * h);
+	gem_close(intel_fd, intel_handle);
 }
 
 /* test 2, see if we can copy from linear to intel X format safely
@@ -685,43 +684,40 @@ static void test3_base(int tile_src, int tile_dst)
 	uint32_t dst_x = 2 * cpp, dst_y = 26;
 	uint32_t w = 298 * cpp, h = 298;
 
-	drm_intel_bo *test_intel_bo;
+	uint32_t intel_handle;
 	int prime_fd;
 
-	test_intel_bo = drm_intel_bo_alloc(bufmgr, "test bo", 2048 * cpp * 768, 4096);
-	igt_assert(test_intel_bo);
-
-	drm_intel_bo_gem_export_to_prime(test_intel_bo, &prime_fd);
-	igt_assert_lte(0, prime_fd);
+	intel_handle = gem_create(intel_fd, 2048 * cpp * 768);
+	prime_fd = prime_handle_to_fd(intel_fd, intel_handle);
 
 	nv_bo_alloc(&bo_intel, &intel, 2048 * cpp, 768, tile_dst, prime_fd, 0);
 	nv_bo_alloc(&bo_nvidia, &nvidia, 300 * cpp, 300, tile_src, -1, NOUVEAU_BO_VRAM);
 	nv_bo_alloc(&bo_linear, &linear, 2048 * cpp, 768, 0, -1, NOUVEAU_BO_GART);
 
-	noop_intel(test_intel_bo);
+	noop_intel(intel_handle);
 	memset(bo_linear->map, 0x80, bo_linear->size);
 	perform_copy(bo_intel, &intel, 0, 0, bo_linear, &linear, 0, 0, linear.pitch, linear.h);
-	noop_intel(test_intel_bo);
+	noop_intel(intel_handle);
 
 	memset(bo_linear->map, 0x04, bo_linear->size);
 	perform_copy(bo_nvidia, &nvidia, 0, 0, bo_linear, &linear, 0, 0, nvidia.pitch, nvidia.h);
 
 	/* Perform the actual sub rectangle copy */
-	noop_intel(test_intel_bo);
+	noop_intel(intel_handle);
 	perform_copy(bo_intel, &intel, dst_x, dst_y, bo_nvidia, &nvidia, src_x, src_y, w, h);
-	noop_intel(test_intel_bo);
+	noop_intel(intel_handle);
 
 	memset(bo_linear->map, 0x3, bo_linear->size);
-	noop_intel(test_intel_bo);
+	noop_intel(intel_handle);
 	perform_copy(bo_linear, &linear, 0, 0, bo_intel, &intel, 0, 0, intel.pitch, intel.h);
-	noop_intel(test_intel_bo);
+	noop_intel(intel_handle);
 
 	check3(bo_linear->map, linear.pitch, linear.h, dst_x, dst_y, w, h);
 
 	nouveau_bo_ref(NULL, &bo_linear);
 	nouveau_bo_ref(NULL, &bo_nvidia);
 	nouveau_bo_ref(NULL, &bo_intel);
-	drm_intel_bo_unreference(test_intel_bo);
+	gem_close(intel_fd, intel_handle);
 }
 
 static void test3_1(void)
@@ -767,25 +763,23 @@ static void test3_5(void)
 /* Test only new style semaphores, old ones are AWFUL */
 static void test_semaphore(void)
 {
-	drm_intel_bo *test_intel_bo = NULL;
+	uint32_t intel_handle;
 	struct nouveau_bo *sema_bo = NULL;
 	int prime_fd;
-	uint32_t *sema;
+	uint32_t *sema, *gtt_map;
 	struct nouveau_pushbuf *push = npush;
 
 	igt_skip_on(ndev->chipset < 0x84);
 
 	/* Should probably be kept in sysmem */
-	test_intel_bo = drm_intel_bo_alloc(bufmgr, "semaphore bo", 4096, 4096);
-	igt_assert(test_intel_bo);
+	intel_handle = gem_create(intel_fd, 4096);
+	prime_fd = prime_handle_to_fd(intel_fd, intel_handle);
 
-	drm_intel_bo_gem_export_to_prime(test_intel_bo, &prime_fd);
-	igt_assert_lte(0, prime_fd);
 	igt_assert(nouveau_bo_prime_handle_ref(ndev, prime_fd, &sema_bo) == 0);
 	close(prime_fd);
 
-	igt_assert(drm_intel_gem_bo_map_gtt(test_intel_bo) == 0);
-	sema = test_intel_bo->virtual;
+	gtt_map = gem_mmap__gtt(intel_fd, intel_handle, 4096, PROT_READ | PROT_WRITE);
+	sema = gtt_map;
 	sema++;
 	*sema = 0;
 
@@ -845,7 +839,8 @@ static void test_semaphore(void)
 	igt_assert(*sema == 9);
 
 	nouveau_bo_ref(NULL, &sema_bo);
-	drm_intel_bo_unreference(test_intel_bo);
+	gem_munmap(gtt_map, 4096);
+	gem_close(intel_fd, intel_handle);
 }
 
 igt_main
@@ -856,19 +851,8 @@ igt_main
 		igt_require(nouveau_fd != -1);
 		igt_require(intel_fd != -1);
 
-		/* set up intel bufmgr */
-		bufmgr = drm_intel_bufmgr_gem_init(intel_fd, 4096);
-		igt_assert(bufmgr);
-		/* Do not enable reuse, we share (almost) all buffers. */
-		//drm_intel_bufmgr_gem_enable_reuse(bufmgr);
-
 		/* set up nouveau bufmgr */
 		init_nouveau();
-
-		/* set up an intel batch buffer */
-		devid = intel_get_drm_devid(intel_fd);
-		batch = intel_batchbuffer_alloc(bufmgr, devid);
-		igt_assert(batch);
 	}
 
 #define xtest(x, args...) \
@@ -893,11 +877,8 @@ igt_main
 		nouveau_pushbuf_del(&npush);
 		nouveau_object_del(&nchannel);
 
-		intel_batchbuffer_free(batch);
-
 		nouveau_client_del(&nclient);
 		nouveau_device_del(&ndev);
-		drm_intel_bufmgr_destroy(bufmgr);
 
 		close(intel_fd);
 		close(nouveau_fd);
