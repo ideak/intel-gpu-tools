@@ -503,6 +503,80 @@ static void dump_bb_ext(struct gen12_block_copy_data_ext *data)
 }
 
 /**
+ * emit_blt_block_copy:
+ * @i915: drm fd
+ * @ahnd: allocator handle
+ * @blt: basic blitter data (for TGL/DG1 which doesn't support ext version)
+ * @ext: extended blitter data (for DG2+, supports flatccs compression)
+ * @bb_pos: position at which insert block copy commands
+ * @emit_bbe: emit MI_BATCH_BUFFER_END after block-copy or not
+ *
+ * Function inserts block-copy blit into batch at @bb_pos. Allows concatenating
+ * with other commands to achieve pipelining.
+ *
+ * Returns:
+ * Next write position in batch.
+ */
+uint64_t emit_blt_block_copy(int i915,
+			     uint64_t ahnd,
+			     const struct blt_copy_data *blt,
+			     const struct blt_block_copy_data_ext *ext,
+			     uint64_t bb_pos,
+			     bool emit_bbe)
+{
+	struct gen12_block_copy_data data = {};
+	struct gen12_block_copy_data_ext dext = {};
+	uint64_t dst_offset, src_offset, bb_offset, alignment;
+	uint32_t bbe = MI_BATCH_BUFFER_END;
+	uint8_t *bb;
+
+	igt_assert_f(ahnd, "block-copy supports softpin only\n");
+	igt_assert_f(blt, "block-copy requires data to do blit\n");
+
+	alignment = gem_detect_safe_alignment(i915);
+	src_offset = get_offset(ahnd, blt->src.handle, blt->src.size, alignment);
+	dst_offset = get_offset(ahnd, blt->dst.handle, blt->dst.size, alignment);
+	bb_offset = get_offset(ahnd, blt->bb.handle, blt->bb.size, alignment);
+
+	fill_data(&data, blt, src_offset, dst_offset, ext);
+
+	bb = gem_mmap__device_coherent(i915, blt->bb.handle, 0, blt->bb.size,
+				       PROT_READ | PROT_WRITE);
+
+	igt_assert(bb_pos + sizeof(data) < blt->bb.size);
+	memcpy(bb + bb_pos, &data, sizeof(data));
+	bb_pos += sizeof(data);
+
+	if (ext) {
+		fill_data_ext(&dext, ext);
+		igt_assert(bb_pos + sizeof(dext) < blt->bb.size);
+		memcpy(bb + bb_pos, &dext, sizeof(dext));
+		bb_pos += sizeof(dext);
+	}
+
+	if (emit_bbe) {
+		igt_assert(bb_pos + sizeof(uint32_t) < blt->bb.size);
+		memcpy(bb + bb_pos, &bbe, sizeof(bbe));
+		bb_pos += sizeof(uint32_t);
+	}
+
+	if (blt->print_bb) {
+		igt_info("[BLOCK COPY]\n");
+		igt_info("src offset: %" PRIx64 ", dst offset: %" PRIx64
+			 ", bb offset: %" PRIx64 "\n",
+			 src_offset, dst_offset, bb_offset);
+
+		dump_bb_cmd(&data);
+		if (ext)
+			dump_bb_ext(&dext);
+	}
+
+	munmap(bb, blt->bb.size);
+
+	return bb_pos;
+}
+
+/**
  * blt_block_copy:
  * @i915: drm fd
  * @ctx: intel_ctx_t context
@@ -525,49 +599,18 @@ int blt_block_copy(int i915,
 {
 	struct drm_i915_gem_execbuffer2 execbuf = {};
 	struct drm_i915_gem_exec_object2 obj[3] = {};
-	struct gen12_block_copy_data data = {};
-	struct gen12_block_copy_data_ext dext = {};
 	uint64_t dst_offset, src_offset, bb_offset, alignment;
-	uint32_t *bb;
-	int i, ret;
+	int ret;
 
 	igt_assert_f(ahnd, "block-copy supports softpin only\n");
 	igt_assert_f(blt, "block-copy requires data to do blit\n");
 
 	alignment = gem_detect_safe_alignment(i915);
 	src_offset = get_offset(ahnd, blt->src.handle, blt->src.size, alignment);
-	if (__special_mode(blt) == SM_FULL_RESOLVE)
-		dst_offset = src_offset;
-	else
-		dst_offset = get_offset(ahnd, blt->dst.handle, blt->dst.size, alignment);
+	dst_offset = get_offset(ahnd, blt->dst.handle, blt->dst.size, alignment);
 	bb_offset = get_offset(ahnd, blt->bb.handle, blt->bb.size, alignment);
 
-	fill_data(&data, blt, src_offset, dst_offset, ext);
-
-	i = sizeof(data) / sizeof(uint32_t);
-	bb = gem_mmap__device_coherent(i915, blt->bb.handle, 0, blt->bb.size,
-				       PROT_READ | PROT_WRITE);
-	memcpy(bb, &data, sizeof(data));
-
-	if (ext) {
-		fill_data_ext(&dext, ext);
-		memcpy(bb + i, &dext, sizeof(dext));
-		i += sizeof(dext) / sizeof(uint32_t);
-	}
-	bb[i++] = MI_BATCH_BUFFER_END;
-
-	if (blt->print_bb) {
-		igt_info("[BLOCK COPY]\n");
-		igt_info("src offset: %llx, dst offset: %llx, bb offset: %llx\n",
-			 (long long) src_offset, (long long) dst_offset,
-			 (long long) bb_offset);
-
-		dump_bb_cmd(&data);
-		if (ext)
-			dump_bb_ext(&dext);
-	}
-
-	munmap(bb, blt->bb.size);
+	emit_blt_block_copy(i915, ahnd, blt, ext, 0, true);
 
 	obj[0].offset = CANONICAL(dst_offset);
 	obj[1].offset = CANONICAL(src_offset);
@@ -655,6 +698,85 @@ static void dump_bb_surf_ctrl_cmd(const struct gen12_ctrl_surf_copy_data *data)
 }
 
 /**
+ * emit_blt_ctrl_surf_copy:
+ * @i915: drm fd
+ * @ahnd: allocator handle
+ * @surf: blitter data for ctrl-surf-copy
+ * @bb_pos: position at which insert block copy commands
+ * @emit_bbe: emit MI_BATCH_BUFFER_END after ctrl-surf-copy or not
+ *
+ * Function emits ctrl-surf-copy blit between @src and @dst described in
+ * @blt object at @bb_pos. Allows concatenating with other commands to
+ * achieve pipelining.
+ *
+ * Returns:
+ * Next write position in batch.
+ */
+uint64_t emit_blt_ctrl_surf_copy(int i915,
+				 uint64_t ahnd,
+				 const struct blt_ctrl_surf_copy_data *surf,
+				 uint64_t bb_pos,
+				 bool emit_bbe)
+{
+	struct gen12_ctrl_surf_copy_data data = {};
+	uint64_t dst_offset, src_offset, bb_offset, alignment;
+	uint32_t bbe = MI_BATCH_BUFFER_END;
+	uint32_t *bb;
+
+	igt_assert_f(ahnd, "ctrl-surf-copy supports softpin only\n");
+	igt_assert_f(surf, "ctrl-surf-copy requires data to do ctrl-surf-copy blit\n");
+
+	alignment = max_t(uint64_t, gem_detect_safe_alignment(i915), 1ull << 16);
+
+	data.dw00.client = 0x2;
+	data.dw00.opcode = 0x48;
+	data.dw00.src_access_type = surf->src.access_type;
+	data.dw00.dst_access_type = surf->dst.access_type;
+
+	/* Ensure dst has size capable to keep src ccs aux */
+	data.dw00.size_of_ctrl_copy = __ccs_size(surf) / CCS_RATIO - 1;
+	data.dw00.length = 0x3;
+
+	src_offset = get_offset(ahnd, surf->src.handle, surf->src.size, alignment);
+	dst_offset = get_offset(ahnd, surf->dst.handle, surf->dst.size, alignment);
+	bb_offset = get_offset(ahnd, surf->bb.handle, surf->bb.size, alignment);
+
+	data.dw01.src_address_lo = src_offset;
+	data.dw02.src_address_hi = src_offset >> 32;
+	data.dw02.src_mocs = surf->src.mocs;
+
+	data.dw03.dst_address_lo = dst_offset;
+	data.dw04.dst_address_hi = dst_offset >> 32;
+	data.dw04.dst_mocs = surf->dst.mocs;
+
+	bb = gem_mmap__device_coherent(i915, surf->bb.handle, 0, surf->bb.size,
+				       PROT_READ | PROT_WRITE);
+
+	igt_assert(bb_pos + sizeof(data) < surf->bb.size);
+	memcpy(bb + bb_pos, &data, sizeof(data));
+	bb_pos += sizeof(data);
+
+	if (emit_bbe) {
+		igt_assert(bb_pos + sizeof(uint32_t) < surf->bb.size);
+		memcpy(bb + bb_pos, &bbe, sizeof(bbe));
+		bb_pos += sizeof(uint32_t);
+	}
+
+	if (surf->print_bb) {
+		igt_info("[CTRL SURF]:\n");
+		igt_info("src offset: %" PRIx64 ", dst offset: %" PRIx64
+			 ", bb offset: %" PRIx64 "\n",
+			 src_offset, dst_offset, bb_offset);
+
+		dump_bb_surf_ctrl_cmd(&data);
+	}
+
+	munmap(bb, surf->bb.size);
+
+	return bb_pos;
+}
+
+/**
  * blt_ctrl_surf_copy:
  * @i915: drm fd
  * @ctx: intel_ctx_t context
@@ -676,55 +798,17 @@ int blt_ctrl_surf_copy(int i915,
 {
 	struct drm_i915_gem_execbuffer2 execbuf = {};
 	struct drm_i915_gem_exec_object2 obj[3] = {};
-	struct gen12_ctrl_surf_copy_data data = {};
 	uint64_t dst_offset, src_offset, bb_offset, alignment;
-	uint32_t *bb;
-	int i;
 
 	igt_assert_f(ahnd, "ctrl-surf-copy supports softpin only\n");
 	igt_assert_f(surf, "ctrl-surf-copy requires data to do ctrl-surf-copy blit\n");
 
 	alignment = max_t(uint64_t, gem_detect_safe_alignment(i915), 1ull << 16);
+	src_offset = get_offset(ahnd, surf->src.handle, surf->src.size, alignment);
+	dst_offset = get_offset(ahnd, surf->dst.handle, surf->dst.size, alignment);
+	bb_offset = get_offset(ahnd, surf->bb.handle, surf->bb.size, alignment);
 
-	data.dw00.client = 0x2;
-	data.dw00.opcode = 0x48;
-	data.dw00.src_access_type = surf->src.access_type;
-	data.dw00.dst_access_type = surf->dst.access_type;
-
-	/* Ensure dst has size capable to keep src ccs aux */
-	data.dw00.size_of_ctrl_copy = __ccs_size(surf) / CCS_RATIO - 1;
-	data.dw00.length = 0x3;
-
-	src_offset = get_offset(ahnd, surf->src.handle, surf->src.size,
-				alignment);
-	dst_offset = get_offset(ahnd, surf->dst.handle, surf->dst.size,
-				alignment);
-	bb_offset = get_offset(ahnd, surf->bb.handle, surf->bb.size,
-			       alignment);
-
-	data.dw01.src_address_lo = src_offset;
-	data.dw02.src_address_hi = src_offset >> 32;
-	data.dw02.src_mocs = surf->src.mocs;
-
-	data.dw03.dst_address_lo = dst_offset;
-	data.dw04.dst_address_hi = dst_offset >> 32;
-	data.dw04.dst_mocs = surf->dst.mocs;
-
-	i = sizeof(data) / sizeof(uint32_t);
-	bb = gem_mmap__device_coherent(i915, surf->bb.handle, 0, surf->bb.size,
-				       PROT_READ | PROT_WRITE);
-	memcpy(bb, &data, sizeof(data));
-	bb[i++] = MI_BATCH_BUFFER_END;
-
-	if (surf->print_bb) {
-		igt_info("BB [CTRL SURF]:\n");
-		igt_info("src offset: %llx, dst offset: %llx, bb offset: %llx\n",
-			 (long long) src_offset, (long long) dst_offset,
-			 (long long) bb_offset);
-
-		dump_bb_surf_ctrl_cmd(&data);
-	}
-	munmap(bb, surf->bb.size);
+	emit_blt_ctrl_surf_copy(i915, ahnd, surf, 0, true);
 
 	obj[0].offset = CANONICAL(dst_offset);
 	obj[1].offset = CANONICAL(src_offset);
@@ -869,31 +953,31 @@ static void dump_bb_fast_cmd(struct gen12_fast_copy_data *data)
 }
 
 /**
- * blt_fast_copy:
+ * emit_blt_fast_copy:
  * @i915: drm fd
- * @ctx: intel_ctx_t context
- * @e: blitter engine for @ctx
  * @ahnd: allocator handle
  * @blt: blitter data for fast-copy (same as for block-copy but doesn't use
  * compression fields).
+ * @bb_pos: position at which insert block copy commands
+ * @emit_bbe: emit MI_BATCH_BUFFER_END after fast-copy or not
  *
- * Function does fast blit between @src and @dst described in @blt object.
+ * Function emits fast-copy blit between @src and @dst described in @blt object
+ * at @bb_pos. Allows concatenating with other commands to
+ * achieve pipelining.
  *
  * Returns:
- * execbuffer status.
+ * Next write position in batch.
  */
-int blt_fast_copy(int i915,
-		  const intel_ctx_t *ctx,
-		  const struct intel_execution_engine2 *e,
-		  uint64_t ahnd,
-		  const struct blt_copy_data *blt)
+uint64_t emit_blt_fast_copy(int i915,
+			    uint64_t ahnd,
+			    const struct blt_copy_data *blt,
+			    uint64_t bb_pos,
+			    bool emit_bbe)
 {
-	struct drm_i915_gem_execbuffer2 execbuf = {};
-	struct drm_i915_gem_exec_object2 obj[3] = {};
 	struct gen12_fast_copy_data data = {};
 	uint64_t dst_offset, src_offset, bb_offset, alignment;
+	uint32_t bbe = MI_BATCH_BUFFER_END;
 	uint32_t *bb;
-	int i, ret;
 
 	alignment = gem_detect_safe_alignment(i915);
 
@@ -931,21 +1015,64 @@ int blt_fast_copy(int i915,
 	data.dw08.src_address_lo = src_offset;
 	data.dw09.src_address_hi = src_offset >> 32;
 
-	i = sizeof(data) / sizeof(uint32_t);
 	bb = gem_mmap__device_coherent(i915, blt->bb.handle, 0, blt->bb.size,
 				       PROT_READ | PROT_WRITE);
 
-	memcpy(bb, &data, sizeof(data));
-	bb[i++] = MI_BATCH_BUFFER_END;
+	igt_assert(bb_pos + sizeof(data) < blt->bb.size);
+	memcpy(bb + bb_pos, &data, sizeof(data));
+	bb_pos += sizeof(data);
+
+	if (emit_bbe) {
+		igt_assert(bb_pos + sizeof(uint32_t) < blt->bb.size);
+		memcpy(bb + bb_pos, &bbe, sizeof(bbe));
+		bb_pos += sizeof(uint32_t);
+	}
 
 	if (blt->print_bb) {
-		igt_info("BB [FAST COPY]\n");
-		igt_info("blit [src offset: %llx, dst offset: %llx\n",
-			 (long long) src_offset, (long long) dst_offset);
+		igt_info("[FAST COPY]\n");
+		igt_info("src offset: %" PRIx64 ", dst offset: %" PRIx64
+			 ", bb offset: %" PRIx64 "\n",
+			 src_offset, dst_offset, bb_offset);
 		dump_bb_fast_cmd(&data);
 	}
 
 	munmap(bb, blt->bb.size);
+
+	return bb_pos;
+}
+
+/**
+ * blt_fast_copy:
+ * @i915: drm fd
+ * @ctx: intel_ctx_t context
+ * @e: blitter engine for @ctx
+ * @ahnd: allocator handle
+ * @blt: blitter data for fast-copy (same as for block-copy but doesn't use
+ * compression fields).
+ *
+ * Function does fast blit between @src and @dst described in @blt object.
+ *
+ * Returns:
+ * execbuffer status.
+ */
+int blt_fast_copy(int i915,
+		  const intel_ctx_t *ctx,
+		  const struct intel_execution_engine2 *e,
+		  uint64_t ahnd,
+		  const struct blt_copy_data *blt)
+{
+	struct drm_i915_gem_execbuffer2 execbuf = {};
+	struct drm_i915_gem_exec_object2 obj[3] = {};
+	uint64_t dst_offset, src_offset, bb_offset, alignment;
+	int ret;
+
+	alignment = gem_detect_safe_alignment(i915);
+
+	src_offset = get_offset(ahnd, blt->src.handle, blt->src.size, alignment);
+	dst_offset = get_offset(ahnd, blt->dst.handle, blt->dst.size, alignment);
+	bb_offset = get_offset(ahnd, blt->bb.handle, blt->bb.size, alignment);
+
+	emit_blt_fast_copy(i915, ahnd, blt, 0, true);
 
 	obj[0].offset = CANONICAL(dst_offset);
 	obj[1].offset = CANONICAL(src_offset);

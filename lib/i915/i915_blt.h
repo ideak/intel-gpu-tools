@@ -168,6 +168,13 @@ bool blt_supports_compression(int i915);
 bool blt_supports_tiling(int i915, enum blt_tiling tiling);
 const char *blt_tiling_name(enum blt_tiling tiling);
 
+uint64_t emit_blt_block_copy(int i915,
+			     uint64_t ahnd,
+			     const struct blt_copy_data *blt,
+			     const struct blt_block_copy_data_ext *ext,
+			     uint64_t bb_pos,
+			     bool emit_bbe);
+
 int blt_block_copy(int i915,
 		   const intel_ctx_t *ctx,
 		   const struct intel_execution_engine2 *e,
@@ -175,11 +182,23 @@ int blt_block_copy(int i915,
 		   const struct blt_copy_data *blt,
 		   const struct blt_block_copy_data_ext *ext);
 
+uint64_t emit_blt_ctrl_surf_copy(int i915,
+				 uint64_t ahnd,
+				 const struct blt_ctrl_surf_copy_data *surf,
+				 uint64_t bb_pos,
+				 bool emit_bbe);
+
 int blt_ctrl_surf_copy(int i915,
 		       const intel_ctx_t *ctx,
 		       const struct intel_execution_engine2 *e,
 		       uint64_t ahnd,
 		       const struct blt_ctrl_surf_copy_data *surf);
+
+uint64_t emit_blt_fast_copy(int i915,
+			    uint64_t ahnd,
+			    const struct blt_copy_data *blt,
+			    uint64_t bb_pos,
+			    bool emit_bbe);
 
 int blt_fast_copy(int i915,
 		  const intel_ctx_t *ctx,
