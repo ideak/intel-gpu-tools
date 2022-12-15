@@ -317,13 +317,11 @@ static void fill_data(struct gen12_block_copy_data *data,
 	data->dw00.special_mode = __special_mode(blt);
 	data->dw00.length = extended_command ? 20 : 10;
 
-	if (__special_mode(blt) == SM_FULL_RESOLVE && blt->src.tiling == T_TILE64) {
-		data->dw01.dst_pitch = blt->src.pitch - 1;
+	if (__special_mode(blt) == SM_FULL_RESOLVE)
 		data->dw01.dst_aux_mode = __aux_mode(&blt->src);
-	} else {
-		data->dw01.dst_pitch = blt->dst.pitch - 1;
+	else
 		data->dw01.dst_aux_mode = __aux_mode(&blt->dst);
-	}
+	data->dw01.dst_pitch = blt->dst.pitch - 1;
 
 	data->dw01.dst_mocs = blt->dst.mocs;
 	data->dw01.dst_compression = blt->dst.compression;
