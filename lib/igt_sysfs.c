@@ -784,3 +784,77 @@ void fbcon_blink_enable(bool enable)
 	write(fd, buffer, r + 1);
 	close(fd);
 }
+
+static bool rw_attr_equal_within_epsilon(uint64_t x, uint64_t ref, double tol)
+{
+	return (x <= (1.0 + tol) * ref) && (x >= (1.0 - tol) * ref);
+}
+
+/* Sweep the range of values for an attribute to identify matching reads/writes */
+static int rw_attr_sweep(igt_sysfs_rw_attr_t *rw)
+{
+	uint64_t get, set = rw->start;
+	int num_points = 0;
+	bool ret;
+
+	igt_debug("'%s': sweeping range of values\n", rw->attr);
+	while (set < UINT64_MAX / 2) {
+		ret = igt_sysfs_set_u64(rw->dir, rw->attr, set);
+		get = igt_sysfs_get_u64(rw->dir, rw->attr);
+		igt_debug("'%s': ret %d set %lu get %lu\n", rw->attr, ret, set, get);
+		if (ret && rw_attr_equal_within_epsilon(get, set, rw->tol)) {
+			igt_debug("'%s': matches\n", rw->attr);
+			num_points++;
+		}
+		set *= 2;
+	}
+	igt_debug("'%s': done sweeping\n", rw->attr);
+
+	return num_points ? 0 : -ENOENT;
+}
+
+/**
+ * igt_sysfs_rw_attr_verify:
+ * @rw: 'struct igt_sysfs_rw_attr' describing a rw sysfs attr
+ *
+ * This function attempts to verify writable sysfs attributes, that is the
+ * attribute is first written to and then read back and it is verified that
+ * the read value matches the written value to a tolerance. However, when
+ * we try to do this we run into the issue that a sysfs attribute might
+ * have a behavior where the read value is different from the written value
+ * for any reason. For example, attributes such as power, voltage,
+ * frequency and time typically have a linear region outside which they are
+ * clamped (the values saturate). Therefore for such attributes read values
+ * match the written value only in the linear region and when writing we
+ * don't know if we are writing to the linear or to the clamped region.
+ *
+ * Therefore the verification implemented here takes the approach of
+ * sweeping across the range of possible values of the attribute (this is
+ * done using 'doubling' rather than linearly) and seeing where there are
+ * matches. There should be at least one match (to a tolerance) for the
+ * verification to have succeeded.
+ */
+void igt_sysfs_rw_attr_verify(igt_sysfs_rw_attr_t *rw)
+{
+	uint64_t prev, get;
+	struct stat st;
+	int ret;
+
+	igt_assert(!fstatat(rw->dir, rw->attr, &st, 0));
+	igt_assert(st.st_mode & 0222); /* writable */
+	igt_assert(rw->start);	/* cannot be 0 */
+
+	prev = igt_sysfs_get_u64(rw->dir, rw->attr);
+	igt_debug("'%s': prev %lu\n", rw->attr, prev);
+
+	ret = rw_attr_sweep(rw);
+
+	/*
+	 * Restore previous value: we don't assert before this point so
+	 * that we can restore the attr before asserting
+	 */
+	igt_assert_eq(1, igt_sysfs_set_u64(rw->dir, rw->attr, prev));
+	get = igt_sysfs_get_u64(rw->dir, rw->attr);
+	igt_assert_eq(get, prev);
+	igt_assert(!ret);
+}

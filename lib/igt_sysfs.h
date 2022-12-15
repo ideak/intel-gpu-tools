@@ -125,4 +125,24 @@ void bind_fbcon(bool enable);
 void kick_snd_hda_intel(void);
 void fbcon_blink_enable(bool enable);
 
+/**
+ * igt_sysfs_rw_attr:
+ * @dir: file descriptor for parent directory
+ * @attr: name of sysfs attribute
+ * @start: start value for searching for matching reads/writes
+ * @tol: tolerance to use to compare written and read values
+ * @rsvd: reserved field used internally
+ *
+ * Structure used to describe the rw sysfs attribute to
+ * igt_sysfs_rw_attr_verify
+ */
+typedef struct igt_sysfs_rw_attr {
+	int dir;
+	char *attr;
+	uint64_t start;
+	double tol;
+} igt_sysfs_rw_attr_t;
+
+void igt_sysfs_rw_attr_verify(igt_sysfs_rw_attr_t *rw);
+
 #endif /* __IGT_SYSFS_H__ */
