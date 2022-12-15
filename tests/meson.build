@@ -211,6 +211,7 @@ i915_progs = [
 	'i915_fb_tiling',
 	'i915_getparams_basic',
 	'i915_hangman',
+	'i915_hwmon',
 	'i915_module_load',
 	'i915_pciid',
 	'i915_pipe_stress',
