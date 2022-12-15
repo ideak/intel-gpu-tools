@@ -848,6 +848,14 @@ static void trigger_pxp_debugfs_forced_teardown(int i915)
 	char str[32];
 
 	fd = igt_debugfs_open(i915, "gt/pxp/terminate_state", O_RDWR);
+	/*
+	 * On newer kernels, we promoted PXP to be a global i915 subsystem,
+	 * so try again with a top-level path if we failed at the gt path.
+	 * If we still fail, then we assert out.
+	 */
+	if (fd < 0)
+		fd = igt_debugfs_open(i915, "pxp/terminate_state", O_RDWR);
+
 	igt_assert_f(fd >= 0, "Can't open pxp termination debugfs\n");
 	ret = snprintf(str, sizeof(str), "0x1");
 	igt_assert(ret > 2 && ret < sizeof(str));
