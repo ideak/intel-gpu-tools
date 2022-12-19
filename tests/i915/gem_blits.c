@@ -264,11 +264,11 @@ static void buffer_set_tiling(const struct device *device,
 	gem_execbuf(device->fd, &execbuf);
 
 	gem_close(device->fd, obj[2].handle);
-	put_offset(device->ahnd, obj[2].offset);
+	put_offset(device->ahnd, obj[2].handle);
 
 	gem_close(device->fd, obj[1].handle);
+	put_offset(device->ahnd, obj[1].handle);
 
-	put_offset(device->ahnd, buffer->gtt_offset);
 	buffer->gtt_offset = obj[0].offset;
 	buffer->handle = obj[0].handle;
 
@@ -403,11 +403,11 @@ static bool blit_to_linear(const struct device *device,
 
 	gem_execbuf(device->fd, &execbuf);
 	gem_close(device->fd, obj[2].handle);
-	put_offset(device->ahnd, obj[2].offset);
+	put_offset(device->ahnd, obj[2].handle);
 
 	gem_sync(device->fd, obj[0].handle);
 	gem_close(device->fd, obj[0].handle);
-	put_offset(device->ahnd, obj[0].offset);
+	put_offset(device->ahnd, obj[0].handle);
 
 	return true;
 }
@@ -531,7 +531,7 @@ static void buffer_free(const struct device *device, struct buffer *buffer)
 {
 	igt_assert(buffer_check(device, buffer, GTT));
 	gem_close(device->fd, buffer->handle);
-	put_offset(device->ahnd, buffer->gtt_offset);
+	put_offset(device->ahnd, buffer->handle);
 	free(buffer);
 }
 
@@ -744,7 +744,7 @@ blit(const struct device *device,
 
 	gem_execbuf(device->fd, &execbuf);
 	gem_close(device->fd, obj[2].handle);
-	put_offset(device->ahnd, obj[2].offset);
+	put_offset(device->ahnd, obj[2].handle);
 
 	dst->gtt_offset = obj[0].offset;
 	src->gtt_offset = obj[1].offset;

@@ -437,7 +437,7 @@ static void write_regs(int fd, uint64_t ahnd,
 	}
 	gem_execbuf(fd, &execbuf);
 	gem_close(fd, obj.handle);
-	put_offset(ahnd, obj.offset);
+	put_offset(ahnd, obj.handle);
 }
 
 static void restore_regs(int fd,
@@ -524,8 +524,8 @@ static void restore_regs(int fd,
 	execbuf.rsvd1 = ctx->id;
 	gem_execbuf(fd, &execbuf);
 	gem_close(fd, obj[1].handle);
-	put_offset(ahnd, obj[0].offset);
-	put_offset(ahnd, obj[1].offset);
+	put_offset(ahnd, obj[0].handle);
+	put_offset(ahnd, obj[1].handle);
 }
 
 __attribute__((unused))
