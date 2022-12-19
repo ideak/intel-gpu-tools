@@ -106,10 +106,10 @@ static void init_hang(struct hang *h, int fd, const intel_ctx_cfg_t *cfg)
 	if (gem_has_contexts(fd)) {
 		h->ctx = intel_ctx_create(h->fd, cfg);
 		h->execbuf.rsvd1 = h->ctx->id;
-		h->ahnd = get_reloc_ahnd(fd, h->ctx->id);
+		h->ahnd = get_reloc_ahnd(h->fd, h->ctx->id);
 	} else {
 		h->ctx = NULL;
-		h->ahnd = get_reloc_ahnd(fd, 0);
+		h->ahnd = get_reloc_ahnd(h->fd, 0);
 	}
 
 	memset(&h->execbuf, 0, sizeof(h->execbuf));
@@ -174,7 +174,8 @@ static void submit_hang(struct hang *h, unsigned *engines, int nengine, unsigned
 
 static void fini_hang(struct hang *h)
 {
-	put_offset(h->ahnd, h->bb_offset);
+	gem_close(h->fd, h->obj.handle);
+	put_offset(h->ahnd, h->obj.handle);
 	put_ahnd(h->ahnd);
 	intel_ctx_destroy(h->fd, h->ctx);
 	close(h->fd);
