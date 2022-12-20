@@ -96,9 +96,10 @@ static void reserve_simple(int fd)
 static void reserve(int fd, uint8_t type)
 {
 	struct test_obj obj;
-	uint64_t ahnd, offset = 0x40000, size = 0x1000;
+	uint64_t ahnd, offset, size = 0x1000;
 
 	ahnd = intel_allocator_open(fd, 0, type);
+	intel_allocator_get_address_range(ahnd, &offset, NULL);
 
 	igt_assert_eq(intel_allocator_reserve(ahnd, 0, size, offset), true);
 	/* try overlapping won't succeed */
