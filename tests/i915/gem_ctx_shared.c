@@ -538,13 +538,13 @@ static void store_dword(int i915, uint64_t ahnd, const intel_ctx_t *ctx,
 	obj[2].handle = gem_create(i915, 4096);
 	if (ahnd) {
 		obj[0].offset = get_offset(ahnd, cork, cork_size, 0);
-		obj[0].flags |= EXEC_OBJECT_PINNED;
+		obj[0].flags |= EXEC_OBJECT_PINNED | EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 		obj[1].offset = get_offset(ahnd, target, target_size, 0);
-		obj[1].flags |= EXEC_OBJECT_PINNED;
+		obj[1].flags |= EXEC_OBJECT_PINNED | EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 		if (write_domain)
 			obj[1].flags |= EXEC_OBJECT_WRITE;
 		obj[2].offset = get_offset(ahnd, obj[2].handle, 4096, 0x0);
-		obj[2].flags |= EXEC_OBJECT_PINNED;
+		obj[2].flags |= EXEC_OBJECT_PINNED | EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 		execbuf.flags |= I915_EXEC_NO_RELOC;
 	} else {
 		obj[0].offset = cork << 20;
@@ -581,6 +581,7 @@ static void store_dword(int i915, uint64_t ahnd, const intel_ctx_t *ctx,
 	gem_write(i915, obj[2].handle, 0, batch, sizeof(batch));
 	gem_execbuf(i915, &execbuf);
 	gem_close(i915, obj[2].handle);
+	put_offset(ahnd, obj[2].handle);
 }
 
 static const intel_ctx_t *
