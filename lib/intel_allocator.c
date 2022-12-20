@@ -910,6 +910,9 @@ static uint64_t __intel_allocator_open_full(int fd, uint32_t ctx,
 	struct alloc_resp resp;
 	uint64_t gtt_size;
 
+	if (!start)
+		req.open.start = gem_detect_safe_start_offset(fd);
+
 	if (!end) {
 		igt_assert_f(can_report_gtt_size(fd), "Invalid fd\n");
 		gtt_size = gem_aperture_size(fd);
@@ -923,6 +926,8 @@ static uint64_t __intel_allocator_open_full(int fd, uint32_t ctx,
 
 	if (!default_alignment)
 		req.open.default_alignment = gem_detect_safe_alignment(fd);
+
+	req.open.start = ALIGN(req.open.start, req.open.default_alignment);
 
 	/* Get child_tid only once at open() */
 	if (child_tid == -1)
