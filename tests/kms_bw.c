@@ -194,6 +194,13 @@ static void run_test_linear_tiling(data_t *data, int pipe, const drmModeModeInfo
 		igt_pipe_crc_collect_crc(data->pipe_crc[i], &captured[i]);
 		igt_assert_f(!igt_check_crc_equal(&zero, &captured[i]),
 			     "CRC is zero\n");
+	}
+
+	for (i = pipe; i >= 0; i--) {
+		output = data->output[i];
+		if (!output)
+			continue;
+
 		igt_remove_fb(display->drm_fd, &buffer[i]);
 	}
 
