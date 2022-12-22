@@ -8,6 +8,8 @@ igt@vc4/vc4_label_bo@set-bad-handle
 igt@vc4/vc4_label_bo@set-bad-name
 igt@vc4/vc4_label_bo@set-kernel-name
 igt@vc4/vc4_lookup_fail@bad-color-write
+igt@vc4/vc4_mmap@mmap-bad-handle
+igt@vc4/vc4_mmap@mmap-bo
 igt@vc4/vc4_perfmon@create-perfmon-0
 igt@vc4/vc4_perfmon@create-perfmon-exceed
 igt@vc4/vc4_perfmon@create-perfmon-invalid-events

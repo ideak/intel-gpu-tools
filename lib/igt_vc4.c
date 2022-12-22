@@ -138,6 +138,8 @@ igt_vc4_mmap_bo(int fd, uint32_t handle, uint32_t size, unsigned prot)
 
 	do_ioctl(fd, DRM_IOCTL_VC4_MMAP_BO, &mmap_bo);
 
+	igt_assert_eq(mmap_bo.offset % sysconf(_SC_PAGE_SIZE), 0);
+
 	ptr = mmap(0, size, prot, MAP_SHARED, fd, mmap_bo.offset);
 	if (ptr == MAP_FAILED)
 		return NULL;

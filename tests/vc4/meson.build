@@ -3,6 +3,7 @@ vc4_progs = [
 	'vc4_dmabuf_poll',
 	'vc4_label_bo',
 	'vc4_lookup_fail',
+	'vc4_mmap',
 	'vc4_perfmon',
 	'vc4_purgeable_bo',
 	'vc4_tiling',
