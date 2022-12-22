@@ -33,12 +33,45 @@ igt_main
 	igt_fixture
 		fd = drm_open_driver(DRIVER_V3D);
 
+	igt_describe("Make sure that flags is equal to zero.");
+	igt_subtest("mmap-bad-flags") {
+		struct drm_v3d_mmap_bo get = {
+			.flags = 1,
+		};
+		do_ioctl_err(fd, DRM_IOCTL_V3D_MMAP_BO, &get, EINVAL);
+	}
+
 	igt_describe("Make sure an invalid BO cannot be mapped.");
 	igt_subtest("mmap-bad-handle") {
 		struct drm_v3d_mmap_bo get = {
 			.handle = 0xd0d0d0d0,
 		};
 		do_ioctl_err(fd, DRM_IOCTL_V3D_MMAP_BO, &get, ENOENT);
+	}
+
+	igt_describe("Test basics of newly mapped bo like default content, write and read "
+		     "coherency, mapping existence after gem_close and unmapping.");
+	igt_subtest("mmap-bo") {
+		struct v3d_bo *bo = igt_v3d_create_bo(fd, PAGE_SIZE);
+		uint8_t expected[PAGE_SIZE];
+
+		igt_v3d_bo_mmap(fd, bo);
+
+		/* Testing contents of newly created objects. */
+		memset(expected, 0, sizeof(expected));
+		igt_assert_eq(memcmp(bo->map, expected, sizeof(expected)), 0);
+
+		memset(bo->map, 0xd0, PAGE_SIZE);
+		memset(expected, 0xd0, PAGE_SIZE);
+		igt_assert_eq(memcmp(expected, bo->map, sizeof(expected)), 0);
+
+		/* Testing that mapping stays after close */
+		gem_close(fd, bo->handle);
+		igt_assert_eq(memcmp(expected, bo->map, sizeof(expected)), 0);
+
+		/* Testing unmapping */
+		munmap(bo->map, PAGE_SIZE);
+		free(bo);
 	}
 
 	igt_fixture

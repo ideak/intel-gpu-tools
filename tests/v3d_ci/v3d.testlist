@@ -7,7 +7,9 @@ igt@v3d/v3d_get_bo_offset@get-bad-handle
 igt@v3d/v3d_get_param@base-params
 igt@v3d/v3d_get_param@get-bad-param
 igt@v3d/v3d_get_param@get-bad-flags
+igt@v3d/v3d_mmap@mmap-bad-flags
 igt@v3d/v3d_mmap@mmap-bad-handle
+igt@v3d/v3d_mmap@mmap-bo
 igt@v3d/v3d_perfmon@create-perfmon-0
 igt@v3d/v3d_perfmon@create-perfmon-exceed
 igt@v3d/v3d_perfmon@create-perfmon-invalid-counters
