@@ -366,6 +366,7 @@ static void check_scaling_pipe_plane_rot(data_t *d, igt_plane_t *plane,
 
 	igt_plane_set_fb(plane, NULL);
 	igt_plane_set_position(plane, 0, 0);
+	cleanup_fbs(d);
 
 	igt_skip_on_f(commit_ret == -ERANGE || commit_ret == -EINVAL,
 		      "Unsupported scaling factor with fb size %dx%d\n",
@@ -670,8 +671,7 @@ test_planes_scaling_combo(data_t *d, int w1, int h1, int w2, int h2,
 					    test_type);
 	}
 
-	igt_remove_fb(display->drm_fd, &d->fb[1]);
-	igt_remove_fb(display->drm_fd, &d->fb[2]);
+	cleanup_fbs(d);
 }
 
 static void
@@ -735,9 +735,7 @@ test_invalid_num_scalers(data_t *d, enum pipe pipe, igt_output_t *output)
 	igt_plane_set_fb(plane[0], NULL);
 	igt_plane_set_fb(plane[1], NULL);
 	igt_plane_set_fb(plane[2], NULL);
-	igt_remove_fb(display->drm_fd, &d->fb[0]);
-	igt_remove_fb(display->drm_fd, &d->fb[1]);
-	igt_remove_fb(display->drm_fd, &d->fb[2]);
+	cleanup_fbs(d);
 }
 
 static void test_scaler_with_multi_pipe_plane(data_t *d)
@@ -813,6 +811,7 @@ static void test_scaler_with_multi_pipe_plane(data_t *d)
 	igt_plane_set_fb(plane[1], NULL);
 	igt_plane_set_fb(plane[2], NULL);
 	igt_plane_set_fb(plane[3], NULL);
+	cleanup_fbs(d);
 
 	igt_skip_on_f(ret1 == -ERANGE || ret1 == -EINVAL ||
 		      ret2 == -ERANGE || ret1 == -EINVAL,
