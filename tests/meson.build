@@ -249,7 +249,10 @@ msm_progs = [
 ]
 
 chamelium_progs = [
-	'kms_chamelium',
+	'kms_chamelium_audio',
+	'kms_chamelium_edid',
+	'kms_chamelium_frames',
+	'kms_chamelium_hpd',
 ]
 
 test_deps = [ igt_deps ]
@@ -298,7 +301,8 @@ endforeach
 if chamelium.found()
 	foreach prog : chamelium_progs
 		test_executables += executable(prog,
-				 join_paths('chamelium', prog + '.c'),
+				 [join_paths('chamelium', prog + '.c'),
+					join_paths('chamelium', 'kms_chamelium_helper.c')],
 				 dependencies : test_deps,
 				 install_dir : libexecdir,
 				 install_rpath : libexecdir_rpathdir,
@@ -425,13 +429,13 @@ test_executables += executable('kms_color',
 test_list += 'kms_color'
 
 if chamelium.found()
-       test_executables += executable('kms_color_chamelium',
-                             [ 'chamelium/kms_color_chamelium.c', 'kms_color_helper.c' ],
+       test_executables += executable('kms_chamelium_color',
+                             [ 'chamelium/kms_chamelium_color.c', 'kms_color_helper.c' ],
                              dependencies : test_deps + [ chamelium ],
                              install_dir : libexecdir,
                              install_rpath : libexecdir_rpathdir,
                              install : true)
-       test_list += 'kms_color_chamelium'
+       test_list += 'kms_chamelium_color'
 endif
 
 test_executables += executable('sw_sync', 'sw_sync.c',

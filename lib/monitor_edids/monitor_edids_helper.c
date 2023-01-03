@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+// SPDX-License-Identifier: MIT
 /*
  * A helper library for parsing and making use of real EDID data from monitors
  * and make them compatible with IGT and Chamelium.

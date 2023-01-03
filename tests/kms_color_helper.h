@@ -27,7 +27,7 @@
 
 /*
  * This header is for code that is shared between kms_color.c and
- * kms_color_chamelium.c. Reusability elsewhere can be questionable.
+ * kms_chamelium_color.c. Reusability elsewhere can be questionable.
  */
 
 #include <math.h>

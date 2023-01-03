@@ -77,7 +77,7 @@ igt@kms_frontbuffer_tracking@.*drrs.*
 # is too costly in comparison to the value
 # provided.
 ###############################################
-igt@kms_chamelium@hdmi-.*-planes-random
+igt@kms_chamelium_frames@hdmi-.*-planes-random
 ###############################################
 # Broadcom
 ###############################################
