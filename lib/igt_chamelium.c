@@ -2476,8 +2476,15 @@ static bool chamelium_read_port_mappings(struct chamelium *chamelium,
 			goto out;
 		}
 
-		port->adapter_allowed = g_key_file_get_boolean(igt_key_file, group,
-		                                               "AdapterAllowed", &error);
+		if (g_key_file_has_key(igt_key_file, group, "AdapterAllowed", NULL)) {
+			port->adapter_allowed = g_key_file_get_boolean(igt_key_file, group,
+								       "AdapterAllowed", &error);
+			if (error) {
+				igt_warn("Unable to read AdapterAllowed: %s\n", error->message);
+				ret = false;
+				goto out;
+			}
+		}
 
 		for (j = 0;
 		     j < res->count_connectors && !port->connector_id;
