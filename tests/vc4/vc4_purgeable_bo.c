@@ -184,7 +184,8 @@ igt_main
 		ret = setjmp(jmp);
 		if (!ret)
 			*map = 0;
-		igt_assert(ret == SIGBUS);
+		else
+			igt_assert(ret == SIGBUS);
 		signal(SIGBUS, SIG_DFL);
 		signal(SIGSEGV, SIG_DFL);
 		igt_vc4_purgeable_bo(fd, bo->handle, false);
@@ -227,7 +228,8 @@ igt_main
 		ret = setjmp(jmp);
 		if (!ret)
 			*map = 0;
-		igt_assert(ret == SIGBUS);
+		else
+			igt_assert(ret == SIGBUS);
 		signal(SIGBUS, SIG_DFL);
 		signal(SIGSEGV, SIG_DFL);
 	}
