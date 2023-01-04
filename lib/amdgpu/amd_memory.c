@@ -41,7 +41,7 @@
 				      uint64_t size,
 				      uint64_t alignment,
 				      uint32_t type,
-				      uint64_t flags,
+				      uint64_t alloc_flags,
 				      uint64_t *vmc_addr,
 				      amdgpu_va_handle *va_handle)
 {
@@ -49,7 +49,7 @@
 		.alloc_size = size,
 		.phys_alignment = alignment,
 		.preferred_heap = type,
-		.flags = flags,
+		.flags = alloc_flags,
 	};
 	amdgpu_bo_handle buf_handle;
 	int r;

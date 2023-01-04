@@ -35,7 +35,7 @@ gpu_mem_alloc(amdgpu_device_handle device_handle,
 				      uint64_t size,
 				      uint64_t alignment,
 				      uint32_t type,
-				      uint64_t flags,
+				      uint64_t alloc_flags,
 				      uint64_t *vmc_addr,
 				      amdgpu_va_handle *va_handle);
 int
