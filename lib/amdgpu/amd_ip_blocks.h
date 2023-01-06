@@ -27,6 +27,8 @@
 
 #include "amd_registers.h"
 
+#define MAX_CARDS_SUPPORTED 4
+
 enum amd_ip_block_type {
 	AMD_IP_GFX,
 	AMD_IP_COMPUTE,
@@ -135,5 +137,8 @@ struct amdgpu_cmd_base {
 struct amdgpu_cmd_base* get_cmd_base(void);
 
 void free_cmd_base(struct amdgpu_cmd_base *base);
+
+int
+amdgpu_open_devices(bool open_render_node, int max_cards_supported, int drm_amdgpu_fds[]);
 
 #endif

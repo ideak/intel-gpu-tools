@@ -21,7 +21,6 @@
  *
 */
 #include <linux/limits.h>
-#include <sys/types.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <pthread.h>
@@ -35,74 +34,6 @@
 #include "xalloc.h"
 #include "amd_ip_blocks.h"
 
-static int
-amdgpu_open_devices(bool open_render_node, int  max_cards_supported, int drm_amdgpu_fds[])
-{
-	drmDevicePtr devices[MAX_CARDS_SUPPORTED];
-	int i;
-	int drm_node;
-	int amd_index = 0;
-	int drm_count;
-	int fd;
-	drmVersionPtr version;
-
-	for (i = 0; i < max_cards_supported && i < MAX_CARDS_SUPPORTED; i++)
-		drm_amdgpu_fds[i] = -1;
-
-	drm_count = drmGetDevices2(0, devices, MAX_CARDS_SUPPORTED);
-
-	if (drm_count < 0) {
-		fprintf(stderr, "drmGetDevices2() returned an error %d\n", drm_count);
-		return 0;
-	}
-
-	for (i = 0; i < drm_count; i++) {
-		/* If this is not PCI device, skip*/
-		if (devices[i]->bustype != DRM_BUS_PCI)
-			continue;
-
-		/* If this is not AMD GPU vender ID, skip*/
-		if (devices[i]->deviceinfo.pci->vendor_id != 0x1002)
-			continue;
-
-		if (open_render_node)
-			drm_node = DRM_NODE_RENDER;
-		else
-			drm_node = DRM_NODE_PRIMARY;
-
-		fd = -1;
-		if (devices[i]->available_nodes & 1 << drm_node)
-			fd = open(
-				devices[i]->nodes[drm_node],
-				O_RDWR | O_CLOEXEC);
-
-		/* This node is not available. */
-		if (fd < 0) continue;
-
-		version = drmGetVersion(fd);
-		if (!version) {
-			fprintf(stderr, "Warning: Cannot get version for %s." "Error is %s\n",
-				devices[i]->nodes[drm_node], strerror(errno));
-			close(fd);
-			continue;
-		}
-
-		if (strcmp(version->name, "amdgpu")) {
-			/* This is not AMDGPU driver, skip.*/
-			drmFreeVersion(version);
-			close(fd);
-			continue;
-		}
-
-		drmFreeVersion(version);
-
-		drm_amdgpu_fds[amd_index] = fd;
-		amd_index++;
-	}
-
-	drmFreeDevices(devices, drm_count);
-	return amd_index;
-}
 static bool
 amdgpu_node_is_drm(int maj, int min)
 {

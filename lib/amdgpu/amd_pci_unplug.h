@@ -26,8 +26,7 @@
 
 #include <amdgpu.h>
 #include <amdgpu_drm.h>
-
-#define MAX_CARDS_SUPPORTED 4
+#include "amd_ip_blocks.h"
 
 struct amd_pci_unplug_setup {
 	uint32_t  major_version_req;
