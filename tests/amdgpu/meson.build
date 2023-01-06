@@ -8,6 +8,7 @@ if libdrm_amdgpu.found()
 			  'amd_bypass',
 			  'amd_deadlock',
 			  'amd_pci_unplug',
+			  'amd_cp_dma_misc',
 			  'amd_color',
 			  'amd_cs_nop',
 			  'amd_hotplug',
