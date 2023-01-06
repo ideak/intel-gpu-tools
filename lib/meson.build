@@ -138,7 +138,8 @@ if libdrm_amdgpu.found()
 		'amdgpu/amd_dispatch.c',
 		'amdgpu/amd_deadlock_helpers.c',
 		'amdgpu/amd_pci_unplug.c',
-		'amdgpu/xalloc.h'
+		'amdgpu/xalloc.h',
+		'amdgpu/amd_cp_dma.c'
 	]
 endif
 
