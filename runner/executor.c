@@ -37,6 +37,7 @@
 
 #define KMSG_HEADER "[IGT] "
 #define KMSG_WARN 4
+#define GRACEFUL_EXITCODE -SIGHUP
 
 static struct {
 	int *fds;
@@ -1247,9 +1248,9 @@ static int monitor_output(pid_t child,
 						write_packet_with_canary(outputs[_F_SOCKET], override, settings->sync);
 						free(override);
 					} else {
-						dprintf(outputs[_F_JOURNAL], "%s%d (%.3fs)\n",
+						dprintf(outputs[_F_JOURNAL], "%s%d (0.000s)\n",
 							EXECUTOR_EXIT,
-							-SIGHUP, 0.0);
+							GRACEFUL_EXITCODE);
 						if (settings->sync)
 							fdatasync(outputs[_F_JOURNAL]);
 					}
@@ -1720,6 +1721,41 @@ out_dirfd:
 	return result;
 }
 
+static void fill_results_directory_with_notruns(struct job_list *list,
+						int resdirfd)
+{
+	int outputs[_F_LAST];
+	char name[32];
+	int dirfd;
+	size_t i;
+
+	for (i = 0; i < list->size; i++) {
+		snprintf(name, sizeof(name), "%zd", i);
+
+		if (faccessat(resdirfd, name, F_OK, 0) == 0)
+			continue;
+
+		mkdirat(resdirfd, name, 0777);
+		dirfd = openat(resdirfd, name, O_DIRECTORY | O_RDONLY);
+		if (dirfd < 0) {
+			errf("Error accessing individual test result directory\n");
+			return;
+		}
+
+		if (!open_output_files(dirfd, outputs, true)) {
+			errf("Error opening output files\n");
+			close(dirfd);
+			return;
+		}
+
+		dprintf(outputs[_F_OUT], "Forced notrun result because of abort condition on bootup\n");
+		dprintf(outputs[_F_JOURNAL], "%s%d (0.000s)\n", EXECUTOR_EXIT, GRACEFUL_EXITCODE);
+
+		close_outputs(outputs);
+		close(dirfd);
+	}
+}
+
 static int remove_file(int dirfd, const char *name)
 {
 	return unlinkat(dirfd, name, 0) && errno != ENOENT;
@@ -1845,7 +1881,6 @@ bool initialize_execute_state_from_resume(int dirfd,
 	clear_settings(settings);
 	free_job_list(list);
 	memset(state, 0, sizeof(*state));
-	state->resuming = true;
 
 	if (!read_settings_from_dir(settings, dirfd) ||
 	    !read_job_list(list, dirfd)) {
@@ -2183,6 +2218,11 @@ bool execute(struct execute_state *state,
 		return true;
 	}
 
+	if (state->next >= job_list->size) {
+		outf("All tests already executed.\n");
+		return true;
+	}
+
 	igt_list_for_each_entry(env_var, &settings->env_vars, link) {
 		setenv(env_var->key, env_var->value, 1);
 	}
@@ -2271,7 +2311,7 @@ bool execute(struct execute_state *state,
 	close(unamefd);
 
 	/* Check if we're already in abort-state at bootup */
-	if (!state->resuming) {
+	{
 		char *reason;
 
 		if ((reason = need_to_abort(settings)) != NULL) {
@@ -2279,6 +2319,17 @@ bool execute(struct execute_state *state,
 			write_abort_file(resdirfd, reason, "nothing", nexttest);
 			free(reason);
 			free(nexttest);
+
+			/*
+			 * If an abort condition happened at bootup,
+			 * assume that it happens on every boot,
+			 * making this test execution impossible.
+			 * Write stuff to the results directory
+			 * indicating this so resuming immediately
+			 * finishes instead of getting stuck in an
+			 * infinite reboot loop.
+			 */
+			fill_results_directory_with_notruns(job_list, resdirfd);
 
 			status = false;
 

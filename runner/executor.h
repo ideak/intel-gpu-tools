@@ -13,7 +13,6 @@ struct execute_state
 	 * > 0 : Timeout in use, time left.
 	 */
 	double time_left;
-	double resuming;
 	bool dry;
 };
 
