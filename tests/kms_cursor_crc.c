@@ -787,6 +787,13 @@ static void run_tests_on_pipe(data_t *data)
 		for_each_pipe(&data->display, pipe) {
 			data->pipe = pipe;
 
+			if(!igt_pipe_connector_valid(pipe, data->output)) {
+				igt_debug("Invalid connector on pipe-%s-%s",
+				      kmstest_pipe_name(pipe),
+				      data->output->name);
+				continue;
+			}
+
 			igt_dynamic_f("pipe-%s-%s",
 				      kmstest_pipe_name(pipe),
 				      data->output->name)
@@ -801,6 +808,13 @@ static void run_tests_on_pipe(data_t *data)
 		for_each_pipe(&data->display, pipe) {
 			data->pipe = pipe;
 
+			if(!igt_pipe_connector_valid(pipe, data->output)) {
+				igt_debug("Invalid connector on pipe-%s-%s",
+				      kmstest_pipe_name(pipe),
+				      data->output->name);
+				continue;
+			}
+
 			igt_dynamic_f("pipe-%s-%s",
 				      kmstest_pipe_name(pipe),
 				      data->output->name)
@@ -814,6 +828,13 @@ static void run_tests_on_pipe(data_t *data)
 	igt_subtest_with_dynamic("cursor-alpha-transparent") {
 		for_each_pipe(&data->display, pipe) {
 			data->pipe = pipe;
+
+			if(!igt_pipe_connector_valid(pipe, data->output)) {
+				igt_debug("Invalid connector on pipe-%s-%s",
+				      kmstest_pipe_name(pipe),
+				      data->output->name);
+				continue;
+			}
 
 			igt_dynamic_f("pipe-%s-%s",
 				      kmstest_pipe_name(pipe),
