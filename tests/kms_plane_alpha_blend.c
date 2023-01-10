@@ -264,7 +264,12 @@ static void basic_alpha(data_t *data, enum pipe pipe, igt_plane_t *plane)
 		igt_display_commit2(display, COMMIT_ATOMIC);
 
 		igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc, &crc);
-		igt_assert_crc_equal(&ref_crc, &crc);
+		if (!igt_check_crc_equal(&ref_crc, &crc) && !igt_skip_crc_compare) {
+			igt_pipe_crc_stop(data->pipe_crc);
+
+			igt_assert_f(false, "crc mismatch with plane alpha value %d\n",
+				     i | (i << 8));
+		}
 	}
 
 	/* And test alpha = 0, should give same CRC, but doesn't on some i915 platforms. */
@@ -272,9 +277,8 @@ static void basic_alpha(data_t *data, enum pipe pipe, igt_plane_t *plane)
 	igt_display_commit2(display, COMMIT_ATOMIC);
 
 	igt_pipe_crc_get_current(display->drm_fd, data->pipe_crc, &crc);
-	igt_assert_crc_equal(&ref_crc, &crc);
-
 	igt_pipe_crc_stop(data->pipe_crc);
+	igt_assert_crc_equal(&ref_crc, &crc);
 }
 
 static void argb_opaque(data_t *data, enum pipe pipe, igt_plane_t *plane)
