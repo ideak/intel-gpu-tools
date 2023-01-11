@@ -190,12 +190,17 @@ static void bad_object(int i915)
 	for (; i >= 0; i--) {
 		for_each_mmap_offset_type(i915, t) {
 			struct drm_i915_gem_mmap_offset arg = {
-				.handle = handles[i],
+				.handle = real_handle,
 				.flags = t->type,
 			};
 
+			if (mmap_offset_ioctl(i915, &arg))
+				continue;
+
 			igt_debug("Trying MMAP IOCTL[%s] with handle %x\n",
 				  t->name, handles[i]);
+
+			arg.handle = handles[i];
 			igt_assert_eq(mmap_offset_ioctl(i915, &arg),
 				      -ENOENT);
 		}
