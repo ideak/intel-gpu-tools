@@ -186,10 +186,12 @@ emit_recursive_batch(igt_spin_t *spin,
 	addr += BATCH_SIZE;
 
 	if (opts->dependency) {
+		uint64_t dep_size = opts->dependency_size ?: BATCH_SIZE;
+
 		igt_assert(!(opts->flags & IGT_SPIN_POLL_RUN));
 		if (ahnd)
 			addr_scratch = intel_allocator_alloc_with_strategy(ahnd, opts->dependency,
-									   BATCH_SIZE, 0,
+									   dep_size, 0,
 									   ALLOC_STRATEGY_LOW_TO_HIGH);
 		else
 			addr_scratch = addr;

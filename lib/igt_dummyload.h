@@ -49,6 +49,7 @@ typedef struct igt_spin_factory {
 	uint32_t ctx_id;
 	const intel_ctx_t *ctx;
 	uint32_t dependency;
+	uint64_t dependency_size;
 	unsigned int engine;
 	unsigned int flags;
 	int fence;
