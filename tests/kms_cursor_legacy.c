@@ -1471,7 +1471,8 @@ static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
 
 		spin = igt_spin_new(display->drm_fd,
 				    .ahnd = ahnd,
-				    .dependency = fb_info[1].gem_handle);
+				    .dependency = fb_info[1].gem_handle,
+				    .dependency_size = fb_info[1].size);
 
 		vblank_start = kmstest_get_vblank(display->drm_fd, pipe, DRM_VBLANK_NEXTONMISS);
 
