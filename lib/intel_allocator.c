@@ -351,7 +351,7 @@ static struct allocator *allocator_open(int fd, uint32_t ctx, uint32_t vm,
 			   "default alignment: 0x%llx "
 			   "not found, creating one\n",
 			   fd, ctx, vm, (long long) start, (long long) end,
-			   (long long) alignment);
+			   (long long) default_alignment);
 		ial = intel_allocator_create(fd, start, end, allocator_type,
 					     allocator_strategy,
 					     default_alignment);
