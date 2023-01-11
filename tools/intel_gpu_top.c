@@ -281,6 +281,8 @@ static const char *class_display_name(unsigned int class)
 		return "Video";
 	case I915_ENGINE_CLASS_VIDEO_ENHANCE:
 		return "VideoEnhance";
+	case I915_ENGINE_CLASS_COMPUTE:
+		return "Compute";
 	default:
 		return "[unknown]";
 	}
@@ -297,6 +299,8 @@ static const char *class_short_name(unsigned int class)
 		return "VCS";
 	case I915_ENGINE_CLASS_VIDEO_ENHANCE:
 		return "VECS";
+	case I915_ENGINE_CLASS_COMPUTE:
+		return "CCS";
 	default:
 		return "UNKN";
 	}
