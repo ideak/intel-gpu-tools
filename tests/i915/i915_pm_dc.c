@@ -552,7 +552,7 @@ igt_main
 		test_dc_state_dpms(&data, CHECK_DC5);
 	}
 
-	igt_describe("This test validates display engine entry to DC5 state "
+	igt_describe("This test validates display engine entry to DC6 state "
 		     "while all connectors's DPMS property set to OFF");
 	igt_subtest("dc6-dpms") {
 		igt_require_f(igt_pm_pc8_plus_residencies_enabled(data.msr_fd),
