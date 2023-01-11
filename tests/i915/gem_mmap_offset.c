@@ -673,8 +673,13 @@ static uint64_t get_npages(_Atomic(uint64_t) *global, uint64_t npages)
 
 	max = *global;
 	do {
+		while (max < 16) {
+			usleep(10);
+			max = *global;
+		}
+
 		old = max;
-		try = 1 + npages % (max / 2);
+		try = 1 + npages % (max / 2 - 1);
 		max -= try;
 	} while ((max = atomic_compare_swap_u64(global, old, max)) != old);
 
