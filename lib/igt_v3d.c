@@ -86,14 +86,27 @@ igt_v3d_get_bo_offset(int fd, uint32_t handle)
 	return get.offset;
 }
 
+/**
+ * igt_v3d_get_param:
+ * @fd: device file descriptor
+ * @param: v3d parameter
+ *
+ * This wraps the GET_PARAM ioctl.
+ *
+ * Returns the current value of the parameter. If the parameter is
+ * invalid, returns 0.
+ */
 uint32_t
 igt_v3d_get_param(int fd, enum drm_v3d_param param)
 {
 	struct drm_v3d_get_param get = {
 		.param = param,
 	};
+	int ret;
 
-	do_ioctl(fd, DRM_IOCTL_V3D_GET_PARAM, &get);
+	ret = igt_ioctl(fd, DRM_IOCTL_V3D_GET_PARAM, &get);
+	if (ret)
+		return 0;
 
 	return get.value;
 }
