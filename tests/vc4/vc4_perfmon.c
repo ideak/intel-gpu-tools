@@ -15,6 +15,7 @@ igt_main
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_VC4);
 		igt_require(igt_vc4_is_v3d(fd));
+		igt_require(igt_vc4_get_param(fd, DRM_VC4_PARAM_SUPPORTS_PERFMON));
 	}
 
 	igt_describe("Make sure a perfmon cannot be created with zero counters.");
