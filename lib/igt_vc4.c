@@ -168,7 +168,17 @@ uint64_t igt_vc4_get_tiling(int fd, uint32_t handle)
 	return get.modifier;
 }
 
-int igt_vc4_get_param(int fd, uint32_t param, uint64_t *val)
+/**
+ * igt_vc4_get_param:
+ * @fd: device file descriptor
+ * @param: vc4 parameter
+ *
+ * This wraps the GET_PARAM ioctl.
+ *
+ * Returns the current value of the parameter. If the parameter is
+ * invalid, returns 0.
+ */
+uint64_t igt_vc4_get_param(int fd, uint32_t param)
 {
 	struct drm_vc4_get_param arg = {
 		.param = param,
@@ -177,10 +187,9 @@ int igt_vc4_get_param(int fd, uint32_t param, uint64_t *val)
 
 	ret = igt_ioctl(fd, DRM_IOCTL_VC4_GET_PARAM, &arg);
 	if (ret)
-		return ret;
+		return 0;
 
-	*val = arg.value;
-	return 0;
+	return arg.value;
 }
 
 bool igt_vc4_purgeable_bo(int fd, int handle, bool purgeable)

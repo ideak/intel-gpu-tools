@@ -31,7 +31,7 @@
 uint32_t igt_vc4_get_cleared_bo(int fd, size_t size, uint32_t clearval);
 int igt_vc4_create_bo(int fd, size_t size);
 void *igt_vc4_mmap_bo(int fd, uint32_t handle, uint32_t size, unsigned prot);
-int igt_vc4_get_param(int fd, uint32_t param, uint64_t *val);
+uint64_t igt_vc4_get_param(int fd, uint32_t param);
 bool igt_vc4_purgeable_bo(int fd, int handle, bool purgeable);
 bool igt_vc4_is_tiled(uint64_t modifier);
 bool igt_vc4_is_v3d(int fd);
