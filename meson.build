@@ -1,5 +1,5 @@
 project('igt-gpu-tools', 'c',
-	version : '1.26',
+	version : '1.27',
         default_options: [
           'warning_level=2',
           'c_std=gnu11',
