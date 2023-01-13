@@ -24,7 +24,7 @@
  * All crc tables are globals to allow direct in-code use.
  */
 
-const uint32_t igt_crc32_tab[256];
+extern const uint32_t igt_crc32_tab[256];
 
 uint32_t igt_cpu_crc32(const void *buf, size_t size);
 
