@@ -158,6 +158,54 @@ static void set_blt_object(struct blt_copy_object *obj,
 	if (param.write_png) \
 		blt_surface_to_png((fd), (id), (name), (obj), (w), (h)); } while (0)
 
+static int compare_nxn(const struct blt_copy_object *surf1,
+		       const struct blt_copy_object *surf2,
+		       int xsize, int ysize, int bx, int by)
+{
+	int x, y, corrupted;
+	uint32_t pos, px1, px2;
+
+	corrupted = 0;
+	for (y = 0; y < ysize; y++) {
+		for (x = 0; x < xsize; x++) {
+			pos = bx * xsize + by * ysize * surf1->pitch / 4;
+			pos += x + y * surf1->pitch / 4;
+			px1 = surf1->ptr[pos];
+			px2 = surf2->ptr[pos];
+			if (px1 != px2)
+				corrupted++;
+		}
+	}
+
+	return corrupted;
+}
+
+static void dump_corruption_info(const struct blt_copy_object *surf1,
+				 const struct blt_copy_object *surf2)
+{
+	const int xsize = 8, ysize = 8;
+	int w, h, bx, by, corrupted;
+
+	igt_assert(surf1->x1 == surf2->x1 && surf1->x2 == surf2->x2);
+	igt_assert(surf1->y1 == surf2->y1 && surf1->y2 == surf2->y2);
+	w = surf1->x2;
+	h = surf1->y2;
+
+	igt_info("dump corruption - width: %d, height: %d, sizex: %x, sizey: %x\n",
+		 surf1->x2, surf1->y2, xsize, ysize);
+
+	for (by = 0; by < h / ysize; by++) {
+		for (bx = 0; bx < w / xsize; bx++) {
+			corrupted = compare_nxn(surf1, surf2, xsize, ysize, bx, by);
+			if (corrupted == 0)
+				igt_info(".");
+			else
+				igt_info("%c", '0' + corrupted);
+		}
+		igt_info("\n");
+	}
+}
+
 static void surf_copy(int i915,
 		      const intel_ctx_t *ctx,
 		      const struct intel_execution_engine2 *e,
@@ -170,7 +218,7 @@ static void surf_copy(int i915,
 	struct blt_copy_data blt = {};
 	struct blt_block_copy_data_ext ext = {};
 	struct blt_ctrl_surf_copy_data surf = {};
-	uint32_t bb, ccs, ccs2, *ccsmap, *ccsmap2;
+	uint32_t bb1, bb2, ccs, ccs2, *ccsmap, *ccsmap2;
 	uint64_t bb_size, ccssize = mid->size / CCS_RATIO;
 	uint32_t *ccscopy;
 	uint8_t uc_mocs = intel_get_uc_mocs(i915);
@@ -178,8 +226,6 @@ static void surf_copy(int i915,
 
 	igt_assert(mid->compression);
 	ccscopy = (uint32_t *) malloc(ccssize);
-	bb_size = 4096;
-	bb = gem_create_from_pool(i915, &bb_size, REGION_SMEM);
 	ccs = gem_create(i915, ccssize);
 	ccs2 = gem_create(i915, ccssize);
 
@@ -189,7 +235,9 @@ static void surf_copy(int i915,
 			uc_mocs, INDIRECT_ACCESS);
 	set_surf_object(&surf.dst, ccs, REGION_SMEM, ccssize,
 			uc_mocs, DIRECT_ACCESS);
-	set_batch(&surf.bb, bb, bb_size, REGION_SMEM);
+	bb_size = 4096;
+	igt_assert_eq(__gem_create(i915, &bb_size, &bb1), 0);
+	set_batch(&surf.bb, bb1, bb_size, REGION_SMEM);
 	blt_ctrl_surf_copy(i915, ctx, e, ahnd, &surf);
 	gem_sync(i915, surf.dst.handle);
 
@@ -240,9 +288,8 @@ static void surf_copy(int i915,
 	set_blt_object(&blt.dst, dst);
 	set_object_ext(&ext.src, mid->compression_type, mid->x2, mid->y2, SURFACE_TYPE_2D);
 	set_object_ext(&ext.dst, 0, dst->x2, dst->y2, SURFACE_TYPE_2D);
-	bb_size = 4096;
-	bb = gem_create_from_pool(i915, &bb_size, REGION_SMEM);
-	set_batch(&blt.bb, bb, bb_size, REGION_SMEM);
+	igt_assert_eq(__gem_create(i915, &bb_size, &bb2), 0);
+	set_batch(&blt.bb, bb2, bb_size, REGION_SMEM);
 	blt_block_copy(i915, ctx, e, ahnd, &blt, &ext);
 	gem_sync(i915, blt.dst.handle);
 	WRITE_PNG(i915, run_id, "corrupted", &blt.dst, dst->x2, dst->y2);
@@ -257,10 +304,18 @@ static void surf_copy(int i915,
 	gem_sync(i915, blt.dst.handle);
 	WRITE_PNG(i915, run_id, "corrected", &blt.dst, dst->x2, dst->y2);
 	result = memcmp(src->ptr, dst->ptr, src->size);
-	igt_assert(result == 0);
+	if (result)
+		dump_corruption_info(src, dst);
 
 	munmap(ccsmap, ccssize);
 	gem_close(i915, ccs);
+	gem_close(i915, ccs2);
+	gem_close(i915, bb1);
+	gem_close(i915, bb2);
+
+	igt_assert_f(result == 0,
+		     "Source and destination surfaces are different after "
+		     "restoring source ccs data\n");
 }
 
 struct blt_copy3_data {
