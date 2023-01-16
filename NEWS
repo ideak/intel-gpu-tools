@@ -1,3 +1,13 @@
+Release 1.27.1 (2023-01-18)
+-------------------------
+
+- Removed gcc option -fcommon from meson.build and fix broken
+  build on Linux RedHat platform. (Zbigniew Kempczyński)
+
+- Updated CONTRIBUTING guidelines for interface deprecation. (Petri Latvala)
+
+- Fixed one additional test bug (Zbigniew Kempczyński)
+
 Release 1.27 (2023-01-12)
 -------------------------
 
