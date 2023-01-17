@@ -1193,6 +1193,101 @@ int blt_fast_copy(int i915,
 	return ret;
 }
 
+void blt_set_geom(struct blt_copy_object *obj, uint32_t pitch,
+		  int16_t x1, int16_t y1, int16_t x2, int16_t y2,
+		  uint16_t x_offset, uint16_t y_offset)
+{
+	obj->pitch = pitch;
+	obj->x1 = x1;
+	obj->y1 = y1;
+	obj->x2 = x2;
+	obj->y2 = y2;
+	obj->x_offset = x_offset;
+	obj->y_offset = y_offset;
+}
+
+void blt_set_batch(struct blt_copy_batch *batch,
+		   uint32_t handle, uint64_t size, uint32_t region)
+{
+	batch->handle = handle;
+	batch->size = size;
+	batch->region = region;
+}
+
+struct blt_copy_object *
+blt_create_object(int i915, uint32_t region,
+		  uint32_t width, uint32_t height, uint32_t bpp, uint8_t mocs,
+		  enum blt_tiling_type tiling,
+		  enum blt_compression compression,
+		  enum blt_compression_type compression_type,
+		  bool create_mapping)
+{
+	struct blt_copy_object *obj;
+	uint64_t size = width * height * bpp / 8;
+	uint32_t stride = tiling == T_LINEAR ? width * 4 : width;
+	uint32_t handle;
+
+	obj = calloc(1, sizeof(*obj));
+
+	obj->size = size;
+	igt_assert(__gem_create_in_memory_regions(i915, &handle,
+						  &size, region) == 0);
+
+	blt_set_object(obj, handle, size, region, mocs, tiling,
+		       compression, compression_type);
+	blt_set_geom(obj, stride, 0, 0, width, height, 0, 0);
+
+	if (create_mapping)
+		obj->ptr = gem_mmap__device_coherent(i915, handle, 0, size,
+						     PROT_READ | PROT_WRITE);
+
+	return obj;
+}
+
+void blt_destroy_object(int i915, struct blt_copy_object *obj)
+{
+	if (obj->ptr)
+		munmap(obj->ptr, obj->size);
+
+	gem_close(i915, obj->handle);
+	free(obj);
+}
+
+void blt_set_object(struct blt_copy_object *obj,
+		    uint32_t handle, uint64_t size, uint32_t region,
+		    uint8_t mocs, enum blt_tiling_type tiling,
+		    enum blt_compression compression,
+		    enum blt_compression_type compression_type)
+{
+	obj->handle = handle;
+	obj->size = size;
+	obj->region = region;
+	obj->mocs = mocs;
+	obj->tiling = tiling;
+	obj->compression = compression;
+	obj->compression_type = compression_type;
+}
+
+void blt_set_object_ext(struct blt_block_copy_object_ext *obj,
+			uint8_t compression_format,
+			uint16_t surface_width, uint16_t surface_height,
+			enum blt_surface_type surface_type)
+{
+	obj->compression_format = compression_format;
+	obj->surface_width = surface_width;
+	obj->surface_height = surface_height;
+	obj->surface_type = surface_type;
+
+	/* Ensure mip tail won't overlap lod */
+	obj->mip_tail_start_lod = 0xf;
+}
+
+void blt_set_copy_object(struct blt_copy_object *obj,
+			 const struct blt_copy_object *orig)
+{
+	memcpy(obj, orig, sizeof(*obj));
+}
+
 /**
  * blt_surface_fill_rect:
  * @i915: drm fd

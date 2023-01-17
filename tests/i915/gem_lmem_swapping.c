@@ -76,53 +76,6 @@ struct object {
 	struct blt_copy_object *blt_obj;
 };
 
-static void set_object(struct blt_copy_object *obj,
-		       uint32_t handle, uint64_t size, uint32_t region,
-		       uint8_t mocs, enum blt_tiling_type tiling,
-		       enum blt_compression compression,
-		       enum blt_compression_type compression_type)
-{
-	obj->handle = handle;
-	obj->size = size;
-	obj->region = region;
-	obj->mocs = mocs;
-	obj->tiling = tiling;
-	obj->compression = compression;
-	obj->compression_type = compression_type;
-}
-
-static void set_geom(struct blt_copy_object *obj, uint32_t pitch,
-		     int16_t x1, int16_t y1, int16_t x2, int16_t y2,
-		     uint16_t x_offset, uint16_t y_offset)
-{
-	obj->pitch = pitch;
-	obj->x1 = x1;
-	obj->y1 = y1;
-	obj->x2 = x2;
-	obj->y2 = y2;
-	obj->x_offset = x_offset;
-	obj->y_offset = y_offset;
-}
-
-static void set_batch(struct blt_copy_batch *batch,
-		      uint32_t handle, uint64_t size, uint32_t region)
-{
-	batch->handle = handle;
-	batch->size = size;
-	batch->region = region;
-}
-
-static void set_object_ext(struct blt_block_copy_object_ext *obj,
-			   uint8_t compression_format,
-			   uint16_t surface_width, uint16_t surface_height,
-			   enum blt_surface_type surface_type)
-{
-	obj->compression_format = compression_format;
-	obj->surface_width = surface_width;
-	obj->surface_height = surface_height;
-	obj->surface_type = surface_type;
-}
-
 static uint32_t create_bo(int i915,
 			  uint64_t *size,
 			  struct drm_i915_gem_memory_class_instance *region,
@@ -179,7 +132,7 @@ init_object_ccs(int i915, struct object *obj, struct blt_copy_object *tmp,
 	cmd = calloc(1, sizeof(*cmd));
 	igt_assert(cmd);
 	cmd->handle = gem_create_from_pool(i915, &size, region);
-	set_batch(cmd, cmd->handle, size, region);
+	blt_set_batch(cmd, cmd->handle, size, region);
 
 	buf = gem_mmap__device_coherent(i915, tmp->handle, 0, obj->size, PROT_WRITE);
 	gem_set_domain(i915, tmp->handle, I915_GEM_DOMAIN_WC, I915_GEM_DOMAIN_WC);
@@ -195,9 +148,9 @@ init_object_ccs(int i915, struct object *obj, struct blt_copy_object *tmp,
 	memcpy(&blt.dst, obj->blt_obj, sizeof(blt.dst));
 	memcpy(&blt.bb, cmd, sizeof(blt.bb));
 
-	set_object_ext(&ext.src, 0, tmp->x2, tmp->y2, SURFACE_TYPE_2D);
-	set_object_ext(&ext.dst, 0, obj->blt_obj->x2, obj->blt_obj->y2,
-		       SURFACE_TYPE_2D);
+	blt_set_object_ext(&ext.src, 0, tmp->x2, tmp->y2, SURFACE_TYPE_2D);
+	blt_set_object_ext(&ext.dst, 0, obj->blt_obj->x2, obj->blt_obj->y2,
+			   SURFACE_TYPE_2D);
 
 	blt_block_copy(i915, ctx, e, ahnd, &blt, pext);
 	free(cmd);
@@ -244,7 +197,7 @@ verify_object_ccs(int i915, const struct object *obj,
 	cmd = calloc(1, sizeof(*cmd));
 	igt_assert(cmd);
 	cmd->handle = gem_create_from_pool(i915, &size, region);
-	set_batch(cmd, cmd->handle, size, region);
+	blt_set_batch(cmd, cmd->handle, size, region);
 
 	memset(&blt, 0, sizeof(blt));
 	blt.color_depth = CD_32bit;
@@ -256,9 +209,9 @@ verify_object_ccs(int i915, const struct object *obj,
 	blt.dst.x2 = min(obj->blt_obj->x2, tmp->x2);
 	blt.dst.y2 = min(obj->blt_obj->y2, tmp->y2);
 
-	set_object_ext(&ext.src, 0, obj->blt_obj->x2, obj->blt_obj->y2,
-		       SURFACE_TYPE_2D);
-	set_object_ext(&ext.dst, 0, tmp->x2, tmp->y2, SURFACE_TYPE_2D);
+	blt_set_object_ext(&ext.src, 0, obj->blt_obj->x2, obj->blt_obj->y2,
+			   SURFACE_TYPE_2D);
+	blt_set_object_ext(&ext.dst, 0, tmp->x2, tmp->y2, SURFACE_TYPE_2D);
 	blt_block_copy(i915, ctx, e, ahnd, &blt, pext);
 
 	buf = gem_mmap__device_coherent(i915, tmp->handle, 0,
@@ -364,11 +317,11 @@ static void __do_evict(int i915,
 
 		tmp->handle = gem_create_in_memory_regions(i915, params->size.max,
 				   INTEL_MEMORY_REGION_ID(I915_SYSTEM_MEMORY, 0));
-		set_object(tmp, tmp->handle, params->size.max,
-			   INTEL_MEMORY_REGION_ID(I915_SYSTEM_MEMORY, 0),
-			   intel_get_uc_mocs(i915), T_LINEAR,
-			   COMPRESSION_DISABLED, COMPRESSION_TYPE_3D);
-		set_geom(tmp, stride, 0, 0, width, height, 0, 0);
+		blt_set_object(tmp, tmp->handle, params->size.max,
+			       INTEL_MEMORY_REGION_ID(I915_SYSTEM_MEMORY, 0),
+			       intel_get_uc_mocs(i915), T_LINEAR,
+			       COMPRESSION_DISABLED, COMPRESSION_TYPE_3D);
+		blt_set_geom(tmp, stride, 0, 0, width, height, 0, 0);
 	}
 
 	size = 0;
@@ -395,10 +348,10 @@ static void __do_evict(int i915,
 
 			obj->blt_obj = calloc(1, sizeof(*obj->blt_obj));
 			igt_assert(obj->blt_obj);
-			set_object(obj->blt_obj, obj->handle, obj->size, region_id,
-				   intel_get_uc_mocs(i915), T_LINEAR,
-				   COMPRESSION_ENABLED, COMPRESSION_TYPE_3D);
-			set_geom(obj->blt_obj, stride, 0, 0, width, height, 0, 0);
+			blt_set_object(obj->blt_obj, obj->handle, obj->size, region_id,
+				       intel_get_uc_mocs(i915), T_LINEAR,
+				       COMPRESSION_ENABLED, COMPRESSION_TYPE_3D);
+			blt_set_geom(obj->blt_obj, stride, 0, 0, width, height, 0, 0);
 			init_object_ccs(i915, obj, tmp, rand(), blt_ctx,
 					region_id, ahnd);
 		} else if (params->flags & TEST_VERIFY) {

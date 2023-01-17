@@ -207,10 +207,36 @@ int blt_fast_copy(int i915,
 		  uint64_t ahnd,
 		  const struct blt_copy_data *blt);
 
+void blt_set_geom(struct blt_copy_object *obj, uint32_t pitch,
+		  int16_t x1, int16_t y1, int16_t x2, int16_t y2,
+		  uint16_t x_offset, uint16_t y_offset);
+void blt_set_batch(struct blt_copy_batch *batch,
+		   uint32_t handle, uint64_t size, uint32_t region);
+
+struct blt_copy_object *
+blt_create_object(int i915, uint32_t region,
+		  uint32_t width, uint32_t height, uint32_t bpp, uint8_t mocs,
+		  enum blt_tiling_type tiling,
+		  enum blt_compression compression,
+		  enum blt_compression_type compression_type,
+		  bool create_mapping);
+void blt_destroy_object(int i915, struct blt_copy_object *obj);
+void blt_set_object(struct blt_copy_object *obj,
+		    uint32_t handle, uint64_t size, uint32_t region,
+		    uint8_t mocs, enum blt_tiling_type tiling,
+		    enum blt_compression compression,
+		    enum blt_compression_type compression_type);
+void blt_set_object_ext(struct blt_block_copy_object_ext *obj,
+			uint8_t compression_format,
+			uint16_t surface_width, uint16_t surface_height,
+			enum blt_surface_type surface_type);
+void blt_set_copy_object(struct blt_copy_object *obj,
+			 const struct blt_copy_object *orig);
+
 void blt_surface_info(const char *info,
 		      const struct blt_copy_object *obj);
 void blt_surface_fill_rect(int i915, const struct blt_copy_object *obj,
 			   uint32_t width, uint32_t height);
 void blt_surface_to_png(int i915, uint32_t run_id, const char *fileid,
-		    const struct blt_copy_object *obj,
-		    uint32_t width, uint32_t height);
+			const struct blt_copy_object *obj,
+			uint32_t width, uint32_t height);
