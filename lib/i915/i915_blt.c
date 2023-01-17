@@ -311,6 +311,11 @@ static enum blt_aux_mode __aux_mode(const struct blt_copy_object *obj)
 	return AM_AUX_NONE;
 }
 
+static bool __new_tile_y_type(enum blt_tiling_type tiling)
+{
+	return tiling == T_TILE4 || tiling == T_YFMAJOR;
+}
+
 static void fill_data(struct gen12_block_copy_data *data,
 		      const struct blt_copy_data *blt,
 		      uint64_t src_offset, uint64_t dst_offset,
@@ -1001,8 +1006,8 @@ uint64_t emit_blt_fast_copy(int i915,
 	data.dw01.color_depth = __fast_color_depth(blt->color_depth);
 	data.dw01.dst_memory = __memory_type(blt->dst.region);
 	data.dw01.src_memory = __memory_type(blt->src.region);
-	data.dw01.dst_type_y = blt->dst.tiling == T_TILE4 ? 1 : 0;
-	data.dw01.src_type_y = blt->src.tiling == T_TILE4 ? 1 : 0;
+	data.dw01.dst_type_y = __new_tile_y_type(blt->dst.tiling) ? 1 : 0;
+	data.dw01.src_type_y = __new_tile_y_type(blt->src.tiling) ? 1 : 0;
 
 	data.dw02.dst_x1 = blt->dst.x1;
 	data.dw02.dst_y1 = blt->dst.y1;
