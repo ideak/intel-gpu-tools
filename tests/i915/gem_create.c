@@ -325,6 +325,7 @@ static void busy_create(int i915, const struct gem_memory_region *r, int timeout
 					      .flags = ((flags & BUSY_HOG ? IGT_SPIN_NO_PREEMPTION : 0) |
 							IGT_SPIN_SOFTDEP));
 			gem_close(i915, handle);
+			put_offset(ahnd, handle);
 
 			igt_spin_free(i915, spin[e->flags]);
 			spin[e->flags] = next;
