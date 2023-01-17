@@ -1568,7 +1568,6 @@ __intel_bb_add_intel_buf(struct intel_bb *ibb, struct intel_buf *buf,
 		}
 	}
 
-	igt_info("Adding offset handle: %u, %lx\n", buf->handle, buf->addr.offset);
 	obj = intel_bb_add_object(ibb, buf->handle, intel_buf_bo_size(buf),
 				  buf->addr.offset, alignment, write);
 	buf->addr.offset = obj->offset;
