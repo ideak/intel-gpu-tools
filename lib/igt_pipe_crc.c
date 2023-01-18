@@ -195,6 +195,7 @@ struct _igt_pipe_crc {
 
 /**
  * igt_require_pipe_crc:
+ * @fd: fd of the device
  *
  * Convenience helper to check whether pipe CRC capturing is supported by the
  * kernel. Uses igt_skip to automatically skip the test/subtest if this isn't
@@ -251,6 +252,7 @@ pipe_crc_new(int fd, enum pipe pipe, const char *source, int flags)
 
 /**
  * igt_pipe_crc_new:
+ * @fd: fd of the device
  * @pipe: display pipe to use as source
  * @source: CRC tap point to use as source
  *
@@ -269,6 +271,7 @@ igt_pipe_crc_new(int fd, enum pipe pipe, const char *source)
 
 /**
  * igt_pipe_crc_new_nonblock:
+ * @fd: fd of the device
  * @pipe: display pipe to use as source
  * @source: CRC tap point to use as source
  *
@@ -518,7 +521,7 @@ void igt_pipe_crc_get_single(igt_pipe_crc_t *pipe_crc, igt_crc_t *crc)
 
 /**
  * igt_pipe_crc_get_current:
- * @drm_fd: Pointer to drm fd for vblank counter
+ * @drm_fd: drm device fd for vblank counter
  * @pipe_crc: pipe CRC object
  * @vblank: frame counter value we're looking for
  * @crc: buffer pointer for the captured CRC value

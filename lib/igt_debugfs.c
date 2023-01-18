@@ -220,7 +220,7 @@ int igt_debugfs_dir(int device)
 /**
  * igt_debugfs_connector_dir:
  * @device: fd of the device
- * @conn_name: conenctor name
+ * @conn_name: connector name
  * @mode: mode bits as used by open()
  *
  * This opens the debugfs directory corresponding to connector on the device
@@ -267,6 +267,7 @@ int igt_debugfs_pipe_dir(int device, int pipe, int mode)
 
 /**
  * igt_debugfs_open:
+ * @device: fd of the device
  * @filename: name of the debugfs node to open
  * @mode: mode bits as used by open()
  *
@@ -314,6 +315,7 @@ bool igt_debugfs_exists(int device, const char *filename, int mode)
 
 /**
  * igt_debugfs_simple_read:
+ * @dir: fd of the debugfs directory
  * @filename: file name
  * @buf: buffer where the contents will be stored, allocated by the caller
  * @size: size of the buffer
@@ -323,7 +325,7 @@ bool igt_debugfs_exists(int device, const char *filename, int mode)
  * first argument.
  *
  * Returns:
- * -errorno on failure or bytes read on success
+ * -errno on failure or bytes read on success
  */
 int igt_debugfs_simple_read(int dir, const char *filename, char *buf, int size)
 {
@@ -340,6 +342,7 @@ int igt_debugfs_simple_read(int dir, const char *filename, char *buf, int size)
 
 /**
  * __igt_debugfs_read:
+ * @fd: fd of the device
  * @filename: file name
  * @buf: buffer where the contents will be stored, allocated by the caller
  * @size: size of the buffer
@@ -375,6 +378,7 @@ void __igt_debugfs_write(int fd, const char *filename, const char *buf, int size
 
 /**
  * igt_debugfs_search:
+ * @device: fd of the device
  * @filename: file name
  * @substring: string to search for in @filename
  *
@@ -419,6 +423,7 @@ static void igt_hpd_storm_exit_handler(int sig)
 
 /**
  * igt_hpd_storm_set_threshold:
+ * @drm_fd: fd of the device
  * @threshold: How many hotplugs per second required to trigger an HPD storm,
  * or 0 to disable storm detection.
  *
@@ -449,6 +454,7 @@ void igt_hpd_storm_set_threshold(int drm_fd, unsigned int threshold)
 
 /**
  * igt_hpd_storm_reset:
+ * @drm_fd: fd of the device
  *
  * Convienence helper to reset HPD storm detection to it's default settings.
  * If hotplug detection was disabled on any ports due to an HPD storm, it will
@@ -476,6 +482,7 @@ void igt_hpd_storm_reset(int drm_fd)
 
 /**
  * igt_hpd_storm_detected:
+ * @drm_fd: fd of the device
  *
  * Checks whether or not i915 has detected an HPD interrupt storm on any of the
  * system's ports.
@@ -515,6 +522,7 @@ bool igt_hpd_storm_detected(int drm_fd)
 
 /**
  * igt_require_hpd_storm_ctl:
+ * @drm_fd: fd of the device
  *
  * Skips the current test if the system does not have HPD storm detection.
  *
@@ -553,6 +561,7 @@ void igt_reset_fifo_underrun_reporting(int drm_fd)
 
 /**
  * igt_drop_caches_has:
+ * @drm_fd: fd of the device
  * @val: bitmask for DROP_* values
  *
  * This queries the debugfs to see if it supports the full set of desired
@@ -573,6 +582,7 @@ bool igt_drop_caches_has(int drm_fd, uint64_t val)
 
 /**
  * igt_drop_caches_set:
+ * @drm_fd: fd of the device
  * @val: bitmask for DROP_* values
  *
  * This calls the debugfs interface the drm/i915 GEM driver exposes to drop or
