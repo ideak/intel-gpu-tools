@@ -184,7 +184,6 @@ static void run_test(int fd, int count, bool do_relocs)
 {
 	uint32_t *handle, *start_val;
 	uint64_t *offset, ahnd;
-	uint32_t start = 0;
 	int i;
 
 	ahnd = intel_allocator_open(fd, 0, do_relocs ?
@@ -197,13 +196,11 @@ static void run_test(int fd, int count, bool do_relocs)
 	start_val = handle + count;
 
 	for (i = 0; i < count; i++) {
-		handle[i] = create_bo(fd, start);
+		start_val[i] = rand();
+		handle[i] = create_bo(fd, start_val[i]);
 
 		offset[i] = intel_allocator_alloc(ahnd, handle[i],
 						  sizeof(linear), ALIGNMENT);
-
-		start_val[i] = start;
-		start += 1024 * 1024 / 4;
 	}
 
 	for (i = 0; i < count; i++) {

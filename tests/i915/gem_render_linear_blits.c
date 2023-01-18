@@ -79,7 +79,6 @@ static void run_test (int fd, int count)
 	struct intel_bb *ibb;
 	uint32_t *start_val;
 	struct intel_buf *bufs;
-	uint32_t start = 0;
 	int i, j;
 
 	render_copy = igt_get_render_copyfunc(intel_get_drm_devid(fd));
@@ -92,11 +91,14 @@ static void run_test (int fd, int count)
 	start_val = malloc(sizeof(*start_val)*count);
 
 	for (i = 0; i < count; i++) {
+		uint32_t val;
+
 		intel_buf_init(bops, &bufs[i], WIDTH, HEIGHT, 32, 0,
 			       I915_TILING_NONE, I915_COMPRESSION_NONE);
-		start_val[i] = start;
+		val = rand();
+		start_val[i] = val;
 		for (j = 0; j < WIDTH*HEIGHT; j++)
-			linear[j] = start++;
+			linear[j] = val++;
 		gem_write(fd, bufs[i].handle, 0, linear, sizeof(linear));
 	}
 

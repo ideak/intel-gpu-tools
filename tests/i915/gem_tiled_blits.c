@@ -128,7 +128,6 @@ static void run_test(int fd, int count)
 	struct buf_ops *bops;
 	struct intel_buf **bo;
 	uint32_t *bo_start_val;
-	uint32_t start = 0;
 	int i;
 
 	bops = buf_ops_create(fd);
@@ -138,9 +137,8 @@ static void run_test(int fd, int count)
 	bo_start_val = malloc(sizeof(uint32_t)*count);
 
 	for (i = 0; i < count; i++) {
-		bo[i] = create_bo(bops, ibb, start);
-		bo_start_val[i] = start;
-		start += 1024 * 1024 / 4;
+		bo_start_val[i] = rand();
+		bo[i] = create_bo(bops, ibb, bo_start_val[i]);
 	}
 
 	for (i = 0; i < count + 1; i++) {

@@ -97,7 +97,6 @@ static void run_test (int fd, int count)
 	struct intel_bb *ibb;
 	uint32_t *start_val;
 	struct intel_buf *bufs;
-	uint32_t start = 0;
 	int i, j;
 	uint32_t devid;
 
@@ -127,18 +126,21 @@ static void run_test (int fd, int count)
 
 	for (i = 0; i < count; i++) {
 		uint32_t tiling = I915_TILING_X + (random() & 1);
+		uint32_t val;
 		uint32_t *ptr;
 
 		intel_buf_init(bops, &bufs[i], WIDTH, HEIGHT, 32, 0,
 			       tiling, I915_COMPRESSION_NONE);
-		start_val[i] = start;
 
 		ptr = gem_mmap__gtt(fd, bufs[i].handle,
 				    bufs[i].surface[0].size, PROT_WRITE);
 		gem_set_domain(fd, bufs[i].handle,
 			       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+
+		val = rand();
+		start_val[i] = val;
 		for (j = 0; j < WIDTH*HEIGHT; j++)
-			ptr[j] = start++;
+			ptr[j] = val++;
 
 		munmap(ptr, bufs[i].surface[0].size);
 	}
