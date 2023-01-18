@@ -253,8 +253,11 @@ out:
 
 static int igt_kmod_unload_r(struct kmod_module *kmod, unsigned int flags)
 {
+#define MAX_TRIES	20
+#define SLEEP_DURATION	500000
 	struct kmod_list *holders, *pos;
-	int err = 0;
+	int err, tries;
+	const char *mod_name = kmod_module_get_name(kmod);
 
 	holders = kmod_module_get_holders(kmod);
 	kmod_list_foreach(pos, holders) {
@@ -269,7 +272,6 @@ static int igt_kmod_unload_r(struct kmod_module *kmod, unsigned int flags)
 		return err;
 
 	if (igt_kmod_is_loading(kmod)) {
-		const char *mod_name = kmod_module_get_name(kmod);
 		igt_debug("%s still initializing\n", mod_name);
 		err = igt_wait(!igt_kmod_is_loading(kmod), 10000, 100);
 		if (err < 0) {
@@ -279,7 +281,36 @@ static int igt_kmod_unload_r(struct kmod_module *kmod, unsigned int flags)
 		}
 	}
 
-	return kmod_module_remove_module(kmod, flags);
+	for (tries = 0; tries < MAX_TRIES; tries++) {
+		err = kmod_module_remove_module(kmod, flags);
+
+		/* Only loop in the following cases */
+		if (err != -EBUSY && err != -EAGAIN)
+			break;
+
+		igt_debug("Module %s failed to unload with err: %d on attempt: %i\n",
+			  mod_name, err, tries + 1);
+
+		if (tries < MAX_TRIES - 1)
+			usleep(SLEEP_DURATION);
+	}
+
+	if (err == -ENOENT)
+		igt_debug("Module %s could not be found or does not exist. err: %d\n",
+			  mod_name, err);
+	else if (err == -ENOTSUP)
+		igt_debug("Module %s cannot be unloaded. err: %d\n",
+			  mod_name, err);
+	else if (err)
+		igt_debug("Module %s failed to unload with err: %d after ~%.1fms\n",
+			  mod_name, err, SLEEP_DURATION*tries/1000.);
+	else if (tries)
+		igt_debug("Module %s unload took ~%.1fms over %i attempts\n",
+			  mod_name, SLEEP_DURATION*tries/1000., tries + 1);
+	else
+		igt_debug("Module %s unloaded immediately\n", mod_name);
+
+	return err;
 }
 
 /**
