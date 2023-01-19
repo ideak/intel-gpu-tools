@@ -11,6 +11,8 @@
 #define DG1_MOCS_WB_IDX				5
 #define DG2_MOCS_UC_IDX				1
 #define DG2_MOCS_WB_IDX				3
+#define MTL_MOCS_UC_IDX				5
+#define MTL_MOCS_WB_IDX				10
 #define GEN12_MOCS_UC_IDX			3
 #define GEN12_MOCS_WB_IDX			2
 #define XY_BLOCK_COPY_BLT_MOCS_SHIFT		21
@@ -32,13 +34,15 @@ static void get_mocs_index(int fd, struct drm_i915_mocs_index *mocs)
 	 * This helper function is providing current UC as well
 	 * as WB MOCS index based on platform.
 	 */
-	if (IS_DG1(devid)) {
-		mocs->uc_index = DG1_MOCS_UC_IDX;
-		mocs->wb_index = DG1_MOCS_WB_IDX;
+	if (IS_METEORLAKE(devid)) {
+		mocs->uc_index = MTL_MOCS_UC_IDX;
+		mocs->wb_index = MTL_MOCS_WB_IDX;
 	} else if (IS_DG2(devid)) {
 		mocs->uc_index = DG2_MOCS_UC_IDX;
 		mocs->wb_index = DG2_MOCS_WB_IDX;
-
+	} else if (IS_DG1(devid)) {
+		mocs->uc_index = DG1_MOCS_UC_IDX;
+		mocs->wb_index = DG1_MOCS_WB_IDX;
 	} else if (IS_GEN12(devid)) {
 		mocs->uc_index = GEN12_MOCS_UC_IDX;
 		mocs->wb_index = GEN12_MOCS_WB_IDX;
