@@ -235,7 +235,6 @@ i915_progs = [
 	'kms_psr2_sf',
 	'kms_psr_stress_test',
 	'kms_pwrite_crc',
-	'sysfs_clients',
 	'sysfs_defaults',
 	'sysfs_heartbeat_interval',
 	'sysfs_preempt_timeout',
