@@ -29,22 +29,8 @@
  * Manasi Navare <manasi.d.navare@intel.com>
  *
  */
-#include "igt.h"
-#include "igt_sysfs.h"
-#include <errno.h>
-#include <getopt.h>
-#include <math.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <strings.h>
-#include <unistd.h>
-#include <stdlib.h>
-#include <signal.h>
-#include <time.h>
-#include <fcntl.h>
-#include <termios.h>
 
-#define HDISPLAY_5K	5120
+#include "kms_dsc_helper.h"
 
 IGT_TEST_DESCRIPTION("Test to validate display stream compression");
 
@@ -64,9 +50,6 @@ typedef struct {
 	enum pipe pipe;
 } data_t;
 
-bool force_dsc_en_orig;
-int force_dsc_restore_fd = -1;
-
 const struct {
 	const int format;
 	const char format_str[20];
@@ -84,56 +67,6 @@ static inline void manual(const char *expected)
 	igt_debug_interactive_mode_check("all", expected);
 }
 
-static void force_dsc_enable(data_t *data)
-{
-	int ret;
-
-	igt_debug("Forcing DSC enable on %s\n", data->output->name);
-	ret = igt_force_dsc_enable(data->drm_fd,
-				   data->output->name);
-	igt_assert_f(ret > 0, "debugfs_write failed");
-}
-
-static void force_dsc_enable_bpc(data_t *data)
-{
-	int ret;
-
-	igt_debug("Forcing input DSC BPC to %d on %s\n",
-		  data->input_bpc, data->output->name);
-	ret = igt_force_dsc_enable_bpc(data->drm_fd,
-				       data->output->name,
-				       data->input_bpc);
-	igt_assert_f(ret > 0, "debugfs_write failed");
-}
-
-static void save_force_dsc_en(data_t *data)
-{
-	force_dsc_en_orig =
-		igt_is_force_dsc_enabled(data->drm_fd,
-					 data->output->name);
-	force_dsc_restore_fd =
-		igt_get_dsc_debugfs_fd(data->drm_fd,
-				       data->output->name);
-	igt_assert(force_dsc_restore_fd >= 0);
-}
-
-static void restore_force_dsc_en(void)
-{
-	if (force_dsc_restore_fd < 0)
-		return;
-
-	igt_debug("Restoring DSC enable\n");
-	igt_assert(write(force_dsc_restore_fd, force_dsc_en_orig ? "1" : "0", 1) == 1);
-
-	close(force_dsc_restore_fd);
-	force_dsc_restore_fd = -1;
-}
-
-static void kms_dsc_exit_handler(int sig)
-{
-	restore_force_dsc_en();
-}
-
 static drmModeModeInfo *get_highres_mode(igt_output_t *output)
 {
 	drmModeConnector *connector = output->config.connector;
@@ -146,26 +79,6 @@ static drmModeModeInfo *get_highres_mode(igt_output_t *output)
 	return highest_mode;
 }
 
-static bool check_dsc_on_connector(data_t *data)
-{
-	igt_output_t *output = data->output;
-
-	if (!igt_is_dsc_supported(data->drm_fd, output->name)) {
-		igt_debug("DSC not supported on connector %s\n",
-			  output->name);
-		return false;
-	}
-
-	if (!output_is_internal_panel(output) &&
-	    !igt_is_fec_supported(data->drm_fd, output->name)) {
-		igt_debug("DSC cannot be enabled without FEC on %s\n",
-			  output->name);
-		return false;
-	}
-
-	return true;
-}
-
 static bool check_big_joiner_pipe_constraint(data_t *data)
 {
 	igt_output_t *output = data->output;
@@ -175,34 +88,6 @@ static bool check_big_joiner_pipe_constraint(data_t *data)
 	    data->pipe == (data->n_pipes - 1)) {
 		igt_debug("Pipe-%s not supported due to bigjoiner limitation\n",
 			   kmstest_pipe_name(data->pipe));
-		return false;
-	}
-
-	return true;
-}
-
-static bool check_gen11_dp_constraint(data_t *data)
-{
-	igt_output_t *output = data->output;
-	uint32_t devid = intel_get_drm_devid(data->drm_fd);
-	drmModeConnector *connector = output->config.connector;
-
-	if ((connector->connector_type == DRM_MODE_CONNECTOR_DisplayPort) &&
-	    (data->pipe == PIPE_A) && IS_GEN11(devid)) {
-		igt_debug("DSC not supported on pipe A on external DP in gen11 platforms\n");
-		return false;
-	}
-
-	return true;
-}
-
-/* Max DSC Input BPC for ICL is 10 and for TGL+ is 12 */
-static bool check_gen11_bpc_constraint(data_t *data)
-{
-	uint32_t devid = intel_get_drm_devid(data->drm_fd);
-
-	if (IS_GEN11(devid) && data->input_bpc == 12) {
-		igt_debug("Input bpc 12 not supported on gen11 platforms\n");
 		return false;
 	}
 
@@ -235,12 +120,12 @@ static void update_display(data_t *data, enum dsc_test_type test_type, unsigned 
 	igt_display_commit(display);
 
 	igt_debug("DSC is supported on %s\n", data->output->name);
-	save_force_dsc_en(data);
-	force_dsc_enable(data);
+	save_force_dsc_en(data->drm_fd, data->output);
+	force_dsc_enable(data->drm_fd, data->output);
 
 	if (test_type == TEST_DSC_BPC) {
 		igt_debug("Trying to set input BPC to %d\n", data->input_bpc);
-		force_dsc_enable_bpc(data);
+		force_dsc_enable_bpc(data->drm_fd, data->output, data->input_bpc);
 	}
 
 	igt_output_set_pipe(output, data->pipe);
@@ -279,7 +164,7 @@ static void update_display(data_t *data, enum dsc_test_type test_type, unsigned 
 	restore_force_dsc_en();
 	igt_debug("Reset compression BPC\n");
 	data->input_bpc = 0;
-	force_dsc_enable_bpc(data);
+	force_dsc_enable_bpc(data->drm_fd, data->output, data->input_bpc);
 
 	igt_assert_f(enabled,
 		     "Default DSC enable failed on connector: %s pipe: %s\n",
@@ -302,13 +187,13 @@ static void test_dsc(data_t *data, enum dsc_test_type test_type, int bpc,
 		data->output = output;
 		data->pipe = pipe;
 
-		if (!check_dsc_on_connector(data))
+		if (!check_dsc_on_connector(data->drm_fd, data->output))
 			continue;
 
-		if (!check_gen11_dp_constraint(data))
+		if (!check_gen11_dp_constraint(data->drm_fd, data->output, data->pipe))
 			continue;
 
-		if (!check_gen11_bpc_constraint(data))
+		if (!check_gen11_bpc_constraint(data->drm_fd, data->output, data->input_bpc))
 			continue;
 
 		if (!check_big_joiner_pipe_constraint(data))
