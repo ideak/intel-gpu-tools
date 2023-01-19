@@ -40,6 +40,7 @@
 #include "igt_pipe_crc.h"
 #include "igt_pm.h"
 #include "igt_stats.h"
+#include "igt_dsc.h"
 #ifdef HAVE_CHAMELIUM
 #include "igt_alsa.h"
 #include "igt_audio.h"
