@@ -46,7 +46,7 @@ struct test_config {
 
 static void set_object(struct blt_copy_object *obj,
 		       uint32_t handle, uint64_t size, uint32_t region,
-		       uint8_t mocs, enum blt_tiling tiling,
+		       uint8_t mocs, enum blt_tiling_type tiling,
 		       enum blt_compression compression,
 		       enum blt_compression_type compression_type)
 {
@@ -108,7 +108,7 @@ static void set_surf_object(struct blt_ctrl_surf_copy_object *obj,
 static struct blt_copy_object *
 create_object(int i915, uint32_t region,
 	      uint32_t width, uint32_t height, uint32_t bpp, uint8_t mocs,
-	      enum blt_tiling tiling,
+	      enum blt_tiling_type tiling,
 	      enum blt_compression compression,
 	      enum blt_compression_type compression_type,
 	      bool create_mapping)
@@ -429,7 +429,7 @@ static void block_copy(int i915,
 		       const intel_ctx_t *ctx,
 		       const struct intel_execution_engine2 *e,
 		       uint32_t region1, uint32_t region2,
-		       enum blt_tiling mid_tiling,
+		       enum blt_tiling_type mid_tiling,
 		       const struct test_config *config)
 {
 	struct blt_copy_data blt = {};
@@ -548,7 +548,7 @@ static void block_multicopy(int i915,
 			    const intel_ctx_t *ctx,
 			    const struct intel_execution_engine2 *e,
 			    uint32_t region1, uint32_t region2,
-			    enum blt_tiling mid_tiling,
+			    enum blt_tiling_type mid_tiling,
 			    const struct test_config *config)
 {
 	struct blt_copy3_data blt3 = {};
@@ -637,7 +637,7 @@ static const struct {
 	const char *suffix;
 	void (*copyfn)(int, const intel_ctx_t *,
 		       const struct intel_execution_engine2 *,
-		       uint32_t, uint32_t, enum blt_tiling,
+		       uint32_t, uint32_t, enum blt_tiling_type,
 		       const struct test_config *);
 } copyfns[] = {
 	[BLOCK_COPY] = { "", block_copy },

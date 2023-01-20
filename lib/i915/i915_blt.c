@@ -217,7 +217,7 @@ bool blt_supports_compression(int i915)
  * Returns:
  * true if it does, false otherwise.
  */
-bool blt_supports_tiling(int i915, enum blt_tiling tiling)
+bool blt_supports_tiling(int i915, enum blt_tiling_type tiling)
 {
 	uint32_t devid = intel_get_drm_devid(i915);
 
@@ -245,7 +245,7 @@ bool blt_supports_tiling(int i915, enum blt_tiling tiling)
  * Returns:
  * name of @tiling passed. Useful to build test names.
  */
-const char *blt_tiling_name(enum blt_tiling tiling)
+const char *blt_tiling_name(enum blt_tiling_type tiling)
 {
 	switch (tiling) {
 	case T_LINEAR: return "linear";
@@ -259,7 +259,7 @@ const char *blt_tiling_name(enum blt_tiling tiling)
 	return NULL;
 }
 
-static int __block_tiling(enum blt_tiling tiling)
+static int __block_tiling(enum blt_tiling_type tiling)
 {
 	switch (tiling) {
 	case T_LINEAR: return 0;
@@ -891,7 +891,7 @@ struct gen12_fast_copy_data {
 	} dw09;
 };
 
-static int __fast_tiling(enum blt_tiling tiling)
+static int __fast_tiling(enum blt_tiling_type tiling)
 {
 	switch (tiling) {
 	case T_LINEAR: return 0;

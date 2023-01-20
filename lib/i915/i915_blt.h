@@ -59,7 +59,7 @@ enum blt_color_depth {
 	CD_128bit,
 };
 
-enum blt_tiling {
+enum blt_tiling_type {
 	T_LINEAR,
 	T_XMAJOR,
 	T_YMAJOR,
@@ -83,7 +83,7 @@ struct blt_copy_object {
 	uint32_t region;
 	uint64_t size;
 	uint8_t mocs;
-	enum blt_tiling tiling;
+	enum blt_tiling_type tiling;
 	enum blt_compression compression;  /* BC only */
 	enum blt_compression_type compression_type; /* BC only */
 	uint32_t pitch;
@@ -165,8 +165,8 @@ struct blt_ctrl_surf_copy_data {
 };
 
 bool blt_supports_compression(int i915);
-bool blt_supports_tiling(int i915, enum blt_tiling tiling);
-const char *blt_tiling_name(enum blt_tiling tiling);
+bool blt_supports_tiling(int i915, enum blt_tiling_type tiling);
+const char *blt_tiling_name(enum blt_tiling_type tiling);
 
 uint64_t emit_blt_block_copy(int i915,
 			     uint64_t ahnd,
