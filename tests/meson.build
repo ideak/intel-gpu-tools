@@ -221,6 +221,7 @@ i915_progs = [
 	'kms_ccs',
 	'kms_cdclk',
 	'kms_draw_crc',
+	'kms_dsc',
 	'kms_fbcon_fbt',
 	'kms_fence_pin_leak',
 	'kms_flip_scaled_crc',
@@ -426,14 +427,6 @@ test_executables += executable('kms_color',
 	   install_rpath : libexecdir_rpathdir,
 	   install : true)
 test_list += 'kms_color'
-
-test_executables += executable('kms_dsc',
-	   [ join_paths('i915', 'kms_dsc.c'), join_paths ('i915', 'kms_dsc_helper.c')],
-	   dependencies : test_deps,
-	   install_dir : libexecdir,
-	   install_rpath : libexecdir_rpathdir,
-	   install : true)
-test_list += 'kms_dsc'
 
 if chamelium.found()
        test_executables += executable('kms_chamelium_color',

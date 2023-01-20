@@ -974,6 +974,16 @@ void igt_require_pipe(igt_display_t *display,
 void igt_dump_connectors_fd(int drmfd);
 void igt_dump_crtcs_fd(int drmfd);
 bool igt_override_all_active_output_modes_to_fit_bw(igt_display_t *display);
+
+bool igt_is_dsc_supported(int drmfd, char *connector_name);
+bool igt_is_fec_supported(int drmfd, char *connector_name);
+bool igt_is_dsc_enabled(int drmfd, char *connector_name);
+bool igt_is_force_dsc_enabled(int drmfd, char *connector_name);
+int igt_force_dsc_enable(int drmfd, char *connector_name);
+int igt_force_dsc_enable_bpc(int drmfd, char *connector_name,
+			     int bpc);
+int igt_get_dsc_debugfs_fd(int drmfd, char *connector_name);
+
 unsigned int igt_get_output_max_bpc(int drmfd, char *connector_name);
 unsigned int igt_get_pipe_current_bpc(int drmfd, enum pipe pipe);
 void igt_assert_output_bpc_equal(int drmfd, enum pipe pipe,
