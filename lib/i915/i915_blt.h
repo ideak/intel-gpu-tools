@@ -158,7 +158,15 @@ struct blt_ctrl_surf_copy_data {
 };
 
 bool blt_supports_compression(int i915);
-bool blt_supports_tiling(int i915, enum blt_tiling_type tiling);
+bool blt_supports_command(const struct blt_cmd_info *info,
+			  enum blt_cmd_type cmd);
+bool blt_cmd_supports_tiling(const struct blt_cmd_info *info,
+			     enum blt_cmd_type cmd,
+			     enum blt_tiling_type tiling);
+bool blt_has_block_copy(int i915);
+bool blt_has_fast_copy(int i915);
+bool blt_fast_copy_supports_tiling(int i915, enum blt_tiling_type tiling);
+bool blt_block_copy_supports_tiling(int i915, enum blt_tiling_type tiling);
 const char *blt_tiling_name(enum blt_tiling_type tiling);
 
 uint64_t emit_blt_block_copy(int i915,

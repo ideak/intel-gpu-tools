@@ -652,6 +652,7 @@ static void block_copy_test(int i915,
 {
 	struct igt_collection *regions;
 	const struct intel_execution_engine2 *e;
+	int tiling;
 
 	if (config->compression && !blt_supports_compression(i915))
 		return;
@@ -659,8 +660,8 @@ static void block_copy_test(int i915,
 	if (config->inplace && !config->compression)
 		return;
 
-	for (int tiling = T_LINEAR; tiling <= T_TILE64; tiling++) {
-		if (!blt_supports_tiling(i915, tiling) ||
+	for_each_tiling(tiling) {
+		if (!blt_block_copy_supports_tiling(i915, tiling) ||
 		    (param.tiling >= 0 && param.tiling != tiling))
 			continue;
 
@@ -758,7 +759,7 @@ igt_main_args("bf:pst:W:H:", NULL, help_str, opt_handler, NULL)
 	igt_fixture {
 		i915 = drm_open_driver(DRIVER_INTEL);
 		igt_require_gem(i915);
-		igt_require(AT_LEAST_GEN(intel_get_drm_devid(i915), 12) > 0);
+		igt_require(blt_has_block_copy(i915));
 
 		query_info = gem_get_query_memory_regions(i915);
 		igt_require(query_info);

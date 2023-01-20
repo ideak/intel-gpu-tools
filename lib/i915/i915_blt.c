@@ -14,6 +14,7 @@
 #include "i915_blt.h"
 
 #define BITRANGE(start, end) (end - start + 1)
+#define GET_BLT_INFO(__fd) intel_get_blt_info(intel_get_drm_devid(__fd))
 
 enum blt_special_mode {
 	SM_NONE,
@@ -208,34 +209,115 @@ bool blt_supports_compression(int i915)
 }
 
 /**
- * blt_supports_tiling:
- * @i915: drm fd
- * @tiling: tiling id
+ * blt_supports_command:
+ * @info: Blitter command info struct
+ * @cmd: Blitter command enum
  *
- * Function checks if blitter supports @tiling on @i915 device.
+ * Checks if @info has an entry of supported tiling formats for @cmd command.
+ *
+ * Returns: true if it does, false otherwise
+ */
+bool blt_supports_command(const struct blt_cmd_info *info,
+			  enum blt_cmd_type cmd)
+{
+	igt_require_f(info, "No config found for the platform\n");
+
+	return info->supported_cmds[cmd];
+}
+
+/**
+ * blt_cmd_supports_tiling:
+ * @info: Blitter command info struct
+ * @cmd: Blitter command enum
+ * @tiling: tiling format enum
+ *
+ * Checks if a @cmd entry of @info lists @tiling. It also returns false if
+ * no information about the command is stored.
+ *
+ * Returns: true if it does, false otherwise
+ */
+bool blt_cmd_supports_tiling(const struct blt_cmd_info *info,
+			     enum blt_cmd_type cmd,
+			     enum blt_tiling_type tiling)
+{
+	struct blt_tiling_info const *tile_config;
+
+	if (!info)
+		return false;
+
+	tile_config = info->supported_cmds[cmd];
+
+	/* no config means no support for that tiling */
+	if (!tile_config)
+		return false;
+
+	return tile_config->supported_tiling & BIT(tiling);
+}
+
+/**
+ * blt_has_block_copy
+ * @i915: drm fd
+ *
+ * Check if block copy is supported by @i915 device
  *
  * Returns:
  * true if it does, false otherwise.
  */
-bool blt_supports_tiling(int i915, enum blt_tiling_type tiling)
+bool blt_has_block_copy(int i915)
 {
-	uint32_t devid = intel_get_drm_devid(i915);
+	const struct blt_cmd_info *blt_info = GET_BLT_INFO(i915);
 
-	if (tiling == T_XMAJOR) {
-		if (IS_TIGERLAKE(devid) || IS_DG1(devid))
-			return false;
-		else
-			return true;
-	}
+	return blt_supports_command(blt_info, XY_BLOCK_COPY);
+}
 
-	if (tiling == T_YMAJOR) {
-		if (IS_TIGERLAKE(devid) || IS_DG1(devid))
-			return true;
-		else
-			return false;
-	}
+/**
+ * blt_has_fast_copy
+ * @i915: drm fd
+ *
+ * Check if fast copy is supported by @i915 device
+ *
+ * Returns:
+ * true if it does, false otherwise.
+ */
+bool blt_has_fast_copy(int i915)
+{
+	const struct blt_cmd_info *blt_info = GET_BLT_INFO(i915);
 
-	return true;
+	return blt_supports_command(blt_info, XY_FAST_COPY);
+}
+
+/**
+ * blt_fast_copy_supports_tiling
+ * @i915: drm fd
+ * @tiling: tiling format
+ *
+ * Check if fast copy provided by @i915 device supports @tiling format
+ *
+ * Returns:
+ * true if it does, false otherwise.
+ */
+bool blt_fast_copy_supports_tiling(int i915, enum blt_tiling_type tiling)
+{
+	const struct blt_cmd_info *blt_info = GET_BLT_INFO(i915);
+
+	return blt_cmd_supports_tiling(blt_info, XY_FAST_COPY, tiling);
+}
+
+/**
+ * blt_block_copy_supports_tiling
+ * @i915: drm fd
+ * @tiling: tiling format
+ *
+ * Check if block copy provided by @i915 device supports @tiling format
+ *
+ * Returns:
+ * true if it does, false otherwise.
+ */
+bool blt_block_copy_supports_tiling(int i915, enum blt_tiling_type tiling)
+{
+	const struct blt_cmd_info *blt_info = GET_BLT_INFO(i915);
+
+	return blt_cmd_supports_tiling(blt_info, XY_BLOCK_COPY, tiling);
 }
 
 /**
