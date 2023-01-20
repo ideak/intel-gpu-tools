@@ -47,6 +47,7 @@ typedef struct {
 	igt_output_t *output;
 	int input_bpc;
 	int n_pipes;
+	int disp_ver;
 	enum pipe pipe;
 } data_t;
 
@@ -217,11 +218,12 @@ igt_main
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
 		data.devid = intel_get_drm_devid(data.drm_fd);
+		data.disp_ver = intel_display_ver(data.devid);
 		kmstest_set_vt_graphics_mode();
 		igt_install_exit_handler(kms_dsc_exit_handler);
 		igt_display_require(&data.display, data.drm_fd);
 		igt_display_require_output(&data.display);
-		igt_require(intel_display_ver(data.devid) >= 11);
+		igt_require(data.disp_ver >= 11);
 		data.n_pipes = 0;
 		for_each_pipe(&data.display, i)
 			data.n_pipes++;
