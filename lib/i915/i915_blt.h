@@ -47,6 +47,7 @@
 #include <malloc.h>
 #include "drm.h"
 #include "igt.h"
+#include "intel_tiling_info.h"
 
 #define CCS_RATIO 256
 
@@ -57,15 +58,6 @@ enum blt_color_depth {
 	CD_64bit,
 	CD_96bit,
 	CD_128bit,
-};
-
-enum blt_tiling_type {
-	T_LINEAR,
-	T_XMAJOR,
-	T_YMAJOR,
-	T_TILE4,
-	T_TILE64,
-	T_YFMAJOR,
 };
 
 enum blt_compression {
