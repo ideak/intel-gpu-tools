@@ -65,6 +65,7 @@ enum blt_tiling_type {
 	T_YMAJOR,
 	T_TILE4,
 	T_TILE64,
+	T_YFMAJOR,
 };
 
 enum blt_compression {

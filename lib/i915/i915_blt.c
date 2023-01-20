@@ -253,6 +253,9 @@ const char *blt_tiling_name(enum blt_tiling_type tiling)
 	case T_YMAJOR: return "ymajor";
 	case T_TILE4:  return "tile4";
 	case T_TILE64: return "tile64";
+	case T_YFMAJOR: return "yfmajor";
+	default:
+		break;
 	}
 
 	igt_warn("invalid tiling passed: %d\n", tiling);
@@ -267,6 +270,8 @@ static int __block_tiling(enum blt_tiling_type tiling)
 	case T_YMAJOR: return 1;
 	case T_TILE4:  return 2;
 	case T_TILE64: return 3;
+	default:
+		break;
 	}
 
 	igt_warn("invalid tiling passed: %d\n", tiling);
@@ -898,8 +903,13 @@ static int __fast_tiling(enum blt_tiling_type tiling)
 	case T_XMAJOR: return 1;
 	case T_YMAJOR: return 2;
 	case T_TILE4:  return 2;
+	case T_YFMAJOR: return 2;
 	case T_TILE64: return 3;
+	default:
+		break;
 	}
+
+	igt_warn("invalid tiling passed: %d\n", tiling);
 	return 0;
 }
 
