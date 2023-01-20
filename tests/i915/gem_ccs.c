@@ -342,9 +342,7 @@ static void block_copy(int i915,
 	struct blt_copy_object *src, *mid, *dst;
 	const uint32_t bpp = 32;
 	uint64_t bb_size = 4096;
-	uint64_t ahnd = intel_allocator_open_full(i915, ctx->id, 0, 0,
-						  INTEL_ALLOCATOR_SIMPLE,
-						  ALLOC_STRATEGY_LOW_TO_HIGH, 0);
+	uint64_t ahnd = intel_allocator_open(i915, ctx->id, INTEL_ALLOCATOR_RELOC);
 	uint32_t run_id = mid_tiling;
 	uint32_t mid_region = region2, bb;
 	uint32_t width = param.width, height = param.height;
@@ -406,9 +404,8 @@ static void block_copy(int i915,
 			cfg.engines[0].engine_instance = e->instance;
 			surf_ctx = intel_ctx_create(i915, &cfg);
 			surf_e.flags = 0;
-			surf_ahnd = intel_allocator_open_full(i915, surf_ctx->id, 0, 0,
-							      INTEL_ALLOCATOR_SIMPLE,
-							      ALLOC_STRATEGY_LOW_TO_HIGH, 0);
+			surf_ahnd = intel_allocator_open(i915, ctx->id,
+							 INTEL_ALLOCATOR_RELOC);
 		}
 
 		surf_copy(i915, surf_ctx, &surf_e, surf_ahnd, src, mid, dst, run_id,
@@ -461,7 +458,7 @@ static void block_multicopy(int i915,
 	struct blt_copy_object *src, *mid, *dst, *final;
 	const uint32_t bpp = 32;
 	uint64_t bb_size = 4096;
-	uint64_t ahnd = get_reloc_ahnd(i915, ctx->id);
+	uint64_t ahnd = intel_allocator_open(i915, ctx->id, INTEL_ALLOCATOR_RELOC);
 	uint32_t run_id = mid_tiling;
 	uint32_t mid_region = region2, bb;
 	uint32_t width = param.width, height = param.height;
