@@ -31,6 +31,8 @@
 #include <pciaccess.h>
 #include <stdbool.h>
 
+#include "i915/intel_tiling_info.h"
+
 #define BIT(x) (1ul <<(x))
 
 struct pci_device *intel_get_pci_device(void);
@@ -86,11 +88,13 @@ struct intel_device_info {
 	bool is_alderlake_p : 1;
 	bool is_alderlake_n : 1;
 	bool is_meteorlake : 1;
+	const struct blt_cmd_info *blt_tiling;
 	const char *codename;
 };
 
 const struct intel_device_info *intel_get_device_info(uint16_t devid) __attribute__((pure));
 
+const struct blt_cmd_info *intel_get_blt_info(uint16_t devid) __attribute__((pure));
 unsigned intel_gen(uint16_t devid) __attribute__((pure));
 unsigned intel_graphics_ver(uint16_t devid) __attribute__((pure));
 unsigned intel_display_ver(uint16_t devid) __attribute__((pure));
