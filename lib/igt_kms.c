@@ -1941,6 +1941,9 @@ kmstest_get_property(int drm_fd, uint32_t object_id, uint32_t object_type,
 	int i;
 
 	proplist = drmModeObjectGetProperties(drm_fd, object_id, object_type);
+	if (!proplist)
+		return false;
+
 	for (i = 0; i < proplist->count_props; i++) {
 		_prop = drmModeGetProperty(drm_fd, proplist->props[i]);
 		if (!_prop)
