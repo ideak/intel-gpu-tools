@@ -32,6 +32,7 @@
 #include <cairo.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <drm_fourcc.h>
 #include <xf86drmMode.h>
 
