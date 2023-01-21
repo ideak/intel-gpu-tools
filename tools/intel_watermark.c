@@ -179,6 +179,11 @@ static bool skl_has_sagv_wm(uint32_t d)
 	return intel_display_ver(d) >= 13;
 }
 
+static bool skl_has_nv12_buf_cfg(uint32_t d)
+{
+	return intel_display_ver(d) < 11;
+}
+
 static int skl_num_wm_levels(uint32_t d)
 {
 	if (skl_has_sagv_wm(d))
@@ -339,7 +344,7 @@ static void skl_wm_dump(void)
 			plane_ctl[pipe][plane] = read_reg(addr + 0x80);
 			wm_trans[pipe][plane] = read_reg(addr + 0x00168);
 			buf_cfg[pipe][plane] = read_reg(addr + 0x0017C);
-			if (!is_cursor(plane) && intel_display_ver(devid) < 11)
+			if (!is_cursor(plane) && skl_has_nv12_buf_cfg(devid))
 				nv12_buf_cfg[pipe][plane] = read_reg(addr + 0x00178);
 			else
 				nv12_buf_cfg[pipe][plane] = 0;
@@ -439,7 +444,7 @@ static void skl_wm_dump(void)
 		}
 		printf("\n");
 
-		if (intel_display_ver(devid) >= 11)
+		if (!skl_has_nv12_buf_cfg(devid))
 			continue;
 
 		if (is_cursor(plane))
@@ -575,7 +580,7 @@ static void skl_wm_dump(void)
 		}
 		printf("\n");
 
-		if (intel_display_ver(devid) < 11) {
+		if (skl_has_nv12_buf_cfg(devid)) {
 			printf("\nNV12 DDB allocation:");
 
 			printf("\nstart");
