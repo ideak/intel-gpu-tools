@@ -625,6 +625,8 @@ static void skl_wm_dump(void)
 		if (wm_dbg & (1 << (23 + level)))
 			printf(" LP%d", level);
 	}
+	if (skl_has_sagv_wm(devid) && wm_dbg & (1 << 29))
+		printf(" SAGV");
 	printf("\n");
 	/* clear the sticky bits */
 	write_reg(0x45280, wm_dbg);
