@@ -183,6 +183,38 @@ bool gem_has_lmem(int fd)
 	return gem_get_lmem_region_count(fd) > 0;
 }
 
+/**
+ * gem_has_smallbar:
+ * @fd: open i915 drm file descriptor
+ *
+ * Helper function to check if the device comes with small-bar.
+ *
+ * Returns: True if the device has small-bar.
+ */
+bool gem_has_smallbar(int fd)
+{
+	struct drm_i915_query_memory_regions *info;
+	struct drm_i915_memory_region_info *rf;
+	bool ret = false;
+
+	info = gem_get_query_memory_regions(fd);
+	igt_assert(info);
+
+	for (int i = 0; i < info->num_regions; i++) {
+		rf = &info->regions[i];
+		if (rf->region.memory_class == I915_MEMORY_CLASS_DEVICE) {
+			if (rf->probed_size > rf->probed_cpu_visible_size) {
+				ret = true;
+				break;
+			}
+		}
+	}
+	free(info);
+
+	return ret;
+}
+
+
 /* A version of gem_create_in_memory_region_list which can be allowed to
    fail so that the object creation can be retried */
 int __gem_create_in_memory_region_list(int fd, uint32_t *handle, uint64_t *size, uint32_t flags,

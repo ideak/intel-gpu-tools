@@ -62,6 +62,7 @@ struct drm_i915_query_memory_regions *gem_get_query_memory_regions(int fd);
 unsigned int gem_get_lmem_region_count(int fd);
 
 bool gem_has_lmem(int fd);
+bool gem_has_smallbar(int fd);
 
 int __gem_create_in_memory_region_list(int fd, uint32_t *handle, uint64_t *size, uint32_t flags,
 				       const struct drm_i915_gem_memory_class_instance *mem_regions,
