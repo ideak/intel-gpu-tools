@@ -500,6 +500,7 @@ static void test_wait(int fd, unsigned int flags, unsigned int wait)
 
 static void test_suspend(int fd, int state)
 {
+	igt_require(!gem_has_smallbar(fd));
 	/* Do a suspend first so that we don't skip inside the test */
 	igt_system_suspend_autoresume(state, SUSPEND_TEST_DEVICES);
 
