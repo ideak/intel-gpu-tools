@@ -340,7 +340,7 @@ static struct engines *discover_engines(char *device)
 
 	d = opendir(sysfs_root);
 	if (!d)
-		return NULL;
+		goto err;
 
 	while ((dent = readdir(d)) != NULL) {
 		const char *endswith = "-busy";
@@ -423,10 +423,8 @@ static struct engines *discover_engines(char *device)
 	}
 
 	if (ret) {
-		free(engines);
 		errno = ret;
-
-		return NULL;
+		goto err;
 	}
 
 	qsort(engine_ptr(engines, 0), engines->num_engines,
@@ -435,6 +433,11 @@ static struct engines *discover_engines(char *device)
 	engines->root = d;
 
 	return engines;
+
+err:
+	free(engines);
+
+	return NULL;
 }
 
 static void free_engines(struct engines *engines)
@@ -447,6 +450,9 @@ static void free_engines(struct engines *engines)
 		NULL
 	};
 	unsigned int i;
+
+	if (!engines)
+		return;
 
 	for (pmu = &free_list[0]; *pmu; pmu++) {
 		if ((*pmu)->present)
@@ -2562,7 +2568,7 @@ int main(int argc, char **argv)
 			"Failed to detect engines! (%s)\n(Kernel 4.16 or newer is required for i915 PMU support.)\n",
 			strerror(errno));
 		ret = EXIT_FAILURE;
-		goto err;
+		goto err_engines;
 	}
 
 	ret = pmu_init(engines);
@@ -2579,7 +2585,7 @@ int main(int argc, char **argv)
 "More information can be found at 'Perf events and tool security' document:\n"
 "https://www.kernel.org/doc/html/latest/admin-guide/perf-security.html\n");
 		ret = EXIT_FAILURE;
-		goto err;
+		goto err_pmu;
 	}
 
 	ret = EXIT_SUCCESS;
@@ -2687,8 +2693,9 @@ int main(int argc, char **argv)
 		free_clients(clients);
 
 	free(codename);
-err:
+err_pmu:
 	free_engines(engines);
+err_engines:
 	free(pmu_device);
 exit:
 	igt_devices_free();
