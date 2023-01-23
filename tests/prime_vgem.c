@@ -1093,7 +1093,10 @@ static void test_each_engine(const char *name, int vgem, int i915,
 					unsigned int flags))
 {
 	const struct intel_execution_engine2 *e;
-	const intel_ctx_t *ctx = intel_ctx_create_all_physical(i915);
+	const intel_ctx_t *ctx;
+
+	igt_fixture
+		ctx = intel_ctx_create_all_physical(i915);
 
 	igt_subtest_with_dynamic(name) {
 		for_each_ctx_engine(i915, ctx, e) {
@@ -1110,7 +1113,8 @@ static void test_each_engine(const char *name, int vgem, int i915,
 		}
 	}
 
-	intel_ctx_destroy(i915, ctx);
+	igt_fixture
+		intel_ctx_destroy(i915, ctx);
 }
 
 igt_main
