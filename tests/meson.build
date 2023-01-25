@@ -233,7 +233,6 @@ i915_progs = [
 	'kms_pipe_b_c_ivb',
 	'kms_psr',
 	'kms_psr2_su',
-	'kms_psr2_sf',
 	'kms_psr_stress_test',
 	'kms_pwrite_crc',
 	'sysfs_defaults',
@@ -435,6 +434,14 @@ test_executables += executable('kms_dsc',
 	   install_rpath : libexecdir_rpathdir,
 	   install : true)
 test_list += 'kms_dsc'
+
+test_executables += executable('kms_psr2_sf',
+	   [ join_paths('i915', 'kms_psr2_sf.c'), join_paths ('i915', 'kms_dsc_helper.c')],
+	   dependencies : test_deps,
+	   install_dir : libexecdir,
+	   install_rpath : libexecdir_rpathdir,
+	   install : true)
+test_list += 'kms_psr2_sf'
 
 if chamelium.found()
        test_executables += executable('kms_chamelium_color',
