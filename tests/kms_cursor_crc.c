@@ -749,7 +749,7 @@ static void run_size_tests(data_t *data, int w, int h)
 				}
 			}
 
-			for_each_pipe(&data->display, pipe) {
+			for_each_pipe_with_single_output(&data->display, pipe, data->output) {
 				data->pipe = pipe;
 
 				if (require_cursor_size(data, w, h)) {
@@ -774,8 +774,6 @@ static void run_tests_on_pipe(data_t *data)
 	int cursor_size;
 
 	igt_fixture {
-		data->output = igt_get_single_output_for_pipe(&data->display, pipe);
-		igt_require(data->output);
 		data->alpha = 1.0;
 		data->flags = 0;
 	}
@@ -784,15 +782,8 @@ static void run_tests_on_pipe(data_t *data)
 		     "flight to smaller ones to see that the size is applied "
 		     "correctly.");
 	igt_subtest_with_dynamic("cursor-size-change") {
-		for_each_pipe(&data->display, pipe) {
+		for_each_pipe_with_single_output(&data->display, pipe, data->output) {
 			data->pipe = pipe;
-
-			if(!igt_pipe_connector_valid(pipe, data->output)) {
-				igt_debug("Invalid connector on pipe-%s-%s",
-				      kmstest_pipe_name(pipe),
-				      data->output->name);
-				continue;
-			}
 
 			igt_dynamic_f("pipe-%s-%s",
 				      kmstest_pipe_name(pipe),
@@ -805,15 +796,8 @@ static void run_tests_on_pipe(data_t *data)
 	igt_describe("Validates the composition of a fully opaque cursor "
 		     "plane, i.e., alpha channel equal to 1.0.");
 	igt_subtest_with_dynamic("cursor-alpha-opaque") {
-		for_each_pipe(&data->display, pipe) {
+		for_each_pipe_with_single_output(&data->display, pipe, data->output) {
 			data->pipe = pipe;
-
-			if(!igt_pipe_connector_valid(pipe, data->output)) {
-				igt_debug("Invalid connector on pipe-%s-%s",
-				      kmstest_pipe_name(pipe),
-				      data->output->name);
-				continue;
-			}
 
 			igt_dynamic_f("pipe-%s-%s",
 				      kmstest_pipe_name(pipe),
@@ -826,15 +810,8 @@ static void run_tests_on_pipe(data_t *data)
 	igt_describe("Validates the composition of a fully transparent cursor "
 		     "plane, i.e., alpha channel equal to 0.0.");
 	igt_subtest_with_dynamic("cursor-alpha-transparent") {
-		for_each_pipe(&data->display, pipe) {
+		for_each_pipe_with_single_output(&data->display, pipe, data->output) {
 			data->pipe = pipe;
-
-			if(!igt_pipe_connector_valid(pipe, data->output)) {
-				igt_debug("Invalid connector on pipe-%s-%s",
-				      kmstest_pipe_name(pipe),
-				      data->output->name);
-				continue;
-			}
 
 			igt_dynamic_f("pipe-%s-%s",
 				      kmstest_pipe_name(pipe),
@@ -850,15 +827,9 @@ static void run_tests_on_pipe(data_t *data)
 
 	igt_describe("Check random placement of a cursor with DPMS.");
 	igt_subtest_with_dynamic("cursor-dpms") {
-		for_each_pipe(&data->display, pipe) {
+		for_each_pipe_with_single_output(&data->display, pipe, data->output) {
 			data->pipe = pipe;
 			data->flags = TEST_DPMS;
-
-			if (require_cursor_size(data, data->cursor_max_w, data->cursor_max_h)) {
-				igt_debug("Cursor size %dx%d not supported by driver\n",
-					  data->cursor_max_w, data->cursor_max_h);
-				continue;
-			}
 
 			igt_dynamic_f("pipe-%s-%s",
 				      kmstest_pipe_name(pipe),
@@ -871,15 +842,9 @@ static void run_tests_on_pipe(data_t *data)
 
 	igt_describe("Check random placement of a cursor with suspend.");
 	igt_subtest_with_dynamic("cursor-suspend") {
-		for_each_pipe(&data->display, pipe) {
+		for_each_pipe_with_single_output(&data->display, pipe, data->output) {
 			data->pipe = pipe;
 			data->flags = TEST_SUSPEND;
-
-			if (require_cursor_size(data, data->cursor_max_w, data->cursor_max_h)) {
-				igt_debug("Cursor size %dx%d not supported by driver\n",
-					  data->cursor_max_w, data->cursor_max_h);
-				continue;
-			}
 
 			igt_dynamic_f("pipe-%s-%s",
 				      kmstest_pipe_name(pipe),
