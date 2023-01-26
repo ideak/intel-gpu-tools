@@ -1540,6 +1540,9 @@ static bool comms_handle_subtest_start(const struct runnerpacket *packet,
 		/* Subtest starting message is not in logs with socket comms, inject it manually */
 		comms_inject_subtest_start_log(context, STARTING_SUBTEST, helper.subteststart.name);
 
+		free(context->subtestresult);
+		context->subtestresult = NULL;
+
 		break;
 	default:
 		assert(false); /* unreachable */
@@ -1668,6 +1671,9 @@ static bool comms_handle_dynamic_subtest_start(const struct runnerpacket *packet
 
 		/* Dynamic subtest starting message is not in logs with socket comms, inject it manually */
 		comms_inject_subtest_start_log(context, STARTING_DYNAMIC_SUBTEST, helper.dynamicsubteststart.name);
+
+		free(context->dynamicsubtestresult);
+		context->dynamicsubtestresult = NULL;
 
 		break;
 	default:
