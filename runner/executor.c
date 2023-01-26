@@ -348,27 +348,32 @@ static const struct {
 	{ 0, 0 },
 };
 
-static char *need_to_abort(const struct settings* settings)
+static char *_need_to_abort(int abort_mask, int log_level)
 {
 	typeof(*abort_handlers) *it;
 
 	for (it = abort_handlers; it->condition; it++) {
 		char *abort;
 
-		if (!(settings->abort_mask & it->condition))
+		if (!(abort_mask & it->condition))
 			continue;
 
 		abort = it->handler();
 		if (!abort)
 			continue;
 
-		if (settings->log_level >= LOG_LEVEL_NORMAL)
+		if (log_level >= LOG_LEVEL_NORMAL)
 			errf("Aborting: %s\n", abort);
 
 		return abort;
 	}
 
 	return NULL;
+}
+
+static char *need_to_abort(const struct settings *settings)
+{
+	return _need_to_abort(settings->abort_mask, settings->log_level);
 }
 
 static void prune_subtest(struct job_list_entry *entry, const char *subtest)
