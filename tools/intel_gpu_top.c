@@ -2515,11 +2515,12 @@ int main(int argc, char **argv)
 	if (signal(SIGINT, sigint_handler) == SIG_ERR)
 		fprintf(stderr, "Failed to install signal handler!\n");
 
+	class_view = !physical_engines;
+
 	switch (output_mode) {
 	case INTERACTIVE:
 		pops = &term_pops;
 		interactive_stdin();
-		class_view = !physical_engines;
 		break;
 	case STDOUT:
 		pops = &stdout_pops;
