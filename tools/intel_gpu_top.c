@@ -2603,6 +2603,9 @@ int main(int argc, char **argv)
 	scan_clients(clients, false);
 	codename = igt_device_get_pretty_name(&card, false);
 
+	if (output_mode == JSON)
+		printf("[\n");
+
 	while (!stop_top) {
 		struct clients *disp_clients;
 		bool consumed = false;
@@ -2688,6 +2691,9 @@ int main(int argc, char **argv)
 		else
 			usleep(period_us);
 	}
+
+	if (output_mode == JSON)
+		printf("]\n");
 
 	if (clients)
 		free_clients(clients);
