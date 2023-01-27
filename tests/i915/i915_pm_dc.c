@@ -246,6 +246,13 @@ static void check_dc_counter(data_t *data, int dc_flag, uint32_t prev_dc_count)
 		     data->debugfs_dump = igt_sysfs_get(data->debugfs_fd, PWR_DOMAIN_INFO));
 }
 
+static void check_dc_counter_negative(data_t *data, int dc_flag, uint32_t prev_dc_count)
+{
+	igt_assert_f(!dc_state_wait_entry(data->debugfs_fd, dc_flag, prev_dc_count),
+		     "%s state is achieved\n%s:\n%s\n", dc_state_name(dc_flag), PWR_DOMAIN_INFO,
+		     data->debugfs_dump = igt_sysfs_get(data->debugfs_fd, PWR_DOMAIN_INFO));
+}
+
 static void setup_videoplayback(data_t *data)
 {
 	color_t red_green_blue[] = {
@@ -411,6 +418,18 @@ static void test_dc_state_dpms(data_t *data, int dc_flag)
 	cleanup_dc_dpms(data);
 }
 
+static void test_dc_state_dpms_negative(data_t *data, int dc_flag)
+{
+	uint32_t dc_counter;
+
+	require_dc_counter(data->debugfs_fd, dc_flag);
+	setup_dc_dpms(data);
+	dc_counter = read_dc_counter(data->debugfs_fd, dc_flag);
+	dpms_on(data);
+	check_dc_counter_negative(data, dc_flag, dc_counter);
+	cleanup_dc_dpms(data);
+}
+
 static bool support_dc6(int debugfs_fd)
 {
 	char buf[4096];
@@ -485,6 +504,21 @@ static void test_dc9_dpms(data_t *data)
 	setup_dc9_dpms(data, dc_target);
 }
 
+static int has_panels_without_dc_support(igt_display_t *display)
+{
+	igt_output_t *output;
+	int external_panel = 0;
+
+	for_each_connected_output(display, output) {
+		drmModeConnectorPtr c = output->config.connector;
+
+		if (c->connector_type != DRM_MODE_CONNECTOR_eDP)
+			external_panel++;
+	}
+
+	return external_panel;
+}
+
 static void kms_poll_state_restore(int sig)
 {
 	int sysfs_fd;
@@ -550,6 +584,15 @@ igt_main
 		     "while all connectors's DPMS property set to OFF");
 	igt_subtest("dc5-dpms") {
 		test_dc_state_dpms(&data, CHECK_DC5);
+	}
+
+	igt_describe("This test validates negative scenario of DC5 display "
+		     "engine entry to DC5 state while all connectors's DPMS "
+		     "property set to ON");
+	igt_subtest("dc5-dpms-negative") {
+		igt_require_f(has_panels_without_dc_support(&data.display),
+			      "External panel not detected, skip execution\n");
+		test_dc_state_dpms_negative(&data, CHECK_DC5);
 	}
 
 	igt_describe("This test validates display engine entry to DC6 state "
