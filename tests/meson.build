@@ -213,6 +213,7 @@ i915_progs = [
 	'i915_pm_dc',
 	'i915_pm_rps',
 	'i915_pm_sseu',
+	'i915_power',
 	'i915_query',
 	'i915_selftest',
 	'i915_suspend',
