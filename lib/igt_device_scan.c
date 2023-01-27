@@ -237,6 +237,7 @@ struct igt_device {
 	char *vendor;
 	char *device;
 	char *pci_slot_name;
+	char *driver;
 	int gpu_index; /* For more than one GPU with same vendor and device. */
 
 	char *codename; /* For grouping by codename */
@@ -440,7 +441,6 @@ static bool is_on_blacklist(const char *what)
 				      "resource3", "resource4", "resource5",
 				      "resource0_wc", "resource1_wc", "resource2_wc",
 				      "resource3_wc", "resource4_wc", "resource5_wc",
-				      "driver",
 				      "uevent", NULL};
 	const char *key;
 	int i = 0;
@@ -662,6 +662,8 @@ static struct igt_device *igt_device_new_from_udev(struct udev_device *dev)
 		get_pci_vendor_device(idev, &vendor, &device);
 		idev->codename = __pci_codename(vendor, device);
 		idev->dev_type = __pci_devtype(vendor, device, idev->pci_slot_name);
+		idev->driver = strdup_nullsafe(get_attr(idev, "driver"));
+		igt_assert(idev->driver);
 	}
 
 	return idev;
@@ -776,7 +778,7 @@ static bool __find_first_i915_card(struct igt_device_card *card, bool discrete)
 
 	igt_list_for_each_entry(dev, &igt_devs.all, link) {
 
-		if (!is_pci_subsystem(dev) || !is_vendor_matched(dev, "intel"))
+		if (!is_pci_subsystem(dev) || strcmp(dev->driver, "i915"))
 			continue;
 
 		cmp = strncmp(dev->pci_slot_name, INTEGRATED_I915_GPU_PCI_ID,
@@ -1023,6 +1025,7 @@ static void igt_device_free(struct igt_device *dev)
 	free(dev->drm_render);
 	free(dev->vendor);
 	free(dev->device);
+	free(dev->driver);
 	free(dev->pci_slot_name);
 	g_hash_table_destroy(dev->attrs_ht);
 	g_hash_table_destroy(dev->props_ht);
