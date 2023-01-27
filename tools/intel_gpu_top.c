@@ -1274,6 +1274,7 @@ usage(const char *appname)
 		"\t[-s <ms>]       Refresh period in milliseconds (default %ums).\n"
 		"\t[-L]            List all cards.\n"
 		"\t[-d <device>]   Device filter, please check manual page for more details.\n"
+		"\t[-p]            Default to showing physical engines instead of classes.\n"
 		"\n",
 		appname, DEFAULT_PERIOD_MS);
 	igt_device_print_filter_types();
@@ -2452,6 +2453,7 @@ int main(int argc, char **argv)
 {
 	unsigned int period_us = DEFAULT_PERIOD_MS * 1000;
 	struct clients *clients = NULL;
+	bool physical_engines = false;
 	int con_w = -1, con_h = -1;
 	char *output_path = NULL;
 	struct engines *engines;
@@ -2462,7 +2464,7 @@ int main(int argc, char **argv)
 	char *codename = NULL;
 
 	/* Parse options */
-	while ((ch = getopt(argc, argv, "o:s:d:JLlh")) != -1) {
+	while ((ch = getopt(argc, argv, "o:s:d:pJLlh")) != -1) {
 		switch (ch) {
 		case 'o':
 			output_path = optarg;
@@ -2472,6 +2474,9 @@ int main(int argc, char **argv)
 			break;
 		case 'd':
 			opt_device = strdup(optarg);
+			break;
+		case 'p':
+			physical_engines = true;
 			break;
 		case 'J':
 			output_mode = JSON;
@@ -2514,7 +2519,7 @@ int main(int argc, char **argv)
 	case INTERACTIVE:
 		pops = &term_pops;
 		interactive_stdin();
-		class_view = true;
+		class_view = !physical_engines;
 		break;
 	case STDOUT:
 		pops = &stdout_pops;

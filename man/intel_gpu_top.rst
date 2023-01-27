@@ -49,6 +49,9 @@ OPTIONS
 -d
     Select a specific GPU using one of the supported filters.
 
+-p
+   Default to showing physical engines instead of aggregated classes.
+
 RUNTIME CONTROL
 ===============
 
