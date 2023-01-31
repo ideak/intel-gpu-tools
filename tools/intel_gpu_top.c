@@ -1391,6 +1391,7 @@ static unsigned int stdout_level;
 
 #define STDOUT_HEADER_REPEAT 20
 static unsigned int stdout_lines = STDOUT_HEADER_REPEAT;
+static bool stdout_header_repeat;
 
 static void
 stdout_open_struct(const char *name)
@@ -1580,16 +1581,22 @@ static const struct print_operations term_pops = {
 
 static bool print_groups(struct cnt_group **groups)
 {
-	unsigned int headers = stdout_lines % STDOUT_HEADER_REPEAT + 1;
+	static bool headers_printed;
 	bool print_data = true;
 
-	if (output_mode == STDOUT && (headers == 1 || headers == 2)) {
-		for (struct cnt_group **grp = groups; *grp; grp++)
-			print_data = pops->print_group(*grp, headers);
+	if (output_mode == STDOUT &&
+	    (stdout_header_repeat || !headers_printed)) {
+		unsigned int headers = stdout_lines % STDOUT_HEADER_REPEAT + 1;
+
+		if (headers == 1 || headers == 2)
+			for (struct cnt_group **grp = groups; *grp; grp++)
+				print_data = pops->print_group(*grp, headers);
+
+		headers_printed = print_data;
 	}
 
 	for (struct cnt_group **grp = groups; print_data && *grp; grp++)
-		pops->print_group(*grp, false);
+		pops->print_group(*grp, 0);
 
 	return print_data;
 }
@@ -2511,6 +2518,8 @@ int main(int argc, char **argv)
 	} else {
 		out = stdout;
 	}
+
+	stdout_header_repeat = output_mode == STDOUT && isatty(fileno(out));
 
 	if (signal(SIGINT, sigint_handler) == SIG_ERR)
 		fprintf(stderr, "Failed to install signal handler!\n");
