@@ -134,6 +134,7 @@ static void make_fb(data_t *data, struct igt_fb *fb,
 
 	cr = igt_get_cairo_ctx(data->drm_fd, fb);
 	igt_paint_color_rand(cr, rec_width * 2 + rec_width * index, height / 4, rec_width, height / 2);
+	igt_put_cairo_ctx(cr);
 }
 
 static void require_monotonic_timestamp(int fd)
