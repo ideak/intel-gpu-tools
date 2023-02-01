@@ -295,5 +295,5 @@ bool supports_i915_crc32(int i915)
 {
 	uint16_t devid = intel_get_drm_devid(i915);
 
-	return IS_DG2(devid);
+	return intel_graphics_ver(devid) > IP_VER(12, 50);
 }
