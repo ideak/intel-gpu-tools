@@ -244,10 +244,11 @@ uint32_t i915_crc32(int i915, uint64_t ahnd, const intel_ctx_t *ctx,
 	uint64_t bb_offset, table_offset, data_offset;
 	uint32_t bb, table, crc, table_size = 4096;
 	uint32_t *ptr;
+	uint32_t region = gem_has_lmem(i915) ? REGION_LMEM(0) : REGION_SMEM;
 
 	igt_assert(data_size % 4 == 0);
 
-	table = gem_create_in_memory_regions(i915, table_size, REGION_LMEM(0));
+	table = gem_create_in_memory_regions(i915, table_size, region);
 	gem_write(i915, table, 0, igt_crc32_tab, sizeof(igt_crc32_tab));
 
 	table_offset = get_offset(ahnd, table, table_size, 0);
@@ -261,7 +262,7 @@ uint32_t i915_crc32(int i915, uint64_t ahnd, const intel_ctx_t *ctx,
 	obj[1].flags = EXEC_OBJECT_PINNED;
 	obj[1].handle = data_handle;
 
-	bb = gem_create_in_memory_regions(i915, BBSIZE, REGION_LMEM(0));
+	bb = gem_create_in_memory_regions(i915, BBSIZE, region);
 	bb_offset = get_offset(ahnd, bb, BBSIZE, 0);
 	fill_batch(i915, bb, bb_offset, table_offset, data_offset, data_size);
 	obj[2].offset = bb_offset;
