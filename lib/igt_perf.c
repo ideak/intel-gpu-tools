@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -96,6 +97,16 @@ uint64_t igt_perf_type_id(const char *device)
 	buf[ret] = '\0';
 
 	return strtoull(buf, NULL, 0);
+}
+
+int igt_perf_events_dir(int i915)
+{
+	char buf[80];
+	char path[PATH_MAX];
+
+	i915_perf_device(i915, buf, sizeof(buf));
+	snprintf(path, sizeof(path), "/sys/bus/event_source/devices/%s/events", buf);
+	return open(path, O_RDONLY);
 }
 
 static int

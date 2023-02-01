@@ -54,6 +54,7 @@ perf_event_open(struct perf_event_attr *attr,
 }
 
 uint64_t igt_perf_type_id(const char *device);
+int igt_perf_events_dir(int i915);
 int igt_perf_open(uint64_t type, uint64_t config);
 int igt_perf_open_group(uint64_t type, uint64_t config, int group);
 

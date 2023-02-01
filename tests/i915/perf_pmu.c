@@ -2132,6 +2132,34 @@ static void test_unload(unsigned int num_engines)
 	igt_assert_eq(__igt_i915_driver_unload(NULL), 0);
 }
 
+static void pmu_read(int i915)
+{
+	char val[128];
+	int pmu_fd;
+	struct dirent *de;
+	DIR *dir;
+
+	pmu_fd = igt_perf_events_dir(i915);
+	igt_require(pmu_fd >= 0);
+
+	dir = fdopendir(dup(pmu_fd));
+	igt_assert(dir);
+	rewinddir(dir);
+
+	errno = 0;
+	while ((de = readdir(dir))) {
+		if (de->d_type != DT_REG)
+			continue;
+
+		igt_assert_eq(igt_sysfs_scanf(pmu_fd, de->d_name, "%127s", val), 1);
+		igt_debug("'%s': %s\n", de->d_name, val);
+	}
+
+	igt_assert_eq(errno, 0);
+	closedir(dir);
+	close(pmu_fd);
+}
+
 #define test_each_engine(T, i915, ctx, e) \
 	igt_subtest_with_dynamic(T) for_each_ctx_engine(i915, ctx, e) \
 		igt_dynamic_f("%s", e->name)
@@ -2166,6 +2194,10 @@ igt_main
 			num_engines++;
 		igt_require(num_engines);
 	}
+
+	igt_describe("Verify i915 pmu dir exists and read all events");
+	igt_subtest("pmu-read")
+		pmu_read(fd);
 
 	/**
 	 * Test invalid access via perf API is rejected.
