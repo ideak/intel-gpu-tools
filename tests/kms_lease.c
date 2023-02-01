@@ -317,6 +317,7 @@ static void setcrtc_implicit_plane(data_t *data)
 	struct drm_mode_create_lease mcl;
 	drmModePlaneRes *plane_resources;
 	uint32_t wrong_plane_id = 0;
+	int ret = 0, ret_mcl = 0;
 	igt_output_t *output =
 		connector_id_to_output(&data->master.display,
 				       data->connector_id);
@@ -349,11 +350,13 @@ static void setcrtc_implicit_plane(data_t *data)
 	igt_assert_eq(0, prepare_crtc(&data->master, data));
 
 	/* sanity check */
-	do_or_die(drmModeSetCrtc(data->master.fd, data->crtc_id, -1,
-				 0, 0, object_ids, 1, mode));
-	do_or_die(drmModeSetCrtc(mcl.fd, data->crtc_id, -1,
-				 0, 0, object_ids, 1, mode));
+	ret = drmModeSetCrtc(data->master.fd, data->crtc_id, -1,
+			     0, 0, object_ids, 1, mode);
+	ret_mcl = drmModeSetCrtc(mcl.fd, data->crtc_id, -1,
+				 0, 0, object_ids, 1, mode);
 	close(mcl.fd);
+	igt_assert_eq(ret, 0);
+	igt_assert_eq(ret_mcl, 0);
 
 	object_ids[mcl.object_count++] = wrong_plane_id;
 	do_or_die(create_lease(data->master.fd, &mcl));
