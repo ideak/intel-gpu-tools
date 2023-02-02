@@ -35,6 +35,9 @@ static int write_dsc_debugfs(int drmfd, char *connector_name, const char *file_n
 
 	close(debugfs_fd);
 
+	if (ret > 0)
+		return 0;
+
 	return ret;
 }
 
@@ -92,7 +95,7 @@ bool igt_is_force_dsc_enabled(int drmfd, char *connector_name)
  * @drmfd: A drm file descriptor
  * @connector_name: Name of the libdrm connector we're going to use
  *
- * Returns: 1 on success or negative error code, in case of failure.
+ * Returns: 0 on success or negative error code, in case of failure.
  */
 int igt_force_dsc_enable(int drmfd, char *connector_name)
 {
@@ -105,7 +108,7 @@ int igt_force_dsc_enable(int drmfd, char *connector_name)
  * @connector_name: Name of the libdrm connector we're going to use
  * @bpc: Input BPC
  *
- * Returns: No. of bytes written or negative error code, in case of failure.
+ * Returns: 0 on success or negative error code, in case of failure.
  */
 int igt_force_dsc_enable_bpc(int drmfd, char *connector_name, int bpc)
 {

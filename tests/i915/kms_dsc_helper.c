@@ -14,7 +14,7 @@ void force_dsc_enable(int drmfd, igt_output_t *output)
 
 	igt_debug("Forcing DSC enable on %s\n", output->name);
 	ret = igt_force_dsc_enable(drmfd, output->name);
-	igt_assert_f(ret > 0, "forcing dsc enable debugfs_write failed\n");
+	igt_assert_f(ret == 0, "forcing dsc enable debugfs_write failed\n");
 }
 
 void force_dsc_enable_bpc(int drmfd, igt_output_t *output, int input_bpc)
@@ -24,7 +24,7 @@ void force_dsc_enable_bpc(int drmfd, igt_output_t *output, int input_bpc)
 	igt_debug("Forcing input DSC BPC to %d on %s\n",
 		  input_bpc, output->name);
 	ret = igt_force_dsc_enable_bpc(drmfd, output->name, input_bpc);
-	igt_assert_f(ret > 0, "forcing input dsc bpc debugfs_write failed\n");
+	igt_assert_f(ret == 0, "forcing input dsc bpc debugfs_write failed\n");
 }
 
 void save_force_dsc_en(int drmfd, igt_output_t *output)
