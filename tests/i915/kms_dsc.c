@@ -44,6 +44,7 @@ typedef struct {
 	uint32_t devid;
 	igt_display_t display;
 	struct igt_fb fb_test_pattern;
+	unsigned int plane_format;
 	igt_output_t *output;
 	int input_bpc;
 	int n_pipes;
@@ -108,7 +109,7 @@ static void test_cleanup(data_t *data)
 }
 
 /* re-probe connectors and do a modeset with DSC */
-static void update_display(data_t *data, enum dsc_test_type test_type, unsigned int plane_format)
+static void update_display(data_t *data, enum dsc_test_type test_type)
 {
 	bool enabled;
 	igt_plane_t *primary;
@@ -137,13 +138,13 @@ static void update_display(data_t *data, enum dsc_test_type test_type, unsigned 
 
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 
-	igt_skip_on(!igt_plane_has_format_mod(primary, plane_format,
+	igt_skip_on(!igt_plane_has_format_mod(primary, data->plane_format,
 		    DRM_FORMAT_MOD_LINEAR));
 
 	igt_create_pattern_fb(data->drm_fd,
 			      mode->hdisplay,
 			      mode->vdisplay,
-			      plane_format,
+			      data->plane_format,
 			      DRM_FORMAT_MOD_LINEAR,
 			      &data->fb_test_pattern);
 
@@ -184,6 +185,7 @@ static void test_dsc(data_t *data, enum dsc_test_type test_type, int bpc,
 	enum pipe pipe;
 
 	for_each_pipe_with_valid_output(display, pipe, output) {
+		data->plane_format = plane_format;
 		data->input_bpc = bpc;
 		data->output = output;
 		data->pipe = pipe;
@@ -201,12 +203,12 @@ static void test_dsc(data_t *data, enum dsc_test_type test_type, int bpc,
 			continue;
 
 		if (test_type == TEST_DSC_BPC)
-			snprintf(name, sizeof(name), "-%dbpc-%s", data->input_bpc, igt_format_str(plane_format));
+			snprintf(name, sizeof(name), "-%dbpc-%s", data->input_bpc, igt_format_str(data->plane_format));
 		else
-			snprintf(name, sizeof(name), "-%s", igt_format_str(plane_format));
+			snprintf(name, sizeof(name), "-%s", igt_format_str(data->plane_format));
 
 		igt_dynamic_f("pipe-%s-%s%s",  kmstest_pipe_name(data->pipe), data->output->name, name)
-			update_display(data, test_type, plane_format);
+			update_display(data, test_type);
 	}
 }
 
