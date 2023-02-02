@@ -52,16 +52,7 @@ typedef struct {
 	enum pipe pipe;
 } data_t;
 
-const struct {
-	const int format;
-	const char format_str[20];
-} format_list[] = {
-	{DRM_FORMAT_XYUV8888, "XYUV8888"},
-	{DRM_FORMAT_XRGB2101010, "XRGB2101010"},
-	{DRM_FORMAT_XRGB16161616F, "XRGB16161616F"},
-	{DRM_FORMAT_YUYV, "YUYV"},
-};
-
+static int format_list[] =  {DRM_FORMAT_XYUV8888, DRM_FORMAT_XRGB2101010, DRM_FORMAT_XRGB16161616F, DRM_FORMAT_YUYV};
 uint32_t bpc_list[] = {12, 10, 8};
 
 static inline void manual(const char *expected)
@@ -242,7 +233,7 @@ igt_main
 		     "with default parameters and creating fb with diff formats");
 	igt_subtest_with_dynamic("dsc-with-formats") {
 		for (int k = 0; k < ARRAY_SIZE(format_list); k++)
-			test_dsc(&data, TEST_DSC_BASIC, 0, format_list[k].format);
+			test_dsc(&data, TEST_DSC_BASIC, 0, format_list[k]);
 	}
 
 	igt_describe("Tests basic display stream compression functionality if supported "
@@ -259,7 +250,7 @@ igt_main
 	igt_subtest_with_dynamic("dsc-with-bpc-formats") {
 		for (int j = 0; j < ARRAY_SIZE(bpc_list); j++) {
 			for (int k = 0; k < ARRAY_SIZE(format_list); k++) {
-				test_dsc(&data, TEST_DSC_BPC, bpc_list[j], format_list[k].format);
+				test_dsc(&data, TEST_DSC_BPC, bpc_list[j], format_list[k]);
 			}
 		}
 	}
