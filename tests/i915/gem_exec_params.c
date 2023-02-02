@@ -411,24 +411,23 @@ igt_main
 	igt_subtest("mmapped")
 		mmapped(fd);
 
-#define RUN_FAIL(expected_errno) do { \
-		igt_assert_eq(__gem_execbuf(fd, &execbuf), -expected_errno); \
-	} while(0)
+#define CHK_RUN(has_check, expected_errno) \
+		igt_assert_eq(__gem_execbuf(fd, &execbuf), has_check(fd) ? 0 : -(expected_errno))
+#define RUN_FAIL(expected_errno) \
+		igt_assert_eq(__gem_execbuf(fd, &execbuf), -(expected_errno))
+
 
 	igt_subtest("no-bsd") {
-		igt_require(!gem_has_bsd(fd));
 		execbuf.flags = I915_EXEC_BSD;
-		RUN_FAIL(EINVAL);
+		CHK_RUN(gem_has_bsd, EINVAL);
 	}
 	igt_subtest("no-blt") {
-		igt_require(!gem_has_blt(fd));
 		execbuf.flags = I915_EXEC_BLT;
-		RUN_FAIL(EINVAL);
+		CHK_RUN(gem_has_blt, EINVAL);
 	}
 	igt_subtest("no-vebox") {
-		igt_require(!gem_has_vebox(fd));
 		execbuf.flags = I915_EXEC_VEBOX;
-		RUN_FAIL(EINVAL);
+		CHK_RUN(gem_has_vebox, EINVAL);
 	}
 	igt_subtest("invalid-ring") {
 		execbuf.flags = I915_EXEC_RING_MASK;
