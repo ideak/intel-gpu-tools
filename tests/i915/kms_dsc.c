@@ -53,7 +53,7 @@ typedef struct {
 } data_t;
 
 static int format_list[] =  {DRM_FORMAT_XYUV8888, DRM_FORMAT_XRGB2101010, DRM_FORMAT_XRGB16161616F, DRM_FORMAT_YUYV};
-uint32_t bpc_list[] = {12, 10, 8};
+static uint32_t bpc_list[] = {12, 10, 8};
 
 static inline void manual(const char *expected)
 {
