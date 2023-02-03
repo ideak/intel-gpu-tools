@@ -31,6 +31,9 @@ OPTIONS
 -h
     Show help text.
 
+-c
+    Output CSV formatted data.
+
 -J
     Output JSON formatted data.
 

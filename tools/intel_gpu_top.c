@@ -1268,6 +1268,7 @@ usage(const char *appname)
 		"\n"
 		"\tThe following parameters are optional:\n\n"
 		"\t[-h]            Show this help text.\n"
+		"\t[-c]            Output CSV formatted data.\n"
 		"\t[-J]            Output JSON formatted data.\n"
 		"\t[-l]            List plain text data.\n"
 		"\t[-o <file|->]   Output to specified file or '-' for standard out.\n"
@@ -1283,6 +1284,7 @@ usage(const char *appname)
 static enum {
 	INTERACTIVE,
 	TEXT,
+	CSV,
 	JSON
 } output_mode;
 
@@ -1457,6 +1459,22 @@ text_add_member(const struct cnt_group *parent, struct cnt_item *item,
 	return len > 0 ? len : 0;
 }
 
+static unsigned int
+csv_add_member(const struct cnt_group *parent, struct cnt_item *item,
+	       unsigned int headers)
+{
+	int len = 0;
+
+	if (headers)
+		fprintf(out, "%s %s", parent->display_name, item->unit);
+	else
+		len = fprintf(out, "%f",
+			      pmu_calc(&item->pmu->val, item->d, item->t,
+				       item->s));
+
+	return len > 0 ? len : 0;
+}
+
 static void
 term_open_struct(const char *name)
 {
@@ -1540,6 +1558,46 @@ print_group(struct cnt_group *grp, unsigned int headers)
 	return consumed;
 }
 
+static unsigned int csv_count, prev_csv_count;
+
+static void csv_close_struct(void)
+{
+	assert(text_level > 0);
+	if (--text_level == 0) {
+		csv_count = prev_csv_count = 0;
+		text_lines++;
+		fputs("\n", out);
+		fflush(out);
+	}
+}
+
+static bool
+csv_print_group(struct cnt_group *grp, unsigned int headers)
+{
+	unsigned int consumed = 0;
+	struct cnt_item *item;
+
+	if (!present_in_group(grp))
+		return false;
+
+	text_open_struct(grp->name);
+
+	for (item = grp->items; item->name; item++) {
+		if (!item->pmu || !item->pmu->present)
+			continue;
+
+		if (csv_count != prev_csv_count)
+			fprintf(out, ",");
+		prev_csv_count = csv_count++;
+
+		consumed += csv_add_member(grp, item, headers);
+	}
+
+	csv_close_struct();
+
+	return consumed;
+}
+
 static bool
 term_print_group(struct cnt_group *grp, unsigned int headers)
 {
@@ -1570,6 +1628,13 @@ static const struct print_operations text_pops = {
 	.print_group = print_group,
 };
 
+static const struct print_operations csv_pops = {
+	.open_struct = text_open_struct,
+	.close_struct = csv_close_struct,
+	.add_member = csv_add_member,
+	.print_group = csv_print_group,
+};
+
 static const struct print_operations term_pops = {
 	.open_struct = term_open_struct,
 	.close_struct = term_close_struct,
@@ -1582,11 +1647,12 @@ static bool print_groups(struct cnt_group **groups)
 	static bool headers_printed;
 	bool print_data = true;
 
-	if (output_mode == TEXT &&
+	if ((output_mode == TEXT || output_mode == CSV) &&
 	    (text_header_repeat || !headers_printed)) {
+		const unsigned int header_lines = output_mode == TEXT ? 2 : 1;
 		unsigned int headers = text_lines % TEXT_HEADER_REPEAT + 1;
 
-		if (headers == 1 || headers == 2)
+		if (headers > 0 && headers <= header_lines)
 			for (struct cnt_group **grp = groups; *grp; grp++)
 				print_data = pops->print_group(*grp, headers);
 
@@ -2469,7 +2535,7 @@ int main(int argc, char **argv)
 	char *codename = NULL;
 
 	/* Parse options */
-	while ((ch = getopt(argc, argv, "o:s:d:pJLlh")) != -1) {
+	while ((ch = getopt(argc, argv, "o:s:d:pcJLlh")) != -1) {
 		switch (ch) {
 		case 'o':
 			output_path = optarg;
@@ -2482,6 +2548,9 @@ int main(int argc, char **argv)
 			break;
 		case 'p':
 			physical_engines = true;
+			break;
+		case 'c':
+			output_mode = CSV;
 			break;
 		case 'J':
 			output_mode = JSON;
@@ -2531,6 +2600,9 @@ int main(int argc, char **argv)
 		break;
 	case TEXT:
 		pops = &text_pops;
+		break;
+	case CSV:
+		pops = &csv_pops;
 		break;
 	case JSON:
 		pops = &json_pops;
