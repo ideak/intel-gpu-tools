@@ -225,7 +225,7 @@ igt_main
 	igt_describe("Tests basic display stream compression functionality if supported "
 		     "by a connector by forcing DSC on all connectors that support it "
 		     "with default parameters");
-	igt_subtest_with_dynamic("basic-dsc")
+	igt_subtest_with_dynamic("dsc-basic")
 			test_dsc(&data, TEST_DSC_BASIC, 0, DRM_FORMAT_XRGB8888);
 
 	igt_describe("Tests basic display stream compression functionality if supported "
