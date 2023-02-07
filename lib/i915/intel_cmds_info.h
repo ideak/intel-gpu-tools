@@ -3,8 +3,8 @@
  * Copyright © 2022 Intel Corporation
  */
 
-#ifndef __INTEL_TILING_INFO_H
-#define __INTEL_TILING_INFO_H
+#ifndef __INTEL_CMDS_INFO_H
+#define __INTEL_CMDS_INFO_H
 
 #include <stdint.h>
 
@@ -26,13 +26,13 @@ enum blt_cmd_type {
 	__BLT_MAX_CMD
 };
 
-struct blt_tiling_info {
+struct blt_cmd_info {
 	enum blt_cmd_type blt_cmd_type;
 	uint32_t supported_tiling;
 };
 
 struct intel_cmds_info {
-	struct blt_tiling_info const *blt_cmds[__BLT_MAX_CMD];
+	struct blt_cmd_info const *blt_cmds[__BLT_MAX_CMD];
 };
 
 extern const struct intel_cmds_info pre_gen8_cmds_info;

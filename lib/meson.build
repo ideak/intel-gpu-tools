@@ -14,7 +14,7 @@ lib_sources = [
 	'i915/intel_decode.c',
 	'i915/intel_memory_region.c',
 	'i915/intel_mocs.c',
-	'i915/intel_tiling_info.c',
+	'i915/intel_cmds_info.c',
 	'i915/i915_blt.c',
 	'i915/i915_crc.c',
 	'igt_collection.c',
@@ -219,7 +219,7 @@ igt_deps = [ lib_igt ] + lib_deps
 lin_igt_chipset_build = static_library('igt_chipset',
                                        ['intel_chipset.c',
 					'intel_device_info.c',
-					'i915/intel_tiling_info.c'],
+					'i915/intel_cmds_info.c'],
                                        include_directories : inc)
 
 lib_igt_chipset = declare_dependency(link_with : lin_igt_chipset_build,
@@ -242,7 +242,7 @@ lib_igt_device_scan_build = static_library('igt_device_scan',
 	'igt_list.c',
 	'igt_tools_stub.c',
 	'intel_device_info.c',
-	'i915/intel_tiling_info.c',
+	'i915/intel_cmds_info.c',
 	],
 	dependencies : scan_dep,
 	include_directories : inc)

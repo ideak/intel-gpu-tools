@@ -47,7 +47,7 @@
 #include <malloc.h>
 #include "drm.h"
 #include "igt.h"
-#include "intel_tiling_info.h"
+#include "intel_cmds_info.h"
 
 #define CCS_RATIO 256
 

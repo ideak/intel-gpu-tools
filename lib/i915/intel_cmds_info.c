@@ -5,46 +5,46 @@
 
 #include <stdint.h>
 #include "intel_chipset.h"
-#include "i915/intel_tiling_info.h"
+#include "i915/intel_cmds_info.h"
 
 #define BLT_INFO(_cmd, _tiling)  { \
 		.blt_cmd_type = _cmd, \
 		.supported_tiling = _tiling \
 	}
 
-static const struct blt_tiling_info src_copy = BLT_INFO(SRC_COPY, BIT(T_LINEAR));
-static const struct blt_tiling_info
+static const struct blt_cmd_info src_copy = BLT_INFO(SRC_COPY, BIT(T_LINEAR));
+static const struct blt_cmd_info
 		pre_gen8_xy_src_copy = BLT_INFO(XY_SRC_COPY,
 						BIT(T_LINEAR) |
 						BIT(T_XMAJOR));
-static const struct blt_tiling_info
+static const struct blt_cmd_info
 		gen8_xy_src_copy = BLT_INFO(XY_SRC_COPY,
 					    BIT(T_LINEAR) |
 					    BIT(T_XMAJOR) |
 					    BIT(T_YMAJOR));
-static const struct blt_tiling_info
+static const struct blt_cmd_info
 		gen11_xy_fast_copy = BLT_INFO(XY_FAST_COPY,
 					      BIT(T_LINEAR)  |
 					      BIT(T_YMAJOR)  |
 					      BIT(T_YFMAJOR) |
 					      BIT(T_TILE64));
-static const struct blt_tiling_info
+static const struct blt_cmd_info
 		gen12_xy_fast_copy = BLT_INFO(XY_FAST_COPY,
 					      BIT(T_LINEAR) |
 					      BIT(T_YMAJOR) |
 					      BIT(T_TILE4)  |
 					      BIT(T_TILE64));
-static const struct blt_tiling_info
+static const struct blt_cmd_info
 		dg2_xy_fast_copy = BLT_INFO(XY_FAST_COPY,
 					    BIT(T_LINEAR) |
 					    BIT(T_XMAJOR) |
 					    BIT(T_TILE4)  |
 					    BIT(T_TILE64));
-static const struct blt_tiling_info
+static const struct blt_cmd_info
 		gen12_xy_block_copy = BLT_INFO(XY_BLOCK_COPY,
 					       BIT(T_LINEAR) |
 					       BIT(T_YMAJOR));
-static const struct blt_tiling_info
+static const struct blt_cmd_info
 		dg2_xy_block_copy = BLT_INFO(XY_BLOCK_COPY,
 					     BIT(T_LINEAR) |
 					     BIT(T_XMAJOR) |

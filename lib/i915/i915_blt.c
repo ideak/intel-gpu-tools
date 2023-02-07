@@ -240,18 +240,18 @@ bool blt_cmd_supports_tiling(const struct intel_cmds_info *cmds_info,
 			     enum blt_cmd_type cmd,
 			     enum blt_tiling_type tiling)
 {
-	struct blt_tiling_info const *tile_config;
+	struct blt_cmd_info const *cmd_info;
 
 	if (!cmds_info)
 		return false;
 
-	tile_config = cmds_info->blt_cmds[cmd];
+	cmd_info = cmds_info->blt_cmds[cmd];
 
 	/* no config means no support for that tiling */
-	if (!tile_config)
+	if (!cmd_info)
 		return false;
 
-	return tile_config->supported_tiling & BIT(tiling);
+	return cmd_info->supported_tiling & BIT(tiling);
 }
 
 /**

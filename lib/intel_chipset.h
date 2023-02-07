@@ -31,7 +31,7 @@
 #include <pciaccess.h>
 #include <stdbool.h>
 
-#include "i915/intel_tiling_info.h"
+#include "i915/intel_cmds_info.h"
 
 #define BIT(x) (1ul <<(x))
 
