@@ -389,6 +389,14 @@ test_executables += executable('i915_pm_rc6_residency',
 	   install : true)
 test_list += 'i915_pm_rc6_residency'
 
+test_executables += executable('gem_barrier_race',
+	   join_paths('i915', 'gem_barrier_race.c'),
+	   dependencies : test_deps + [ lib_igt_i915_perf ],
+	   install_dir : libexecdir,
+	   install_rpath : libexecdir_rpathdir,
+	   install : true)
+test_list += 'gem_barrier_race'
+
 test_executables += executable('perf_pmu',
 	   join_paths('i915', 'perf_pmu.c'),
 	   dependencies : test_deps + [ lib_igt_perf ],
