@@ -157,7 +157,6 @@ struct blt_ctrl_surf_copy_data {
 	bool print_bb;
 };
 
-bool blt_supports_compression(int i915);
 bool blt_supports_command(const struct intel_cmds_info *cmds_info,
 			  enum blt_cmd_type cmd);
 bool blt_cmd_supports_tiling(const struct intel_cmds_info *cmds_info,

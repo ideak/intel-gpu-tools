@@ -346,7 +346,6 @@ static void block_copy(int i915,
 	uint32_t run_id = mid_tiling;
 	uint32_t mid_region = region2, bb;
 	uint32_t width = param.width, height = param.height;
-	uint32_t devid = intel_get_drm_devid(i915);
 	enum blt_compression mid_compression = config->compression;
 	int mid_compression_format = param.compression_format;
 	enum blt_compression_type comp_type = COMPRESSION_TYPE_3D;
@@ -355,7 +354,7 @@ static void block_copy(int i915,
 
 	igt_assert(__gem_create_in_memory_regions(i915, &bb, &bb_size, region1) == 0);
 
-	if (!blt_supports_compression(i915) && !IS_METEORLAKE(devid))
+	if (!blt_uses_extended_block_copy(i915))
 		pext = NULL;
 
 	src = blt_create_object(i915, region1, width, height, bpp, uc_mocs,
@@ -470,7 +469,7 @@ static void block_multicopy(int i915,
 
 	igt_assert(__gem_create_in_memory_regions(i915, &bb, &bb_size, region1) == 0);
 
-	if (!blt_supports_compression(i915))
+	if (!blt_uses_extended_block_copy(i915))
 		pext3 = NULL;
 
 	src = blt_create_object(i915, region1, width, height, bpp, uc_mocs,
@@ -557,7 +556,7 @@ static void block_copy_test(int i915,
 	const struct intel_execution_engine2 *e;
 	int tiling;
 
-	if (config->compression && !blt_supports_compression(i915))
+	if (config->compression && !blt_block_copy_supports_compression(i915))
 		return;
 
 	if (config->inplace && !config->compression)

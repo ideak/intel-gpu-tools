@@ -192,23 +192,6 @@ struct gen12_block_copy_data_ext {
 };
 
 /**
- * blt_supports_compression:
- * @i915: drm fd
- *
- * Function checks if HW supports flatccs compression in blitter commands
- * on @i915 device.
- *
- * Returns:
- * true if it does, false otherwise.
- */
-bool blt_supports_compression(int i915)
-{
-	uint32_t devid = intel_get_drm_devid(i915);
-
-	return HAS_FLATCCS(devid);
-}
-
-/**
  * blt_supports_command:
  * @cmds_info: Copy commands description struct
  * @cmd: Blitter command enum
