@@ -31,16 +31,16 @@ struct blt_tiling_info {
 	uint32_t supported_tiling;
 };
 
-struct blt_cmd_info {
-	struct blt_tiling_info const *supported_cmds[__BLT_MAX_CMD];
+struct intel_cmds_info {
+	struct blt_tiling_info const *blt_cmds[__BLT_MAX_CMD];
 };
 
-extern const struct blt_cmd_info pre_gen8_blt_info;
-extern const struct blt_cmd_info gen8_blt_info;
-extern const struct blt_cmd_info gen11_blt_info;
-extern const struct blt_cmd_info gen12_blt_info;
-extern const struct blt_cmd_info gen12_dg2_blt_info;
-extern const struct blt_cmd_info gen12_mtl_blt_info;
+extern const struct intel_cmds_info pre_gen8_cmds_info;
+extern const struct intel_cmds_info gen8_cmds_info;
+extern const struct intel_cmds_info gen11_cmds_info;
+extern const struct intel_cmds_info gen12_cmds_info;
+extern const struct intel_cmds_info gen12_dg2_cmds_info;
+extern const struct intel_cmds_info gen12_mtl_cmds_info;
 
 #define for_each_tiling(__tiling) \
 	for (__tiling = T_LINEAR; __tiling < __BLT_MAX_TILING; __tiling++)

@@ -14,7 +14,7 @@
 #include "i915_blt.h"
 
 #define BITRANGE(start, end) (end - start + 1)
-#define GET_BLT_INFO(__fd) intel_get_blt_info(intel_get_drm_devid(__fd))
+#define GET_CMDS_INFO(__fd) intel_get_cmds_info(intel_get_drm_devid(__fd))
 
 enum blt_special_mode {
 	SM_NONE,
@@ -210,42 +210,42 @@ bool blt_supports_compression(int i915)
 
 /**
  * blt_supports_command:
- * @info: Blitter command info struct
+ * @cmds_info: Copy commands description struct
  * @cmd: Blitter command enum
  *
- * Checks if @info has an entry of supported tiling formats for @cmd command.
+ * Checks if @cmds_info has an entry of supported tiling formats for @cmd command.
  *
  * Returns: true if it does, false otherwise
  */
-bool blt_supports_command(const struct blt_cmd_info *info,
+bool blt_supports_command(const struct intel_cmds_info *cmds_info,
 			  enum blt_cmd_type cmd)
 {
-	igt_require_f(info, "No config found for the platform\n");
+	igt_require_f(cmds_info, "No config found for the platform\n");
 
-	return info->supported_cmds[cmd];
+	return cmds_info->blt_cmds[cmd];
 }
 
 /**
  * blt_cmd_supports_tiling:
- * @info: Blitter command info struct
+ * @cmds_info: Copy commands description struct
  * @cmd: Blitter command enum
  * @tiling: tiling format enum
  *
- * Checks if a @cmd entry of @info lists @tiling. It also returns false if
+ * Checks if a @cmd entry of @cmds_info lists @tiling. It also returns false if
  * no information about the command is stored.
  *
  * Returns: true if it does, false otherwise
  */
-bool blt_cmd_supports_tiling(const struct blt_cmd_info *info,
+bool blt_cmd_supports_tiling(const struct intel_cmds_info *cmds_info,
 			     enum blt_cmd_type cmd,
 			     enum blt_tiling_type tiling)
 {
 	struct blt_tiling_info const *tile_config;
 
-	if (!info)
+	if (!cmds_info)
 		return false;
 
-	tile_config = info->supported_cmds[cmd];
+	tile_config = cmds_info->blt_cmds[cmd];
 
 	/* no config means no support for that tiling */
 	if (!tile_config)
@@ -265,9 +265,9 @@ bool blt_cmd_supports_tiling(const struct blt_cmd_info *info,
  */
 bool blt_has_block_copy(int i915)
 {
-	const struct blt_cmd_info *blt_info = GET_BLT_INFO(i915);
+	const struct intel_cmds_info *cmds_info = GET_CMDS_INFO(i915);
 
-	return blt_supports_command(blt_info, XY_BLOCK_COPY);
+	return blt_supports_command(cmds_info, XY_BLOCK_COPY);
 }
 
 /**
@@ -281,9 +281,9 @@ bool blt_has_block_copy(int i915)
  */
 bool blt_has_fast_copy(int i915)
 {
-	const struct blt_cmd_info *blt_info = GET_BLT_INFO(i915);
+	const struct intel_cmds_info *cmds_info = GET_CMDS_INFO(i915);
 
-	return blt_supports_command(blt_info, XY_FAST_COPY);
+	return blt_supports_command(cmds_info, XY_FAST_COPY);
 }
 
 /**
@@ -298,9 +298,9 @@ bool blt_has_fast_copy(int i915)
  */
 bool blt_fast_copy_supports_tiling(int i915, enum blt_tiling_type tiling)
 {
-	const struct blt_cmd_info *blt_info = GET_BLT_INFO(i915);
+	const struct intel_cmds_info *cmds_info = GET_CMDS_INFO(i915);
 
-	return blt_cmd_supports_tiling(blt_info, XY_FAST_COPY, tiling);
+	return blt_cmd_supports_tiling(cmds_info, XY_FAST_COPY, tiling);
 }
 
 /**
@@ -315,9 +315,9 @@ bool blt_fast_copy_supports_tiling(int i915, enum blt_tiling_type tiling)
  */
 bool blt_block_copy_supports_tiling(int i915, enum blt_tiling_type tiling)
 {
-	const struct blt_cmd_info *blt_info = GET_BLT_INFO(i915);
+	const struct intel_cmds_info *cmds_info = GET_CMDS_INFO(i915);
 
-	return blt_cmd_supports_tiling(blt_info, XY_BLOCK_COPY, tiling);
+	return blt_cmd_supports_tiling(cmds_info, XY_BLOCK_COPY, tiling);
 }
 
 /**

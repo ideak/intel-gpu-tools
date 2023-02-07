@@ -158,9 +158,9 @@ struct blt_ctrl_surf_copy_data {
 };
 
 bool blt_supports_compression(int i915);
-bool blt_supports_command(const struct blt_cmd_info *info,
+bool blt_supports_command(const struct intel_cmds_info *cmds_info,
 			  enum blt_cmd_type cmd);
-bool blt_cmd_supports_tiling(const struct blt_cmd_info *info,
+bool blt_cmd_supports_tiling(const struct intel_cmds_info *cmds_info,
 			     enum blt_cmd_type cmd,
 			     enum blt_tiling_type tiling);
 bool blt_has_block_copy(int i915);

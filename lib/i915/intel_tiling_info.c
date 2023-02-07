@@ -51,44 +51,44 @@ static const struct blt_tiling_info
 					     BIT(T_TILE4)  |
 					     BIT(T_TILE64));
 
-const struct blt_cmd_info pre_gen8_blt_info = {
-	.supported_cmds = {
+const struct intel_cmds_info pre_gen8_cmds_info = {
+	.blt_cmds = {
 		[SRC_COPY] = &src_copy,
 		[XY_SRC_COPY] = &pre_gen8_xy_src_copy
 	}
 };
 
-const struct blt_cmd_info gen8_blt_info = {
-	.supported_cmds = {
+const struct intel_cmds_info gen8_cmds_info = {
+	.blt_cmds = {
 		[XY_SRC_COPY] = &gen8_xy_src_copy,
 	}
 };
 
-const struct blt_cmd_info gen11_blt_info = {
-	.supported_cmds = {
+const struct intel_cmds_info gen11_cmds_info = {
+	.blt_cmds = {
 		[XY_SRC_COPY] = &gen8_xy_src_copy,
 		[XY_FAST_COPY] = &gen11_xy_fast_copy,
 	}
 };
 
-const struct blt_cmd_info gen12_blt_info = {
-	.supported_cmds = {
+const struct intel_cmds_info gen12_cmds_info = {
+	.blt_cmds = {
 		[XY_SRC_COPY] = &gen8_xy_src_copy,
 		[XY_FAST_COPY] = &gen12_xy_fast_copy,
 		[XY_BLOCK_COPY] = &gen12_xy_block_copy,
 	}
 };
 
-const struct blt_cmd_info gen12_dg2_blt_info = {
-	.supported_cmds = {
+const struct intel_cmds_info gen12_dg2_cmds_info = {
+	.blt_cmds = {
 		[XY_SRC_COPY] = &gen8_xy_src_copy,
 		[XY_FAST_COPY] = &dg2_xy_fast_copy,
 		[XY_BLOCK_COPY] = &dg2_xy_block_copy,
 	}
 };
 
-const struct blt_cmd_info gen12_mtl_blt_info = {
-	.supported_cmds = {
+const struct intel_cmds_info gen12_mtl_cmds_info = {
+	.blt_cmds = {
 		[XY_FAST_COPY] = &dg2_xy_fast_copy,
 		[XY_BLOCK_COPY] = &dg2_xy_block_copy
 	}
