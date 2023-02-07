@@ -49,4 +49,7 @@ extern const struct intel_cmds_info gen12_mtl_cmds_info;
 #define for_each_tiling(__tiling) \
 	for (__tiling = T_LINEAR; __tiling < __BLT_MAX_TILING; __tiling++)
 
+const struct blt_cmd_info *blt_get_cmd_info(const struct intel_cmds_info *cmds_info,
+					    enum blt_cmd_type cmd);
+
 #endif

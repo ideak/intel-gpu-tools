@@ -4,6 +4,8 @@
  */
 
 #include <stdint.h>
+#include <stddef.h>
+
 #include "intel_chipset.h"
 #include "i915/intel_cmds_info.h"
 
@@ -109,3 +111,12 @@ const struct intel_cmds_info gen12_mtl_cmds_info = {
 		[XY_BLOCK_COPY] = &mtl_xy_block_copy,
 	}
 };
+
+const struct blt_cmd_info *blt_get_cmd_info(const struct intel_cmds_info *cmds_info,
+					    enum blt_cmd_type cmd)
+{
+	if (!cmds_info)
+		return NULL;
+
+	return cmds_info->blt_cmds[cmd];
+}
