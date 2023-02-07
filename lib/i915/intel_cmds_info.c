@@ -12,6 +12,12 @@
 		.supported_tiling = _tiling \
 	}
 
+#define BLT_INFO_EXT(_cmd, _tiling, _flags)  { \
+		.blt_cmd_type = _cmd, \
+		.supported_tiling = _tiling, \
+		.flags = _flags, \
+	}
+
 static const struct blt_cmd_info src_copy = BLT_INFO(SRC_COPY, BIT(T_LINEAR));
 static const struct blt_cmd_info
 		pre_gen8_xy_src_copy = BLT_INFO(XY_SRC_COPY,
@@ -45,11 +51,21 @@ static const struct blt_cmd_info
 					       BIT(T_LINEAR) |
 					       BIT(T_YMAJOR));
 static const struct blt_cmd_info
-		dg2_xy_block_copy = BLT_INFO(XY_BLOCK_COPY,
-					     BIT(T_LINEAR) |
-					     BIT(T_XMAJOR) |
-					     BIT(T_TILE4)  |
-					     BIT(T_TILE64));
+		dg2_xy_block_copy = BLT_INFO_EXT(XY_BLOCK_COPY,
+						 BIT(T_LINEAR) |
+						 BIT(T_XMAJOR) |
+						 BIT(T_TILE4)  |
+						 BIT(T_TILE64),
+						 BLT_CMD_EXTENDED |
+						 BLT_CMD_SUPPORTS_COMPRESSION);
+
+static const struct blt_cmd_info
+		mtl_xy_block_copy = BLT_INFO_EXT(XY_BLOCK_COPY,
+						 BIT(T_LINEAR) |
+						 BIT(T_XMAJOR) |
+						 BIT(T_TILE4)  |
+						 BIT(T_TILE64),
+						 BLT_CMD_EXTENDED);
 
 const struct intel_cmds_info pre_gen8_cmds_info = {
 	.blt_cmds = {
@@ -90,6 +106,6 @@ const struct intel_cmds_info gen12_dg2_cmds_info = {
 const struct intel_cmds_info gen12_mtl_cmds_info = {
 	.blt_cmds = {
 		[XY_FAST_COPY] = &dg2_xy_fast_copy,
-		[XY_BLOCK_COPY] = &dg2_xy_block_copy
+		[XY_BLOCK_COPY] = &mtl_xy_block_copy,
 	}
 };

@@ -29,6 +29,10 @@ enum blt_cmd_type {
 struct blt_cmd_info {
 	enum blt_cmd_type blt_cmd_type;
 	uint32_t supported_tiling;
+
+	uint32_t flags;
+#define BLT_CMD_EXTENDED               (1 << 0)
+#define BLT_CMD_SUPPORTS_COMPRESSION   (1 << 1)
 };
 
 struct intel_cmds_info {
