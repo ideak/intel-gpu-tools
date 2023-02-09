@@ -28,6 +28,10 @@
 
 IGT_TEST_DESCRIPTION("Test plane alpha and blending mode properties");
 
+static bool extended;
+static enum pipe active_pipes[IGT_MAX_PIPES];
+static uint32_t last_pipe;
+
 typedef struct {
 	int gfx_fd;
 	igt_display_t display;
@@ -482,6 +486,8 @@ static void run_test_on_pipe_planes(data_t *data, enum pipe pipe, igt_output_t *
 {
 	igt_display_t *display = &data->display;
 	igt_plane_t *plane;
+	int first_plane = -1;
+	int last_plane = -1;
 
 	for_each_plane_on_pipe(display, pipe, plane) {
 		if (!igt_plane_has_prop(plane, IGT_PLANE_ALPHA))
@@ -494,6 +500,29 @@ static void run_test_on_pipe_planes(data_t *data, enum pipe pipe, igt_output_t *
 		reset_alpha(display, pipe);
 
 		if (must_multiply && !has_multiplied_alpha(data, plane))
+			continue;
+
+		/* Get first & last valid planes. */
+		if (first_plane < 0)
+			first_plane = j__;
+
+		last_plane = j__;
+	}
+
+	for_each_plane_on_pipe(display, pipe, plane) {
+		if (!igt_plane_has_prop(plane, IGT_PLANE_ALPHA))
+			continue;
+
+		if (blend && !igt_plane_has_prop(plane, IGT_PLANE_PIXEL_BLEND_MODE))
+			continue;
+
+		/* Reset plane alpha properties between each plane. */
+		reset_alpha(display, pipe);
+
+		if (must_multiply && !has_multiplied_alpha(data, plane))
+			continue;
+
+		if (!extended && j__ != first_plane && j__ != last_plane)
 			continue;
 
 		igt_info("Testing plane %u\n", plane->index);
@@ -621,6 +650,11 @@ static void run_subtests(data_t *data)
 
 		igt_subtest_with_dynamic(subtests[i].name) {
 			for_each_pipe_with_single_output(&data->display, pipe, output) {
+				if (!extended &&
+				    pipe != active_pipes[0] &&
+				    pipe != active_pipes[last_pipe])
+					continue;
+
 				prepare_crtc(data, output, pipe);
 				if (!pipe_check(data, pipe, subtests[i].blend, subtests[i].must_multiply))
 					continue;
@@ -633,15 +667,40 @@ static void run_subtests(data_t *data)
 	}
 }
 
-igt_main
+static int opt_handler(int opt, int opt_index, void *_data)
+{
+	switch (opt) {
+	case 'e':
+		extended = true;
+		break;
+	default:
+		return IGT_OPT_HANDLER_ERROR;
+	}
+
+	return IGT_OPT_HANDLER_SUCCESS;
+}
+
+const char *help_str =
+	"  -e \tExtended tests.\n";
+
+igt_main_args("e", NULL, help_str, opt_handler, NULL)
 {
 	data_t data = {};
 
 	igt_fixture {
+		enum pipe pipe;
+
+		last_pipe = 0;
+
 		data.gfx_fd = drm_open_driver_master(DRIVER_ANY);
 		igt_require_pipe_crc(data.gfx_fd);
 		igt_display_require(&data.display, data.gfx_fd);
 		igt_require(data.display.is_atomic);
+
+		/* Get active pipes. */
+		for_each_pipe(&data.display, pipe)
+			active_pipes[last_pipe++] = pipe;
+		last_pipe--;
 	}
 
 	run_subtests(&data);
