@@ -253,8 +253,18 @@ igt_main
 	igt_subtest("basic-s3-without-i915")
 		test_suspend_without_i915(SUSPEND_STATE_S3);
 
-	igt_fixture
+	igt_fixture {
+		/*
+		 * Since above subtests may fail, leaving i915 module unloaded
+		 * but device list populated, refresh the device list before
+		 * reopening the i915 device if we've been called with a device
+		 * filter specified, otherwise drm_open_driver() will fail
+		 * instead of reloading the i915 module.
+		 */
+		if (igt_device_filter_count())
+			igt_devices_scan(true);
 		fd = drm_open_driver(DRIVER_INTEL);
+	}
 
 	igt_subtest("fence-restore-tiled2untiled") {
 		gem_require_mappable_ggtt(fd);

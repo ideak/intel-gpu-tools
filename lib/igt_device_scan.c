@@ -1918,6 +1918,10 @@ static bool __igt_device_card_match(const char *filter,
 		return false;
 	memset(card, 0, sizeof(*card));
 
+	/*
+	 * Scan devices in case the user hasn't yet,
+	 * but leave a decision on forced rescan on the user side.
+	 */
 	igt_devices_scan(false);
 
 	if (igt_device_filter_apply(filter) == false)

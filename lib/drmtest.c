@@ -260,7 +260,7 @@ static bool _is_already_opened(const char *path, int as_idx)
 	 * we cannot even stat the device, so it's of no use - let's claim it's
 	 * already opened
 	 */
-	if (stat(path, &new) != 0)
+	if (igt_debug_on(stat(path, &new) != 0))
 		return true;
 
 	for (int i = 0; i < as_idx; ++i) {
