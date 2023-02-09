@@ -286,32 +286,23 @@ igt_main
 	igt_fixture
 		setup_environment();
 
-	igt_describe("This subtest verfies igt_draw library works "
-		     "with different modifiers, DRM_FORMATS, DRAW_METHODS.");
-	igt_subtest_with_dynamic("draw-method") {
-		for (format_idx = 0; format_idx < ARRAY_SIZE(formats); format_idx++) {
-			/* 10-bit & 16-bit formats are bit slow, ignore in pre-si. */
-			if (igt_run_in_simulation() &&
-			    formats[format_idx] != DRM_FORMAT_XRGB8888)
-				continue;
+	for (method = 0; method < IGT_DRAW_METHOD_COUNT; method++) {
+		igt_describe_f("Verify that igt draw library works for the draw "
+			       "method (%s) with different modifiers & DRM formats.",
+			       igt_draw_get_method_name(method));
+		igt_subtest_with_dynamic_f("draw-method-%s", igt_draw_get_method_name(method)) {
+			igt_skip_on(method == IGT_DRAW_MMAP_WC && !gem_mmap__has_wc(drm_fd));
+			igt_skip_on(method == IGT_DRAW_MMAP_GTT && !gem_has_mappable_ggtt(drm_fd));
 
-			for (method = 0; method < IGT_DRAW_METHOD_COUNT; method++) {
+			for (format_idx = 0; format_idx < ARRAY_SIZE(formats); format_idx++) {
 				for (modifier_idx = 0; modifier_idx < ARRAY_SIZE(modifiers); modifier_idx++) {
 					modifier = modifiers[modifier_idx];
 
 					if (!igt_display_has_format_mod(&display, formats[format_idx], modifier))
 						continue;
 
-					if (method == IGT_DRAW_MMAP_WC && !gem_mmap__has_wc(drm_fd))
-						continue;
-
-					if (method == IGT_DRAW_MMAP_GTT &&
-					    !gem_has_mappable_ggtt(drm_fd))
-						continue;
-
-					igt_dynamic_f("%s-%s-%s",
+					igt_dynamic_f("%s-%s",
 						      format_str(format_idx),
-						      igt_draw_get_method_name(method),
 						      modifier_str(modifier_idx))
 						draw_method_subtest(method, format_idx,
 								    modifier);
