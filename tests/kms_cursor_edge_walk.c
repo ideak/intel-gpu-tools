@@ -60,6 +60,10 @@ enum {
 	EDGE_BOTTOM = 0x8,
 };
 
+static bool extended;
+static enum pipe active_pipes[IGT_MAX_PIPES];
+static uint32_t last_pipe;
+
 static void create_cursor_fb(data_t *data, int cur_w, int cur_h)
 {
 	cairo_t *cr;
@@ -284,6 +288,9 @@ static int opt_handler(int opt, int opt_index, void *_data)
 	case 'd':
 		data->disable = true;
 		break;
+	case 'e':
+		extended = true;
+		break;
 	case 'j':
 		data->jump = true;
 		break;
@@ -300,12 +307,14 @@ static const struct option long_opts[] = {
 	{ .name = "colored", .val = 'c' },
 	{ .name = "disable", .val = 'd'},
 	{ .name = "jump", .val = 'j' },
+	{ .name = "extended", .val = 'e'},
 	{}
 };
 static const char *help_str =
 	"  --colored\t\tUse a colored cursor (disables CRC checks)\n"
 	"  --disable\t\tDisable the cursor between each step\n"
-	"  --jump\t\tJump the cursor to middle of the screen between each step)\n";
+	"  --jump\t\tJump the cursor to middle of the screen between each step)\n"
+	"  --extended\t\tRun on all pipes.(Default it will Run only two pipes)\n";
 
 igt_main_args("", long_opts, help_str, opt_handler, &data)
 {
@@ -322,6 +331,7 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 
 	igt_fixture {
 		int ret;
+		enum pipe pipe;
 
 		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
 
@@ -340,6 +350,12 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 
 		igt_display_require(&data.display, data.drm_fd);
 		igt_display_require_output(&data.display);
+
+		/* Get active pipes. */
+		last_pipe = 0;
+		for_each_pipe(&data.display, pipe)
+			active_pipes[last_pipe++] = pipe;
+		last_pipe--;
 	}
 
 	for (i = 0; i < ARRAY_SIZE(tests); i++) {
@@ -353,6 +369,10 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 			igt_subtest_with_dynamic_f("%dx%d-%s", data.curw,
 						   data.curh, tests[i].name) {
 				for_each_pipe_with_single_output(&data.display, data.pipe, data.output) {
+					if (!extended && data.pipe != active_pipes[0] &&
+					    data.pipe != active_pipes[last_pipe])
+						continue;
+
 					igt_dynamic_f("pipe-%s-%s",
 						      kmstest_pipe_name(data.pipe),
 						      data.output->name)
