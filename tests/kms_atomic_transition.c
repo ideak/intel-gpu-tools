@@ -704,15 +704,21 @@ static void commit_display(data_t *data, unsigned event_mask, bool nonblocking)
 	igt_reset_timeout();
 }
 
+static void unset_output_pipe(igt_display_t *display)
+{
+	int i;
+
+	for (i = 0; i < display->n_outputs; i++)
+		igt_output_set_pipe(&display->outputs[i], PIPE_NONE);
+}
+
 static unsigned set_combinations(data_t *data, unsigned mask, struct igt_fb *fb)
 {
 	igt_output_t *output;
 	enum pipe pipe;
 	unsigned event_mask = 0;
-	int i;
 
-	for (i = 0; i < data->display.n_outputs; i++)
-		igt_output_set_pipe(&data->display.outputs[i], PIPE_NONE);
+	unset_output_pipe(&data->display);
 
 	for_each_pipe(&data->display, pipe) {
 		igt_plane_t *plane = igt_pipe_get_plane_type(&data->display.pipes[pipe],
@@ -806,10 +812,9 @@ static void run_modeset_tests(data_t *data, int howmany, bool nonblocking, bool 
 	igt_output_t *output;
 	uint16_t width = 0, height = 0;
 
-	for (i = 0; i < data->display.n_outputs; i++)
-		igt_output_set_pipe(&data->display.outputs[i], PIPE_NONE);
-
 retry:
+	unset_output_pipe(&data->display);
+
 	j = 0;
 	for_each_connected_output(&data->display, output) {
 		drmModeModeInfo *mode = igt_output_get_mode(output);
@@ -865,12 +870,8 @@ retry:
 				DRM_MODE_ATOMIC_TEST_ONLY |
 				DRM_MODE_ATOMIC_ALLOW_MODESET,
 				NULL) != 0) {
-		igt_output_t *out;
 		bool found = igt_override_all_active_output_modes_to_fit_bw(&data->display);
 		igt_require_f(found, "No valid mode combo found.\n");
-
-		for_each_connected_output(&data->display, out)
-			igt_output_set_pipe(out, PIPE_NONE);
 
 		goto retry;
 	}
@@ -971,7 +972,7 @@ static void run_modeset_transition(data_t *data, int requested_outputs, bool non
 		run_modeset_tests(data, requested_outputs, nonblocking, fencing);
 
 	/* Cleanup */
-	set_combinations(data, 0, NULL);
+	unset_output_pipe(&data->display);
 	igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
 	if (is_i915_device(data->drm_fd)) {
