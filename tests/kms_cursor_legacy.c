@@ -1524,7 +1524,6 @@ igt_main
 		"atomic-transitions",
 		"atomic-transitions-varying-size"
 	};
-	const char *prefix[2] = {"basic", "short"};
 
 	igt_fixture {
 		display.drm_fd = drm_open_driver_master(DRIVER_ANY);
@@ -1667,39 +1666,46 @@ igt_main
 			flip_vs_cursor_busy_crc(&display, true);
 	}
 
-	for (i = 0; i < ARRAY_SIZE(prefix); i++) {
-		int j;
+	igt_describe("Adds variety of tests:\n"
+		"* varying-size: change the size of cursor b/w 64*64 to maxw x maxh.\n"
+		"* atomic-transition: alternates between a full screen sprite plane "
+			"and full screen primary plane.\n"
+		"* toggle: which toggles cursor visibility and make sure cursor moves between updates.");
+	igt_subtest_group {
+		struct {
+			const char *name;
+			enum basic_flip_cursor order;
+			unsigned flags;
+		} tests[] = {
+			{ "flip-before-cursor", FLIP_BEFORE_CURSOR, 0 },
+			{ "busy-flip-before-cursor", FLIP_BEFORE_CURSOR, BASIC_BUSY },
+			{ "flip-after-cursor", FLIP_AFTER_CURSOR, 0 },
+		};
+		int t;
 
-		igt_describe("Adds variety of tests:\n"
-			"* varying-size: change the size of cursor b/w 64*64 to maxw x maxh.\n"
-			"* atomic-transition: alternates between a full screen sprite plane "
-				"and full screen primary plane.\n"
-			"* toggle: which toggles cursor visibility and make sure cursor moves between updates.");
-		igt_subtest_group {
-			igt_fixture
-				igt_display_require_output(&display);
+		igt_fixture
+			igt_display_require_output(&display);
 
-			igt_subtest_with_dynamic_f("%s-flip-before-cursor", prefix[i]) {
-				for (j = 0; j <= flip_test_last; j++) {
-					igt_dynamic_f("%s", modes[j])
-						basic_flip_cursor(&display, j, FLIP_BEFORE_CURSOR, 0);
-				}
+		for (i = 0; i <= flip_test_last; i++) {
+			const char *prefix = "short-";
+
+			switch (i) {
+			case flip_test_legacy:
+			case flip_test_varying_size:
+			case flip_test_atomic:
+				prefix = "basic-";
+				break;
+			default: break;
 			}
 
-			igt_subtest_with_dynamic_f("%s-busy-flip-before-cursor", prefix[i]) {
-				igt_require(!cursor_slowpath(&display, i));
-				igt_require_gem(display.drm_fd);
+			for (t = 0; t < ARRAY_SIZE(tests); t++) {
+				igt_subtest_f("%s%s-%s", prefix, tests[t].name, modes[i]) {
+					if (tests[t].flags == BASIC_BUSY) {
+						igt_require(!cursor_slowpath(&display, i));
+						igt_require_gem(display.drm_fd);
+					}
 
-				for (j = 0; j <= flip_test_last; j++) {
-					igt_dynamic_f("%s", modes[j])
-						basic_flip_cursor(&display, j, FLIP_BEFORE_CURSOR, BASIC_BUSY);
-				}
-			}
-
-			igt_subtest_with_dynamic_f("%s-flip-after-cursor", prefix[i]) {
-				for (j = 0; j <= flip_test_last; j++) {
-					igt_dynamic_f("%s", modes[j])
-						basic_flip_cursor(&display, j, FLIP_AFTER_CURSOR, 0);
+					basic_flip_cursor(&display, i, tests[t].order, tests[t].flags);
 				}
 			}
 		}
@@ -1708,48 +1714,34 @@ igt_main
 	igt_describe("The essence of the basic test is that neither the cursor nor the "
 		     "nonblocking flip stall the application of the next");
 	igt_subtest_group {
+		struct {
+			const char *name;
+			int cursor_pipe;
+			int flip_pipe;
+			int timeout;
+		} tests[] = {
+			{ "cursorA-vs-flipA", 0, 0, 10 },
+			{ "cursorA-vs-flipB", 0, 1, 10 },
+			{ "cursorB-vs-flipA", 1, 0, 10 },
+			{ "cursorB-vs-flipB", 1, 1, 10 },
+		};
+
 		igt_fixture
 			igt_display_require_output(&display);
 
-		igt_subtest_with_dynamic("flip-vs-cursor") {
-			for (i = 0; i <= flip_test_last; i++) {
-				igt_dynamic_f("%s", modes[i])
-					flip_vs_cursor(&display, i, 150);
-			}
-		}
+		for (i = 0; i <= flip_test_last; i++) {
+			int j;
 
-		igt_subtest_with_dynamic("cursor-vs-flip") {
-			for (i = 0; i <= flip_test_last; i++) {
-				igt_dynamic_f("%s", modes[i])
-					cursor_vs_flip(&display, i, 50);
-			}
-		}
+			igt_subtest_f("cursor-vs-flip-%s", modes[i])
+				cursor_vs_flip(&display, i, 50);
 
-		igt_subtest_with_dynamic("cursorA-vs-flipA") {
-			for (i = 0; i <= flip_test_last; i++) {
-				igt_dynamic_f("%s", modes[i])
-					flip(&display, 0, 0, 10, i);
-			}
-		}
+			igt_subtest_f("flip-vs-cursor-%s", modes[i])
+				flip_vs_cursor(&display, i, 150);
 
-		igt_subtest_with_dynamic("cursorA-vs-flipB") {
-			for (i = 0; i <= flip_test_last; i++) {
-				igt_dynamic_f("%s", modes[i])
-					flip(&display, 0, 1, 10, i);
-			}
-		}
-
-		igt_subtest_with_dynamic("cursorB-vs-flipA") {
-			for (i = 0; i <= flip_test_last; i++) {
-				igt_dynamic_f("%s", modes[i])
-					flip(&display, 1, 0, 10, i);
-			}
-		}
-
-		igt_subtest_with_dynamic("cursorB-vs-flipB") {
-			for (i = 0; i <= flip_test_last; i++) {
-				igt_dynamic_f("%s", modes[i])
-					flip(&display, 1, 1, 10, i);
+			for (j = 0; j < ARRAY_SIZE(tests); j++) {
+				igt_subtest_f("%s-%s", tests[j].name, modes[i])
+					flip(&display, tests[j].cursor_pipe,
+					     tests[j].flip_pipe, tests[j].timeout, i);
 			}
 		}
 	}
