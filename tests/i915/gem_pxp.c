@@ -933,6 +933,27 @@ static void test_pxp_stale_buf_optout_execution(int i915)
 {
 	int ret;
 	struct simple_exec_assets data = {0};
+	uint32_t tmpctx;
+
+	/*
+	 * NOTE: this subtest creates a non-protected context
+	 * for submissions that uses a protected buffer. The UAPI
+	 * requirement dictates that gem_exec_buf will not fail
+	 * if a teardown occurs since the context was not protected,
+	 * despite the buffer being protected. However, the teardown
+	 * is simulated using the pxp termination debugfs which will
+	 * fail if PXP arb session is not active. Coincidentially
+	 * this will likely not happen when running all the subtests
+	 * together but if we execute this specific subtest on its own
+	 * and we didn't previously create an ARB session or if runtime
+	 * power management forced the arb session into invalid state,
+	 * we will not have active ARB session and thus the termination debugfs
+	 * will fail and cause an assertion. That said, we need to
+	 * create a background protected context (uninvolved with
+	 * the intent of the subtest) to ensure ARB session is alive.
+	 */
+	ret = create_ctx_with_params(i915, true, true, true, false, &tmpctx);
+	igt_assert(ret == 0);
 
 	/*
 	 * Use a normal context for testing opt-out behavior
@@ -948,6 +969,7 @@ static void test_pxp_stale_buf_optout_execution(int i915)
 	igt_assert_f((ret == 0), "Opt-out-execution with stale pxp buffer didn't succeed\n");
 
 	free_exec_assets(i915, &data);
+	gem_context_destroy(i915, tmpctx);
 }
 
 static void test_pxp_pwrcycle_staleasset_execution(int i915, struct powermgt_data *pm)
