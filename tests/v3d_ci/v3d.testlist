@@ -7,6 +7,9 @@ igt@v3d/v3d_get_bo_offset@get-bad-handle
 igt@v3d/v3d_get_param@base-params
 igt@v3d/v3d_get_param@get-bad-param
 igt@v3d/v3d_get_param@get-bad-flags
+igt@v3d/v3d_job_submission@array-job-submission
+igt@v3d/v3d_job_submission@multiple-singlesync-to-multisync
+igt@v3d/v3d_job_submission@threaded-job-submission
 igt@v3d/v3d_mmap@mmap-bad-flags
 igt@v3d/v3d_mmap@mmap-bad-handle
 igt@v3d/v3d_mmap@mmap-bo
