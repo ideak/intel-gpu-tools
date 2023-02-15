@@ -31,7 +31,8 @@ IGT_TEST_DESCRIPTION("Test display plane scaling");
 enum scaler_combo_test_type {
 	TEST_PLANES_UPSCALE = 0,
 	TEST_PLANES_DOWNSCALE,
-	TEST_PLANES_UPSCALE_DOWNSCALE
+	TEST_PLANES_UPSCALE_DOWNSCALE,
+	TEST_PLANES_DOWNSCALE_UPSCALE,
 };
 
 typedef struct {
@@ -285,6 +286,69 @@ const struct {
 		1.0,
 		0.75,
 		TEST_PLANES_UPSCALE_DOWNSCALE,
+	},
+	{
+		"Tests downscaling (scaling factor 0.25) and upscaling (20x20) of 2 planes.",
+		"planes-downscale-factor-0-25-upscale-20x20",
+		0.25,
+		0.0,
+		TEST_PLANES_DOWNSCALE_UPSCALE,
+	},
+	{
+		"Tests downscaling (scaling factor 0.25) and upscaling (scaling factor 0.25) of 2 planes.",
+		"planes-downscale-factor-0-25-upscale-0-25",
+		0.25,
+		0.25,
+		TEST_PLANES_DOWNSCALE_UPSCALE,
+	},
+	{
+		"Tests downscaling (scaling factor 0.25) and scaling (unity) of 2 planes.",
+		"planes-downscale-factor-0-25-unity-scaling",
+		0.25,
+		1.0,
+		TEST_PLANES_DOWNSCALE_UPSCALE,
+	},
+	{
+		"Tests downscaling (scaling factor 0.5) and upscaling (20x20) of 2 planes.",
+		"planes-downscale-factor-0-5-upscale-20x20",
+		0.5,
+		0.0,
+		TEST_PLANES_DOWNSCALE_UPSCALE,
+	},
+	{
+		"Tests downscaling (scaling factor 0.5) and upscaling (scaling factor 0.25) of 2 planes.",
+		"planes-downscale-factor-0-5-upscale-0-25",
+		0.5,
+		0.25,
+		TEST_PLANES_DOWNSCALE_UPSCALE,
+	},
+	{
+		"Tests downscaling (scaling factor 0.5) and scaling (unity) of 2 planes.",
+		"planes-downscale-factor-0-5-unity-scaling",
+		0.5,
+		1.0,
+		TEST_PLANES_DOWNSCALE_UPSCALE,
+	},
+	{
+		"Tests downscaling (scaling factor 0.75) and upscaling (20x20) of 2 planes.",
+		"planes-downscale-factor-0-75-upscale-20x20",
+		0.75,
+		0.0,
+		TEST_PLANES_DOWNSCALE_UPSCALE,
+	},
+	{
+		"Tests downscaling (scaling factor 0.75) and upscaling (scaling factor 0.25) of 2 planes.",
+		"planes-downscale-factor-0-75-upscale-0-25",
+		0.75,
+		0.25,
+		TEST_PLANES_DOWNSCALE_UPSCALE,
+	},
+	{
+		"Tests downscaling (scaling factor 0.75) and scaling (unity) of 2 planes.",
+		"planes-downscale-factor-0-75-unity-scaling",
+		0.75,
+		1.0,
+		TEST_PLANES_DOWNSCALE_UPSCALE,
 	},
 };
 
@@ -589,23 +653,25 @@ __test_planes_scaling_combo(data_t *d, int w1, int h1, int w2, int h2,
 	igt_plane_set_fb(p1, fb1);
 	igt_plane_set_fb(p2, fb2);
 
-	if (test_type == TEST_PLANES_UPSCALE) {
-		/* first plane upscaling */
+	switch (test_type) {
+	case TEST_PLANES_UPSCALE:
 		igt_plane_set_size(p1, mode->hdisplay, mode->vdisplay);
-		/* second plane upscaling */
 		igt_plane_set_size(p2, mode->hdisplay - 20, mode->vdisplay - 20);
-	}
-	if (test_type == TEST_PLANES_DOWNSCALE) {
-		/* first plane downscaling */
+		break;
+	case TEST_PLANES_DOWNSCALE:
 		igt_plane_set_size(p1, w1, h1);
-		/* second plane downscaling */
 		igt_plane_set_size(p2, w2, h2);
-	}
-	if (test_type == TEST_PLANES_UPSCALE_DOWNSCALE) {
-		/* first plane upscaling */
+		break;
+	case TEST_PLANES_UPSCALE_DOWNSCALE:
 		igt_plane_set_size(p1, mode->hdisplay, mode->vdisplay);
-		/* second plane downscaling */
 		igt_plane_set_size(p2, w2, h2);
+		break;
+	case TEST_PLANES_DOWNSCALE_UPSCALE:
+		igt_plane_set_size(p1, w1, h1);
+		igt_plane_set_size(p2, mode->hdisplay, mode->vdisplay);
+		break;
+	default:
+		igt_assert(0);
 	}
 
 	ret = igt_display_try_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
@@ -641,17 +707,25 @@ test_planes_scaling_combo(data_t *d, int w1, int h1, int w2, int h2,
 	igt_output_set_pipe(output, pipe);
 	mode = igt_output_get_mode(output);
 
-	if (test_type == TEST_PLANES_UPSCALE) {
+	switch (test_type) {
+	case TEST_PLANES_UPSCALE:
 		setup_fb(display->drm_fd, w1, h1, 1.0, 0.0, 0.0, &d->fb[1]);
 		setup_fb(display->drm_fd, w2, h2, 0.0, 1.0, 0.0, &d->fb[2]);
-	}
-	if (test_type == TEST_PLANES_DOWNSCALE) {
+		break;
+	case TEST_PLANES_DOWNSCALE:
 		setup_fb(display->drm_fd, mode->hdisplay, mode->vdisplay, 1.0, 0.0, 0.0, &d->fb[1]);
 		setup_fb(display->drm_fd, mode->hdisplay, mode->vdisplay, 0.0, 1.0, 0.0, &d->fb[2]);
-	}
-	if (test_type == TEST_PLANES_UPSCALE_DOWNSCALE) {
+		break;
+	case TEST_PLANES_UPSCALE_DOWNSCALE:
 		setup_fb(display->drm_fd, w1, h1, 1.0, 0.0, 0.0, &d->fb[1]);
 		setup_fb(display->drm_fd, mode->hdisplay, mode->vdisplay, 0.0, 1.0, 0.0, &d->fb[2]);
+		break;
+	case TEST_PLANES_DOWNSCALE_UPSCALE:
+		setup_fb(display->drm_fd, mode->hdisplay, mode->vdisplay, 1.0, 0.0, 0.0, &d->fb[1]);
+		setup_fb(display->drm_fd, w2, h2, 0.0, 1.0, 0.0, &d->fb[2]);
+		break;
+	default:
+		igt_assert(0);
 	}
 
 	for (int k = 0; k < display->pipes[pipe].n_planes; k++) {
