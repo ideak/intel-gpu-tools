@@ -355,3 +355,79 @@ void igt_v3d_free_cl_job(int fd, struct v3d_cl_job *job)
 	free(job->submit);
 	free(job);
 }
+
+/**
+ * igt_v3d_empty_shader:
+ * @fd: device file descriptor
+ *
+ * This helper returns a simple compute dispatch job. It sets the
+ * configurations (cfg) needed for the job and has the assembled instructions
+ * necessary to process an empty shader.
+ */
+struct v3d_csd_job *igt_v3d_empty_shader(int fd)
+{
+	struct v3d_csd_job *job;
+	uint32_t *bos;
+
+	/* Reproduce an empty shader */
+	const uint32_t assembly[] = { 0xbb800000, 0x3c203186,
+				      0xbb800000, 0x3c003186,
+				      0xbb800000, 0x3c003186 };
+	const uint32_t group_count_x = 1, group_count_y = 1, group_count_z = 1;
+	const uint32_t num_batches = 1, wgs_per_sg = 1, batches_per_sg = 1, wg_size = 1;
+
+	job = calloc(1, sizeof(*job));
+
+	job->shader_assembly = igt_v3d_create_bo(fd, PAGE_SIZE);
+	job->cl = igt_v3d_create_bo(fd, PAGE_SIZE);
+	job->submit = calloc(1, sizeof(*job->submit));
+
+	igt_v3d_bo_mmap(fd, job->shader_assembly);
+	igt_v3d_bo_mmap(fd, job->cl);
+
+	memset(job->shader_assembly->map, 0, sizeof(*job->shader_assembly->map));
+	memcpy(job->shader_assembly->map, assembly, sizeof(assembly));
+	memset(job->cl->map, 0, sizeof(*job->cl->map));
+
+	job->submit->bo_handle_count = 2;
+	bos = malloc(sizeof(*bos) * job->submit->bo_handle_count);
+	bos[0] = job->shader_assembly->handle;
+	bos[1] = job->cl->handle;
+
+	job->submit->bo_handles = to_user_pointer(bos);
+
+	job->submit->cfg[0] |= group_count_x << V3D_CSD_CFG012_WG_COUNT_SHIFT;
+	job->submit->cfg[1] |= group_count_y << V3D_CSD_CFG012_WG_COUNT_SHIFT;
+	job->submit->cfg[2] |= group_count_z << V3D_CSD_CFG012_WG_COUNT_SHIFT;
+
+	job->submit->cfg[3] |= (wgs_per_sg & 0xf) << V3D_CSD_CFG3_WGS_PER_SG_SHIFT;
+	job->submit->cfg[3] |= (batches_per_sg - 1) << V3D_CSD_CFG3_BATCHES_PER_SG_M1_SHIFT;
+	job->submit->cfg[3] |= (wg_size & 0xff) << V3D_CSD_CFG3_WG_SIZE_SHIFT;
+
+	job->submit->cfg[4] = num_batches - 1;
+
+	job->submit->cfg[5] = job->shader_assembly->offset | V3D_CSD_CFG5_PROPAGATE_NANS;
+	job->submit->cfg[5] |= V3D_CSD_CFG5_SINGLE_SEG;
+	job->submit->cfg[5] |= V3D_CSD_CFG5_THREADING;
+
+	job->submit->cfg[6] = job->cl->offset;
+
+	return job;
+}
+
+/**
+ * igt_v3d_free_csd_job:
+ * @fd: device file descriptor
+ * @job: a compute shader dispatch job
+ *
+ * This helper frees all the fields of the struct v3d_csd_job and the
+ * alocatted job itself.
+ */
+void igt_v3d_free_csd_job(int fd, struct v3d_csd_job *job)
+{
+	free(from_user_pointer(job->submit->bo_handles));
+	igt_v3d_free_bo(fd, job->shader_assembly);
+	igt_v3d_free_bo(fd, job->cl);
+	free(job->submit);
+	free(job);
+}

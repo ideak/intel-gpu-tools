@@ -28,6 +28,17 @@
 
 #define PAGE_SIZE 4096
 
+#define V3D_CSD_CFG012_WG_COUNT_SHIFT 16
+/* Batches per supergroup minus 1.  8 bits. */
+#define V3D_CSD_CFG3_BATCHES_PER_SG_M1_SHIFT 12
+/* Workgroups per supergroup, 0 means 16 */
+#define V3D_CSD_CFG3_WGS_PER_SG_SHIFT 8
+#define V3D_CSD_CFG3_WG_SIZE_SHIFT 0
+
+#define V3D_CSD_CFG5_PROPAGATE_NANS (1 << 2)
+#define V3D_CSD_CFG5_SINGLE_SEG (1 << 1)
+#define V3D_CSD_CFG5_THREADING (1 << 0)
+
 struct v3d_cl;
 
 struct v3d_bo {
@@ -44,6 +55,12 @@ struct v3d_cl_job {
 	struct v3d_cl *icl;
 	struct v3d_bo *tile_alloc;
 	struct v3d_bo *tile_state;
+};
+
+struct v3d_csd_job {
+	struct drm_v3d_submit_csd *submit;
+	struct v3d_bo *shader_assembly;
+	struct v3d_bo *cl;
 };
 
 struct v3d_bo *igt_v3d_create_bo(int fd, size_t size);
@@ -66,5 +83,8 @@ void igt_v3d_set_multisync(struct drm_v3d_multi_sync *ms, enum v3d_queue wait_st
 
 struct v3d_cl_job *igt_v3d_noop_job(int fd);
 void igt_v3d_free_cl_job(int fd, struct v3d_cl_job *job);
+
+struct v3d_csd_job *igt_v3d_empty_shader(int fd);
+void igt_v3d_free_csd_job(int fd, struct v3d_csd_job *job);
 
 #endif /* IGT_V3D_H */
