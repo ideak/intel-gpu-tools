@@ -176,15 +176,22 @@ test_shrink(int fd, unsigned int mode)
 	void *mem;
 
 	gem_quiescent_gpu(fd);
-	igt_purge_vm_caches(fd);
 
-	mem = igt_get_total_pinnable_mem(&size);
-	igt_assert(mem != MAP_FAILED);
+	igt_multi_fork(child, 1) {
+		fd = gem_reopen_driver(fd);
+		igt_purge_vm_caches(fd);
 
-	igt_purge_vm_caches(fd);
-	igt_system_suspend_autoresume(mode, SUSPEND_TEST_NONE);
+		mem = igt_get_total_pinnable_mem(&size);
+		igt_assert(mem != MAP_FAILED);
 
-	munmap(mem, size);
+		igt_purge_vm_caches(fd);
+		igt_system_suspend_autoresume(mode, SUSPEND_TEST_NONE);
+
+		munmap(mem, size);
+		close(fd);
+	}
+
+	igt_waitchildren();
 }
 
 static void
