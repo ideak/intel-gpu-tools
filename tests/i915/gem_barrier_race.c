@@ -142,7 +142,8 @@ igt_main
 		struct intel_execution_engine2 *e;
 
 		for_each_physical_engine(fd, e) {
-			if (e->class != I915_ENGINE_CLASS_RENDER)
+			if (e->class != I915_ENGINE_CLASS_RENDER &&
+			    e->class != I915_ENGINE_CLASS_COMPUTE)
 				continue;
 
 			igt_dynamic(e->name)
