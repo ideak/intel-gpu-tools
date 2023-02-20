@@ -626,6 +626,21 @@ static void dump_backlight_info(struct context *context,
 
 		printf("\t\tControl type: %u\n", control->type);
 		printf("\t\tController: %u\n", control->controller);
+
+		if (context->bdb->version >= 234) {
+			printf("\t\tBrightness level: %u\n",
+			       backlight->brightness_level[i].level);
+			printf("\t\tBrightness min level: %u\n",
+			       backlight->brightness_min_level[i].level);
+		}
+
+		if (context->bdb->version >= 236)
+			printf("\t\tBrigthness precision bits: %u\n",
+			       backlight->brightness_precision_bits[i]);
+
+		if (context->bdb->version >= 239)
+			printf("\t\tHDR DPCD refresh timeout: %.2f ms\n",
+			       backlight->hdr_dpcd_refresh_timeout[i] / 100.0);
 	}
 }
 
