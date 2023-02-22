@@ -51,6 +51,7 @@ enum {
 	TEST_SUSPEND = 1 << 2,
 	TEST_SWAP = 1 << 3,
 	TEST_INVALID_METADATA_SIZES = 1 << 4,
+	TEST_INVALID_HDR = 1 << 5,
 };
 
 /* BPC connector state. */
@@ -414,6 +415,10 @@ static void test_static_toggle(data_t *data, enum pipe pipe,
 	set_hdr_output_metadata(data, &hdr);
 	igt_output_set_prop_value(data->output, IGT_CONNECTOR_MAX_BPC, 10);
 	igt_display_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
+	if (flags & TEST_INVALID_HDR) {
+		igt_assert_eq(system("dmesg|tail -n 1000|grep -E \"EOTF Not Supported\""), 0);
+		goto cleanup;
+	}
 	igt_assert_output_bpc_equal(data->fd, pipe, output->name, 10);
 
 	/* Verify that the CRC are equal after DPMS or suspend. */
@@ -429,6 +434,7 @@ static void test_static_toggle(data_t *data, enum pipe pipe,
 
 	igt_assert_crc_equal(&ref_crc, &new_crc);
 
+cleanup:
 	test_fini(data);
 	igt_remove_fb(data->fd, &afb);
 }
@@ -567,7 +573,11 @@ static void test_hdr(data_t *data, uint32_t flags)
 		if (!has_max_bpc(output) || !has_hdr(output))
 			continue;
 
-		if (!is_panel_hdr(data, output))
+		/* For negative test, panel should be non-hdr. */
+		if ((flags & TEST_INVALID_HDR) && is_panel_hdr(data, output))
+			continue;
+
+		if ((flags & ~TEST_INVALID_HDR) && !is_panel_hdr(data, output))
 			continue;
 
 		if (igt_get_output_max_bpc(data->fd, output->name) < 10)
@@ -589,7 +599,7 @@ static void test_hdr(data_t *data, uint32_t flags)
 
 				igt_dynamic_f("pipe-%s-%s",
 					      kmstest_pipe_name(pipe), output->name) {
-					if (flags & TEST_NONE || flags & TEST_DPMS || flags & TEST_SUSPEND)
+					if (flags & (TEST_NONE | TEST_DPMS | TEST_SUSPEND | TEST_INVALID_HDR))
 						test_static_toggle(data, pipe, output, flags);
 					if (flags & TEST_SWAP)
 						test_static_swap(data, pipe, output);
@@ -646,6 +656,10 @@ igt_main
 	igt_describe("Tests invalid HDR metadata sizes");
 	igt_subtest_with_dynamic("invalid-metadata-sizes")
 		test_hdr(&data, TEST_INVALID_METADATA_SIZES);
+
+	igt_describe("Test to ensure HDR is not enabled on non-HDR panel");
+	igt_subtest_with_dynamic("invalid-hdr")
+		test_hdr(&data, TEST_INVALID_HDR);
 
 	igt_fixture {
 		igt_display_fini(&data.display);
