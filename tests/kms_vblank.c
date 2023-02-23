@@ -174,6 +174,22 @@ static void run_test(data_t *data, void (*testfunc)(data_t *, int, int))
 	cleanup_crtc(data, fd, output);
 }
 
+static bool
+pipe_output_combo_valid(igt_display_t *display,
+			enum pipe pipe, igt_output_t *output)
+{
+	bool ret = true;
+
+	igt_display_reset(display);
+
+	igt_output_set_pipe(output, pipe);
+	if (!i915_pipe_output_combo_valid(display))
+		ret = false;
+	igt_output_set_pipe(output, PIPE_NONE);
+
+	return ret;
+}
+
 static void crtc_id_subtest(data_t *data, int fd)
 {
 	igt_display_t *display = &data->display;
@@ -186,6 +202,15 @@ static void crtc_id_subtest(data_t *data, int fd)
 		unsigned crtc_id, expected_crtc_id;
 		uint64_t val;
 		union drm_wait_vblank vbl;
+
+		igt_display_reset(display);
+
+		igt_output_set_pipe(output, p);
+		if (!i915_pipe_output_combo_valid(display))
+			continue;
+
+		igt_info("Using (pipe %s + %s) to run the subtest.\n",
+			 kmstest_pipe_name(p), igt_output_name(output));
 
 		crtc_id = display->pipes[p].crtc_id;
 		if (drmGetCap(display->drm_fd, DRM_CAP_CRTC_IN_VBLANK_EVENT, &val) == 0)
@@ -448,10 +473,18 @@ static void run_subtests_for_pipe(data_t *data)
 			igt_subtest_f("pipe-%s-%s-%s",
 				      kmstest_pipe_name(data->pipe),
 				      f->name, m->name) {
+				int found = 0;
+
 				for_each_valid_output_on_pipe(&data->display, data->pipe, data->output) {
+					if (!pipe_output_combo_valid(&data->display, data->pipe, data->output))
+						continue;
+
 					data->flags = m->flags | NOHANG;
 					run_test(data, f->func);
+
+					found++;
 				}
+				igt_require_f(found, "No valid pipe/output combo found.\n");
 			}
 
 			/* Skip the -hang version if NOHANG flag is set */
@@ -463,13 +496,20 @@ static void run_subtests_for_pipe(data_t *data)
 				      kmstest_pipe_name(data->pipe),
 				      f->name, m->name) {
 				igt_hang_t hang;
+				int found = 0;
 
 				hang = igt_allow_hang(data->display.drm_fd, 0, 0);
 				for_each_valid_output_on_pipe(&data->display, data->pipe, data->output) {
+					if (!pipe_output_combo_valid(&data->display, data->pipe, data->output))
+						continue;
+
 					data->flags = m->flags;
 					run_test(data, f->func);
+
+					found++;
 				}
 				igt_disallow_hang(data->display.drm_fd, hang);
+				igt_require_f(found, "No valid pipe/output combo found.\n");
 			}
 		}
 	}
@@ -481,12 +521,22 @@ static void invalid_subtest(data_t *data, int fd)
 	unsigned long valid_flags;
 	igt_display_t* display = &data->display;
 	enum pipe pipe = 0;
-	igt_output_t* output = igt_get_single_output_for_pipe(display, pipe);
+	igt_output_t *output;
+
+	igt_display_reset(display);
+
+	output = igt_get_single_output_for_pipe(display, pipe);
+	igt_require(output);
 
 	data->pipe = pipe;
 	data->output = output;
+
 	igt_output_set_pipe(output, pipe);
-	igt_display_require_output_on_pipe(display, pipe);
+	igt_require(i915_pipe_output_combo_valid(display));
+
+	igt_info("Using (pipe %s + %s) to run the subtest.\n",
+		 kmstest_pipe_name(pipe), igt_output_name(output));
+
 	prepare_crtc(data, fd, output);
 
 	/* First check all is well with a simple query */
