@@ -175,9 +175,6 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe)
 	int w, h;
 	igt_plane_t *primary = igt_pipe_get_plane_type(&display->pipes[pipe], DRM_PLANE_TYPE_PRIMARY);
 
-	igt_display_reset(display);
-	igt_output_set_pipe(output, pipe);
-
 	/* create the pipe_crc object for this pipe */
 	igt_pipe_crc_free(data->pipe_crc);
 	data->pipe_crc = igt_pipe_crc_new(data->gfx_fd, pipe,
@@ -653,6 +650,12 @@ static void run_subtests(data_t *data)
 				if (!extended &&
 				    pipe != active_pipes[0] &&
 				    pipe != active_pipes[last_pipe])
+					continue;
+
+				igt_display_reset(&data->display);
+
+				igt_output_set_pipe(output, pipe);
+				if (!i915_pipe_output_combo_valid(&data->display))
 					continue;
 
 				prepare_crtc(data, output, pipe);
