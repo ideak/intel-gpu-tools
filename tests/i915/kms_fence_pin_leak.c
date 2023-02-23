@@ -124,6 +124,9 @@ static void run_single_test(data_t *data, enum pipe pipe, igt_output_t *output)
 	struct igt_fb fb[2];
 	int i;
 
+	igt_info("Using (pipe %s + %s) to run the subtest.\n",
+		 kmstest_pipe_name(pipe), igt_output_name(output));
+
 	igt_output_set_pipe(output, pipe);
 
 	mode = igt_output_get_mode(output);
@@ -196,6 +199,12 @@ static void run_test(data_t *data)
 	enum pipe p;
 
 	for_each_pipe_with_valid_output(display, p, output) {
+		igt_display_reset(display);
+
+		igt_output_set_pipe(output, p);
+		if (!i915_pipe_output_combo_valid(display))
+			continue;
+
 		run_single_test(data, p, output);
 
 		return; /* one time ought to be enough */
