@@ -171,4 +171,9 @@ igt_map_insert_pre_hashed(struct igt_map *map,
 			     uint32_t hash,
 			     const void *key, void *data);
 
+uint32_t igt_map_hash_32(const void *key);
+int igt_map_equal_32(const void *key1, const void *key2);
+uint32_t igt_map_hash_64(const void *key);
+int igt_map_equal_64(const void *key1, const void *key2);
+
 #endif

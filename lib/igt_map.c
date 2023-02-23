@@ -196,6 +196,7 @@ igt_map_search(struct igt_map *map, const void *key)
  * Returns: map entry or %NULL if no entry is found.
  * Note that the data pointer may be modified by the user.
  */
+
 struct igt_map_entry *
 igt_map_search_entry(struct igt_map *map, const void *key)
 {
@@ -499,4 +500,62 @@ igt_map_random_entry(struct igt_map *map,
 	}
 
 	return NULL;
+}
+
+#define GOLDEN_RATIO_PRIME_32 0x9e370001UL
+/**
+ * igt_map_hash_32:
+ * @key: pointer to 32-bit key
+ *
+ * Function is hashing function for 32-bit keys. Key is pointer to 32-bit
+ * value so it must be dereferenced.
+ */
+uint32_t igt_map_hash_32(const void *key)
+{
+	uint32_t hash = *(uint32_t *)key;
+
+	hash = hash * GOLDEN_RATIO_PRIME_32;
+	return hash;
+}
+
+/**
+ * igt_map_equal_32:
+ * @key1: pointer to first 32-bit key
+ * @key2: pointer to second 32-bit key
+ *
+ * Function compares 32-bit keys.
+ */
+int igt_map_equal_32(const void *key1, const void *key2)
+{
+	return *(uint32_t *)key1 == *(uint32_t *)key2;
+}
+
+/*  2^63 + 2^61 - 2^57 + 2^54 - 2^51 - 2^18 + 1 */
+#define GOLDEN_RATIO_PRIME_64 0x9e37fffffffc0001ULL
+/**
+ * igt_map_hash_64:
+ * @key: pointer to 64-bit key
+ *
+ * Function is hashing function for 64-bit keys. Key is pointer to 64-bit
+ * value so it must be dereferenced.
+ */
+uint32_t igt_map_hash_64(const void *key)
+{
+	uint64_t hash = *(uint64_t *)key;
+
+	hash = hash * GOLDEN_RATIO_PRIME_64;
+	/* High bits are more random, so use them. */
+	return hash >> 32;
+}
+
+/**
+ * igt_map_equal_64:
+ * @key1: pointer to first 64-bit key
+ * @key2: pointer to second 64-bit key
+ *
+ * Function compares 64-bit keys.
+ */
+int igt_map_equal_64(const void *key1, const void *key2)
+{
+	return *(uint64_t *)key1 == *(uint64_t *)key2;
 }
