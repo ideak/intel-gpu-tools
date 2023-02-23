@@ -24,6 +24,18 @@
 
 #include "kms_color_helper.h"
 
+bool pipe_output_combo_valid(data_t *data, enum pipe pipe)
+{
+	bool ret = true;
+
+	igt_output_set_pipe(data->output, pipe);
+	if (!i915_pipe_output_combo_valid(&data->display))
+		ret = false;
+	igt_output_set_pipe(data->output, PIPE_NONE);
+
+	return ret;
+}
+
 bool
 panel_supports_deep_color(int drm_fd, char *output_name)
 {
