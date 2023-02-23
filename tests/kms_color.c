@@ -726,9 +726,13 @@ run_gamma_degamma_tests_for_pipe(data_t *data, enum pipe p,
 	data->drm_format = DRM_FORMAT_XRGB8888;
 	data->mode = igt_output_get_mode(data->output);
 
+	if (!pipe_output_combo_valid(data, p))
+		goto out;
+
 	igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(p), data->output->name)
 		igt_assert(test_t(data, data->primary));
 
+out:
 	test_cleanup(data);
 }
 
@@ -755,6 +759,9 @@ run_ctm_tests_for_pipe(data_t *data, enum pipe p,
 	delta = 1.0 / (1 << data->color_depth);
 	data->drm_format = DRM_FORMAT_XRGB8888;
 	data->mode = igt_output_get_mode(data->output);
+
+	if (!pipe_output_combo_valid(data, p))
+		goto out;
 
 	igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(p), data->output->name) {
 		bool success = false;
@@ -784,6 +791,7 @@ run_ctm_tests_for_pipe(data_t *data, enum pipe p,
 		igt_assert(success);
 	}
 
+out:
 	test_cleanup(data);
 }
 
@@ -824,7 +832,6 @@ run_deep_color_tests_for_pipe(data_t *data, enum pipe p)
 		igt_display_reset(&data->display);
 		igt_output_set_prop_value(output, IGT_CONNECTOR_MAX_BPC, 10);
 		igt_output_set_pipe(output, p);
-		igt_display_commit_atomic(&data->display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
 
 		if (is_i915_device(data->drm_fd) &&
 		    !igt_max_bpc_constraint(&data->display, p, output, 10))
