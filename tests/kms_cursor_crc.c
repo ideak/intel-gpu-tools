@@ -700,6 +700,22 @@ static void test_rapid_movement(data_t *data)
 	igt_assert_lt(usec, 0.9 * 400 * 1000000 / data->refresh);
 }
 
+static bool valid_pipe_output_combo(data_t *data)
+{
+	bool ret = false;
+	igt_display_t *display = &data->display;
+
+	igt_display_reset(display);
+	igt_output_set_pipe(data->output, data->pipe);
+
+	if (i915_pipe_output_combo_valid(display))
+		ret = true;
+
+	igt_output_set_pipe(data->output, PIPE_NONE);
+
+	return ret;
+}
+
 static void run_size_tests(data_t *data, int w, int h)
 {
 	enum pipe pipe;
@@ -752,6 +768,9 @@ static void run_size_tests(data_t *data, int w, int h)
 			for_each_pipe_with_single_output(&data->display, pipe, data->output) {
 				data->pipe = pipe;
 
+				if (!valid_pipe_output_combo(data))
+					continue;
+
 				if (require_cursor_size(data, w, h)) {
 					igt_info("Cursor size %dx%d not supported by driver\n", w, h);
 					continue;
@@ -785,6 +804,9 @@ static void run_tests_on_pipe(data_t *data)
 		for_each_pipe_with_single_output(&data->display, pipe, data->output) {
 			data->pipe = pipe;
 
+			if (!valid_pipe_output_combo(data))
+				continue;
+
 			igt_dynamic_f("pipe-%s-%s",
 				      kmstest_pipe_name(pipe),
 				      data->output->name)
@@ -799,6 +821,9 @@ static void run_tests_on_pipe(data_t *data)
 		for_each_pipe_with_single_output(&data->display, pipe, data->output) {
 			data->pipe = pipe;
 
+			if (!valid_pipe_output_combo(data))
+				continue;
+
 			igt_dynamic_f("pipe-%s-%s",
 				      kmstest_pipe_name(pipe),
 				      data->output->name)
@@ -812,6 +837,9 @@ static void run_tests_on_pipe(data_t *data)
 	igt_subtest_with_dynamic("cursor-alpha-transparent") {
 		for_each_pipe_with_single_output(&data->display, pipe, data->output) {
 			data->pipe = pipe;
+
+			if (!valid_pipe_output_combo(data))
+				continue;
 
 			igt_dynamic_f("pipe-%s-%s",
 				      kmstest_pipe_name(pipe),
@@ -831,6 +859,9 @@ static void run_tests_on_pipe(data_t *data)
 			data->pipe = pipe;
 			data->flags = TEST_DPMS;
 
+			if (!valid_pipe_output_combo(data))
+				continue;
+
 			igt_dynamic_f("pipe-%s-%s",
 				      kmstest_pipe_name(pipe),
 				      data->output->name)
@@ -845,6 +876,9 @@ static void run_tests_on_pipe(data_t *data)
 		for_each_pipe_with_single_output(&data->display, pipe, data->output) {
 			data->pipe = pipe;
 			data->flags = TEST_SUSPEND;
+
+			if (!valid_pipe_output_combo(data))
+				continue;
 
 			igt_dynamic_f("pipe-%s-%s",
 				      kmstest_pipe_name(pipe),
