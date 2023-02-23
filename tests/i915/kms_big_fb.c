@@ -406,6 +406,9 @@ static bool test_pipe(data_t *data)
 	igt_plane_t *primary;
 	bool ret = false;
 
+	igt_info("Using (pipe %s + %s) to run the subtest.\n",
+		 kmstest_pipe_name(data->pipe), igt_output_name(data->output));
+
 	if (data->format == DRM_FORMAT_C8 &&
 	    !igt_pipe_obj_has_prop(&data->display.pipes[data->pipe],
 				   IGT_CRTC_GAMMA_LUT))
@@ -481,6 +484,10 @@ max_hw_stride_async_flip_test(data_t *data)
 	igt_crc_t compare_crc, async_crc;
 
 	igt_require(data->display.is_atomic);
+
+	igt_info("Using (pipe %s + %s) to run the subtest.\n",
+		 kmstest_pipe_name(data->pipe), igt_output_name(data->output));
+
 	igt_output_set_pipe(data->output, data->pipe);
 
 	primary = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_PRIMARY);
@@ -592,6 +599,12 @@ static void test_scanout(data_t *data)
 		    data->format, data->modifier);
 
 	for_each_pipe_with_valid_output(&data->display, data->pipe, data->output) {
+		igt_display_reset(&data->display);
+
+		igt_output_set_pipe(data->output, data->pipe);
+		if (!i915_pipe_output_combo_valid(&data->display))
+			continue;
+
 		if (data->async_flip_test) {
 			if (max_hw_stride_async_flip_test(data))
 				return;
