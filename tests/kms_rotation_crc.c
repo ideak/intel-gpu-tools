@@ -215,6 +215,8 @@ static void prepare_crtc(data_t *data, igt_output_t *output, enum pipe pipe,
 	cleanup_crtc(data);
 
 	igt_output_set_pipe(output, pipe);
+	igt_require(i915_pipe_output_combo_valid(display));
+
 	igt_plane_set_rotation(plane, IGT_ROTATION_0);
 
 	/* create the pipe_crc object for this pipe */
@@ -479,6 +481,7 @@ static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_form
 	igt_output_t *output;
 	enum pipe pipe;
 	int pipe_count = 0, connected_outputs = 0;
+	bool found = false;
 
 	if (is_amdgpu_device(data->gfx_fd))
 		igt_require(plane_type != DRM_PLANE_TYPE_OVERLAY &&
@@ -496,6 +499,13 @@ static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_form
 		igt_plane_t *plane;
 		int i, j, c;
 
+		igt_display_reset(display);
+
+		igt_output_set_pipe(output, pipe);
+		if (!i915_pipe_output_combo_valid(display))
+			continue;
+
+		found = true;
 		mode = igt_output_get_mode(output);
 
 		/*
@@ -586,6 +596,7 @@ static void test_plane_rotation(data_t *data, int plane_type, bool test_bad_form
 			igt_pipe_crc_stop(data->pipe_crc);
 		}
 	}
+	igt_require_f(found, "No valid pipe/output combo found.\n");
 }
 
 typedef struct {
@@ -804,12 +815,22 @@ static void test_multi_plane_rotation(data_t *data, enum pipe pipe)
 		{IGT_ROTATION_270, .2f, .4f, I915_FORMAT_MOD_Y_TILED },
 		{IGT_ROTATION_270, .2f, .4f, I915_FORMAT_MOD_Yf_TILED },
 	};
+	bool found = false;
+
+	igt_display_require_output(display);
 
 	for_each_valid_output_on_pipe(display, pipe, output) {
 		int i, j, k, l, flipsw, fliphw;
+
+		igt_display_reset(display);
+
 		igt_output_set_pipe(output, pipe);
+		if (!i915_pipe_output_combo_valid(display))
+			continue;
+
+		found = true;
+
 		mode = igt_output_get_mode(output);
-		igt_display_require_output(display);
 		igt_display_commit2(display, COMMIT_ATOMIC);
 
 		p[0].plane = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
@@ -952,6 +973,8 @@ static void test_multi_plane_rotation(data_t *data, enum pipe pipe)
 			igt_remove_fb(data->gfx_fd, &planeconfigs[c].fbs[d][MULTIPLANE_ROTATED]);
 		}
 	}
+
+	igt_require_f(found, "No valid pipe/output combo found.\n");
 }
 
 static void test_plane_rotation_exhaust_fences(data_t *data,
