@@ -277,6 +277,9 @@ static void run_test(data_t *data, uint64_t modifier)
 			igt_display_reset(&data->display);
 			igt_output_set_pipe(data->output, data->pipe);
 
+			if (!i915_pipe_output_combo_valid(&data->display))
+				continue;
+
 			data->pipe_crc = igt_pipe_crc_new(data->drm_fd, data->pipe,
 							  IGT_PIPE_CRC_SOURCE_AUTO);
 
