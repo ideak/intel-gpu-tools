@@ -588,12 +588,21 @@ static int test_ccs(data_t *data)
 static void test_output(data_t *data, const int testnum)
 {
 	igt_fixture {
+		bool found = false;
+
 		data->flags = tests[testnum].flags;
 
-		data->output = igt_get_single_output_for_pipe(&data->display,
-							      data->pipe);
-		igt_require(data->output);
-		igt_output_set_pipe(data->output, data->pipe);
+		for_each_valid_output_on_pipe(&data->display, data->pipe, data->output) {
+			igt_display_reset(&data->display);
+
+			igt_output_set_pipe(data->output, data->pipe);
+			if (i915_pipe_output_combo_valid(&data->display)) {
+				found = true;
+				break;
+			}
+
+		}
+		igt_require_f(found, "No valid pipe/output combo found.\n");
 	}
 
 	for (int i = 0; i < ARRAY_SIZE(ccs_modifiers); i++) {
@@ -609,7 +618,6 @@ static void test_output(data_t *data, const int testnum)
 		igt_subtest_f("pipe-%s-%s-%s", kmstest_pipe_name(data->pipe),
 			      tests[testnum].testname, ccs_modifiers[i].str) {
 			int valid_tests = 0;
-			igt_require(data->output);
 
 			if (data->flags == TEST_RANDOM)
 				igt_info("Testing with seed %d\n", data->seed);
