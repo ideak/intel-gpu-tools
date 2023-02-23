@@ -287,6 +287,21 @@ static void test_disable_crc_after_crtc(data_t *data, enum pipe pipe,
 	igt_remove_fb(data->drm_fd, &data->fb);
 }
 
+static bool pipe_output_combo_valid(igt_display_t *display,
+				    enum pipe pipe, igt_output_t *output)
+{
+	bool ret = true;
+
+	igt_display_reset(display);
+
+	igt_output_set_pipe(output, pipe);
+	if (!i915_pipe_output_combo_valid(display))
+		ret = false;
+	igt_output_set_pipe(output, PIPE_NONE);
+
+	return ret;
+}
+
 data_t data = {0, };
 
 static int opt_handler(int opt, int opt_index, void *_data)
@@ -360,6 +375,9 @@ igt_main_args("e", NULL, help_str, opt_handler, NULL)
 				if (simulation_constraint(pipe))
 					continue;
 
+				if(!pipe_output_combo_valid(&data.display, pipe, output))
+					continue;
+
 				igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(pipe), output->name) {
 					if (tests[i].flags & TEST_SUSPEND) {
 						test_read_crc(&data, pipe, output, 0);
@@ -391,6 +409,9 @@ igt_main_args("e", NULL, help_str, opt_handler, NULL)
 			if (simulation_constraint(pipe))
 				continue;
 
+			if(!pipe_output_combo_valid(&data.display, pipe, output))
+				continue;
+
 			igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(pipe), output->name)
 				test_disable_crc_after_crtc(&data, pipe, output);
 		}
@@ -400,6 +421,9 @@ igt_main_args("e", NULL, help_str, opt_handler, NULL)
 	igt_subtest_with_dynamic("compare-crc-sanitycheck") {
 		for_each_pipe_with_single_output(&data.display, pipe, output) {
 			if (simulation_constraint(pipe))
+				continue;
+
+			if(!pipe_output_combo_valid(&data.display, pipe, output))
 				continue;
 
 			igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(pipe), output->name)
