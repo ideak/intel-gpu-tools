@@ -257,15 +257,23 @@ static void test_mode_transition_on_all_outputs(data_t *data)
 	for_each_connected_output(&data->display, output)
 		valid_outputs++;
 
+	i = 0;
 	for_each_connected_output(display, output) {
 		mode = igt_output_get_mode(output);
 		igt_assert(mode);
 
-		igt_output_set_pipe(output, PIPE_NONE);
-
 		width = max(width, mode->hdisplay);
 		height = max(height, mode->vdisplay);
+
+		mode_hi = get_highres_mode(output);
+		igt_require(mode_hi != NULL);
+
+		igt_output_set_pipe(output, i);
+		igt_output_override_mode(output, mode_hi);
+		i++;
 	}
+	igt_require(i915_pipe_output_combo_valid(display));
+	igt_display_reset(display);
 
 	igt_create_pattern_fb(data->drm_fd, width, height, DRM_FORMAT_XRGB8888,
 			      DRM_FORMAT_MOD_LINEAR, &fb);
@@ -332,13 +340,18 @@ static void run_cdclk_test(data_t *data, uint32_t flags)
 	enum pipe pipe;
 
 	for_each_pipe_with_valid_output(display, pipe, output) {
-		igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(pipe), output->name)
-			if (igt_pipe_connector_valid(pipe, output)) {
-				if (flags & TEST_PLANESCALING)
-					test_plane_scaling(data, pipe, output);
-				if (flags & TEST_MODETRANSITION)
-					test_mode_transition(data, pipe, output);
-			}
+		igt_output_set_pipe(output, pipe);
+		if (!i915_pipe_output_combo_valid(display)) {
+			igt_output_set_pipe(output, PIPE_NONE);
+			continue;
+		}
+
+		igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(pipe), output->name) {
+			if (flags & TEST_PLANESCALING)
+				test_plane_scaling(data, pipe, output);
+			if (flags & TEST_MODETRANSITION)
+				test_mode_transition(data, pipe, output);
+		}
 	}
 }
 
