@@ -37,119 +37,47 @@ typedef struct {
 	int n_pipes;
 	enum pipe pipe1;
 	enum pipe pipe2;
-	struct output_data {
-		uint32_t id;
-		int mode_number;
-	} big_joiner_output[2];
+	uint32_t big_joiner_output[2];
 } data_t;
 
 static void test_invalid_modeset(data_t *data)
 {
-	drmModeModeInfo *mode;
+	igt_output_t *output;
 	igt_display_t *display = &data->display;
-	igt_output_t *output, *big_joiner_output = NULL, *second_output = NULL;
 	int ret;
-	igt_pipe_t *pipe;
-	igt_plane_t *plane;
 
-	igt_display_reset(display);
+	igt_info("Bigjoiner test on ");
+	for_each_connected_output(display, output){
+		enum pipe p = output->pending_pipe;
+		drmModeModeInfo *mode;
+		igt_pipe_t *pipe;
+		igt_plane_t *plane;
 
-	for_each_connected_output(display, output) {
-		mode = &output->config.connector->modes[0];
+		if (p == PIPE_NONE)
+			continue;
 
-		if (data->big_joiner_output[0].id == output->id) {
-			big_joiner_output = output;
-		} else if (second_output == NULL) {
-			second_output = output;
-		}
+		mode = igt_output_get_mode(output);
+		igt_info("pipe:%s, output:%s, mode:", kmstest_pipe_name(p), igt_output_name(output));
+		kmstest_dump_mode(mode);
+
+		pipe = &display->pipes[p];
+		plane = igt_pipe_get_plane_type(pipe, DRM_PLANE_TYPE_PRIMARY);
+
+		igt_plane_set_fb(plane, &data->fb);
+		igt_fb_set_size(&data->fb, plane, mode->hdisplay, mode->vdisplay);
+		igt_plane_set_size(plane, mode->hdisplay, mode->vdisplay);
 	}
 
-	igt_output_set_pipe(big_joiner_output, data->pipe1);
-
-	mode = &big_joiner_output->config.connector->modes[data->big_joiner_output[0].mode_number];
-	igt_output_override_mode(big_joiner_output, mode);
-
-	pipe = &display->pipes[data->pipe1];
-	plane = igt_pipe_get_plane_type(pipe, DRM_PLANE_TYPE_PRIMARY);
-
-	igt_plane_set_fb(plane, &data->fb);
-	igt_fb_set_size(&data->fb, plane, mode->hdisplay, mode->vdisplay);
-	igt_plane_set_size(plane, mode->hdisplay, mode->vdisplay);
-
-	igt_display_commit2(display, COMMIT_ATOMIC);
-
-	igt_output_set_pipe(second_output, data->pipe2);
-
-	mode = igt_output_get_mode(second_output);
-
-	pipe = &display->pipes[data->pipe2];
-	plane = igt_pipe_get_plane_type(pipe, DRM_PLANE_TYPE_PRIMARY);
-
-	igt_plane_set_fb(plane, &data->fb);
-	igt_fb_set_size(&data->fb, plane, mode->hdisplay, mode->vdisplay);
-	igt_plane_set_size(plane, mode->hdisplay, mode->vdisplay);
+	igt_assert(!igt_check_bigjoiner_support(display));
 
 	/* This commit is expectd to fail as this pipe is being used for big joiner */
 	ret = igt_display_try_commit_atomic(display, DRM_MODE_ATOMIC_TEST_ONLY |
 					    DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
+
+	igt_display_reset(&data->display);
+	igt_display_commit2(display, COMMIT_ATOMIC);
+
 	igt_assert_lt(ret, 0);
-
-	igt_output_set_pipe(big_joiner_output, PIPE_NONE);
-	igt_output_set_pipe(second_output, PIPE_NONE);
-
-	pipe = &display->pipes[data->pipe1];
-	plane = igt_pipe_get_plane_type(pipe, DRM_PLANE_TYPE_PRIMARY);
-
-	/*
-	 * Do not explicitly set the plane of the second output to NULL,
-	 * as it is the adjacent pipe to the big joiner output and
-	 * setting the big joiner plane to NULL will take care of this.
-	 */
-	igt_plane_set_fb(plane, NULL);
-	igt_display_commit2(display, COMMIT_ATOMIC);
-	igt_output_override_mode(big_joiner_output, NULL);
-
-	igt_output_set_pipe(second_output, data->pipe2);
-
-	mode = igt_output_get_mode(second_output);
-
-	pipe = &display->pipes[data->pipe2];
-	plane = igt_pipe_get_plane_type(pipe, DRM_PLANE_TYPE_PRIMARY);
-
-	igt_plane_set_fb(plane, &data->fb);
-	igt_fb_set_size(&data->fb, plane, mode->hdisplay, mode->vdisplay);
-	igt_plane_set_size(plane, mode->hdisplay, mode->vdisplay);
-
-	igt_display_commit2(display, COMMIT_ATOMIC);
-
-	igt_output_set_pipe(big_joiner_output, data->pipe1);
-
-	mode = &big_joiner_output->config.connector->modes[data->big_joiner_output[0].mode_number];
-	igt_output_override_mode(big_joiner_output, mode);
-
-	pipe = &display->pipes[data->pipe1];
-	plane = igt_pipe_get_plane_type(pipe, DRM_PLANE_TYPE_PRIMARY);
-
-	igt_plane_set_fb(plane, &data->fb);
-	igt_fb_set_size(&data->fb, plane, mode->hdisplay, mode->vdisplay);
-	igt_plane_set_size(plane, mode->hdisplay, mode->vdisplay);
-
-	/* This commit is expected to fail as the adjacent pipe is already in use*/
-	ret = igt_display_try_commit_atomic(display, DRM_MODE_ATOMIC_TEST_ONLY |
-					    DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
-	igt_assert_lt(ret, 0);
-
-	igt_output_set_pipe(big_joiner_output, PIPE_NONE);
-	igt_output_set_pipe(second_output, PIPE_NONE);
-	igt_plane_set_fb(plane, NULL);
-
-	pipe = &display->pipes[data->pipe2];
-	plane = igt_pipe_get_plane_type(pipe, DRM_PLANE_TYPE_PRIMARY);
-	igt_plane_set_fb(plane, NULL);
-
-	igt_display_commit2(display, COMMIT_ATOMIC);
-
-	igt_output_override_mode(big_joiner_output, NULL);
 }
 
 static void test_basic_modeset(data_t *data)
@@ -163,7 +91,7 @@ static void test_basic_modeset(data_t *data)
 	igt_display_reset(display);
 
 	for_each_connected_output(display, output) {
-		if (data->big_joiner_output[0].id == output->id) {
+		if (data->big_joiner_output[0] == output->id) {
 			big_joiner_output = output;
 			break;
 		}
@@ -171,7 +99,9 @@ static void test_basic_modeset(data_t *data)
 
 	igt_output_set_pipe(big_joiner_output, data->pipe1);
 
-	mode = &big_joiner_output->config.connector->modes[data->big_joiner_output[0].mode_number];
+	igt_sort_connector_modes(big_joiner_output->config.connector,
+				 sort_drm_modes_by_res_dsc);
+	mode = &big_joiner_output->config.connector->modes[0];
 	igt_output_override_mode(big_joiner_output, mode);
 
 	pipe = &display->pipes[data->pipe1];
@@ -200,7 +130,7 @@ static void test_dual_display(data_t *data)
 	igt_display_reset(display);
 
 	for_each_connected_output(display, output) {
-		if (data->big_joiner_output[count].id == output->id) {
+		if (data->big_joiner_output[count] == output->id) {
 			big_joiner_output[count] = output;
 			count++;
 		}
@@ -213,7 +143,9 @@ static void test_dual_display(data_t *data)
 	igt_output_set_pipe(big_joiner_output[1], data->pipe2);
 
 	/* Set up first big joiner output on Pipe A*/
-	mode = &big_joiner_output[0]->config.connector->modes[data->big_joiner_output[0].mode_number];
+	igt_sort_connector_modes(big_joiner_output[0]->config.connector,
+				 sort_drm_modes_by_res_dsc);
+	mode = &big_joiner_output[0]->config.connector->modes[0];
 	igt_output_override_mode(big_joiner_output[0], mode);
 
 	pipe = &display->pipes[data->pipe1];
@@ -224,7 +156,9 @@ static void test_dual_display(data_t *data)
 	igt_plane_set_size(plane1, mode->hdisplay, mode->vdisplay);
 
 	/* Set up second big joiner output on Pipe C*/
-	mode = &big_joiner_output[1]->config.connector->modes[data->big_joiner_output[1].mode_number];
+	igt_sort_connector_modes(big_joiner_output[1]->config.connector,
+				 sort_drm_modes_by_res_dsc);
+	mode = &big_joiner_output[1]->config.connector->modes[0];
 	igt_output_override_mode(big_joiner_output[1], mode);
 
 	pipe = &display->pipes[data->pipe2];
@@ -261,19 +195,15 @@ igt_main
 		igt_require(data.display.is_atomic);
 
 		for_each_connected_output(&data.display, output) {
-			if (count < 2) {
-				for (i = 0; i < output->config.connector->count_modes; i++) {
-					mode = &output->config.connector->modes[i];
-					if (mode->hdisplay > MAX_HDISPLAY_PER_PIPE) {
-						data.big_joiner_output[count].mode_number = i;
-						data.big_joiner_output[count].id = output->id;
-						count++;
+			igt_sort_connector_modes(output->config.connector,
+						 sort_drm_modes_by_res_dsc);
 
-						width = max(width, mode->hdisplay);
-						height = max(height, mode->vdisplay);
-						break;
-					}
-				}
+			mode = &output->config.connector->modes[0];
+			if (mode->hdisplay > MAX_HDISPLAY_PER_PIPE) {
+				data.big_joiner_output[count++] = output->id;
+
+				width = max(width, mode->hdisplay);
+				height = max(height, mode->vdisplay);
 			}
 			valid_output++;
 		}
@@ -303,13 +233,57 @@ igt_main
 	igt_describe("Verify if the modeset on the adjoining pipe is rejected "
 		     "when the pipe is active with a big joiner modeset");
 	igt_subtest_with_dynamic("invalid-modeset") {
-		igt_require_f(valid_output > 1, "No valid Second output found\n");
-		for (i = 0; i < data.n_pipes - 1; i++) {
-			data.pipe1 = pipe_seq[i];
-			data.pipe2 = pipe_seq[i + 1];
-			igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(pipe_seq[i]),
-						    kmstest_pipe_name(pipe_seq[i + 1]))
+		data.pipe1 = pipe_seq[j - 1];
+
+		igt_display_reset(&data.display);
+		for_each_connected_output(&data.display, output) {
+			if (data.big_joiner_output[0] != output->id)
+				continue;
+
+			igt_sort_connector_modes(output->config.connector,
+						 sort_drm_modes_by_res_dsc);
+
+			igt_output_set_pipe(output, data.pipe1);
+			igt_output_override_mode(output, &output->config.connector->modes[0]);
+
+			igt_dynamic_f("pipe-%s-%s",
+				      kmstest_pipe_name(data.pipe1),
+				      igt_output_name(output))
 				test_invalid_modeset(&data);
+		}
+
+		if(valid_output > 1) {
+			for (i = 0; i < data.n_pipes - 1; i++) {
+				igt_output_t *first_output = NULL, *second_output = NULL;
+
+				data.pipe1 = pipe_seq[i];
+				data.pipe2 = pipe_seq[i + 1];
+
+				igt_display_reset(&data.display);
+				for_each_connected_output(&data.display, output) {
+					igt_sort_connector_modes(output->config.connector,
+								 sort_drm_modes_by_res_dsc);
+
+					if (data.big_joiner_output[0] == output->id) {
+						first_output = output;
+						igt_output_set_pipe(output, data.pipe1);
+						igt_output_override_mode(output, &output->config.connector->modes[0]);
+					} else if (second_output == NULL) {
+						second_output = output;
+						igt_output_set_pipe(output, data.pipe2);
+						igt_output_override_mode(output, &output->config.connector->modes[0]);
+
+						break;
+					}
+				}
+
+				igt_dynamic_f("pipe-%s-%s-pipe-%s-%s",
+					      kmstest_pipe_name(data.pipe1),
+					      igt_output_name(first_output),
+					      kmstest_pipe_name(data.pipe2),
+					      igt_output_name(second_output))
+					test_invalid_modeset(&data);
+			}
 		}
 	}
 
