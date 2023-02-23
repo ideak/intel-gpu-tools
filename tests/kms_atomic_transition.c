@@ -68,6 +68,10 @@ run_primary_test(data_t *data, enum pipe pipe, igt_output_t *output)
 	unsigned flags = DRM_MODE_ATOMIC_TEST_ONLY | DRM_MODE_ATOMIC_ALLOW_MODESET;
 
 	igt_display_reset(&data->display);
+
+	igt_info("Using (pipe %s + %s) to run the subtest.\n",
+		 kmstest_pipe_name(pipe), igt_output_name(output));
+
 	igt_output_set_pipe(output, pipe);
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 
@@ -487,6 +491,9 @@ run_transition_test(data_t *data, enum pipe pipe, igt_output_t *output,
 	unsigned flags = 0;
 	int ret;
 
+	igt_info("Using (pipe %s + %s) to run the subtest.\n",
+		 kmstest_pipe_name(pipe), igt_output_name(output));
+
 	if (fencing)
 		prepare_fencing(data, pipe);
 	else
@@ -759,8 +766,13 @@ static unsigned set_combinations(data_t *data, unsigned mask, struct igt_fb *fb)
 			if (output->pending_pipe != PIPE_NONE)
 				continue;
 
-			mode = igt_output_get_mode(output);
-			break;
+			igt_output_set_pipe(output, pipe);
+			if (i915_pipe_output_combo_valid(&data->display)) {
+				mode = igt_output_get_mode(output);
+				break;
+			} else {
+				igt_output_set_pipe(output, PIPE_NONE);
+			}
 		}
 
 		if (!mode)
@@ -845,8 +857,17 @@ retry:
 				continue;
 
 			igt_output_set_pipe(output, i);
-			mode = igt_output_get_mode(output);
-			break;
+			if (i915_pipe_output_combo_valid(&data->display)) {
+				mode = igt_output_get_mode(output);
+
+				igt_info("(pipe %s + %s), mode:",
+					 kmstest_pipe_name(i), igt_output_name(output));
+				kmstest_dump_mode(mode);
+
+				break;
+			} else {
+				igt_output_set_pipe(output, PIPE_NONE);
+			}
 		}
 
 		if (mode) {
@@ -984,6 +1005,21 @@ static void run_modeset_transition(data_t *data, int requested_outputs, bool non
 	igt_remove_fb(data->drm_fd, &data->fbs[1]);
 }
 
+static bool pipe_output_combo_valid(igt_display_t *display,
+				    enum pipe pipe, igt_output_t *output)
+{
+	bool ret = true;
+
+	igt_display_reset(display);
+
+	igt_output_set_pipe(output, pipe);
+	if (!i915_pipe_output_combo_valid(display))
+		ret = false;
+	igt_output_set_pipe(output, PIPE_NONE);
+
+	return ret;
+}
+
 static int opt_handler(int opt, int opt_index, void *_data)
 {
 	data_t *data = _data;
@@ -1083,6 +1119,9 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 			if (pipe_count == 2 * count && !data.extended)
 				break;
 
+			if (!pipe_output_combo_valid(&data.display, pipe, output))
+				continue;
+
 			pipe_count++;
 			igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(pipe), igt_output_name(output))
 				run_primary_test(&data, pipe, output);
@@ -1111,6 +1150,9 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 
 				if (pipe_count == 2 * count && !data.extended)
 					break;
+
+				if (!pipe_output_combo_valid(&data.display, pipe, output))
+					continue;
 
 				pipe_count++;
 				igt_dynamic_f("pipe-%s-%s",
