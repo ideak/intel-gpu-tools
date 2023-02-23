@@ -301,6 +301,12 @@ igt_main
 	for (int i = 0; i < ARRAY_SIZE(subtests); i++) {
 		igt_subtest_with_dynamic(subtests[i].name) {
 			for_each_pipe_with_valid_output(&data.display, pipe, output) {
+				igt_display_reset(&data.display);
+
+				igt_output_set_pipe(output, pipe);
+				if (!i915_pipe_output_combo_valid(&data.display))
+					continue;
+
 				igt_dynamic_f("%s-pipe-%s", igt_output_name(output), kmstest_pipe_name(pipe)) {
 					data.output = output;
 					data.pipe = pipe;
