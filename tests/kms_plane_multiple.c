@@ -103,6 +103,7 @@ get_reference_crc(data_t *data, igt_output_t *output, enum pipe pipe,
 	igt_plane_t *primary;
 	int ret;
 
+	igt_display_reset(&data->display);
 	igt_output_set_pipe(output, pipe);
 
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
@@ -290,6 +291,9 @@ test_plane_position_with_output(data_t *data, enum pipe pipe,
 	bool loop_forever;
 	char info[256];
 
+	igt_info("Using (pipe %s + %s) to run the subtest.\n",
+		 kmstest_pipe_name(pipe), igt_output_name(output));
+
 	if (opt.iterations == LOOP_FOREVER) {
 		loop_forever = true;
 		sprintf(info, "forever");
@@ -373,12 +377,17 @@ static void run_test(data_t *data, uint64_t modifier)
 {
 	enum pipe pipe;
 	igt_output_t *output;
+	igt_display_t *display = &data->display;
 
-	if (!igt_display_has_format_mod(&data->display, DRM_FORMAT_XRGB8888, modifier))
+	if (!igt_display_has_format_mod(display, DRM_FORMAT_XRGB8888, modifier))
 		return;
 
-	for_each_pipe_with_valid_output(&data->display, pipe, output) {
-		igt_display_reset(&data->display);
+	for_each_pipe_with_valid_output(display, pipe, output) {
+		igt_display_reset(display);
+
+		igt_output_set_pipe(output, pipe);
+		if (!i915_pipe_output_combo_valid(display))
+			continue;
 
 		igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(pipe), output->name)
 			test_plane_position(data, pipe, output, modifier);
