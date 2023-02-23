@@ -5762,6 +5762,11 @@ bool igt_max_bpc_constraint(igt_display_t *display, enum pipe pipe,
 
 	for_each_connector_mode(output) {
 		igt_output_override_mode(output, &connector->modes[j__]);
+
+		if (is_i915_device(display->drm_fd) &&
+		    !igt_check_bigjoiner_support(display))
+			continue;
+
 		igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 
 		if (!igt_check_output_bpc_equal(display->drm_fd, pipe,
