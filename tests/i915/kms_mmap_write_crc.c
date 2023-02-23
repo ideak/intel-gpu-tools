@@ -277,6 +277,12 @@ igt_main_args("n", NULL, NULL, opt_handler, NULL)
 
 	igt_subtest_with_dynamic("main") {
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
+			igt_display_reset(&data.display);
+
+			igt_output_set_pipe(output, pipe);
+			if (!i915_pipe_output_combo_valid(&data.display))
+				continue;
+
 			igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(pipe),
 				      igt_output_name(output)) {
 				data.output = output;
