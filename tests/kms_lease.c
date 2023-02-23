@@ -1224,10 +1224,14 @@ igt_main
 			igt_describe(f->desc);
 			igt_subtest_with_dynamic_f("%s", f->name) {
 				for_each_pipe_with_valid_output(display, data.pipe, output) {
+					igt_display_reset(display);
+
+					igt_output_set_pipe(output, data.pipe);
+					if (!i915_pipe_output_combo_valid(display))
+						continue;
+
 					igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(data.pipe),
 						      igt_output_name(output)) {
-						igt_display_reset(display);
-						igt_display_commit(display);
 						data.crtc_id = display->pipes[data.pipe].crtc_id;
 						data.connector_id = output->id;
 						data.plane_id =
