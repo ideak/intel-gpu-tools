@@ -59,43 +59,6 @@ struct intel_allocator_record {
 #define simple_vma_foreach_hole_safe_rev(_hole, _heap, _tmp) \
 	igt_list_for_each_entry_safe_reverse(_hole, _tmp,  &(_heap)->holes, link)
 
-/* 2^31 + 2^29 - 2^25 + 2^22 - 2^19 - 2^16 + 1 */
-#define GOLDEN_RATIO_PRIME_32 0x9e370001UL
-
-/*  2^63 + 2^61 - 2^57 + 2^54 - 2^51 - 2^18 + 1 */
-#define GOLDEN_RATIO_PRIME_64 0x9e37fffffffc0001ULL
-
-static inline uint32_t hash_handles(const void *val)
-{
-	uint32_t hash = *(uint32_t *) val;
-
-	hash = hash * GOLDEN_RATIO_PRIME_32;
-	return hash;
-}
-
-static int equal_handles(const void *a, const void *b)
-{
-	uint32_t *key1 = (uint32_t *) a, *key2 = (uint32_t *) b;
-
-	return *key1 == *key2;
-}
-
-static inline uint32_t hash_offsets(const void *val)
-{
-	uint64_t hash = *(uint64_t *) val;
-
-	hash = hash * GOLDEN_RATIO_PRIME_64;
-	/* High bits are more random, so use them. */
-	return hash >> 32;
-}
-
-static int equal_offsets(const void *a, const void *b)
-{
-	uint64_t *key1 = (uint64_t *) a, *key2 = (uint64_t *) b;
-
-	return *key1 == *key2;
-}
-
 static void map_entry_free_func(struct igt_map_entry *entry)
 {
 	free(entry->data);
@@ -755,8 +718,8 @@ intel_allocator_simple_create(int fd, uint64_t start, uint64_t end,
 	ials = ial->priv = malloc(sizeof(struct intel_allocator_simple));
 	igt_assert(ials);
 
-	ials->objects = igt_map_create(hash_handles, equal_handles);
-	ials->reserved = igt_map_create(hash_offsets, equal_offsets);
+	ials->objects = igt_map_create(igt_map_hash_32, igt_map_equal_32);
+	ials->reserved = igt_map_create(igt_map_hash_64, igt_map_equal_64);
 	igt_assert(ials->objects && ials->reserved);
 
 	ials->start = start;

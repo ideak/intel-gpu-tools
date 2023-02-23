@@ -34,27 +34,6 @@ struct intel_allocator_record {
 /* Keep the low 256k clear, for negative deltas */
 #define BIAS (256 << 10)
 
-/* 2^31 + 2^29 - 2^25 + 2^22 - 2^19 - 2^16 + 1 */
-#define GOLDEN_RATIO_PRIME_32 0x9e370001UL
-
-/*  2^63 + 2^61 - 2^57 + 2^54 - 2^51 - 2^18 + 1 */
-#define GOLDEN_RATIO_PRIME_64 0x9e37fffffffc0001ULL
-
-static inline uint32_t hash_handles(const void *val)
-{
-	uint32_t hash = *(uint32_t *) val;
-
-	hash = hash * GOLDEN_RATIO_PRIME_32;
-	return hash;
-}
-
-static int equal_handles(const void *a, const void *b)
-{
-	uint32_t *key1 = (uint32_t *) a, *key2 = (uint32_t *) b;
-
-	return *key1 == *key2;
-}
-
 static void map_entry_free_func(struct igt_map_entry *entry)
 {
 	free(entry->data);
@@ -252,7 +231,7 @@ intel_allocator_reloc_create(int fd, uint64_t start, uint64_t end)
 
 	ialr = ial->priv = calloc(1, sizeof(*ialr));
 	igt_assert(ial->priv);
-	ialr->objects = igt_map_create(hash_handles, equal_handles);
+	ialr->objects = igt_map_create(igt_map_hash_32, igt_map_equal_32);
 	ialr->prng = (uint32_t) to_user_pointer(ial);
 
 	start = max_t(uint64_t, start, BIAS);
