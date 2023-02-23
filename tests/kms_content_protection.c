@@ -174,7 +174,6 @@ static void modeset_with_fb(const enum pipe pipe, igt_output_t *output,
 	igt_plane_t *primary;
 
 	mode = igt_output_get_mode(output);
-	igt_output_set_pipe(output, pipe);
 
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_plane_set_fb(primary, &data.red);
@@ -502,6 +501,11 @@ test_content_protection(enum igt_commit_style s, int content_type)
 				continue;
 
 			igt_display_reset(display);
+
+			igt_output_set_pipe(output, pipe);
+			if (!i915_pipe_output_combo_valid(display))
+				continue;
+
 			modeset_with_fb(pipe, output, s);
 
 			if (!output_hdcp_capable(output, content_type))
