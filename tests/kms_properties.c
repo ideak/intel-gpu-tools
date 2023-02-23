@@ -241,6 +241,12 @@ static void plane_properties(igt_display_t *display, bool atomic)
 		found = false;
 
 		for_each_valid_output_on_pipe(display, pipe, output) {
+			igt_display_reset(display);
+
+			igt_output_set_pipe(output, pipe);
+			if (!i915_pipe_output_combo_valid(display))
+				continue;
+
 			found_any = found = true;
 
 			run_plane_property_tests(display, pipe, output, atomic);
@@ -264,6 +270,12 @@ static void crtc_properties(igt_display_t *display, bool atomic)
 		found = false;
 
 		for_each_valid_output_on_pipe(display, pipe, output) {
+			igt_display_reset(display);
+
+			igt_output_set_pipe(output, pipe);
+			if (!i915_pipe_output_combo_valid(display))
+				continue;
+
 			found_any_valid_pipe = found = true;
 
 			run_crtc_property_tests(display, pipe, output, atomic);
@@ -288,6 +300,12 @@ static void connector_properties(igt_display_t *display, bool atomic)
 
 		for_each_pipe(display, pipe) {
 			if (!igt_pipe_connector_valid(pipe, output))
+				continue;
+
+			igt_display_reset(display);
+
+			igt_output_set_pipe(output, pipe);
+			if (!i915_pipe_output_combo_valid(display))
 				continue;
 
 			found = true;
