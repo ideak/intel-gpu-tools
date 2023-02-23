@@ -252,15 +252,6 @@ void gem_pool_dump(void)
 	pthread_mutex_unlock(&pool_mutex);
 }
 
-#define GOLDEN_RATIO_PRIME_64 0x9e37fffffffc0001ULL
-static inline uint32_t hash_pool(const void *val)
-{
-	uint64_t hash = *(uint64_t *) val;
-
-	hash = hash * GOLDEN_RATIO_PRIME_64;
-	return hash >> 32;
-}
-
 static int equal_pool(const void *a, const void *b)
 {
 	struct pool_list *p1 = (struct pool_list *) a;
@@ -356,7 +347,7 @@ void gem_pool_init(void)
 {
 	pthread_mutex_init(&pool_mutex, NULL);
 	__destroy_pool(pool, &pool_mutex);
-	pool = igt_map_create(hash_pool, equal_pool);
+	pool = igt_map_create(igt_map_hash_64, equal_pool);
 }
 
 igt_constructor {
