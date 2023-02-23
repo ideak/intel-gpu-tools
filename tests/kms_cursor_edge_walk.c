@@ -373,6 +373,13 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 					    data.pipe != active_pipes[last_pipe])
 						continue;
 
+					igt_display_reset(&data.display);
+					igt_output_set_pipe(data.output, data.pipe);
+					if (!i915_pipe_output_combo_valid(&data.display))
+						continue;
+
+					igt_output_set_pipe(data.output, PIPE_NONE);
+
 					igt_dynamic_f("pipe-%s-%s",
 						      kmstest_pipe_name(data.pipe),
 						      data.output->name)
