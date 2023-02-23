@@ -48,10 +48,6 @@ static void test(data_t *data, enum pipe pipe, igt_output_t *output)
 	struct igt_fb fb[2];
 	int fd, ret;
 
-	igt_display_reset(&data->display);
-	/* select the pipe we want to use */
-	igt_output_set_pipe(output, pipe);
-
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	mode = igt_output_get_mode(output);
 
@@ -104,9 +100,14 @@ igt_main
 		igt_display_require_output(&data.display);
 	}
 
-
 	igt_subtest_with_dynamic("basic") {
 		for_each_pipe_with_valid_output(&data.display, pipe, output) {
+			igt_display_reset(&data.display);
+
+			igt_output_set_pipe(output, pipe);
+			if (!i915_pipe_output_combo_valid(&data.display))
+				continue;
+
 			igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(pipe), igt_output_name(output)) {
 				test(&data, pipe, output);
 			}
