@@ -1449,13 +1449,17 @@ igt_main
 
 		igt_describe("Check that we can combine manual placement with automatic"
 			     " GTT placement.");
-		igt_subtest("allocator-nopin")
+		igt_subtest("allocator-nopin") {
+			gem_quiescent_gpu(fd);
 			test_allocator_nopin(fd, false);
+		}
 
 		igt_describe("Check that we can combine manual placement with automatic"
 			     " GTT placement and reserves/unreserves space for objects.");
-		igt_subtest("allocator-nopin-reserve")
+		igt_subtest("allocator-nopin-reserve") {
+			gem_quiescent_gpu(fd);
 			test_allocator_nopin(fd, true);
+		}
 
 		igt_describe("Check if multiple processes can use alloctor.");
 		igt_subtest("allocator-fork")
