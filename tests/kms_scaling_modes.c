@@ -93,13 +93,17 @@ static void test_scaling_mode(data_t *data, uint32_t flags)
 	enum pipe pipe;
 
 	for_each_pipe_with_valid_output(display, pipe, output) {
+		igt_display_reset(display);
+
 		if (!has_scaling_mode(output))
+			continue;
+
+		igt_output_set_pipe(output, pipe);
+		if (!i915_pipe_output_combo_valid(display))
 			continue;
 
 		igt_dynamic_f("%s-pipe-%s", output->name, kmstest_pipe_name(pipe))
 			test_scaling_mode_on_output(display, pipe, output, flags);
-
-		igt_display_reset(display);
 	}
 }
 
