@@ -458,6 +458,9 @@ run_gamma_degamma_tests_for_pipe(data_t *data, enum pipe p,
 	data->drm_format = DRM_FORMAT_XRGB8888;
 	data->mode = igt_output_get_mode(data->output);
 
+	if (!pipe_output_combo_valid(data, p))
+		return;
+
 	igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(p), data->output->name)
 		igt_assert(test_t(data, data->primary, data->ports[port_idx]));
 }
@@ -492,6 +495,9 @@ run_ctm_tests_for_pipe(data_t *data, enum pipe p,
 	delta = 1.0 / (1 << data->color_depth);
 	data->drm_format = DRM_FORMAT_XRGB8888;
 	data->mode = igt_output_get_mode(data->output);
+
+	if (!pipe_output_combo_valid(data, p))
+		return;
 
 	igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(p), data->output->name) {
 		bool success = false;
@@ -537,6 +543,9 @@ run_limited_range_ctm_test_for_pipe(data_t *data, enum pipe p,
 	data->color_depth = 8;
 	data->drm_format = DRM_FORMAT_XRGB8888;
 	data->mode = igt_output_get_mode(data->output);
+
+	if (!pipe_output_combo_valid(data, p))
+		return;
 
 	igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(p), data->output->name)
 		igt_assert(test_t(data, data->primary, data->ports[port_idx]));
