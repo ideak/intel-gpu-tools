@@ -346,6 +346,14 @@ static void setcrtc_implicit_plane(data_t *data)
 	do_or_die(create_lease(data->master.fd, &mcl));
 	drmSetClientCap(data->master.fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
 
+	/*
+	 * For Legacy commit, If userspace wants to send modes with aspect-ratio bits
+	 * then the client cap for aspect-ratio bits must be set.
+	 */
+	if (mode->flags & DRM_MODE_FLAG_PIC_AR_MASK) {
+		drmSetClientCap(mcl.fd, DRM_CLIENT_CAP_ASPECT_RATIO, 1);
+	}
+
 	/* Set a mode on the leased output */
 	igt_assert_eq(0, prepare_crtc(&data->master, data));
 
