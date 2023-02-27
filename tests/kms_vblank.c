@@ -79,11 +79,10 @@ static void prepare_crtc(data_t *data, int fd, igt_output_t *output)
 
 	/* create and set the primary plane fb */
 	mode = igt_output_get_mode(output);
-	igt_create_color_fb(fd, mode->hdisplay, mode->vdisplay,
-			    DRM_FORMAT_XRGB8888,
-			    DRM_FORMAT_MOD_LINEAR,
-			    0.0, 0.0, 0.0,
-			    &data->primary_fb);
+	igt_create_fb(fd, mode->hdisplay, mode->vdisplay,
+		      DRM_FORMAT_XRGB8888,
+		      DRM_FORMAT_MOD_LINEAR,
+		      &data->primary_fb);
 
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 	igt_plane_set_fb(primary, &data->primary_fb);
