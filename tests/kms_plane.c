@@ -1125,6 +1125,56 @@ test_pixel_formats(data_t *data, enum pipe pipe)
 	igt_assert_f(result, "At least one CRC mismatch happened\n");
 }
 
+static void test_invalid_settings(data_t *data)
+{
+	enum pipe pipe = PIPE_A;
+	igt_output_t *output;
+	igt_fb_t fb;
+	igt_plane_t *primary;
+	int rval;
+
+	/*
+	 * If here is added non-intel tests below require will need to be
+	 * changed to if(..)
+	 */
+	igt_require_intel(data->drm_fd);
+	igt_require(intel_display_ver(intel_get_drm_devid(data->drm_fd)) >= 9);
+
+	output = igt_get_single_output_for_pipe(&data->display, pipe);
+	igt_require(output);
+
+	igt_output_set_pipe(output, pipe);
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+
+	igt_display_commit2(&data->display, data->display.is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
+
+	/* test against intel_plane_check_src_coordinates() in i915 */
+	if (igt_plane_has_format_mod(primary, DRM_FORMAT_NV12,
+				     DRM_FORMAT_MOD_LINEAR)) {
+		igt_create_fb(data->drm_fd, 257, 256,
+			      DRM_FORMAT_NV12, DRM_FORMAT_MOD_LINEAR, &fb);
+		igt_plane_set_fb(primary, &fb);
+		rval = igt_display_try_commit_atomic(&data->display, 0, NULL);
+		igt_remove_fb(data->drm_fd, &fb);
+		igt_assert_f(rval == -EINVAL, "Odd width NV12 framebuffer\n");
+	} else {
+		igt_debug("Odd width NV12 framebuffer test skipped\n");
+	}
+
+	/* test against intel_plane_check_src_coordinates() in i915 */
+	if (igt_plane_has_format_mod(primary, DRM_FORMAT_NV12,
+				     DRM_FORMAT_MOD_LINEAR)) {
+		igt_create_fb(data->drm_fd, 256, 257,
+			      DRM_FORMAT_NV12, DRM_FORMAT_MOD_LINEAR, &fb);
+		igt_plane_set_fb(primary, &fb);
+		rval = igt_display_try_commit_atomic(&data->display, 0, NULL);
+		igt_remove_fb(data->drm_fd, &fb);
+		igt_assert_f(rval == -EINVAL, "Odd height NV12 framebuffer\n");
+	} else {
+		igt_debug("Odd height NV12 framebuffer test skipped\n");
+	}
+}
+
 static bool is_pipe_limit_reached(int count) {
 	return count >= CRTC_RESTRICT_CNT && !all_pipes;
 }
@@ -1194,6 +1244,10 @@ run_tests_for_pipe_plane(data_t *data)
 		data->flags = TEST_PANNING_BOTTOM_RIGHT | TEST_SUSPEND_RESUME;
 		run_test(data, test_plane_panning);
 	}
+
+	igt_describe("verify invalid settings for pixel format are not accepted");
+	igt_subtest_f("invalid-pixel-format-settings")
+		test_invalid_settings(data);
 }
 
 static int opt_handler(int opt, int opt_index, void *_data)
