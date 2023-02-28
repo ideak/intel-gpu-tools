@@ -31,10 +31,13 @@ int main(int argc, char **argv)
 		return 127;
 	}
 
-	if (!initialize_execute_state_from_resume(dirfd, &state, &settings, &job_list))
+	if (!initialize_execute_state_from_resume(dirfd, &state, &settings, &job_list)) {
+		fprintf(stderr, "resume failed at initialization step\n");
 		return 127;
+	}
 
 	if (!execute(&state, &settings, &job_list)) {
+		fprintf(stderr, "resume failed at execute step\n");
 		exitcode = 1;
 	}
 
@@ -43,11 +46,13 @@ int main(int argc, char **argv)
 		 * Overall timeout happened. Results generation can
 		 * override this
 		 */
+		fprintf(stderr, "resume failed at timeout\n");
 		exitcode = 2;
 	}
 
 	if (!generate_results_path(settings.results_path)) {
-		exitcode = 1;
+		fprintf(stderr, "resume failed at generating results\n");
+		exitcode = 3;
 	}
 
 	printf("Done.\n");
