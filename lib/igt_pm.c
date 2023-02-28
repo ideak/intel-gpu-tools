@@ -785,6 +785,11 @@ bool igt_wait_for_pm_status(enum igt_runtime_pm_status status)
 	return ret;
 }
 
+static const char *yesno(bool x)
+{
+	return x ? "yes" : "no";
+}
+
 /**
  * dmc_loaded:
  * @debugfs: fd to the debugfs dir.
@@ -798,7 +803,8 @@ bool igt_wait_for_pm_status(enum igt_runtime_pm_status status)
  */
 bool igt_pm_dmc_loaded(int debugfs)
 {
-	char buf[15];
+	char buf[512];
+	bool loaded;
 	int len;
 
 	len = igt_sysfs_read(debugfs, "i915_dmc_info", buf, sizeof(buf) - 1);
@@ -807,8 +813,10 @@ bool igt_pm_dmc_loaded(int debugfs)
 
 	buf[len] = '\0';
 
-	igt_info("DMC: %s\n", buf);
-	return strstr(buf, "fw loaded: yes");
+	loaded = strstr(buf, "fw loaded: yes");
+	igt_info("DMC: fw loaded: %s\n", yesno(loaded));
+
+	return loaded;
 }
 
 /**
