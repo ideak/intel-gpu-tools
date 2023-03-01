@@ -353,7 +353,6 @@ igt_main_args("b:pst:W:H:", NULL, help_str, opt_handler, NULL)
 	struct igt_collection *set;
 	const intel_ctx_t *ctx;
 	int i915;
-	igt_hang_t hang;
 
 	igt_fixture {
 		i915 = drm_open_driver(DRIVER_INTEL);
@@ -369,7 +368,6 @@ igt_main_args("b:pst:W:H:", NULL, help_str, opt_handler, NULL)
 					    I915_SYSTEM_MEMORY,
 					    I915_DEVICE_MEMORY);
 		ctx = intel_ctx_create_all_physical(i915);
-		hang = igt_allow_hang(i915, ctx->id, 0);
 	}
 
 	igt_describe("Check fast-copy blit");
@@ -383,7 +381,6 @@ igt_main_args("b:pst:W:H:", NULL, help_str, opt_handler, NULL)
 	}
 
 	igt_fixture {
-		igt_disallow_hang(i915, hang);
 		close(i915);
 	}
 }
