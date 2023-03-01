@@ -26,6 +26,9 @@
 #include "igt_vec.h"
 #include <math.h>
 
+#define HDISPLAY_4K	3840
+#define VDISPLAY_4K	2160
+
 IGT_TEST_DESCRIPTION("Test display plane scaling");
 
 enum scaler_combo_test_type {
@@ -964,6 +967,122 @@ static void invalid_parameter_tests(data_t *d)
 	}
 }
 
+static drmModeModeInfo *find_mode(data_t *data, igt_output_t *output, const uint32_t planesize[])
+{
+	drmModeModeInfo *mode = NULL;
+
+	for (int i = 0; i < output->config.connector->count_modes; i++) {
+		if (output->config.connector->modes[i].hdisplay == planesize[0] &&
+		    output->config.connector->modes[i].vdisplay == planesize[1] ) {
+			if (mode &&
+			    mode->vrefresh < output->config.connector->modes[i].vrefresh)
+				continue;
+
+			mode = &output->config.connector->modes[i];
+		}
+	}
+
+	return mode;
+}
+
+/*
+ *	Max source/destination width/height for i915 driver.
+ *	These numbers are coming from
+ *	drivers/gpu/drm/i915/display/skl_scaler.c in kernel sources.
+ *
+ *	DISPLAY_VER < 11
+ *		max_src_w = 4096
+ *		max_src_h = 4096
+ *		max_dst_w = 4096
+ *		max_dst_h = 4096
+ *
+ *	DISPLAY_VER = 11
+ *		max_src_w = 5120
+ *		max_src_h = 4096
+ *		max_dst_w = 5120
+ *		max_dst_h = 4096
+ *
+ *	DISPLAY_VER = 12-13
+ *		max_src_w = 5120
+ *		max_src_h = 8192
+ *		max_dst_w = 8192
+ *		max_dst_h = 8192
+ *
+ *	DISPLAY_VER = 14
+ *		max_src_w = 4096
+ *		max_src_h = 8192
+ *		max_dst_w = 8192
+ *		max_dst_h = 8192
+ */
+
+static void i915_max_source_size_test(data_t *d)
+{
+	enum pipe pipe = PIPE_A;
+	drmModeModeInfo *mode = NULL;
+	igt_output_t *output;
+	igt_fb_t fb;
+	igt_plane_t *plane;
+	int rval;
+
+	static const struct invalid_paramtests paramtests[] = {
+		{
+			.testname = "max-src-size",
+			.planesize = {3840, 2160},
+		},
+	};
+
+	igt_fixture {
+		igt_require_intel(d->drm_fd);
+
+		output = igt_get_single_output_for_pipe(&d->display, pipe);
+		igt_require(output);
+
+		mode = igt_output_get_mode(output);
+		igt_require(mode->hdisplay >= HDISPLAY_4K && mode->vdisplay >= VDISPLAY_4K);
+
+		igt_output_set_pipe(output, pipe);
+		plane = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+
+		igt_create_fb(d->drm_fd, 5120, 4320,
+			      DRM_FORMAT_XRGB8888,
+			      DRM_FORMAT_MOD_NONE,
+			      &fb);
+	}
+
+	igt_describe("test for validating max source size.");
+	igt_subtest_with_dynamic("i915-max-source-size") {
+		for (uint32_t i = 0; i < ARRAY_SIZE(paramtests); i++) {
+			/*
+			 * Need to find mode with lowest vrefresh else
+			 * we can exceed cdclk limits.
+			 */
+			mode = find_mode(d, output, paramtests[i].planesize);
+			if (mode) {
+				igt_output_override_mode(output, mode);
+				igt_dynamic(paramtests[i].testname) {
+					igt_plane_set_position(plane, 0, 0);
+					igt_plane_set_fb(plane, &fb);
+					igt_plane_set_size(plane,
+							   paramtests[i].planesize[0],
+							   paramtests[i].planesize[1]);
+
+				rval = igt_display_try_commit2(&d->display, COMMIT_ATOMIC);
+
+				if (intel_display_ver(d->devid) < 11 || intel_display_ver(d->devid) >= 14)
+					igt_assert_eq(rval, -EINVAL);
+				else
+					igt_assert_eq(rval, 0);
+				}
+			}
+		}
+	}
+
+	igt_fixture {
+		igt_remove_fb(d->drm_fd, &fb);
+		igt_output_set_pipe(output, PIPE_NONE);
+	}
+}
+
 static int opt_handler(int opt, int opt_index, void *_data)
 {
 	data_t *data = _data;
@@ -1125,6 +1244,9 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 
 	igt_subtest_group
 		invalid_parameter_tests(&data);
+
+	igt_subtest_group
+		i915_max_source_size_test(&data);
 
 	igt_describe("Tests scaling with multi-pipe.");
 	igt_subtest_f("2x-scaler-multi-pipe")
