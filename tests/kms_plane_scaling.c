@@ -931,9 +931,9 @@ static void invalid_parameter_tests(data_t *d)
 		plane = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 
 		igt_create_fb(d->drm_fd, 256, 256,
-			DRM_FORMAT_XRGB8888,
-			DRM_FORMAT_MOD_NONE,
-			&fb);
+			      DRM_FORMAT_XRGB8888,
+			      DRM_FORMAT_MOD_NONE,
+			      &fb);
 	}
 
 	igt_describe("test parameters which should not be accepted");
@@ -943,14 +943,13 @@ static void invalid_parameter_tests(data_t *d)
 				igt_plane_set_position(plane, 0, 0);
 				igt_plane_set_fb(plane, &fb);
 				igt_plane_set_size(plane,
-							paramtests[i].planesize[0],
-							paramtests[i].planesize[1]);
-
+						   paramtests[i].planesize[0],
+						   paramtests[i].planesize[1]);
 
 				for (uint32_t j = 0; paramtests[i].params[j].prop != ~0; j++)
 					igt_plane_set_prop_value(plane,
-									paramtests[i].params[j].prop,
-									paramtests[i].params[j].value);
+								 paramtests[i].params[j].prop,
+								 paramtests[i].params[j].value);
 
 				rval = igt_display_try_commit2(&d->display, COMMIT_ATOMIC);
 
@@ -1124,11 +1123,12 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 		}
 	}
 
+	igt_subtest_group
+		invalid_parameter_tests(&data);
+
 	igt_describe("Tests scaling with multi-pipe.");
 	igt_subtest_f("2x-scaler-multi-pipe")
 		test_scaler_with_multi_pipe_plane(&data);
-
-	invalid_parameter_tests(&data);
 
 	igt_fixture {
 		igt_display_fini(&data.display);
