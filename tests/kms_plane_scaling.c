@@ -43,6 +43,15 @@ typedef struct {
 	bool extended;
 } data_t;
 
+struct invalid_paramtests {
+	const char *testname;
+	uint32_t planesize[2];
+	struct {
+		enum igt_atomic_plane_properties prop;
+		uint32_t value;
+	} params[8];
+};
+
 const struct {
 	const char * const describe;
 	const char * const name;
@@ -901,14 +910,7 @@ static void invalid_parameter_tests(data_t *d)
 	igt_plane_t *plane;
 	int rval;
 
-	const struct {
-		const char *testname;
-		uint32_t planesize[2];
-		struct {
-			enum igt_atomic_plane_properties prop;
-			uint32_t value;
-		} params[8];
-	} paramtests[] = {
+	static const struct invalid_paramtests paramtests[] = {
 		{
 			.testname = "less-than-1-height-src",
 			.planesize = {256, 8},
