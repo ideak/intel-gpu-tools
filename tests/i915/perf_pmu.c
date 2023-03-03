@@ -1703,6 +1703,16 @@ static bool wait_for_rc6(int fd, int timeout)
 	return false;
 }
 
+static bool wait_for_suspended(int gem_fd)
+{
+	bool suspended = igt_wait_for_pm_status(IGT_RUNTIME_PM_STATUS_SUSPENDED);
+
+	if (!suspended)
+		__igt_debugfs_dump(gem_fd, "i915_runtime_pm_status", IGT_LOG_INFO);
+
+	return suspended;
+}
+
 static void
 test_rc6(int gem_fd, unsigned int flags)
 {
@@ -1727,7 +1737,7 @@ test_rc6(int gem_fd, unsigned int flags)
 		drmModeFreeResources(res);
 
 		igt_require(igt_setup_runtime_pm(gem_fd));
-		igt_require(igt_wait_for_pm_status(IGT_RUNTIME_PM_STATUS_SUSPENDED));
+		igt_require(wait_for_suspended(gem_fd));
 
 		/*
 		 * Sleep for a bit to see if once woken up estimated RC6 hasn't
