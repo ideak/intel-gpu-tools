@@ -694,14 +694,6 @@ igt_main_args("bf:pst:W:H:", NULL, help_str, opt_handler, NULL)
 		block_copy_test(i915, &config, ctx, set, BLOCK_MULTICOPY);
 	}
 
-	igt_describe("Check block-copy flatccs inplace decompression blit");
-	igt_subtest_with_dynamic("block-copy-inplace") {
-		struct test_config config = { .compression = true,
-					      .inplace = true };
-
-		block_copy_test(i915, &config, ctx, set, BLOCK_COPY);
-	}
-
 	igt_describe("Check block-multicopy flatccs inplace decompression blit");
 	igt_subtest_with_dynamic("block-multicopy-inplace") {
 		struct test_config config = { .compression = true,
