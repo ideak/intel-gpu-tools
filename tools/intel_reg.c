@@ -322,7 +322,7 @@ static int register_srm(struct config *config, struct reg *reg,
 		batch[i++] = MI_NOOP;
 		batch[i++] = MI_NOOP;
 
-		batch[i++] = MI_LOAD_REGISTER_IMM;
+		batch[i++] = MI_LOAD_REGISTER_IMM(1);
 		batch[i++] = reg->addr;
 		batch[i++] = *val_in;
 		batch[i++] = MI_NOOP;

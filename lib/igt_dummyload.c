@@ -256,7 +256,7 @@ emit_recursive_batch(igt_spin_t *spin,
 		r->offset = sizeof(uint32_t) * 1;
 		r->delta = sizeof(uint32_t) * SPIN_POLL_START_IDX;
 
-		*cs++ = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+		*cs++ = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 
 		if (gen >= 8) {
 			*cs++ = r->presumed_offset + r->delta;

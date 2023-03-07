@@ -41,15 +41,6 @@
 
 IGT_TEST_DESCRIPTION("Exercise in-kernel load-balancing");
 
-#define MI_SEMAPHORE_WAIT		(0x1c << 23)
-#define   MI_SEMAPHORE_POLL             (1 << 15)
-#define   MI_SEMAPHORE_SAD_GT_SDD       (0 << 12)
-#define   MI_SEMAPHORE_SAD_GTE_SDD      (1 << 12)
-#define   MI_SEMAPHORE_SAD_LT_SDD       (2 << 12)
-#define   MI_SEMAPHORE_SAD_LTE_SDD      (3 << 12)
-#define   MI_SEMAPHORE_SAD_EQ_SDD       (4 << 12)
-#define   MI_SEMAPHORE_SAD_NEQ_SDD      (5 << 12)
-
 #define INSTANCE_COUNT (1 << I915_PMU_SAMPLE_INSTANCE_BITS)
 
 static size_t sizeof_load_balance(int count)
@@ -589,7 +580,7 @@ static uint32_t create_semaphore_to_spinner(int i915, igt_spin_t *spin)
 
 	/* Wait until the spinner is running */
 	addr = spin->obj[0].offset + 4 * SPIN_POLL_START_IDX;
-	*cs++ = MI_SEMAPHORE_WAIT |
+	*cs++ = MI_SEMAPHORE_WAIT_CMD |
 		MI_SEMAPHORE_POLL |
 		MI_SEMAPHORE_SAD_NEQ_SDD |
 		(4 - 2);
@@ -600,7 +591,7 @@ static uint32_t create_semaphore_to_spinner(int i915, igt_spin_t *spin)
 	/* Then cancel the spinner */
 	addr = spin->obj[IGT_SPIN_BATCH].offset +
 		offset_in_page(spin->condition);
-	*cs++ = MI_STORE_DWORD_IMM;
+	*cs++ = MI_STORE_DWORD_IMM_GEN4;
 	*cs++ = addr;
 	*cs++ = addr >> 32;
 	*cs++ = MI_BATCH_BUFFER_END;
@@ -1116,7 +1107,7 @@ static uint32_t sync_from(int i915, uint32_t addr, uint32_t target)
 	cs = map = gem_mmap__device_coherent(i915, handle, 0, 4096, PROT_WRITE);
 
 	/* cancel target spinner */
-	*cs++ = MI_STORE_DWORD_IMM;
+	*cs++ = MI_STORE_DWORD_IMM_GEN4;
 	*cs++ = target + 64;
 	*cs++ = 0;
 	*cs++ = 0;
@@ -1131,7 +1122,7 @@ static uint32_t sync_from(int i915, uint32_t addr, uint32_t target)
 	*cs++ = 0;
 
 	/* self-heal */
-	*cs++ = MI_STORE_DWORD_IMM;
+	*cs++ = MI_STORE_DWORD_IMM_GEN4;
 	*cs++ = addr + 64;
 	*cs++ = 0;
 	*cs++ = MI_BATCH_BUFFER_START | 1 << 8 | 1;
@@ -1162,13 +1153,13 @@ static uint32_t sync_to(int i915, uint32_t addr, uint32_t target)
 	*cs++ = MI_NOOP;
 
 	/* cancel their spin as a compliment */
-	*cs++ = MI_STORE_DWORD_IMM;
+	*cs++ = MI_STORE_DWORD_IMM_GEN4;
 	*cs++ = target + 64;
 	*cs++ = 0;
 	*cs++ = 0;
 
 	/* self-heal */
-	*cs++ = MI_STORE_DWORD_IMM;
+	*cs++ = MI_STORE_DWORD_IMM_GEN4;
 	*cs++ = addr + 64;
 	*cs++ = 0;
 	*cs++ = MI_BATCH_BUFFER_START | 1 << 8 | 1;
@@ -1906,7 +1897,7 @@ static uint32_t sema_create(int i915, uint64_t addr, uint32_t **x)
 	for (int n = 1; n <= 32; n++) {
 		uint32_t *cs = *x + n * 16;
 
-		*cs++ = MI_SEMAPHORE_WAIT |
+		*cs++ = MI_SEMAPHORE_WAIT_CMD |
 			MI_SEMAPHORE_POLL |
 			MI_SEMAPHORE_SAD_GTE_SDD |
 			(4 - 2);

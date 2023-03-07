@@ -46,15 +46,6 @@
 #define ATTR "timeslice_duration_ms"
 #define RESET_TIMEOUT 50 /* milliseconds, at least one jiffie for kworker */
 
-#define MI_SEMAPHORE_WAIT		(0x1c << 23)
-#define   MI_SEMAPHORE_POLL             (1 << 15)
-#define   MI_SEMAPHORE_SAD_GT_SDD       (0 << 12)
-#define   MI_SEMAPHORE_SAD_GTE_SDD      (1 << 12)
-#define   MI_SEMAPHORE_SAD_LT_SDD       (2 << 12)
-#define   MI_SEMAPHORE_SAD_LTE_SDD      (3 << 12)
-#define   MI_SEMAPHORE_SAD_EQ_SDD       (4 << 12)
-#define   MI_SEMAPHORE_SAD_NEQ_SDD      (5 << 12)
-
 static bool __enable_hangcheck(int dir, bool state)
 {
 	return igt_sysfs_set(dir, "enable_hangcheck", state ? "1" : "0");
@@ -214,7 +205,7 @@ static uint64_t __test_duration(int i915, int engine, unsigned int timeout)
 
 	cs = map;
 	for (i = 0; i < 10; i++) {
-		*cs++ = MI_SEMAPHORE_WAIT |
+		*cs++ = MI_SEMAPHORE_WAIT_CMD |
 			MI_SEMAPHORE_POLL |
 			MI_SEMAPHORE_SAD_NEQ_SDD |
 			(4 - 2 + (gen >= 12));
@@ -229,7 +220,7 @@ static uint64_t __test_duration(int i915, int engine, unsigned int timeout)
 		*cs++ = obj[1].offset + sizeof(uint32_t) * i;
 		*cs++ = 0;
 
-		*cs++ = MI_STORE_DWORD_IMM;
+		*cs++ = MI_STORE_DWORD_IMM_GEN4;
 		*cs++ = obj[0].offset +
 			4096 - sizeof(uint32_t) * i - sizeof(uint32_t);
 		*cs++ = 0;
@@ -240,12 +231,12 @@ static uint64_t __test_duration(int i915, int engine, unsigned int timeout)
 	cs += 16 - ((cs - map) & 15);
 	start = (cs - map) * sizeof(*cs);
 	for (i = 0; i < 10; i++) {
-		*cs++ = MI_STORE_DWORD_IMM;
+		*cs++ = MI_STORE_DWORD_IMM_GEN4;
 		*cs++ = obj[0].offset + sizeof(uint32_t) * i;
 		*cs++ = 0;
 		*cs++ = 1;
 
-		*cs++ = MI_SEMAPHORE_WAIT |
+		*cs++ = MI_SEMAPHORE_WAIT_CMD |
 			MI_SEMAPHORE_POLL |
 			MI_SEMAPHORE_SAD_NEQ_SDD |
 			(4 - 2 + (gen >= 12));

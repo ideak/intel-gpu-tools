@@ -41,18 +41,6 @@ IGT_TEST_DESCRIPTION("Tests softpin feature with normal usage, invalid inputs"
 
 #define LIMIT_32b ((1ull << 32) - (1ull << 12))
 
-/* gen8_canonical_addr
- * Used to convert any address into canonical form, i.e. [63:48] == [47].
- * Based on kernel's sign_extend64 implementation.
- * @address - a virtual address
-*/
-#define GEN8_HIGH_ADDRESS_BIT 47
-static uint64_t gen8_canonical_addr(uint64_t address)
-{
-	__u8 shift = 63 - GEN8_HIGH_ADDRESS_BIT;
-	return (__s64)(address << shift) >> shift;
-}
-
 #define INTERRUPTIBLE 0x1
 
 static void test_invalid(int fd)
@@ -653,7 +641,7 @@ static void test_noreloc(int fd, enum sleep sleep, unsigned flags)
 	gem_set_domain(fd, object[i].handle,
 		       I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
 	for (i = 0; i < ARRAY_SIZE(object) - 1; i++) {
-		*b++ = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+		*b++ = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 		if (gen >= 8) {
 			*b++ = object[i].offset;
 			*b++ = object[i].offset >> 32;
@@ -922,7 +910,7 @@ static void submit(int fd, unsigned int gen,
 						   BATCH_ALIGNMENT);
 		address = obj.offset + BATCH_SIZE - eb->batch_start_offset - 8;
 		n = 0;
-		batch[n] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+		batch[n] = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 		if (gen >= 8) {
 			batch[n] |= 1 << 21;
 			batch[n]++;

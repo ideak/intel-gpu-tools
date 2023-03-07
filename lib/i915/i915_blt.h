@@ -135,8 +135,8 @@ struct blt_block_copy_data_ext {
 };
 
 enum blt_access_type {
-	INDIRECT_ACCESS,
-	DIRECT_ACCESS,
+	BLT_INDIRECT_ACCESS,
+	BLT_DIRECT_ACCESS,
 };
 
 struct blt_ctrl_surf_copy_object {

@@ -73,7 +73,7 @@ static void store_dword(int fd, int id, const intel_ctx_t *ctx,
 	obj[1].relocation_count = !id ? 1 : 0;
 
 	i = 0;
-	batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+	batch[i] = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 	if (gen >= 8) {
 		batch[++i] = target_offset + offset;
 		batch[++i] = (target_offset + offset) >> 32;

@@ -80,7 +80,7 @@ static void store_all(int i915)
 	int i;
 
 	i = 0;
-	batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+	batch[i] = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 	if (gen >= 8) {
 		batch[++i] = 0;
 		batch[++i] = 0;

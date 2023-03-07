@@ -83,6 +83,13 @@
 #define DEBUGFN()
 #endif
 
+#undef TILE_NONE
+#undef TILE_X
+#undef TILE_Y
+#undef TILE_Yf
+#undef TILE_Ys
+#undef TILE_4
+
 #define TILE_DEF(x) (1 << (x))
 #define TILE_NONE   TILE_DEF(I915_TILING_NONE)
 #define TILE_X      TILE_DEF(I915_TILING_X)

@@ -92,7 +92,7 @@ static void *thread(void *data)
 	}
 
 	i = 0;
-	batch[i] = MI_STORE_DWORD_IMM | (t->gen < 6 ? 1 << 22 : 0);
+	batch[i] = MI_STORE_DWORD_IMM_GEN4 | (t->gen < 6 ? 1 << 22 : 0);
 	if (t->gen >= 8) {
 		batch[++i] = 4*t->id;
 		batch[++i] = 0;

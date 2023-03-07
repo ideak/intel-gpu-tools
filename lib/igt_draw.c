@@ -385,12 +385,12 @@ static void switch_blt_tiling(struct intel_bb *ibb, uint32_t tiling, bool on)
 	/* To change the tile register, insert an MI_FLUSH_DW followed by an
 	 * MI_LOAD_REGISTER_IMM
 	 */
-	intel_bb_out(ibb, MI_FLUSH_DW | 2);
+	intel_bb_out(ibb, MI_FLUSH_DW_CMD | 2);
 	intel_bb_out(ibb, 0x0);
 	intel_bb_out(ibb, 0x0);
 	intel_bb_out(ibb, 0x0);
 
-	intel_bb_out(ibb, MI_LOAD_REGISTER_IMM);
+	intel_bb_out(ibb, MI_LOAD_REGISTER_IMM(1));
 	intel_bb_out(ibb, 0x22200); /* BCS_SWCTRL */
 	intel_bb_out(ibb, bcs_swctrl);
 	intel_bb_out(ibb, MI_NOOP);

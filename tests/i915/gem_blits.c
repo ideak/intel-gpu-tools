@@ -27,8 +27,6 @@
 #include "igt.h"
 #include "igt_x86.h"
 
-#define MI_FLUSH_DW (0x26 << 23)
-
 #define BCS_SWCTRL 0x22200
 #define BCS_SRC_Y (1 << 0)
 #define BCS_DST_Y (1 << 1)
@@ -198,7 +196,7 @@ static void buffer_set_tiling(const struct device *device,
 	if ((tiling | buffer->tiling) >= I915_TILING_Y) {
 		unsigned int mask;
 
-		batch[i++] = MI_LOAD_REGISTER_IMM;
+		batch[i++] = MI_LOAD_REGISTER_IMM(1);
 		batch[i++] = BCS_SWCTRL;
 
 		mask = (BCS_SRC_Y | BCS_DST_Y) << 16;
@@ -248,12 +246,12 @@ static void buffer_set_tiling(const struct device *device,
 
 	if ((tiling | buffer->tiling) >= I915_TILING_Y) {
 		igt_assert(device->gen >= 6);
-		batch[i++] = MI_FLUSH_DW | 2;
+		batch[i++] = MI_FLUSH_DW_CMD | 2;
 		batch[i++] = 0;
 		batch[i++] = 0;
 		batch[i++] = 0;
 
-		batch[i++] = MI_LOAD_REGISTER_IMM;
+		batch[i++] = MI_LOAD_REGISTER_IMM(1);
 		batch[i++] = BCS_SWCTRL;
 		batch[i++] = (BCS_SRC_Y | BCS_DST_Y) << 16;
 	}
@@ -345,7 +343,7 @@ static bool blit_to_linear(const struct device *device,
 	if (buffer->tiling >= I915_TILING_Y) {
 		unsigned int mask;
 
-		batch[i++] = MI_LOAD_REGISTER_IMM;
+		batch[i++] = MI_LOAD_REGISTER_IMM(1);
 		batch[i++] = BCS_SWCTRL;
 
 		mask = (BCS_SRC_Y | BCS_DST_Y) << 16;
@@ -388,12 +386,12 @@ static bool blit_to_linear(const struct device *device,
 
 	if (buffer->tiling >= I915_TILING_Y) {
 		igt_assert(device->gen >= 6);
-		batch[i++] = MI_FLUSH_DW | 2;
+		batch[i++] = MI_FLUSH_DW_CMD | 2;
 		batch[i++] = 0;
 		batch[i++] = 0;
 		batch[i++] = 0;
 
-		batch[i++] = MI_LOAD_REGISTER_IMM;
+		batch[i++] = MI_LOAD_REGISTER_IMM(1);
 		batch[i++] = BCS_SWCTRL;
 		batch[i++] = (BCS_SRC_Y | BCS_DST_Y) << 16;
 	}
@@ -678,7 +676,7 @@ blit(const struct device *device,
 	if ((src->tiling | dst->tiling) >= I915_TILING_Y) {
 		unsigned int mask;
 
-		batch[i++] = MI_LOAD_REGISTER_IMM;
+		batch[i++] = MI_LOAD_REGISTER_IMM(1);
 		batch[i++] = BCS_SWCTRL;
 
 		mask = (BCS_SRC_Y | BCS_DST_Y) << 16;
@@ -729,12 +727,12 @@ blit(const struct device *device,
 
 	if ((src->tiling | dst->tiling) >= I915_TILING_Y) {
 		igt_assert(device->gen >= 6);
-		batch[i++] = MI_FLUSH_DW | 2;
+		batch[i++] = MI_FLUSH_DW_CMD | 2;
 		batch[i++] = 0;
 		batch[i++] = 0;
 		batch[i++] = 0;
 
-		batch[i++] = MI_LOAD_REGISTER_IMM;
+		batch[i++] = MI_LOAD_REGISTER_IMM(1);
 		batch[i++] = BCS_SWCTRL;
 		batch[i++] = (BCS_SRC_Y | BCS_DST_Y) << 16;
 	}

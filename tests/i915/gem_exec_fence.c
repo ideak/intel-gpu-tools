@@ -50,15 +50,6 @@ struct sync_merge_data {
 #define SYNC_IOC_MERGE _IOWR(SYNC_IOC_MAGIC, 3, struct sync_merge_data)
 #endif
 
-#define MI_SEMAPHORE_WAIT		(0x1c << 23)
-#define   MI_SEMAPHORE_POLL             (1 << 15)
-#define   MI_SEMAPHORE_SAD_GT_SDD       (0 << 12)
-#define   MI_SEMAPHORE_SAD_GTE_SDD      (1 << 12)
-#define   MI_SEMAPHORE_SAD_LT_SDD       (2 << 12)
-#define   MI_SEMAPHORE_SAD_LTE_SDD      (3 << 12)
-#define   MI_SEMAPHORE_SAD_EQ_SDD       (4 << 12)
-#define   MI_SEMAPHORE_SAD_NEQ_SDD      (5 << 12)
-
 static bool fence_busy(int fence)
 {
 	return poll(&(struct pollfd){fence, POLLIN}, 1, 0) == 0;
@@ -345,7 +336,7 @@ static uint32_t timeslicing_batches(int i915, uint32_t *offset)
 		for (int step = 0; step < 8; step++) {
 			if (pair) {
 				cs[i++] =
-					MI_SEMAPHORE_WAIT |
+					MI_SEMAPHORE_WAIT_CMD |
 					MI_SEMAPHORE_POLL |
 					MI_SEMAPHORE_SAD_EQ_SDD |
 					(4 - 2);
@@ -354,14 +345,14 @@ static uint32_t timeslicing_batches(int i915, uint32_t *offset)
 				cs[i++] = 0;
 			}
 
-			cs[i++] = MI_STORE_DWORD_IMM;
+			cs[i++] = MI_STORE_DWORD_IMM_GEN4;
 			cs[i++] = *offset;
 			cs[i++] = 0;
 			cs[i++] = x++;
 
 			if (!pair) {
 				cs[i++] =
-					MI_SEMAPHORE_WAIT |
+					MI_SEMAPHORE_WAIT_CMD |
 					MI_SEMAPHORE_POLL |
 					MI_SEMAPHORE_SAD_EQ_SDD |
 					(4 - 2);
@@ -452,7 +443,7 @@ static uint32_t submitN_batches(int i915, uint32_t offset, int count)
 
 		for (int step = 0; step < 8; step++) {
 			cs[i++] =
-				MI_SEMAPHORE_WAIT |
+				MI_SEMAPHORE_WAIT_CMD |
 				MI_SEMAPHORE_POLL |
 				MI_SEMAPHORE_SAD_EQ_SDD |
 				(4 - 2);
@@ -460,7 +451,7 @@ static uint32_t submitN_batches(int i915, uint32_t offset, int count)
 			cs[i++] = offset;
 			cs[i++] = 0;
 
-			cs[i++] = MI_STORE_DWORD_IMM;
+			cs[i++] = MI_STORE_DWORD_IMM_GEN4;
 			cs[i++] = offset;
 			cs[i++] = 0;
 			cs[i++] = x + 1;
@@ -606,7 +597,7 @@ static void test_parallel(int i915, const intel_ctx_t *ctx,
 		}
 
 		i = 0;
-		batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+		batch[i] = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 		if (gen >= 8) {
 			batch[++i] = scratch_offset + reloc.delta;
 			batch[++i] = scratch_offset >> 32;
@@ -726,7 +717,7 @@ static void test_concurrent(int i915, const intel_ctx_t *ctx,
 	close(fence);
 
 	i = 0;
-	batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+	batch[i] = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 	if (gen >= 8) {
 		batch[++i] = target_offset + reloc.delta;
 		batch[++i] = target_offset >> 32;
@@ -2464,21 +2455,21 @@ build_wait_bb(int i915,
 	map = gem_mmap__device_coherent(i915, obj.handle, 0, 4096, PROT_WRITE);
 	bb = map;
 
-	*bb++ = MI_LOAD_REGISTER_IMM;
+	*bb++ = MI_LOAD_REGISTER_IMM(1);
 	*bb++ = mmio_base + HSW_CS_GPR(0);
 	*bb++ = wait_value & 0xffffffff;
-	*bb++ = MI_LOAD_REGISTER_IMM;
+	*bb++ = MI_LOAD_REGISTER_IMM(1);
 	*bb++ = mmio_base + HSW_CS_GPR(0) + 4;
 	*bb++ = wait_value >> 32;
 
 	*bb++ = MI_LOAD_REGISTER_REG;
 	*bb++ = mmio_base + RING_TIMESTAMP;
 	*bb++ = mmio_base + HSW_CS_GPR(1);
-	*bb++ = MI_LOAD_REGISTER_IMM;
+	*bb++ = MI_LOAD_REGISTER_IMM(1);
 	*bb++ = mmio_base + HSW_CS_GPR(1) + 4;
 	*bb++ = 0;
 
-	*bb++ = MI_LOAD_REGISTER_IMM;
+	*bb++ = MI_LOAD_REGISTER_IMM(1);
 	*bb++ = mmio_base + HSW_CS_GPR(2) + 4;
 	*bb++ = 0;
 	relocs->delta = offset_in_page(bb);
@@ -2563,23 +2554,23 @@ static void build_increment_engine_bb(struct inter_engine_batches *batch,
 {
 	uint32_t *bb = batch->increment_bb = calloc(1, 4096);
 
-	*bb++ = MI_LOAD_REGISTER_MEM | 2;
+	*bb++ = MI_LOAD_REGISTER_MEM_CMD | 2;
 	*bb++ = mmio_base + HSW_CS_GPR(0);
 	batch->read0_ptrs[0] = bb;
 	*bb++ = 0;
 	*bb++ = 0;
-	*bb++ = MI_LOAD_REGISTER_MEM | 2;
+	*bb++ = MI_LOAD_REGISTER_MEM_CMD | 2;
 	*bb++ = mmio_base + HSW_CS_GPR(0) + 4;
 	batch->read0_ptrs[1] = bb;
 	*bb++ = 0;
 	*bb++ = 0;
 
-	*bb++ = MI_LOAD_REGISTER_MEM | 2;
+	*bb++ = MI_LOAD_REGISTER_MEM_CMD | 2;
 	*bb++ = mmio_base + HSW_CS_GPR(1);
 	batch->read1_ptrs[0] = bb;
 	*bb++ = 0;
 	*bb++ = 0;
-	*bb++ = MI_LOAD_REGISTER_MEM | 2;
+	*bb++ = MI_LOAD_REGISTER_MEM_CMD | 2;
 	*bb++ = mmio_base + HSW_CS_GPR(1) + 4;
 	batch->read1_ptrs[1] = bb;
 	*bb++ = 0;
@@ -2591,12 +2582,12 @@ static void build_increment_engine_bb(struct inter_engine_batches *batch,
 	*bb++ = MI_MATH_ADD;
 	*bb++ = MI_MATH_STORE(MI_MATH_REG(0), MI_MATH_REG_ACCU);
 
-	*bb++ = MI_STORE_REGISTER_MEM | 2;
+	*bb++ = MI_STORE_REGISTER_MEM_GEN8;
 	*bb++ = mmio_base + HSW_CS_GPR(0);
 	batch->write_ptrs[0] = bb;
 	*bb++ = 0;
 	*bb++ = 0;
-	*bb++ = MI_STORE_REGISTER_MEM | 2;
+	*bb++ = MI_STORE_REGISTER_MEM_GEN8;
 	*bb++ = mmio_base + HSW_CS_GPR(0) + 4;
 	batch->write_ptrs[1] = bb;
 	*bb++ = 0;

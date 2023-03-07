@@ -76,7 +76,7 @@ void igt_store_word(int fd, uint64_t ahnd, const intel_ctx_t *ctx,
 		obj[BATCH].offset = bb_offset;
 		obj[BATCH].flags |= EXEC_OBJECT_PINNED;
 	}
-	batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+	batch[i] = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 	if (gen >= 8) {
 		uint64_t addr = target_gpu_addr + delta;
 		batch[++i] = lower_32_bits(addr);

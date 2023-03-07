@@ -48,7 +48,6 @@ IGT_TEST_DESCRIPTION("Test (TLB-)Coherency of pipe_control QW writes.");
 
 static struct buf_ops *bops;
 
-#define GFX_OP_PIPE_CONTROL	((0x3<<29)|(0x3<<27)|(0x2<<24)|2)
 #define   PIPE_CONTROL_WRITE_IMMEDIATE	(1<<14)
 #define   PIPE_CONTROL_WRITE_TIMESTAMP	(3<<14)
 #define   PIPE_CONTROL_DEPTH_STALL (1<<13)
@@ -96,7 +95,7 @@ store_pipe_control_loop(bool preuse_buffer, int timeout)
 		 * support code will do that for us. */
 		if (ibb->gen >= 8) {
 			intel_bb_add_intel_buf(ibb, target_buf, true);
-			intel_bb_out(ibb, GFX_OP_PIPE_CONTROL + 1);
+			intel_bb_out(ibb, GFX_OP_PIPE_CONTROL(5));
 			intel_bb_out(ibb, PIPE_CONTROL_WRITE_IMMEDIATE);
 			intel_bb_emit_reloc_fenced(ibb, target_buf->handle,
 						   I915_GEM_DOMAIN_INSTRUCTION,
@@ -108,13 +107,13 @@ store_pipe_control_loop(bool preuse_buffer, int timeout)
 			/* work-around hw issue, see intel_emit_post_sync_nonzero_flush
 			 * in mesa sources. */
 			intel_bb_add_intel_buf(ibb, target_buf, true);
-			intel_bb_out(ibb, GFX_OP_PIPE_CONTROL);
+			intel_bb_out(ibb, GFX_OP_PIPE_CONTROL(4));
 			intel_bb_out(ibb, PIPE_CONTROL_CS_STALL |
 				     PIPE_CONTROL_STALL_AT_SCOREBOARD);
 			intel_bb_out(ibb, 0); /* address */
 			intel_bb_out(ibb, 0); /* write data */
 
-			intel_bb_out(ibb, GFX_OP_PIPE_CONTROL);
+			intel_bb_out(ibb, GFX_OP_PIPE_CONTROL(4));
 			intel_bb_out(ibb, PIPE_CONTROL_WRITE_IMMEDIATE);
 			intel_bb_emit_reloc(ibb, target_buf->handle,
 					    I915_GEM_DOMAIN_INSTRUCTION,
@@ -124,10 +123,10 @@ store_pipe_control_loop(bool preuse_buffer, int timeout)
 			intel_bb_out(ibb, val); /* write data */
 		} else if (ibb->gen >= 4) {
 			intel_bb_add_intel_buf(ibb, target_buf, true);
-			intel_bb_out(ibb, GFX_OP_PIPE_CONTROL |
+			intel_bb_out(ibb, GFX_OP_PIPE_CONTROL(4) |
 				     PIPE_CONTROL_WC_FLUSH |
 				     PIPE_CONTROL_TC_FLUSH |
-				     PIPE_CONTROL_WRITE_IMMEDIATE | 2);
+				     PIPE_CONTROL_WRITE_IMMEDIATE);
 			intel_bb_emit_reloc(ibb, target_buf->handle,
 					    I915_GEM_DOMAIN_INSTRUCTION,
 					    I915_GEM_DOMAIN_INSTRUCTION,

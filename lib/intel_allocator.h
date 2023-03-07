@@ -12,6 +12,7 @@
 #include <stdint.h>
 #include <stdatomic.h>
 #include "i915/gem_submission.h"
+#include "intel_reg.h"
 
 /**
  * SECTION:intel_allocator
@@ -216,13 +217,6 @@ void intel_allocator_print(uint64_t allocator_handle);
 #define INTEL_ALLOCATOR_SIMPLE 2
 
 #define GEN8_GTT_ADDRESS_WIDTH 48
-
-static inline uint64_t sign_extend64(uint64_t x, int high)
-{
-	int shift = 63 - high;
-
-	return (int64_t)(x << shift) >> shift;
-}
 
 static inline uint64_t CANONICAL(uint64_t offset)
 {

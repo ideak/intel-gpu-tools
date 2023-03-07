@@ -158,7 +158,7 @@ static void setup_execbuf(int fd, const intel_ctx_t *ctx,
 		reloc[i].write_domain = I915_GEM_DOMAIN_INSTRUCTION;
 
 		offset = obj[0].offset + reloc[i].delta;
-		*b++ = MI_STORE_DWORD_IMM;
+		*b++ = MI_STORE_DWORD_IMM_GEN4;
 		if (gen >= 8) {
 			*b++ = offset;
 			*b++ = offset >> 32;

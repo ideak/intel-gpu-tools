@@ -309,7 +309,7 @@ static void exec_shared_gtt(int i915, const intel_ctx_cfg_t *cfg,
 	batch = gem_create(i915, 4096);
 
 	i = 0;
-	cs[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+	cs[i] = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 	if (gen >= 8) {
 		cs[++i] = obj.offset;
 		cs[++i] = obj.offset >> 32;
@@ -564,7 +564,7 @@ static void store_dword(int i915, uint64_t ahnd, const intel_ctx_t *ctx,
 	obj[2].relocation_count = !ahnd ? 1 : 0;
 
 	i = 0;
-	batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+	batch[i] = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 	if (gen >= 8) {
 		batch[++i] = reloc.presumed_offset + reloc.delta;
 		batch[++i] = 0;

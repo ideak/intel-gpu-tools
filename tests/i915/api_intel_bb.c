@@ -1154,7 +1154,7 @@ static void delta_check(struct buf_ops *bops)
 	intel_bb_add_object(ibb, buf->handle, intel_buf_bo_size(buf),
 			    buf->addr.offset, 0, false);
 
-	intel_bb_out(ibb, MI_STORE_DWORD_IMM);
+	intel_bb_out(ibb, MI_STORE_DWORD_IMM_GEN4);
 	intel_bb_emit_reloc(ibb, buf->handle,
 			    I915_GEM_DOMAIN_RENDER,
 			    I915_GEM_DOMAIN_RENDER,

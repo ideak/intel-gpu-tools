@@ -332,7 +332,7 @@ static void delay(int i915,
 
 	cs = map = gem_mmap__device_coherent(i915, handle, 0, 4096, PROT_WRITE);
 
-	*cs++ = MI_LOAD_REGISTER_IMM;
+	*cs++ = MI_LOAD_REGISTER_IMM(1);
 	*cs++ = CS_GPR(START_TS) + 4;
 	*cs++ = 0;
 	*cs++ = MI_LOAD_REGISTER_REG;
@@ -345,7 +345,7 @@ static void delay(int i915,
 
 	*cs++ = 0x5 << 23; /* MI_ARB_CHECK */
 
-	*cs++ = MI_LOAD_REGISTER_IMM;
+	*cs++ = MI_LOAD_REGISTER_IMM(1);
 	*cs++ = CS_GPR(NOW_TS) + 4;
 	*cs++ = 0;
 	*cs++ = MI_LOAD_REGISTER_REG;
@@ -367,7 +367,7 @@ static void delay(int i915,
 
 	/* Delay between SRM and COND_BBE to post the writes */
 	for (int n = 0; n < 8; n++) {
-		*cs++ = MI_STORE_DWORD_IMM;
+		*cs++ = MI_STORE_DWORD_IMM_GEN4;
 		if (use_64b) {
 			*cs++ = addr + 4064;
 			*cs++ = addr >> 32;

@@ -9,7 +9,6 @@
 #include "gem_create.h"
 #include "gem_engine_topology.h"
 #include "gem_mman.h"
-#include "i830_reg.h"
 #include "i915_drm.h"
 #include "intel_reg.h"
 #include "intel_chipset.h"
@@ -36,13 +35,13 @@
 	} while (0)
 
 #define LOAD_REGISTER_IMM32(__reg, __imm1) do { \
-		*bb++ = MI_LOAD_REGISTER_IMM | MI_CS_MMIO_DST; \
+		*bb++ = MI_LOAD_REGISTER_IMM(1) | MI_CS_MMIO_DST; \
 		*bb++ = (__reg); \
 		*bb++ = (__imm1); \
 	} while (0)
 
 #define LOAD_REGISTER_IMM64(__reg, __imm1, __imm2) do { \
-		*bb++ = (MI_LOAD_REGISTER_IMM + 2) | MI_CS_MMIO_DST; \
+		*bb++ = MI_LOAD_REGISTER_IMM(2) | MI_CS_MMIO_DST; \
 		*bb++ = (__reg); \
 		*bb++ = (__imm1); \
 		*bb++ = (__reg) + 4; \
@@ -50,29 +49,29 @@
 	} while (0)
 
 #define LOAD_REGISTER_MEM(__reg, __offset) do { \
-		*bb++ = MI_LOAD_REGISTER_MEM | MI_CS_MMIO_DST | 2; \
+		*bb++ = MI_LOAD_REGISTER_MEM_CMD | MI_CS_MMIO_DST | 2; \
 		*bb++ = (__reg); \
 		*bb++ = (__offset); \
 		*bb++ = (__offset) >> 32; \
 	} while (0)
 
 #define LOAD_REGISTER_MEM_WPARID(__reg, __offset) do { \
-		*bb++ = MI_LOAD_REGISTER_MEM | MI_CS_MMIO_DST | MI_WPARID_ENABLE_GEN12 | 2; \
+		*bb++ = MI_LOAD_REGISTER_MEM_CMD | MI_CS_MMIO_DST | MI_WPARID_ENABLE_GEN12 | 2; \
 		*bb++ = (__reg); \
 		*bb++ = (__offset); \
 		*bb++ = (__offset) >> 32; \
 	} while (0)
 
 #define STORE_REGISTER_MEM(__reg, __offset) do { \
-		*bb++ = MI_STORE_REGISTER_MEM | MI_CS_MMIO_DST | 2; \
+		*bb++ = MI_STORE_REGISTER_MEM_GEN8 | MI_CS_MMIO_DST; \
 		*bb++ = (__reg); \
 		*bb++ = (__offset); \
 		*bb++ = (__offset) >> 32; \
 	} while (0)
 
 #define STORE_REGISTER_MEM_PREDICATED(__reg, __offset) do { \
-		*bb++ = MI_STORE_REGISTER_MEM | MI_CS_MMIO_DST | \
-			MI_STORE_PREDICATE_ENABLE_GEN12 | 2; \
+		*bb++ = MI_STORE_REGISTER_MEM_GEN8 | MI_CS_MMIO_DST | \
+			MI_STORE_PREDICATE_ENABLE_GEN12; \
 		*bb++ = (__reg); \
 		*bb++ = (__offset); \
 		*bb++ = (__offset) >> 32; \

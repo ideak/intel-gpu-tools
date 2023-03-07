@@ -44,6 +44,9 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #ifndef _I810_REG_H
 #define _I810_REG_H
 
+#include "intel_gpu_commands.h"
+#include "intel_gpu_commands_staging.h"
+
 /* I/O register offsets
  */
 #define CRX_MDA		0x3B4
@@ -2534,7 +2537,6 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define I855_CLOCK_166_250			(3 << 0)
 
 /* BLT commands */
-#define COLOR_BLT_CMD		((2<<29)|(0x40<<22)|(0x3))
 #define COLOR_BLT_WRITE_ALPHA	(1<<21)
 #define COLOR_BLT_WRITE_RGB	(1<<20)
 
@@ -2545,15 +2547,8 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #define XY_SETUP_CLIP_BLT_CMD		((2<<29)|(3<<22)|1)
 
-#define XY_SRC_COPY_BLT_CMD		((2<<29)|(0x53<<22))
 #define XY_SRC_COPY_BLT_WRITE_ALPHA	(1<<21)
 #define XY_SRC_COPY_BLT_WRITE_RGB	(1<<20)
-#define XY_SRC_COPY_BLT_SRC_TILED	(1<<15)
-#define XY_SRC_COPY_BLT_DST_TILED	(1<<11)
-
-#define SRC_COPY_BLT_CMD		((2<<29)|(0x43<<22)|0x4)
-#define SRC_COPY_BLT_WRITE_ALPHA	(1<<21)
-#define SRC_COPY_BLT_WRITE_RGB		(1<<20)
 
 #define XY_PAT_BLT_IMMEDIATE		((2<<29)|(0x72<<22))
 
@@ -2591,15 +2586,10 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define   XY_FAST_COPY_COLOR_DEPTH_64			(4  << 24)
 #define   XY_FAST_COPY_COLOR_DEPTH_128			(5  << 24)
 
-#define MI_STORE_DWORD_IMM		((0x20<<23)|2)
-#define   MI_MEM_VIRTUAL	(1 << 22) /* 965+ only */
-
-#define MI_SET_CONTEXT			(0x18<<23)
 #define CTXT_NO_RESTORE			(1)
 #define CTXT_PALETTE_SAVE_DISABLE	(1<<3)
 #define CTXT_PALETTE_RESTORE_DISABLE	(1<<2)
 
-#define MI_SET_APPID                    (0x0E << 23)
 #define APPID_CTXREST_INHIBIT           (1 << 9)
 #define APPID_CTXSAVE_INHIBIT           (1 << 8)
 #define APPTYPE(n)                      ((n) << 7)
@@ -2616,36 +2606,26 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define MI_VERTEX_BUFFER_DISABLE	(1)
 
 /* Overlay Flip */
-#define MI_OVERLAY_FLIP			(0x11<<23)
 #define MI_OVERLAY_FLIP_CONTINUE	(0<<21)
 #define MI_OVERLAY_FLIP_ON		(1<<21)
 #define MI_OVERLAY_FLIP_OFF		(2<<21)
 
 /* Wait for Events */
-#define MI_WAIT_FOR_EVENT		(0x03<<23)
 #define MI_WAIT_FOR_PIPEB_SVBLANK	(1<<18)
 #define MI_WAIT_FOR_PIPEA_SVBLANK	(1<<17)
-#define MI_WAIT_FOR_OVERLAY_FLIP	(1<<16)
 #define MI_WAIT_FOR_PIPEB_VBLANK	(1<<7)
 #define MI_WAIT_FOR_PIPEA_VBLANK	(1<<3)
 #define MI_WAIT_FOR_PIPEB_SCAN_LINE_WINDOW	(1<<5)
 #define MI_WAIT_FOR_PIPEA_SCAN_LINE_WINDOW	(1<<1)
 
-#define MI_LOAD_SCAN_LINES_INCL		(0x12<<23)
-#define MI_LOAD_REGISTER_IMM		((0x22 << 23) | 1)
-#define MI_LOAD_REGISTER_REG		((0x2A << 23) | 1)
-#define MI_LOAD_REGISTER_MEM		(0x29 << 23)
 #define   MI_CS_MMIO_DST		(1 << 19)
 #define   MI_CS_MMIO_SRC		(1 << 18)
 #define   MI_MMIO_REMAP_ENABLE_GEN12	(1 << 17)
 #define   MI_WPARID_ENABLE_GEN12	(1 << 16)
-#define MI_STORE_REGISTER_MEM		(0x24 << 23)
 #define   MI_STORE_PREDICATE_ENABLE_GEN12 (1 << 21)
 
 /* Flush */
-#define MI_FLUSH			(0x04<<23)
 #define MI_WRITE_DIRTY_STATE		(1<<4)
-#define MI_END_SCENE			(1<<3)
 #define MI_GLOBAL_SNAPSHOT_COUNT_RESET	(1<<3)
 #define MI_INHIBIT_RENDER_CACHE_FLUSH	(1<<2)
 #define MI_STATE_INSTRUCTION_CACHE_FLUSH (1<<1)
@@ -2654,27 +2634,16 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define BRW_MI_GLOBAL_SNAPSHOT_RESET   (1 << 3)
 
 /* Noop */
-#define MI_NOOP				0x00
 #define MI_NOOP_WRITE_ID		(1<<22)
 #define MI_NOOP_ID_MASK			(1<<22 - 1)
-
-/* ARB Check */
-#define MI_ARB_CHECK                    (0x5 << 23)
 
 #define STATE3D_COLOR_FACTOR	((0x3<<29)|(0x1d<<24)|(0x01<<16))
 
 /* Atomics */
-#define MI_ATOMIC			((0x2f << 23) | 1)
-#define   MI_ATOMIC_INLINE_DATA         (1 << 18)
 #define   MI_ATOMIC_INC                 (0x5 << 8)
 #define   MI_ATOMIC_ADD                 (0x7 << 8)
 
 /* Batch */
-#define MI_BATCH_BUFFER		((0x30 << 23) | 1)
-#define MI_BATCH_BUFFER_START	(0x31 << 23)
-#define MI_BATCH_BUFFER_START_GEN8 ((0x31 << 13) | 1)
-#define   MI_BATCH_PREDICATE       (1 << 15) /* HSW+ on RCS only*/
-#define MI_BATCH_BUFFER_END	(0xA << 23)
 #define MI_COND_BATCH_BUFFER_END	(0x36 << 23)
 #define   MAD_GT_IDD                    (0 << 12)
 #define   MAD_GT_OR_EQ_IDD              (1 << 12)
@@ -2682,44 +2651,12 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define   MAD_LT_OR_EQ_IDD              (3 << 12)
 #define   MAD_EQ_IDD                    (4 << 12)
 #define   MAD_NEQ_IDD                   (5 << 12)
-#define MI_DO_COMPARE                   (1 << 21)
-
-#define MI_BATCH_NON_SECURE		(1)
-#define MI_BATCH_NON_SECURE_I965	(1 << 8)
-#define MI_BATCH_NON_SECURE_HSW		(1<<13) /* Additional bit for RCS */
 
 /* Math */
-#define MI_INSTR(opcode, flags)         (((opcode) << 23) | (flags))
-#define MI_MATH(x)                      MI_INSTR(0x1a, (x) - 1)
-#define MI_MATH_INSTR(opcode, op1, op2) ((opcode) << 20 | (op1) << 10 | (op2))
-/* Opcodes for MI_MATH_INSTR */
-#define   MI_MATH_NOOP                  MI_MATH_INSTR(0x000, 0x0, 0x0)
-#define   MI_MATH_LOAD(op1, op2)        MI_MATH_INSTR(0x080, op1, op2)
-#define   MI_MATH_LOADINV(op1, op2)     MI_MATH_INSTR(0x480, op1, op2)
-#define   MI_MATH_LOAD0(op1)            MI_MATH_INSTR(0x081, op1)
-#define   MI_MATH_LOAD1(op1)            MI_MATH_INSTR(0x481, op1)
-#define   MI_MATH_ADD                   MI_MATH_INSTR(0x100, 0x0, 0x0)
-#define   MI_MATH_SUB                   MI_MATH_INSTR(0x101, 0x0, 0x0)
-#define   MI_MATH_AND                   MI_MATH_INSTR(0x102, 0x0, 0x0)
-#define   MI_MATH_OR                    MI_MATH_INSTR(0x103, 0x0, 0x0)
-#define   MI_MATH_XOR                   MI_MATH_INSTR(0x104, 0x0, 0x0)
-#define   MI_MATH_STORE(op1, op2)       MI_MATH_INSTR(0x180, op1, op2)
-#define   MI_MATH_STOREINV(op1, op2)    MI_MATH_INSTR(0x580, op1, op2)
 /* DG2+ */
 #define   MI_MATH_SHL                   MI_MATH_INSTR(0x105, 0x0, 0x0)
 #define   MI_MATH_SHR                   MI_MATH_INSTR(0x106, 0x0, 0x0)
 #define   MI_MATH_SAR                   MI_MATH_INSTR(0x107, 0x0, 0x0)
-
-/* Registers used as operands in MI_MATH_INSTR */
-#define   MI_MATH_REG(x)                (x)
-#define   MI_MATH_REG_SRCA              0x20
-#define   MI_MATH_REG_SRCB              0x21
-#define   MI_MATH_REG_ACCU              0x31
-#define   MI_MATH_REG_ZF                0x32
-#define   MI_MATH_REG_CF                0x33
-
-/* DG2+ */
-#define MI_SET_PREDICATE                MI_INSTR(0x1, 0)
 
 #define MAX_DISPLAY_PIPES	2
 

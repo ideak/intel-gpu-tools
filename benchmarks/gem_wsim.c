@@ -1426,7 +1426,7 @@ static unsigned int create_bb(struct w_step *w, int self)
 	cs = ptr = gem_mmap__wc(fd, w->bb_handle, 0, 4096, PROT_WRITE);
 
 	/* Store initial 64b timestamp: start */
-	*cs++ = MI_LOAD_REGISTER_IMM | MI_CS_MMIO_DST;
+	*cs++ = MI_LOAD_REGISTER_IMM(1) | MI_CS_MMIO_DST;
 	*cs++ = CS_GPR(START_TS) + 4;
 	*cs++ = 0;
 	*cs++ = MI_LOAD_REGISTER_REG | MI_CS_MMIO_DST | MI_CS_MMIO_SRC;
@@ -1441,7 +1441,7 @@ static unsigned int create_bb(struct w_step *w, int self)
 		*cs++ = MI_ARB_CHECK;
 
 	/* Store this 64b timestamp: now */
-	*cs++ = MI_LOAD_REGISTER_IMM | MI_CS_MMIO_DST;
+	*cs++ = MI_LOAD_REGISTER_IMM(1) | MI_CS_MMIO_DST;
 	*cs++ = CS_GPR(NOW_TS) + 4;
 	*cs++ = 0;
 	*cs++ = MI_LOAD_REGISTER_REG | MI_CS_MMIO_DST | MI_CS_MMIO_SRC;
@@ -1456,7 +1456,7 @@ static unsigned int create_bb(struct w_step *w, int self)
 	*cs++ = MI_MATH_STOREINV(MI_MATH_REG(NOW_TS), MI_MATH_REG_ACCU);
 
 	/* Save delta for indirect read by COND_BBE */
-	*cs++ = MI_STORE_REGISTER_MEM | (1 + use_64b) | MI_CS_MMIO_DST;
+	*cs++ = MI_STORE_REGISTER_MEM_CMD | (1 + use_64b) | MI_CS_MMIO_DST;
 	*cs++ = CS_GPR(NOW_TS);
 	w->reloc[r].target_handle = self;
 	w->reloc[r].offset = offset_in_page(cs);

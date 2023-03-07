@@ -38,14 +38,6 @@
 #define INSTR_CLIENT_SHIFT	29
 #define   INSTR_INVALID_CLIENT  0x7
 
-#define MI_ARB_ON_OFF (0x8 << 23)
-#define MI_USER_INTERRUPT (0x02 << 23)
-#define MI_FLUSH_DW (0x26 << 23)
-#define MI_REPORT_HEAD (0x07 << 23)
-#define MI_SUSPEND_FLUSH (0x0b << 23)
-#define MI_LOAD_SCAN_LINES_EXCL (0x13 << 23)
-#define MI_UPDATE_GTT (0x23 << 23)
-
 #define BCS_SWCTRL     0x22200
 #define BCS_GPR_BASE   0x22600
 #define BCS_GPR(n)     (0x22600 + (n) * 8)
@@ -324,7 +316,7 @@ static const struct cmd allowed_cmds[] = {
 	CMD_N(MI_NOOP),
 	CMD_N(MI_USER_INTERRUPT),
 	CMD_N(MI_WAIT_FOR_EVENT),
-	CMD(MI_FLUSH_DW, 5),
+	CMD(MI_FLUSH_DW_CMD, 5),
 	CMD_N(MI_ARB_CHECK),
 	CMD_N(MI_REPORT_HEAD),
 	CMD_N(MI_FLUSH),
@@ -453,11 +445,11 @@ static void test_bb_start(const int i915, const uint32_t handle, int test)
 		MI_NOOP,
 		MI_NOOP,
 		MI_NOOP,
-		MI_STORE_DWORD_IMM,
+		MI_STORE_DWORD_IMM_GEN4,
 		0,
 		0,
 		1,
-		MI_STORE_DWORD_IMM,
+		MI_STORE_DWORD_IMM_GEN4,
 		4,
 		0,
 		2,
@@ -680,13 +672,13 @@ static void test_bb_chained(const int i915, const uint32_t handle)
 static void test_cmd_crossing_page(const int i915, const uint32_t handle)
 {
 	const uint32_t lri_ok[] = {
-		MI_LOAD_REGISTER_IMM,
+		MI_LOAD_REGISTER_IMM(1),
 		BCS_GPR(0),
 		0xbaadf00d,
 		MI_BATCH_BUFFER_END,
 	};
 	const uint32_t store_reg[] = {
-		MI_STORE_REGISTER_MEM | 2,
+		MI_STORE_REGISTER_MEM_CMD | 2,
 		BCS_GPR(0),
 		0, /* reloc */
 		0, /* reloc */
@@ -711,21 +703,21 @@ static void test_invalid_length(const int i915, const uint32_t handle)
 	const uint32_t noops[8192] = { 0, };
 
 	const uint32_t lri_ok[] = {
-		MI_LOAD_REGISTER_IMM,
+		MI_LOAD_REGISTER_IMM(1),
 		BCS_GPR(0),
 		ok_val,
 		MI_BATCH_BUFFER_END,
 	};
 
 	const uint32_t lri_bad[] = {
-		MI_LOAD_REGISTER_IMM,
+		MI_LOAD_REGISTER_IMM(1),
 		BCS_GPR(0),
 		bad_val,
 		MI_BATCH_BUFFER_END,
 	};
 
 	const uint32_t store_reg[] = {
-		MI_STORE_REGISTER_MEM | 2,
+		MI_STORE_REGISTER_MEM_CMD | 2,
 		BCS_GPR(0),
 		0, /* reloc */
 		0, /* reloc */
@@ -824,21 +816,21 @@ static void test_register(const int i915, const uint32_t handle,
 			  const struct reg *r)
 {
 	const uint32_t lri_zero[] = {
-		MI_LOAD_REGISTER_IMM,
+		MI_LOAD_REGISTER_IMM(1),
 		r->addr,
 		r->masked_write ? 0xffff0000 : 0,
 		MI_BATCH_BUFFER_END,
 	};
 
 	const uint32_t lri_mask[] = {
-		MI_LOAD_REGISTER_IMM,
+		MI_LOAD_REGISTER_IMM(1),
 		r->addr,
 		r->masked_write ? (r->mask << 16) | r->mask : r->mask,
 		MI_BATCH_BUFFER_END,
 	};
 
 	const uint32_t store_reg[] = {
-		MI_STORE_REGISTER_MEM | 2,
+		MI_STORE_REGISTER_MEM_CMD | 2,
 		r->addr,
 		0, /* reloc */
 		0, /* reloc */
@@ -877,7 +869,7 @@ static long int read_reg(const int i915, const uint32_t handle,
 			 const uint32_t addr)
 {
 	const uint32_t store_reg[] = {
-		MI_STORE_REGISTER_MEM | 2,
+		MI_STORE_REGISTER_MEM_CMD | 2,
 		addr,
 		0, /* reloc */
 		0, /* reloc */
@@ -911,7 +903,7 @@ static int write_reg(const int i915, const uint32_t handle,
 		     const uint32_t addr, const uint32_t val)
 {
 	const uint32_t lri[] = {
-		MI_LOAD_REGISTER_IMM,
+		MI_LOAD_REGISTER_IMM(1),
 		addr,
 		val,
 		MI_BATCH_BUFFER_END,
@@ -1088,17 +1080,6 @@ static inline uint32_t fill_and_copy_shadow(uint32_t *batch, uint32_t len,
 	return i * sizeof(uint32_t);
 }
 
-static inline uint64_t sign_extend(uint64_t x, int index)
-{
-	int shift = 63 - index;
-	return (int64_t)(x << shift) >> shift;
-}
-
-static uint64_t gen8_canonical_address(uint64_t address)
-{
-	return sign_extend(address, 47);
-}
-
 static void test_shadow_peek(int fd)
 {
 	uint64_t size = PAGE_SIZE;
@@ -1130,7 +1111,7 @@ static void test_shadow_peek(int fd)
 
 	exec[1].handle = gem_create(fd, size); /* batch */
 	exec[1].flags = EXEC_OBJECT_PINNED | EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
-	exec[1].offset = gen8_canonical_address(exec[0].pad_to_size);
+	exec[1].offset = gen8_canonical_addr(exec[0].pad_to_size);
 
 	vaddr = gem_mmap__wc(fd, exec[1].handle, 0, size, PROT_WRITE);
 

@@ -70,7 +70,7 @@ static void submit(int fd, uint64_t ahnd, unsigned int gen,
 	reloc[1].read_domains = I915_GEM_DOMAIN_INSTRUCTION;
 
 	n = 0;
-	batch[n] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+	batch[n] = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 	if (gen >= 8) {
 		batch[n] |= 1 << 21;
 		batch[n]++;

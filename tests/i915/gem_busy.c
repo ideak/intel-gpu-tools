@@ -235,10 +235,10 @@ static void one(int fd, const intel_ctx_t *ctx,
 
 static void xchg_u32(void *array, unsigned i, unsigned j)
 {
-	uint32_t *u32 = array;
-	uint32_t tmp = u32[i];
-	u32[i] = u32[j];
-	u32[j] = tmp;
+	uint32_t *ui32 = array;
+	uint32_t tmp = ui32[i];
+	ui32[i] = ui32[j];
+	ui32[j] = tmp;
 }
 
 static void close_race(int fd, const intel_ctx_t *ctx)

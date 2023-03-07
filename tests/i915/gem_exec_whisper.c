@@ -312,7 +312,7 @@ static void whisper(int fd, const intel_ctx_t *ctx,
 		}
 
 		i = 0;
-		batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+		batch[i] = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 		if (gen >= 8) {
 			batch[++i] = store.offset + loc;
 			batch[++i] = (store.offset + loc) >> 32;

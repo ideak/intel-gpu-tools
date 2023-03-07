@@ -48,10 +48,6 @@
 #define INSTR_CLIENT_SHIFT	29
 #define   INSTR_INVALID_CLIENT  0x7
 
-#define MI_ARB_ON_OFF (0x8 << 23)
-#define MI_DISPLAY_FLIP ((0x14 << 23) | 1)
-
-#define GFX_OP_PIPE_CONTROL	((0x3<<29)|(0x3<<27)|(0x2<<24)|2)
 #define   PIPE_CONTROL_QW_WRITE	(1<<14)
 #define   PIPE_CONTROL_LRI_POST_OP (1<<23)
 
@@ -298,7 +294,7 @@ static void
 test_lri(int fd, uint32_t handle, struct test_lri *test)
 {
 	uint32_t lri[] = {
-		MI_LOAD_REGISTER_IMM,
+		MI_LOAD_REGISTER_IMM(1),
 		test->reg,
 		test->test_val,
 		MI_BATCH_BUFFER_END,
@@ -372,13 +368,13 @@ static void test_allocations(int fd)
 static void hsw_load_register_reg(void)
 {
 	uint32_t init_gpr0[16] = {
-		MI_LOAD_REGISTER_IMM,
+		MI_LOAD_REGISTER_IMM(1),
 		HSW_CS_GPR0,
 		0xabcdabc0, /* leave [1:0] zero */
 		MI_BATCH_BUFFER_END,
 	};
 	uint32_t store_gpr0[16] = {
-		MI_STORE_REGISTER_MEM | (3 - 2),
+		MI_STORE_REGISTER_MEM_CMD | (3 - 2),
 		HSW_CS_GPR0,
 		0, /* reloc*/
 		MI_BATCH_BUFFER_END,
@@ -475,7 +471,7 @@ igt_main
 
 	igt_subtest("basic-allowed") {
 		uint32_t pc[] = {
-			GFX_OP_PIPE_CONTROL,
+			GFX_OP_PIPE_CONTROL(4),
 			PIPE_CONTROL_QW_WRITE,
 			0, /* To be patched */
 			0x12000000,
@@ -490,7 +486,7 @@ igt_main
 
 	igt_subtest("basic-offset") {
 		uint32_t pc[] = {
-			GFX_OP_PIPE_CONTROL,
+			GFX_OP_PIPE_CONTROL(4),
 			PIPE_CONTROL_QW_WRITE,
 			0, /* To be patched */
 			0x12000000,
@@ -597,7 +593,7 @@ igt_main
 
 	igt_subtest("bitmasks") {
 		uint32_t pc[] = {
-			GFX_OP_PIPE_CONTROL,
+			GFX_OP_PIPE_CONTROL(4),
 			(PIPE_CONTROL_QW_WRITE |
 			 PIPE_CONTROL_LRI_POST_OP),
 			0, /* To be patched */
@@ -631,13 +627,13 @@ igt_main
 
 	igt_subtest("cmd-crossing-page") {
 		uint32_t lri_ok[] = {
-			MI_LOAD_REGISTER_IMM,
+			MI_LOAD_REGISTER_IMM(1),
 			SO_WRITE_OFFSET_0, /* allowed register address */
 			0xdcbaabc0, /* [1:0] MBZ */
 			MI_BATCH_BUFFER_END,
 		};
 		uint32_t store_reg[] = {
-			MI_STORE_REGISTER_MEM | (3 - 2),
+			MI_STORE_REGISTER_MEM_CMD | (3 - 2),
 			SO_WRITE_OFFSET_0,
 			0, /* reloc */
 			MI_BATCH_BUFFER_END,
@@ -655,29 +651,29 @@ igt_main
 
 	igt_subtest("oacontrol-tracking") {
 		uint32_t lri_ok[] = {
-			MI_LOAD_REGISTER_IMM,
+			MI_LOAD_REGISTER_IMM(1),
 			OACONTROL,
 			0x31337000,
-			MI_LOAD_REGISTER_IMM,
+			MI_LOAD_REGISTER_IMM(1),
 			OACONTROL,
 			0x0,
 			MI_BATCH_BUFFER_END,
 			0
 		};
 		uint32_t lri_bad[] = {
-			MI_LOAD_REGISTER_IMM,
+			MI_LOAD_REGISTER_IMM(1),
 			OACONTROL,
 			0x31337000,
 			MI_BATCH_BUFFER_END,
 		};
 		uint32_t lri_extra_bad[] = {
-			MI_LOAD_REGISTER_IMM,
+			MI_LOAD_REGISTER_IMM(1),
 			OACONTROL,
 			0x31337000,
-			MI_LOAD_REGISTER_IMM,
+			MI_LOAD_REGISTER_IMM(1),
 			OACONTROL,
 			0x0,
-			MI_LOAD_REGISTER_IMM,
+			MI_LOAD_REGISTER_IMM(1),
 			OACONTROL,
 			0x31337000,
 			MI_BATCH_BUFFER_END,
@@ -701,7 +697,7 @@ igt_main
 
 	igt_subtest("chained-batch") {
 		uint32_t pc[] = {
-			GFX_OP_PIPE_CONTROL,
+			GFX_OP_PIPE_CONTROL(4),
 			PIPE_CONTROL_QW_WRITE,
 			0, /* To be patched */
 			0x12000000,

@@ -208,7 +208,7 @@ static void run(int fd, unsigned ring, int nchild, int timeout,
 			reloc0[i].write_domain = I915_GEM_DOMAIN_INSTRUCTION;
 
 			offset = obj[0].offset + reloc0[i].delta;
-			*b++ = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+			*b++ = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 			if (gen >= 8) {
 				*b++ = offset;
 				*b++ = offset >> 32;
@@ -242,7 +242,7 @@ static void run(int fd, unsigned ring, int nchild, int timeout,
 			reloc1[i].write_domain = I915_GEM_DOMAIN_INSTRUCTION;
 
 			offset = obj[0].offset + reloc1[i].delta;
-			*b++ = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+			*b++ = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 			if (gen >= 8) {
 				*b++ = offset;
 				*b++ = offset >> 32;
@@ -496,7 +496,7 @@ static void batch(int fd, unsigned ring, int nchild, int timeout,
 				reloc.delta = i * sizeof(uint32_t);
 
 				offset = reloc.presumed_offset + reloc.delta;
-				*b++ = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+				*b++ = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 				if (gen >= 8) {
 					*b++ = offset;
 					*b++ = offset >> 32;

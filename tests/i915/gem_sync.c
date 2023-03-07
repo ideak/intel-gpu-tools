@@ -588,7 +588,7 @@ store_ring(int fd, const intel_ctx_t *ctx, unsigned ring,
 			reloc[i].write_domain = I915_GEM_DOMAIN_INSTRUCTION;
 
 			offset = object[0].offset + reloc[i].delta;
-			*b++ = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+			*b++ = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 			if (gen >= 8) {
 				*b++ = offset;
 				*b++ = offset >> 32;
@@ -698,7 +698,7 @@ switch_ring(int fd, const intel_ctx_t *ctx, unsigned ring,
 				c->reloc[r].write_domain = I915_GEM_DOMAIN_INSTRUCTION;
 
 				offset = c->object[0].offset + c->reloc[r].delta;
-				*b++ = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+				*b++ = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 				if (gen >= 8) {
 					*b++ = offset;
 					*b++ = offset >> 32;
@@ -772,10 +772,10 @@ switch_ring(int fd, const intel_ctx_t *ctx, unsigned ring,
 
 static void xchg(void *array, unsigned i, unsigned j)
 {
-	uint32_t *u32 = array;
-	uint32_t tmp = u32[i];
-	u32[i] = u32[j];
-	u32[j] = tmp;
+	uint32_t *ui32 = array;
+	uint32_t tmp = ui32[i];
+	ui32[i] = ui32[j];
+	ui32[j] = tmp;
 }
 
 struct waiter {
@@ -859,7 +859,7 @@ __store_many(int fd, const intel_ctx_t *ctx, unsigned ring,
 		reloc[i].write_domain = I915_GEM_DOMAIN_INSTRUCTION;
 
 		offset = object[0].offset + reloc[i].delta;
-		*b++ = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+		*b++ = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 		if (gen >= 8) {
 			*b++ = offset;
 			*b++ = offset >> 32;
@@ -1080,7 +1080,7 @@ store_all(int fd, const intel_ctx_t *ctx, int num_children, int timeout)
 			reloc[i].write_domain = I915_GEM_DOMAIN_INSTRUCTION;
 
 			offset = object[0].offset + reloc[i].delta;
-			*b++ = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+			*b++ = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 			if (gen >= 8) {
 				*b++ = offset;
 				*b++ = offset >> 32;

@@ -268,7 +268,7 @@ write_to_address(int fd, uint32_t ctx, uint64_t addr, uint32_t value)
 	int i;
 
 	i = 0;
-	cs[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+	cs[i] = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 	if (gen >= 8) {
 		cs[++i] = addr;
 		cs[++i] = addr >> 32;

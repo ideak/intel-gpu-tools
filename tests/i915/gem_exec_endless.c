@@ -33,15 +33,6 @@
 
 #define MAX_ENGINES 64
 
-#define MI_SEMAPHORE_WAIT		(0x1c << 23)
-#define   MI_SEMAPHORE_POLL             (1 << 15)
-#define   MI_SEMAPHORE_SAD_GT_SDD       (0 << 12)
-#define   MI_SEMAPHORE_SAD_GTE_SDD      (1 << 12)
-#define   MI_SEMAPHORE_SAD_LT_SDD       (2 << 12)
-#define   MI_SEMAPHORE_SAD_LTE_SDD      (3 << 12)
-#define   MI_SEMAPHORE_SAD_EQ_SDD       (4 << 12)
-#define   MI_SEMAPHORE_SAD_NEQ_SDD      (5 << 12)
-
 static uint32_t batch_create(int i915)
 {
 	const uint32_t bbe = MI_BATCH_BUFFER_END;
@@ -133,7 +124,7 @@ static void __supervisor_run(struct supervisor *sv)
 
 	sv->semaphore = cs + 1000;
 
-	*cs++ = MI_SEMAPHORE_WAIT |
+	*cs++ = MI_SEMAPHORE_WAIT_CMD |
 		MI_SEMAPHORE_POLL |
 		MI_SEMAPHORE_SAD_EQ_SDD |
 		(4 - 2);
@@ -142,7 +133,7 @@ static void __supervisor_run(struct supervisor *sv)
 	*cs++ = 0;
 
 	sv->terminate = cs;
-	*cs++ = MI_STORE_DWORD_IMM;
+	*cs++ = MI_STORE_DWORD_IMM_GEN4;
 	*cs++ = offset_in_page(sv->semaphore);
 	*cs++ = 0;
 	*cs++ = 0;

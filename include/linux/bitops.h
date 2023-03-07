@@ -17,4 +17,6 @@
 
 #include "linux_scaffold.h"
 
+#define REG_BIT(x) (1ul << (x))
+
 #endif /* _LINUX_BITOPS_H_ */

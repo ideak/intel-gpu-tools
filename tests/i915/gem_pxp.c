@@ -748,10 +748,7 @@ static void test_pxp_pwrcycle_teardown_keychange(int i915, struct powermgt_data 
 	igt_assert_eq(matched_after_keychange, 0);
 }
 
-#define GFX_OP_PIPE_CONTROL    ((3 << 29) | (3 << 27) | (2 << 24))
-#define PIPE_CONTROL_CS_STALL	            (1 << 20)
 #define PIPE_CONTROL_RENDER_TARGET_FLUSH    (1 << 12)
-#define PIPE_CONTROL_FLUSH_ENABLE           (1 << 7)
 #define PIPE_CONTROL_DATA_CACHE_INVALIDATE  (1 << 5)
 #define PIPE_CONTROL_PROTECTEDPATH_DISABLE  (1 << 27)
 #define PIPE_CONTROL_PROTECTEDPATH_ENABLE   (1 << 22)
@@ -765,7 +762,7 @@ static void emit_pipectrl(struct intel_bb *ibb, struct intel_buf *fenceb, bool b
 	uint32_t pipe_ctl_flags = 0;
 	uint32_t ps_op_id;
 
-	intel_bb_out(ibb, GFX_OP_PIPE_CONTROL);
+	intel_bb_out(ibb, GFX_OP_PIPE_CONTROL(4));
 	intel_bb_out(ibb, pipe_ctl_flags);
 
 	if (before)
@@ -776,7 +773,7 @@ static void emit_pipectrl(struct intel_bb *ibb, struct intel_buf *fenceb, bool b
 	pipe_ctl_flags = (PIPE_CONTROL_FLUSH_ENABLE |
 			  PIPE_CONTROL_CS_STALL |
 			  PIPE_CONTROL_POST_SYNC_OP);
-	intel_bb_out(ibb, GFX_OP_PIPE_CONTROL | 4);
+	intel_bb_out(ibb, GFX_OP_PIPE_CONTROL(6));
 	intel_bb_out(ibb, pipe_ctl_flags);
 	intel_bb_emit_reloc(ibb, fenceb->handle, 0, I915_GEM_DOMAIN_COMMAND, (before?0:8),
 			    fenceb->addr.offset);

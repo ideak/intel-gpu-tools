@@ -378,7 +378,7 @@ void igt_blitter_src_copy(int fd,
 	if ((src_tiling | dst_tiling) >= I915_TILING_Y) {
 		unsigned int mask;
 
-		batch[i++] = MI_LOAD_REGISTER_IMM;
+		batch[i++] = MI_LOAD_REGISTER_IMM(1);
 		batch[i++] = BCS_SWCTRL;
 
 		mask = (BCS_SRC_Y | BCS_DST_Y) << 16;
@@ -407,12 +407,12 @@ void igt_blitter_src_copy(int fd,
 
 	if ((src_tiling | dst_tiling) >= I915_TILING_Y) {
 		igt_assert(gen >= 6);
-		batch[i++] = MI_FLUSH_DW | 2;
+		batch[i++] = MI_FLUSH_DW_CMD | 2;
 		batch[i++] = 0;
 		batch[i++] = 0;
 		batch[i++] = 0;
 
-		batch[i++] = MI_LOAD_REGISTER_IMM;
+		batch[i++] = MI_LOAD_REGISTER_IMM(1);
 		batch[i++] = BCS_SWCTRL;
 		batch[i++] = (BCS_SRC_Y | BCS_DST_Y) << 16;
 	}
@@ -2413,7 +2413,7 @@ void intel_bb_emit_blt_copy(struct intel_bb *ibb,
 	}
 
 	if ((src->tiling | dst->tiling) >= I915_TILING_Y) {
-		intel_bb_out(ibb, MI_LOAD_REGISTER_IMM);
+		intel_bb_out(ibb, MI_LOAD_REGISTER_IMM(1));
 		intel_bb_out(ibb, BCS_SWCTRL);
 
 		mask = (BCS_SRC_Y | BCS_DST_Y) << 16;
@@ -2450,12 +2450,12 @@ void intel_bb_emit_blt_copy(struct intel_bb *ibb,
 
 	if ((src->tiling | dst->tiling) >= I915_TILING_Y) {
 		igt_assert(ibb->gen >= 6);
-		intel_bb_out(ibb, MI_FLUSH_DW | 2);
+		intel_bb_out(ibb, MI_FLUSH_DW_CMD | 2);
 		intel_bb_out(ibb, 0);
 		intel_bb_out(ibb, 0);
 		intel_bb_out(ibb, 0);
 
-		intel_bb_out(ibb, MI_LOAD_REGISTER_IMM);
+		intel_bb_out(ibb, MI_LOAD_REGISTER_IMM(1));
 		intel_bb_out(ibb, BCS_SWCTRL);
 		intel_bb_out(ibb, (BCS_SRC_Y | BCS_DST_Y) << 16);
 	}

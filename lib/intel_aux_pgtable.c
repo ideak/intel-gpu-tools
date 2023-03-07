@@ -9,7 +9,6 @@
 
 #include "i915/gem_mman.h"
 
-#define BITS_PER_LONG_LONG	(sizeof(long long) * 8)
 #define BITMASK(e, s)		((~0ULL << (s)) & \
 				 (~0ULL >> (BITS_PER_LONG_LONG - 1 - (e))))
 
@@ -644,11 +643,11 @@ gen12_emit_aux_pgtable_state(struct intel_bb *ibb, uint32_t state, bool render)
 	if (!state)
 		return;
 
-	intel_bb_out(ibb, MI_LOAD_REGISTER_MEM | MI_MMIO_REMAP_ENABLE_GEN12 | 2);
+	intel_bb_out(ibb, MI_LOAD_REGISTER_MEM_CMD | MI_MMIO_REMAP_ENABLE_GEN12 | 2);
 	intel_bb_out(ibb, table_base_reg);
 	intel_bb_emit_reloc(ibb, ibb->handle, 0, 0, state, ibb->batch_offset);
 
-	intel_bb_out(ibb, MI_LOAD_REGISTER_MEM | MI_MMIO_REMAP_ENABLE_GEN12 | 2);
+	intel_bb_out(ibb, MI_LOAD_REGISTER_MEM_CMD | MI_MMIO_REMAP_ENABLE_GEN12 | 2);
 	intel_bb_out(ibb, table_base_reg + 4);
 	intel_bb_emit_reloc(ibb, ibb->handle, 0, 0, state + 4, ibb->batch_offset);
 }

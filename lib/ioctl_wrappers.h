@@ -173,9 +173,9 @@ static inline uint64_t to_user_pointer(const void *ptr)
  *
  * Casts a 64bit value from an ioctl into a pointer.
  */
-static inline void *from_user_pointer(uint64_t u64)
+static inline void *from_user_pointer(uint64_t u64p)
 {
-	return (void *)(uintptr_t)u64;
+	return (void *)(uintptr_t)u64p;
 }
 
 /**

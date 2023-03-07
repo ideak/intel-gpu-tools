@@ -144,7 +144,7 @@ static void poll_ring(int fd, const intel_ctx_t *ctx,
 		r->delta = 4092;
 		r->read_domains = I915_GEM_DOMAIN_RENDER;
 
-		*b = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+		*b = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 		if (gen >= 8) {
 			*++b = r->delta;
 			*++b = 0;
@@ -272,7 +272,7 @@ static void poll_sequential(int fd, const intel_ctx_t *ctx,
 		r->read_domains = I915_GEM_DOMAIN_RENDER;
 		r->write_domain = I915_GEM_DOMAIN_RENDER;
 
-		*b = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+		*b = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 		if (gen >= 8) {
 			*++b = r->delta;
 			*++b = 0;

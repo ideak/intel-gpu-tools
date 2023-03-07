@@ -55,15 +55,6 @@
 #define MAX_CONTEXTS 1024
 #define MAX_ELSP_QLEN 16
 
-#define MI_SEMAPHORE_WAIT		(0x1c << 23)
-#define   MI_SEMAPHORE_POLL             (1 << 15)
-#define   MI_SEMAPHORE_SAD_GT_SDD       (0 << 12)
-#define   MI_SEMAPHORE_SAD_GTE_SDD      (1 << 12)
-#define   MI_SEMAPHORE_SAD_LT_SDD       (2 << 12)
-#define   MI_SEMAPHORE_SAD_LTE_SDD      (3 << 12)
-#define   MI_SEMAPHORE_SAD_EQ_SDD       (4 << 12)
-#define   MI_SEMAPHORE_SAD_NEQ_SDD      (5 << 12)
-
 IGT_TEST_DESCRIPTION("Check that we can control the order of execution");
 
 static unsigned int offset_in_page(void *addr)
@@ -148,7 +139,7 @@ static uint32_t __store_dword(int fd, uint64_t ahnd, const intel_ctx_t *ctx,
 	obj[2].relocation_count = !ahnd ? 1 : 0;
 
 	i = 0;
-	batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+	batch[i] = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 	if (gen >= 8) {
 		batch[++i] = reloc.presumed_offset + reloc.delta;
 		batch[++i] = (reloc.presumed_offset + reloc.delta) >> 32;
@@ -521,7 +512,7 @@ static uint32_t timeslicing_batches(int i915, uint32_t *offset)
 		for (int step = 0; step < 8; step++) {
 			if (pair) {
 				cs[i++] =
-					MI_SEMAPHORE_WAIT |
+					MI_SEMAPHORE_WAIT_CMD |
 					MI_SEMAPHORE_POLL |
 					MI_SEMAPHORE_SAD_EQ_SDD |
 					(4 - 2);
@@ -530,14 +521,14 @@ static uint32_t timeslicing_batches(int i915, uint32_t *offset)
 				cs[i++] = 0;
 			}
 
-			cs[i++] = MI_STORE_DWORD_IMM;
+			cs[i++] = MI_STORE_DWORD_IMM_GEN4;
 			cs[i++] = *offset;
 			cs[i++] = 0;
 			cs[i++] = x++;
 
 			if (!pair) {
 				cs[i++] =
-					MI_SEMAPHORE_WAIT |
+					MI_SEMAPHORE_WAIT_CMD |
 					MI_SEMAPHORE_POLL |
 					MI_SEMAPHORE_SAD_EQ_SDD |
 					(4 - 2);
@@ -629,7 +620,7 @@ static uint32_t timesliceN_batches(int i915, uint32_t offset, int count)
 
 		for (int step = 0; step < 8; step++) {
 			cs[i++] =
-				MI_SEMAPHORE_WAIT |
+				MI_SEMAPHORE_WAIT_CMD |
 				MI_SEMAPHORE_POLL |
 				MI_SEMAPHORE_SAD_EQ_SDD |
 				(4 - 2);
@@ -637,7 +628,7 @@ static uint32_t timesliceN_batches(int i915, uint32_t offset, int count)
 			cs[i++] = offset;
 			cs[i++] = 0;
 
-			cs[i++] = MI_STORE_DWORD_IMM;
+			cs[i++] = MI_STORE_DWORD_IMM_GEN4;
 			cs[i++] = offset;
 			cs[i++] = 0;
 			cs[i++] = x + 1;
@@ -797,7 +788,7 @@ static void cancel_spinner(int i915,
 	map = gem_mmap__device_coherent(i915, obj.handle, 0, 4096, PROT_WRITE);
 	cs = map;
 
-	*cs++ = MI_STORE_DWORD_IMM;
+	*cs++ = MI_STORE_DWORD_IMM_GEN4;
 	*cs++ = spin->obj[IGT_SPIN_BATCH].offset +
 		offset_in_page(spin->condition);
 	*cs++ = spin->obj[IGT_SPIN_BATCH].offset >> 32;
@@ -1108,13 +1099,13 @@ static void semaphore_resolve(int i915, const intel_ctx_cfg_t *cfg,
 		cs = map = gem_mmap__cpu(i915, handle, 0, 4096, PROT_WRITE);
 
 		/* Set semaphore initially to 1 for polling and signaling */
-		*cs++ = MI_STORE_DWORD_IMM;
+		*cs++ = MI_STORE_DWORD_IMM_GEN4;
 		*cs++ = SEMAPHORE_ADDR;
 		*cs++ = 0;
 		*cs++ = 1;
 
 		/* Wait until another batch writes to our semaphore */
-		*cs++ = MI_SEMAPHORE_WAIT |
+		*cs++ = MI_SEMAPHORE_WAIT_CMD |
 			MI_SEMAPHORE_POLL |
 			MI_SEMAPHORE_SAD_EQ_SDD |
 			(4 - 2);
@@ -1123,7 +1114,7 @@ static void semaphore_resolve(int i915, const intel_ctx_cfg_t *cfg,
 		*cs++ = 0;
 
 		/* Then cancel the spinner */
-		*cs++ = MI_STORE_DWORD_IMM;
+		*cs++ = MI_STORE_DWORD_IMM_GEN4;
 		*cs++ = spin->obj[IGT_SPIN_BATCH].offset +
 			offset_in_page(spin->condition);
 		*cs++ = 0;
@@ -1161,7 +1152,7 @@ static void semaphore_resolve(int i915, const intel_ctx_cfg_t *cfg,
 		/* Now the semaphore is spinning, cancel it */
 		cancel = gem_create(i915, 4096);
 		cs = map = gem_mmap__cpu(i915, cancel, 0, 4096, PROT_WRITE);
-		*cs++ = MI_STORE_DWORD_IMM;
+		*cs++ = MI_STORE_DWORD_IMM_GEN4;
 		*cs++ = SEMAPHORE_ADDR;
 		*cs++ = 0;
 		*cs++ = 0;
@@ -1203,7 +1194,7 @@ static void semaphore_noskip(int i915, const intel_ctx_cfg_t *cfg,
 	const intel_ctx_t *ctx0, *ctx1;
 	uint64_t ahnd;
 
-	igt_require(gen >= 6); /* MI_STORE_DWORD_IMM convenience */
+	igt_require(gen >= 6); /* MI_STORE_DWORD_IMM_GEN4 convenience */
 
 	ctx0 = intel_ctx_create(i915, cfg);
 	ctx1 = intel_ctx_create(i915, cfg);
@@ -1233,7 +1224,7 @@ static void semaphore_noskip(int i915, const intel_ctx_cfg_t *cfg,
 		cs = map = gem_mmap__cpu(i915, handle, 0, 4096, PROT_WRITE);
 
 		/* Cancel the following spinner */
-		*cs++ = MI_STORE_DWORD_IMM;
+		*cs++ = MI_STORE_DWORD_IMM_GEN4;
 		if (gen >= 8) {
 			*cs++ = spin->obj[IGT_SPIN_BATCH].offset +
 				offset_in_page(spin->condition);
@@ -1359,14 +1350,14 @@ noreorder(int i915, const intel_ctx_cfg_t *cfg,
 	addr = spin->obj[IGT_SPIN_BATCH].offset +
 		offset_in_page(spin->condition);
 	if (gen >= 8) {
-		*cs++ = MI_STORE_DWORD_IMM;
+		*cs++ = MI_STORE_DWORD_IMM_GEN4;
 		*cs++ = addr;
 		addr >>= 32;
 	} else if (gen >= 4) {
-		*cs++ = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+		*cs++ = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 		*cs++ = 0;
 	} else {
-		*cs++ = (MI_STORE_DWORD_IMM | 1 << 22) - 1;
+		*cs++ = (MI_STORE_DWORD_IMM_GEN4 | 1 << 22) - 1;
 	}
 	*cs++ = addr;
 	*cs++ = MI_BATCH_BUFFER_END;
@@ -2294,7 +2285,7 @@ static void reorder_wide(int fd, const intel_ctx_cfg_t *cfg, unsigned ring)
 			addr = reloc.presumed_offset + reloc.delta;
 
 			i = execbuf.batch_start_offset / sizeof(uint32_t);
-			batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+			batch[i] = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 			if (gen >= 8) {
 				batch[++i] = addr;
 				batch[++i] = addr >> 32;

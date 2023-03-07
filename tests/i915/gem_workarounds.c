@@ -121,7 +121,7 @@ static int workaround_fail_count(int i915, const intel_ctx_t *ctx)
 	out = base =
 		gem_mmap__cpu(i915, obj[1].handle, 0, batch_sz, PROT_WRITE);
 	for (int i = 0; i < num_wa_regs; i++) {
-		*out++ = MI_STORE_REGISTER_MEM | (1 + (gen >= 8));
+		*out++ = MI_STORE_REGISTER_MEM_CMD | (1 + (gen >= 8));
 		*out++ = wa_regs[i].addr;
 		reloc[i].target_handle = obj[0].handle;
 		reloc[i].offset = (out - base) * sizeof(*out);

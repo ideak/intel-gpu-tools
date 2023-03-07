@@ -681,12 +681,6 @@ no_sema(int gem_fd, const intel_ctx_t *ctx,
 	assert_within_epsilon(val[0][1], 0.0f, tolerance);
 }
 
-#define MI_INSTR(opcode, flags) (((opcode) << 23) | (flags))
-#define MI_SEMAPHORE_WAIT	MI_INSTR(0x1c, 2) /* GEN8+ */
-#define   MI_SEMAPHORE_POLL		(1<<15)
-#define   MI_SEMAPHORE_SAD_GTE_SDD	(1<<12)
-#define   MI_SEMAPHORE_SAD_EQ_SDD       (4 << 12)
-
 static void
 sema_wait(int gem_fd, const intel_ctx_t *ctx,
 	  const struct intel_execution_engine2 *e,
@@ -719,7 +713,7 @@ sema_wait(int gem_fd, const intel_ctx_t *ctx,
 
 	obj_ptr = gem_mmap__device_coherent(gem_fd, obj_handle, 0, 4096, PROT_WRITE);
 
-	batch[0] = MI_STORE_DWORD_IMM;
+	batch[0] = MI_STORE_DWORD_IMM_GEN4;
 	batch[1] = obj_offset + sizeof(*obj_ptr);
 	batch[2] = (obj_offset + sizeof(*obj_ptr)) >> 32;
 	batch[3] = 1;
@@ -807,7 +801,7 @@ create_sema(int gem_fd, uint64_t ahnd,
 {
 	uint32_t cs[] = {
 		/* Reset our semaphore wait */
-		MI_STORE_DWORD_IMM,
+		MI_STORE_DWORD_IMM_GEN4,
 		0,
 		0,
 		1,
@@ -1108,17 +1102,17 @@ event_wait(int gem_fd, const intel_ctx_t *ctx,
 	obj.handle = gem_create(gem_fd, 4096);
 
 	b = batch;
-	*b++ = MI_LOAD_REGISTER_IMM;
+	*b++ = MI_LOAD_REGISTER_IMM(1);
 	*b++ = FORCEWAKE_MT;
 	*b++ = 2 << 16 | 2;
-	*b++ = MI_LOAD_REGISTER_IMM;
+	*b++ = MI_LOAD_REGISTER_IMM(1);
 	*b++ = DERRMR;
 	*b++ = ~0u;
 	*b++ = MI_WAIT_FOR_EVENT;
-	*b++ = MI_LOAD_REGISTER_IMM;
+	*b++ = MI_LOAD_REGISTER_IMM(1);
 	*b++ = DERRMR;
 	*b++ = ~0u;
-	*b++ = MI_LOAD_REGISTER_IMM;
+	*b++ = MI_LOAD_REGISTER_IMM(1);
 	*b++ = FORCEWAKE_MT;
 	*b++ = 2 << 16;
 	*b++ = MI_BATCH_BUFFER_END;

@@ -137,7 +137,7 @@ static void surf_copy(int i915,
 	surf.i915 = i915;
 	surf.print_bb = param.print_bb;
 	set_surf_object(&surf.src, mid->handle, mid->region, mid->size,
-			uc_mocs, INDIRECT_ACCESS);
+			uc_mocs, BLT_INDIRECT_ACCESS);
 	set_surf_object(&surf.dst, ccs, REGION_SMEM, ccssize,
 			uc_mocs, DIRECT_ACCESS);
 	bb_size = 4096;

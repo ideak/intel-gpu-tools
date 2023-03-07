@@ -58,30 +58,17 @@ IGT_TEST_DESCRIPTION("Test the i915 perf metrics streaming interface");
 #define OAREPORT_REASON_GO             (1<<4)
 #define OAREPORT_REASON_CLK_RATIO      (1<<5)
 
-#define GFX_OP_PIPE_CONTROL     ((3 << 29) | (3 << 27) | (2 << 24))
-#define PIPE_CONTROL_CS_STALL	   (1 << 20)
 #define PIPE_CONTROL_GLOBAL_SNAPSHOT_COUNT_RESET	(1 << 19)
-#define PIPE_CONTROL_TLB_INVALIDATE     (1 << 18)
 #define PIPE_CONTROL_SYNC_GFDT	  (1 << 17)
-#define PIPE_CONTROL_MEDIA_STATE_CLEAR  (1 << 16)
 #define PIPE_CONTROL_NO_WRITE	   (0 << 14)
 #define PIPE_CONTROL_WRITE_IMMEDIATE    (1 << 14)
 #define PIPE_CONTROL_WRITE_DEPTH_COUNT  (2 << 14)
-#define PIPE_CONTROL_WRITE_TIMESTAMP    (3 << 14)
-#define PIPE_CONTROL_DEPTH_STALL	(1 << 13)
 #define PIPE_CONTROL_RENDER_TARGET_FLUSH (1 << 12)
 #define PIPE_CONTROL_INSTRUCTION_INVALIDATE (1 << 11)
-#define PIPE_CONTROL_TEXTURE_CACHE_INVALIDATE   (1 << 10) /* GM45+ only */
 #define PIPE_CONTROL_ISP_DIS	    (1 << 9)
 #define PIPE_CONTROL_INTERRUPT_ENABLE   (1 << 8)
-#define PIPE_CONTROL_FLUSH_ENABLE       (1 << 7) /* Gen7+ only */
 /* GT */
 #define PIPE_CONTROL_DATA_CACHE_INVALIDATE      (1 << 5)
-#define PIPE_CONTROL_VF_CACHE_INVALIDATE	(1 << 4)
-#define PIPE_CONTROL_CONST_CACHE_INVALIDATE     (1 << 3)
-#define PIPE_CONTROL_STATE_CACHE_INVALIDATE     (1 << 2)
-#define PIPE_CONTROL_STALL_AT_SCOREBOARD	(1 << 1)
-#define PIPE_CONTROL_DEPTH_CACHE_FLUSH	  (1 << 0)
 #define PIPE_CONTROL_PPGTT_WRITE	(0 << 2)
 #define PIPE_CONTROL_GLOBAL_GTT_WRITE   (1 << 2)
 
@@ -3242,9 +3229,9 @@ emit_stall_timestamp_and_rpc(struct intel_bb *ibb,
 	intel_bb_add_intel_buf(ibb, dst, true);
 
 	if (intel_gen(devid) >= 8)
-		intel_bb_out(ibb, GFX_OP_PIPE_CONTROL | (6 - 2));
+		intel_bb_out(ibb, GFX_OP_PIPE_CONTROL(6));
 	else
-		intel_bb_out(ibb, GFX_OP_PIPE_CONTROL | (5 - 2));
+		intel_bb_out(ibb, GFX_OP_PIPE_CONTROL(5));
 
 	intel_bb_out(ibb, pipe_ctl_flags);
 	intel_bb_emit_reloc(ibb, dst->handle,

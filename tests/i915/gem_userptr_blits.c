@@ -338,7 +338,7 @@ static void store_dword(int fd, uint32_t target,
 	obj[1].relocation_count = 1;
 
 	i = 0;
-	batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+	batch[i] = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 	if (gen >= 8) {
 		batch[++i] = offset;
 		batch[++i] = 0;
@@ -1318,7 +1318,7 @@ static void store_dword_rand(int i915, const intel_ctx_t *ctx,
 
 		offset = reloc[n].presumed_offset + reloc[n].delta;
 
-		batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+		batch[i] = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 		if (gen >= 8) {
 			batch[++i] = offset;
 			batch[++i] = offset >> 32;
@@ -1379,7 +1379,7 @@ static void test_readonly(int i915)
 
 	/*
 	 * We have only a 31bit delta which we use for generating
-	 * the target address for MI_STORE_DWORD_IMM, so our maximum
+	 * the target address for MI_STORE_DWORD_IMM_GEN4, so our maximum
 	 * usable object size is only 2GiB. For now.
 	 */
 	igt_nsec_elapsed(memset(&tv, 0, sizeof(tv)));

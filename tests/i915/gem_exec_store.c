@@ -94,7 +94,7 @@ static void store_dword(int fd, const intel_ctx_t *ctx,
 	}
 
 	i = 0;
-	batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+	batch[i] = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 	if (gen >= 8) {
 		batch[++i] = obj[0].offset;
 		batch[++i] = obj[0].offset >> 32;
@@ -180,7 +180,7 @@ static void store_cachelines(int fd, const intel_ctx_t *ctx,
 		reloc[n].write_domain = I915_GEM_DOMAIN_INSTRUCTION;
 		dst_offset = CANONICAL(reloc[n].presumed_offset + reloc[n].delta);
 
-		batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+		batch[i] = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 		if (gen >= 8) {
 			batch[++i] = dst_offset;
 			batch[++i] = dst_offset >> 32;
@@ -283,7 +283,7 @@ static void store_all(int fd, const intel_ctx_t *ctx)
 
 	offset = sizeof(uint32_t);
 	i = 0;
-	batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+	batch[i] = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 	if (gen >= 8) {
 		batch[address = ++i] = 0;
 		batch[++i] = 0;

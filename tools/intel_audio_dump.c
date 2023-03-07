@@ -48,6 +48,7 @@ static int disp_reg_base = 0;	/* base address of display registers */
 #define BITSTO(n)		(n >= sizeof(long) * 8 ? ~0 : (1UL << (n)) - 1)
 #define BITMASK(high, low)	(BITSTO(high+1) & ~BITSTO(low))
 #define REG_BITS(reg, high, low)	(((reg) & (BITMASK(high, low))) >> (low))
+#undef REG_BIT
 #define REG_BIT(reg, n)		REG_BITS(reg, n, n)
 
 #define min_t(type, x, y) ({                    \

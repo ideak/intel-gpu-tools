@@ -120,7 +120,7 @@ static void test_batch_first(int fd)
 	map = gem_mmap__cpu(fd, obj[0].handle, 0, 4096, PROT_WRITE);
 	gem_set_domain(fd, obj[0].handle,
 			I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
-	map[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+	map[i] = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 	if (gen >= 8) {
 		map[++i] = obj[1].offset;
 		map[++i] = obj[1].offset >> 32;
@@ -152,7 +152,7 @@ static void test_batch_first(int fd)
 	map = gem_mmap__cpu(fd, obj[2].handle, 0, 4096, PROT_WRITE);
 	gem_set_domain(fd, obj[2].handle,
 			I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
-	map[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+	map[i] = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 	if (gen >= 8) {
 		map[++i] = obj[1].offset;
 		map[++i] = obj[1].offset >> 32;

@@ -967,10 +967,7 @@ static void gen8_emit_primitive(struct intel_bb *ibb, uint32_t offset)
 	intel_bb_out(ibb, 0);	/* index buffer offset, ignored */
 }
 
-#define GFX_OP_PIPE_CONTROL    ((3 << 29) | (3 << 27) | (2 << 24))
-#define PIPE_CONTROL_CS_STALL	            (1 << 20)
 #define PIPE_CONTROL_RENDER_TARGET_FLUSH    (1 << 12)
-#define PIPE_CONTROL_FLUSH_ENABLE           (1 << 7)
 #define PIPE_CONTROL_DATA_CACHE_INVALIDATE  (1 << 5)
 #define PIPE_CONTROL_PROTECTEDPATH_DISABLE  (1 << 27)
 #define PIPE_CONTROL_PROTECTEDPATH_ENABLE   (1 << 22)
@@ -986,7 +983,7 @@ static void gen12_emit_pxp_state(struct intel_bb *ibb, bool enable,
 
 	if (enable) {
 		pipe_ctl_flags = PIPE_CONTROL_FLUSH_ENABLE;
-		intel_bb_out(ibb, GFX_OP_PIPE_CONTROL);
+		intel_bb_out(ibb, GFX_OP_PIPE_CONTROL(2));
 		intel_bb_out(ibb, pipe_ctl_flags);
 
 		set_app_id =  MI_SET_APPID |
@@ -1005,7 +1002,7 @@ static void gen12_emit_pxp_state(struct intel_bb *ibb, bool enable,
 			   PIPE_CONTROL_RENDER_TARGET_FLUSH |
 			   PIPE_CONTROL_DATA_CACHE_INVALIDATE |
 			   PIPE_CONTROL_POST_SYNC_OP);
-	intel_bb_out(ibb, GFX_OP_PIPE_CONTROL | 4);
+	intel_bb_out(ibb, GFX_OP_PIPE_CONTROL(6));
 	intel_bb_out(ibb, pipe_ctl_flags);
 	intel_bb_emit_reloc(ibb, ibb->handle, 0, I915_GEM_DOMAIN_COMMAND,
 			    (enable ? pxp_write_op_offset : (pxp_write_op_offset+8)),
@@ -1107,7 +1104,7 @@ void _gen9_render_op(struct intel_bb *ibb,
 
 	if (fast_clear) {
 		for (int i = 0; i < 4; i++) {
-			intel_bb_out(ibb, MI_STORE_DWORD_IMM);
+			intel_bb_out(ibb, MI_STORE_DWORD_IMM_GEN4);
 			intel_bb_emit_reloc(ibb, dst->handle,
 					    I915_GEM_DOMAIN_RENDER, I915_GEM_DOMAIN_RENDER,
                                             dst->cc.offset + i*sizeof(float),

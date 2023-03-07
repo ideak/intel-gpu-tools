@@ -308,7 +308,7 @@ static void __capture1(int fd, int dir, uint64_t ahnd, const intel_ctx_t *ctx,
 			I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
 
 	i = 0;
-	batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+	batch[i] = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 	if (gen >= 8) {
 		batch[++i] = obj[SCRATCH].offset;
 		batch[++i] = obj[SCRATCH].offset >> 32;
@@ -498,7 +498,7 @@ __captureN(int fd, int dir, uint64_t ahnd, const intel_ctx_t *ctx,
 			I915_GEM_DOMAIN_CPU, I915_GEM_DOMAIN_CPU);
 
 	i = 0;
-	batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+	batch[i] = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 	if (gen >= 8) {
 		batch[++i] = obj[0].offset;
 		batch[++i] = obj[0].offset >> 32;

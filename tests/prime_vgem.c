@@ -624,7 +624,7 @@ static void work(int i915, uint64_t ahnd, uint64_t scratch_offset, int dmabuf,
 		store[count].delta = sizeof(uint32_t) * count;
 		store[count].read_domains = I915_GEM_DOMAIN_INSTRUCTION;
 		store[count].write_domain = I915_GEM_DOMAIN_INSTRUCTION;
-		batch[i] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+		batch[i] = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 		if (gen >= 8) {
 			batch[++i] = scratch_offset + store[count].delta;
 			batch[++i] = (scratch_offset + store[count].delta) >> 32;

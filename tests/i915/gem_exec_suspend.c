@@ -159,7 +159,7 @@ static void run_test(int fd, const intel_ctx_t *ctx,
 		}
 
 		b = 0;
-		buf[b] = MI_STORE_DWORD_IMM | (gen < 6 ? 1 << 22 : 0);
+		buf[b] = MI_STORE_DWORD_IMM_GEN4 | (gen < 6 ? 1 << 22 : 0);
 		if (gen >= 8) {
 			buf[++b] = offset;
 			buf[++b] = offset >> 32;
