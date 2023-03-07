@@ -852,7 +852,7 @@ igt_main_args("dac", NULL, help_str, opt_handler, NULL)
 			 force_vebox_dst_copy ? "vebox-" : "",
 			 dst_mode);
 		igt_subtest_with_dynamic(name) {
-			igt_skip_on(IS_DG2(data.devid) &&
+			igt_skip_on((IS_DG2(data.devid) || IS_METEORLAKE(data.devid)) &&
 				    ((t->src_tiling == I915_TILING_Y) ||
 				     (t->src_tiling == I915_TILING_Yf) ||
 				     (t->dst_tiling == I915_TILING_Y) ||
