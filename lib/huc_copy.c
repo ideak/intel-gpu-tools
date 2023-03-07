@@ -80,14 +80,14 @@ gen9_huc_copyfunc(int fd, uint64_t ahnd,
 	buf[i++] = 0;
 	buf[i++] = 0x3;
 
-	buf[i++] = MFX_WAIT;
-	buf[i++] = MFX_WAIT;
+	buf[i++] = HUC_MFX_WAIT;
+	buf[i++] = HUC_MFX_WAIT;
 
 	buf[i++] = HUC_PIPE_MODE_SELECT;
 	buf[i++] = 0;
 	buf[i++] = 0;
 
-	buf[i++] = MFX_WAIT;
+	buf[i++] = HUC_MFX_WAIT;
 
 	memset(reloc, 0, sizeof(reloc));
 

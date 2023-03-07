@@ -31,7 +31,7 @@
 #include "intel_reg.h"
 
 #define PARALLEL_VIDEO_PIPE		(0x3<<29)
-#define MFX_WAIT			(PARALLEL_VIDEO_PIPE|(0x1<<27)|(0x1<<8))
+#define HUC_MFX_WAIT			(PARALLEL_VIDEO_PIPE|(0x1<<27)|(0x1<<8))
 
 #define HUC_IMEM_STATE			(PARALLEL_VIDEO_PIPE|(0x2<<27)|(0xb<<23)|(0x1<<16)|0x3)
 #define HUC_PIPE_MODE_SELECT		(PARALLEL_VIDEO_PIPE|(0x2<<27)|(0xb<<23)|0x1)
