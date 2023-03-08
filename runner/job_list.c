@@ -130,6 +130,7 @@ static void add_subtests(struct job_list *job_list, struct settings *settings,
 		}
 	} else {
 		fprintf(stderr, "Test binary %s died unexpectedly\n", binary);
+		exit(1);
 	}
 }
 
