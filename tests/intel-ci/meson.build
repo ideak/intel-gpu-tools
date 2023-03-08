@@ -5,6 +5,7 @@ intelci_files = [
   'README',
   'blacklist.txt',
   'blacklist-pre-merge.txt',
+  'xe-fast-feedback.testlist',
 ]
 
 install_data(sources : intelci_files, install_dir : datadir)
