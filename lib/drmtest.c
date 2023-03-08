@@ -189,6 +189,7 @@ static const struct module {
 	{ DRIVER_V3D, "v3d" },
 	{ DRIVER_VC4, "vc4" },
 	{ DRIVER_VGEM, "vgem" },
+	{ DRIVER_XE, "xe" },
 	{}
 };
 
@@ -547,6 +548,8 @@ static const char *chipset_to_str(int chipset)
 		return "panfrost";
 	case DRIVER_MSM:
 		return "msm";
+	case DRIVER_XE:
+		return "xe";
 	case DRIVER_ANY:
 		return "any";
 	default:

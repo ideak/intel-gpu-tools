@@ -98,6 +98,10 @@ lib_sources = [
 	'veboxcopy_gen12.c',
 	'igt_msm.c',
 	'igt_dsc.c',
+	'xe/xe_compute.c',
+	'xe/xe_ioctl.c',
+	'xe/xe_query.c',
+	'xe/xe_spin.c'
 ]
 
 lib_deps = [
