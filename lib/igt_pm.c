@@ -1363,3 +1363,21 @@ int igt_pm_get_runtime_suspended_time(struct pci_device *pci_dev)
 
 	return -1;
 }
+
+/**
+ * igt_pm_get_runtime_usage:
+ * @pci_dev: pci device
+ *
+ * Reports the runtime PM usage count of a device.
+ */
+int igt_pm_get_runtime_usage(struct pci_device *pci_dev)
+{
+	char usage_str[64];
+	int usage, fd;
+
+	fd = igt_pm_get_power_attr_fd_rdonly(pci_dev, "runtime_usage");
+	if (igt_pm_read_power_attr(fd, usage_str, 64, true))
+		igt_assert(sscanf(usage_str, "%d", &usage) > 0);
+
+	return usage;
+}
