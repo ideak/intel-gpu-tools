@@ -267,7 +267,7 @@ test_exec(int fd, int gt, int class, int n_engines, int n_execs,
 			batches[j] = batch_addr;
 
 		b = 0;
-		data[i].batch[b++] = MI_STORE_DWORD_IMM;
+		data[i].batch[b++] = MI_STORE_DWORD_IMM_GEN4;
 		data[i].batch[b++] = sdi_addr;
 		data[i].batch[b++] = sdi_addr >> 32;
 		data[i].batch[b++] = 0xc0ffee;
@@ -499,7 +499,7 @@ test_cm(int fd, int gt, int class, int n_engines, int n_execs,
 		int e = i % n_engines;
 
 		b = 0;
-		data[i].batch[b++] = MI_STORE_DWORD_IMM;
+		data[i].batch[b++] = MI_STORE_DWORD_IMM_GEN4;
 		data[i].batch[b++] = sdi_addr;
 		data[i].batch[b++] = sdi_addr >> 32;
 		data[i].batch[b++] = 0xc0ffee;

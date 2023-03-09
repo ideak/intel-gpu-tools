@@ -180,7 +180,7 @@ test_export_dma_buf(struct drm_xe_engine_class_instance *hwe0,
 		syncobj_import_sync_file(fd[1], syncobj, sync_fd);
 
 		/* Do an exec with syncobj as in fence on FD[1] */
-		data[i]->batch[b++] = MI_STORE_DWORD_IMM;
+		data[i]->batch[b++] = MI_STORE_DWORD_IMM_GEN4;
 		data[i]->batch[b++] = sdi_addr;
 		data[i]->batch[b++] = sdi_addr >> 32;
 		data[i]->batch[b++] = 0xc0ffee;
