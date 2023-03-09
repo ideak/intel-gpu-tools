@@ -53,7 +53,7 @@ write_dwords(int fd, uint32_t vm, int n_dwords, uint64_t *addrs)
 		igt_assert(addrs[i] + sizeof(uint32_t) <= batch_addr ||
 			   batch_addr + batch_size <= addrs[i]);
 
-		batch_map[b++] = MI_STORE_DWORD_IMM;
+		batch_map[b++] = MI_STORE_DWORD_IMM_GEN4;
 		batch_map[b++] = addr_low(addrs[i]);
 		batch_map[b++] = addr_high(fd, addrs[i]);
 		batch_map[b++] = hash_addr(addrs[i]);
@@ -485,7 +485,7 @@ shared_pte_page(int fd, struct drm_xe_engine_class_instance *eci, int n_bo,
 		int e = i % n_engines;
 
 		b = 0;
-		data[i]->batch[b++] = MI_STORE_DWORD_IMM;
+		data[i]->batch[b++] = MI_STORE_DWORD_IMM_GEN4;
 		data[i]->batch[b++] = sdi_addr;
 		data[i]->batch[b++] = sdi_addr >> 32;
 		data[i]->batch[b++] = 0xc0ffee;
@@ -534,7 +534,7 @@ shared_pte_page(int fd, struct drm_xe_engine_class_instance *eci, int n_bo,
 
 		b = 0;
 		memset(data[i], 0, sizeof(struct shared_pte_page_data));
-		data[i]->batch[b++] = MI_STORE_DWORD_IMM;
+		data[i]->batch[b++] = MI_STORE_DWORD_IMM_GEN4;
 		data[i]->batch[b++] = sdi_addr;
 		data[i]->batch[b++] = sdi_addr >> 32;
 		data[i]->batch[b++] = 0xc0ffee;
@@ -675,7 +675,7 @@ test_bind_engines_independent(int fd, struct drm_xe_engine_class_instance *eci)
 		 * progress.
 		 */
 		b = 0;
-		data[i].batch[b++] = MI_STORE_DWORD_IMM;
+		data[i].batch[b++] = MI_STORE_DWORD_IMM_GEN4;
 		data[i].batch[b++] = sdi_addr;
 		data[i].batch[b++] = sdi_addr >> 32;
 		data[i].batch[b++] = 0xc0ffee;
@@ -787,7 +787,7 @@ test_bind_array(int fd, struct drm_xe_engine_class_instance *eci, int n_execs,
 		uint64_t sdi_addr = addr + sdi_offset;
 
 		b = 0;
-		data[i].batch[b++] = MI_STORE_DWORD_IMM;
+		data[i].batch[b++] = MI_STORE_DWORD_IMM_GEN4;
 		data[i].batch[b++] = sdi_addr;
 		data[i].batch[b++] = sdi_addr >> 32;
 		data[i].batch[b++] = 0xc0ffee;
@@ -920,7 +920,7 @@ test_large_binds(int fd, struct drm_xe_engine_class_instance *eci,
 
 		data = map + (addr - base_addr);
 		b = 0;
-		data[i].batch[b++] = MI_STORE_DWORD_IMM;
+		data[i].batch[b++] = MI_STORE_DWORD_IMM_GEN4;
 		data[i].batch[b++] = sdi_addr;
 		data[i].batch[b++] = sdi_addr >> 32;
 		data[i].batch[b++] = 0xc0ffee;
@@ -1029,7 +1029,7 @@ static void *hammer_thread(void *tdata)
 		uint64_t sdi_addr = t->addr + sdi_offset;
 
 		b = 0;
-		data->batch[b++] = MI_STORE_DWORD_IMM;
+		data->batch[b++] = MI_STORE_DWORD_IMM_GEN4;
 		data->batch[b++] = sdi_addr;
 		data->batch[b++] = sdi_addr >> 32;
 		data->batch[b++] = 0xc0ffee;
@@ -1155,7 +1155,7 @@ test_munmap_style_unbind(int fd, struct drm_xe_engine_class_instance *eci,
 		data = map + i * page_size;
 
 		b = 0;
-		data->batch[b++] = MI_STORE_DWORD_IMM;
+		data->batch[b++] = MI_STORE_DWORD_IMM_GEN4;
 		data->batch[b++] = sdi_addr;
 		data->batch[b++] = sdi_addr >> 32;
 		data->batch[b++] = 0xc0ffee;
@@ -1212,7 +1212,7 @@ try_again_after_invalidate:
 		if (i < unbind_n_page_offfset ||
 		    i + 1 > unbind_n_page_offfset + unbind_n_pages) {
 			b = 0;
-			data->batch[b++] = MI_STORE_DWORD_IMM;
+			data->batch[b++] = MI_STORE_DWORD_IMM_GEN4;
 			data->batch[b++] = sdi_addr;
 			data->batch[b++] = sdi_addr >> 32;
 			data->batch[b++] = 0xc0ffee;
@@ -1283,7 +1283,7 @@ try_again_after_invalidate:
 		data = map + i * page_size;
 
 		b = 0;
-		data->batch[b++] = MI_STORE_DWORD_IMM;
+		data->batch[b++] = MI_STORE_DWORD_IMM_GEN4;
 		data->batch[b++] = sdi_addr;
 		data->batch[b++] = sdi_addr >> 32;
 		data->batch[b++] = 0xc0ffee;

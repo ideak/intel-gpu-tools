@@ -131,7 +131,7 @@ test_evict(int fd, struct drm_xe_engine_class_instance *eci,
 		addr += bo_size;
 
 		b = 0;
-		data[i].batch[b++] = MI_STORE_DWORD_IMM;
+		data[i].batch[b++] = MI_STORE_DWORD_IMM_GEN4;
 		data[i].batch[b++] = sdi_addr;
 		data[i].batch[b++] = sdi_addr >> 32;
 		data[i].batch[b++] = 0xc0ffee;
@@ -314,7 +314,7 @@ test_evict_cm(int fd, struct drm_xe_engine_class_instance *eci,
 		addr += bo_size;
 
 		b = 0;
-		data[i].batch[b++] = MI_STORE_DWORD_IMM;
+		data[i].batch[b++] = MI_STORE_DWORD_IMM_GEN4;
 		data[i].batch[b++] = sdi_addr;
 		data[i].batch[b++] = sdi_addr >> 32;
 		data[i].batch[b++] = 0xc0ffee;

@@ -200,7 +200,7 @@ test_balancer(int fd, int gt, int class, int n_engines, int n_execs,
 			exec_addr = spin_addr;
 		} else {
 			b = 0;
-			data[i].batch[b++] = MI_STORE_DWORD_IMM;
+			data[i].batch[b++] = MI_STORE_DWORD_IMM_GEN4;
 			data[i].batch[b++] = sdi_addr;
 			data[i].batch[b++] = sdi_addr >> 32;
 			data[i].batch[b++] = 0xc0ffee;
@@ -349,7 +349,7 @@ test_legacy_mode(int fd, struct drm_xe_engine_class_instance *eci,
 			exec_addr = spin_addr;
 		} else {
 			b = 0;
-			data[i].batch[b++] = MI_STORE_DWORD_IMM;
+			data[i].batch[b++] = MI_STORE_DWORD_IMM_GEN4;
 			data[i].batch[b++] = sdi_addr;
 			data[i].batch[b++] = sdi_addr >> 32;
 			data[i].batch[b++] = 0xc0ffee;
@@ -501,7 +501,7 @@ test_compute_mode(int fd, struct drm_xe_engine_class_instance *eci,
 			exec_addr = spin_addr;
 		} else {
 			b = 0;
-			data[i].batch[b++] = MI_STORE_DWORD_IMM;
+			data[i].batch[b++] = MI_STORE_DWORD_IMM_GEN4;
 			data[i].batch[b++] = sdi_addr;
 			data[i].batch[b++] = sdi_addr >> 32;
 			data[i].batch[b++] = 0xc0ffee;

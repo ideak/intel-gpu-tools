@@ -193,7 +193,7 @@ test_exec(int fd, struct drm_xe_engine_class_instance *eci,
 		int e = i % n_engines;
 
 		b = 0;
-		data[i].batch[b++] = MI_STORE_DWORD_IMM;
+		data[i].batch[b++] = MI_STORE_DWORD_IMM_GEN4;
 		data[i].batch[b++] = sdi_addr;
 		data[i].batch[b++] = sdi_addr >> 32;
 		data[i].batch[b++] = 0xc0ffee;

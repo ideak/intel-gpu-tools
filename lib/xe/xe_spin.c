@@ -35,7 +35,7 @@ void xe_spin_init(struct xe_spin *spin, uint64_t addr, bool preempt)
 	spin->start = 0;
 	spin->end = 0xffffffff;
 
-	spin->batch[b++] = MI_STORE_DWORD_IMM;
+	spin->batch[b++] = MI_STORE_DWORD_IMM_GEN4;
 	spin->batch[b++] = start_addr;
 	spin->batch[b++] = start_addr >> 32;
 	spin->batch[b++] = 0xc0ffee;

@@ -143,7 +143,7 @@ test_balancer(int fd, int gt, uint32_t vm, uint64_t addr, uint64_t userptr,
 			batches[j] = batch_addr;
 
 		b = 0;
-		data[i].batch[b++] = MI_STORE_DWORD_IMM;
+		data[i].batch[b++] = MI_STORE_DWORD_IMM_GEN4;
 		data[i].batch[b++] = sdi_addr;
 		data[i].batch[b++] = sdi_addr >> 32;
 		data[i].batch[b++] = 0xc0ffee;
@@ -338,7 +338,7 @@ test_compute_mode(int fd, uint32_t vm, uint64_t addr, uint64_t userptr,
 		int e = i % n_engines;
 
 		b = 0;
-		data[i].batch[b++] = MI_STORE_DWORD_IMM;
+		data[i].batch[b++] = MI_STORE_DWORD_IMM_GEN4;
 		data[i].batch[b++] = sdi_addr;
 		data[i].batch[b++] = sdi_addr >> 32;
 		data[i].batch[b++] = 0xc0ffee;
@@ -563,7 +563,7 @@ test_legacy_mode(int fd, uint32_t vm, uint64_t addr, uint64_t userptr,
 			exec_addr = spin_addr;
 		} else {
 			b = 0;
-			data[i].batch[b++] = MI_STORE_DWORD_IMM;
+			data[i].batch[b++] = MI_STORE_DWORD_IMM_GEN4;
 			data[i].batch[b++] = sdi_addr;
 			data[i].batch[b++] = sdi_addr >> 32;
 			data[i].batch[b++] = 0xc0ffee;
