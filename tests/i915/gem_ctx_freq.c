@@ -174,10 +174,8 @@ static void restore_sysfs_freq(int sig)
 {
 	char buf[256];
 
-	if (igt_sysfs_read(sysfs, "gt_RPn_freq_mhz", buf, sizeof(buf)) > 0) {
-		igt_sysfs_set(sysfs, "gt_idle_freq_mhz", buf);
+	if (igt_sysfs_read(sysfs, "gt_RPn_freq_mhz", buf, sizeof(buf)) > 0)
 		igt_sysfs_set(sysfs, "gt_min_freq_mhz", buf);
-	}
 
 	if (igt_sysfs_read(sysfs, "gt_RP0_freq_mhz", buf, sizeof(buf)) > 0) {
 		igt_sysfs_set(sysfs, "gt_max_freq_mhz", buf);
