@@ -293,6 +293,10 @@ class TestList:
                     for fname in glob.glob(cfg_file):
                         self.filenames.append(fname)
                         has_implemented = True
+            else:
+                for cfg_file in self.filenames:
+                    if cfg_file:
+                        has_implemented = True
 
             has_planned = False
             if include_plan and "planning_files" in self.config:
