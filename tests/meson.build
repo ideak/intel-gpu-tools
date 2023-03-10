@@ -241,6 +241,28 @@ i915_progs = [
 	'sysfs_timeslice_duration',
 ]
 
+xe_progs = [
+	'xe_compute',
+	'xe_dma_buf_sync',
+	'xe_debugfs',
+	'xe_evict',
+	'xe_exec_balancer',
+	'xe_exec_basic',
+	'xe_exec_compute_mode',
+	'xe_exec_fault_mode',
+	'xe_exec_reset',
+	'xe_exec_threads',
+	'xe_guc_pc',
+	'xe_huc_copy',
+	'xe_mmap',
+	'xe_mmio',
+	'xe_pm',
+	'xe_prime_self_import',
+	'xe_query',
+	'xe_vm',
+	'xe_waitfence',
+]
+
 msm_progs = [
 	'msm_mapping',
 	'msm_recovery',
@@ -282,6 +304,16 @@ endforeach
 foreach prog : i915_progs
 	test_executables += executable(prog,
 		   join_paths('i915', prog + '.c'),
+		   dependencies : test_deps,
+		   install_dir : libexecdir,
+		   install_rpath : libexecdir_rpathdir,
+		   install : true)
+	test_list += prog
+endforeach
+
+foreach prog : xe_progs
+	test_executables += executable(prog,
+		   join_paths('xe', prog + '.c'),
 		   dependencies : test_deps,
 		   install_dir : libexecdir,
 		   install_rpath : libexecdir_rpathdir,
