@@ -235,7 +235,6 @@ class TestList:
     def __init__(self, config_fname, include_plan, file_list):
         self.doc = {}
         self.test_number = 0
-        self.min_test_prefix = ''
         self.config = None
         self.filenames = file_list
         self.plan_filenames = []
@@ -494,7 +493,7 @@ class TestList:
         for test in self.doc:                   # pylint: disable=C0206
             fname = self.doc[test]["File"]
 
-            name = re.sub(r'.*tests/', '', fname)
+            name = re.sub(r'.*/', '', fname)
             name = re.sub(r'\.[\w+]$', '', name)
             name = "igt@" + name
 
@@ -548,7 +547,7 @@ class TestList:
         for test in sorted(self.doc.keys()):
             fname = self.doc[test]["File"]
 
-            name = re.sub(r'.*tests/', '', fname)
+            name = re.sub(r'.*/', '', fname)
             name = re.sub(r'\.[ch]', '', name)
             name = "igt@" + name
 
@@ -720,7 +719,7 @@ class TestList:
         for test in sorted(self.doc.keys()):
             fname = self.doc[test]["File"]
 
-            test_name = re.sub(r'.*tests/', '', fname)
+            test_name = re.sub(r'.*/', '', fname)
             test_name = re.sub(r'\.[ch]', '', test_name)
             test_name = "igt@" + test_name
 
@@ -759,10 +758,12 @@ class TestList:
         for i in range(0, len(doc_subtests)): # pylint: disable=C0200
             doc_subtests[i] = re.sub(r'\<[^\>]+\>', r'\\d+', doc_subtests[i])
 
+        test_prefix = os.path.commonprefix(doc_subtests)
+
         # Get a list of tests from
         try:
             result = subprocess.run([ f"{IGT_BUILD_PATH}/{IGT_RUNNER}",
-                                    "-L", "-t",  self.min_test_prefix,
+                                    "-L", "-t",  test_prefix,
                                     f"{IGT_BUILD_PATH}/tests"], check = True,
                                     stdout=subprocess.PIPE, universal_newlines=True)
         except subprocess.CalledProcessError as sub_err:
@@ -823,14 +824,6 @@ class TestList:
         arg_number = 1
         cur_arg = -1
         cur_arg_element = 0
-
-        prefix = re.sub(r'.*tests/', '', fname)
-        prefix = r'igt\@' + re.sub(r'(.*/).*', r'\1', prefix)
-
-        if self.min_test_prefix == '':
-            self.min_test_prefix = prefix
-        elif len(prefix) < len(self.min_test_prefix):
-            self.min_test_prefix = prefix
 
         with open(fname, 'r', encoding='utf8') as handle:
             arg_ref = None
