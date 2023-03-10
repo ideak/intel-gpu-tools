@@ -18,6 +18,10 @@ import re
 import subprocess
 import sys
 
+MIN_PYTHON = (3, 6)
+if sys.version_info < MIN_PYTHON:
+    sys.exit("Python %s.%s or later is required.\n" % MIN_PYTHON) # pylint: disable=C0209
+
 IGT_BUILD_PATH = 'build'
 IGT_RUNNER = 'runner/igt_runner'
 
