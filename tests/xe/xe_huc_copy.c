@@ -9,6 +9,10 @@
  * Sub-category: HuC
  * Functionality: HuC copy
  * Test category: functionality test
+ * TODO: make the test more generic, getting rid of the PCI ID list
+ * GPU requirements: This test currently requires TGL, and runs only if the
+ *	PCI ID is 0x9A60, 0x9A68, 0x9A70, 0x9A40, 0x9A49, 0x9A59, 0x9A78,
+ *	0x9AC0, 0x9AC9, 0x9AD9 or 0x9AF8
  */
 
 #include <string.h>
