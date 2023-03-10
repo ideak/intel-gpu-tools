@@ -11,6 +11,7 @@
 """Maintain test plan and test implementation documentation on IGT."""
 
 import argparse
+import json
 import re
 import subprocess
 import sys
@@ -231,6 +232,42 @@ class TestList:
 
         return subtest_array
 
+    def expand_dictionary(self):
+
+        """ prepares a dictonary with subtest arguments expanded """
+
+        test_dict = {}
+
+        for test in self.doc:                   # pylint: disable=C0206
+            fname = self.doc[test]["File"]
+
+            name = re.sub(r'.*tests/', '', fname)
+            name = re.sub(r'\.[ch]', '', name)
+            name = "igt@" + name
+
+            test_dict[name] = {}
+
+            for field in self.doc[test]:
+                if field == "subtest":
+                    continue
+                if field == "arg":
+                    continue
+
+                test_dict[name][field] = self.doc[test][field]
+
+            subtest_array = self.expand_subtest(fname, name, test)
+            for subtest in subtest_array:
+                summary = subtest["Summary"]
+                test_dict[name][summary] = {}
+                for field in sorted(subtest.keys()):
+                    if field == 'Summary':
+                        continue
+                    if field == 'arg':
+                        continue
+                    test_dict[name][summary][field] = subtest[field]
+
+        return test_dict
+
     #
     # Output methods
     #
@@ -279,6 +316,14 @@ class TestList:
 
             print()
             print()
+
+    def print_json(self, out_fname):
+
+        """Adds the contents of test/subtest documentation form a file"""
+        test_dict = self.expand_dictionary()
+
+        with open(out_fname, "w", encoding='utf8') as write_file:
+            json.dump(test_dict, write_file, indent=4)
 
     #
     # Subtest list methods
@@ -541,6 +586,8 @@ parser = argparse.ArgumentParser(description = "Print formatted kernel documenta
                                  epilog = 'If no action specified, assume --rest.')
 parser.add_argument("--rest", action="store_true",
                     help="Generate documentation from the source files, in ReST file format.")
+parser.add_argument("--to-json",
+                    help="Output test documentation in JSON format as TO_JSON file")
 parser.add_argument("--show-subtests", action="store_true",
                     help="Shows the name of the documented subtests in alphabetical order.")
 parser.add_argument("--check-testlist", action="store_true",
@@ -569,6 +616,10 @@ if parse_args.show_subtests:
 if parse_args.check_testlist:
     RUN = 1
     tests.check_tests()
+
+if parse_args.to_json:
+    RUN = 1
+    tests.print_json(parse_args.to_json)
 
 if not RUN or parse_args.rest:
     tests.print_test()
