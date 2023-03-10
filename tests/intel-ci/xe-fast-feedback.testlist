@@ -1,7 +1,6 @@
 igt@xe/xe_compute@compute-square
 igt@xe/xe_debugfs@base
-igt@xe/xe_debugfs@gt0
-igt@xe/xe_debugfs@gt1
+igt@xe/xe_debugfs@gt
 igt@xe/xe_debugfs@forcewake
 igt@xe/xe_dma_buf_sync@export-dma-buf-once
 igt@xe/xe_dma_buf_sync@export-dma-buf-once-read-sync
