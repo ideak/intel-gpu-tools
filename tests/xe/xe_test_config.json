@@ -4,128 +4,66 @@
     "fields": {
         "Category": {
             "_properties_": {
-                "is_field": true,
                 "description": "Contains the major group for the tested functionality"
             },
-            "Hardware": {
+            "Sub-category": {
                 "_properties_": {
-                    "description": "Harware-supported build blocks"
+                    "description": "Contains the minor group of the functionality"
                 },
-                "Sub-category": {
+                "Functionality": {
                     "_properties_": {
-                        "is_field": true,
-                        "description": "Contains the minor group of the functionality"
-                    },
-                    "Page table": {
-                        "Functionality": {
-                            "_properties_": {
-                                "is_field": true,
-                                "description": "Groups page table tests per functionality"
-                            }
-                        }
-                    },
-                    "Unified Shared Memory building block": {
-                        "Functionality": {
-                            "_properties_": {
-                                "is_field": true,
-                                "description": "Groups page table tests per functionality"
-                            }
-                        }
-                    },
-                    "Compression": {
-                        "Functionality": {
-                            "_properties_": {
-                                "is_field": true
-                            }
-                        }
+                        "description": "Groups page table tests per functionality"
+                    }
+                },
+                "Run type": {
+                    "_properties_": {
+                        "description": "Defines what category of testlist it belongs"
                     }
                 }
             },
-            "Software building block": {
+            "Mega feature": {
                 "_properties_": {
-                    "description": "Software-based building blocks"
-                },
-                "Sub-category": {
-                    "_properties_": {
-                        "is_field": true,
-                        "description": "Contains the minor group of the functionality"
-                    }
-                }
-            },
-            "Software feature": {
-                "Sub-category": {
-                    "_properties_": {
-                        "is_field": true,
-                        "description": "Contains the minor group of the functionality"
-                    }
-                }
-            },
-            "End to end use case": {
-                "Sub-category": {
-                    "_properties_": {
-                        "is_field": true,
-                        "description": "Contains the minor group of the functionality"
-                    }
-                },
-                "Mega feature": {
-                    "_properties_": {
-                        "is_field": true,
-                        "description": "Contains the mega feature for E2E use case"
-                    }
+                    "description": "Contains the mega feature for E2E use case"
                 }
             }
         },
         "Test category": {
             "_properties_": {
-                "is_field": true,
                 "description": "Defines the test category. Usually used at subtest level."
             }
         },
         "Test requirement": {
             "_properties_": {
-                "is_field": true,
                 "description": "Defines Kernel parameters required for the test to run"
-            }
-        },
-        "Run type": {
-            "_properties_": {
-                "is_field": true,
-                "description": "Defines the test primary usage. Usually used at subtest level."
             }
         },
         "Issue": {
             "_properties_": {
-                "is_field": true,
                 "description": "If the test is used to solve an issue, point to the URL containing the issue."
             }
         },
         "GPU excluded platform": {
             "_properties_": {
-                "is_field": true,
                 "description": "Provides a list of GPUs not capable of running the subtest (or the test as a hole)."
             }
         },
         "GPU requirement": {
             "_properties_": {
-                "is_field": true,
                 "description": "Describes any GPU-specific requrirement, like requiring multi-tiles."
             }
         },
         "Depends on" : {
             "_properties_": {
-                "is_field": true,
                 "description": "List other subtests that are required to not be skipped before calling this one."
             }
         },
         "TODO": {
             "_properties_": {
-                "is_field": true,
                 "description": "Point to known missing features at the test or subtest."
             }
         },
         "Description" : {
             "_properties_": {
-                "is_field": true,
                 "description": "Provides a description for the test/subtest."
             }
         }
