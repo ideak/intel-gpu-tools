@@ -3,6 +3,14 @@
  * Copyright © 2021 Intel Corporation
  */
 
+/**
+ * TEST: Check VMA eviction
+ * Category: Software building block
+ * Sub-category: VMA
+ * Functionality: evict
+ * GPU requirements: GPU needs to have dedicated VRAM
+ */
+
 #include "igt.h"
 #include "lib/igt_syncobj.h"
 #include "lib/intel_reg.h"
@@ -449,6 +457,80 @@ static uint64_t calc_bo_size(uint64_t vram_size, int mul, int div)
 {
 	return (ALIGN(vram_size, 0x40000000)  * mul) / div;
 }
+
+/**
+ * SUBTEST: evict-%s
+ * Description:  %arg[1] evict test.
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * arg[1]:
+ *
+ * @small:			small
+ * @small-external:		small external
+ * @small-multi-vm:		small multi VM
+ * @large:			large
+ * @large-external:		large external
+ * @large-multi-vm:		large multi VM
+ * @beng-small:			small bind engine
+ * @beng-small-external:	small external bind engine
+ * @beng-small-multi-vm:	small multi VM bind ending
+ * @beng-large:			large bind engine
+ * @beng-large-external:	large external bind engine
+ * @beng-large-multi-vm:	large multi VM bind engine
+ *
+ * @small-cm:			small compute machine
+ * @small-external-cm:		small external compute machine
+ * @small-multi-vm-cm:		small multi VM compute machine
+ * @large-cm:			large compute machine
+ * @large-external-cm:		large external compute machine
+ * @large-multi-vm-cm:		large multi VM compute machine
+ * @beng-small-cm:		small bind engine compute machine
+ * @beng-small-external-cm:	small external bind engine compute machine
+ * @beng-small-multi-vm-cm:	small multi VM bind ending compute machine
+ * @beng-large-cm:		large bind engine compute machine
+ * @beng-large-external-cm:	large external bind engine compute machine
+ * @beng-large-multi-vm-cm:	large multi VM bind engine compute machine
+ *
+ * @threads-small:		threads small
+ * @cm-threads-small:		compute mode threads small
+ * @mixed-threads-small:	mixed threads small
+ * @mixed-many-threads-small:	mixed many threads small
+ * @threads-large:		threads large
+ * @cm-threads-large:		compute mode threads large
+ * @mixed-threads-large:	mixed threads large
+ * @mixed-many-threads-large:	mixed many threads large
+ * @threads-small-multi-vm:	threads small multi vm
+ * @cm-threads-small-multi-vm:	compute mode threads small multi vm
+ * @mixed-threads-small-multi-vm:
+ * 				mixed threads small multi vm
+ * @threads-large-multi-vm:	threads large multi vm
+ * @cm-threads-large-multi-vm:	compute mode threads large multi vm
+ * @mixed-threads-large-multi-vm:
+ *				mixed threads large multi vm
+ * @beng-threads-small:		bind engine threads small
+ * @beng-cm-threads-small:	bind engine compute mode threads small
+ * @beng-mixed-threads-small:	bind engine mixed threads small
+ * @beng-mixed-many-threads-small:
+ *				bind engine mixed many threads small
+ * @beng-threads-large:		bind engine threads large
+ * @beng-cm-threads-large:	bind engine compute mode threads large
+ * @beng-mixed-threads-large:	bind engine mixed threads large
+ * @beng-mixed-many-threads-large:
+ *				bind engine mixed many threads large
+ * @beng-threads-small-multi-vm:
+ *				bind engine threads small multi vm
+ * @beng-cm-threads-small-multi-vm:
+ *				bind engine compute mode threads small multi vm
+ * @beng-mixed-threads-small-multi-vm:
+ *				bind engine mixed threads small multi vm
+ * @beng-threads-large-multi-vm:
+ *				bind engine threads large multi vm
+ * @beng-cm-threads-large-multi-vm:
+ *				bind engine compute mode threads large multi vm
+ * @beng-mixed-threads-large-multi-vm:
+ *				bind engine mixed threads large multi vm
+ */
 
 /*
  * Table driven test that attempts to cover all possible scenarios of eviction

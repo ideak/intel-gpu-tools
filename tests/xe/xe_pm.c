@@ -3,6 +3,15 @@
  * Copyright © 2022 Intel Corporation
  */
 
+/**
+ * TEST: Check Power Management functionality
+ * Category: Software building block
+ * Sub-category: power management
+ * Test category: functionality test
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ */
+
 #include <limits.h>
 #include <fcntl.h>
 #include <string.h>
@@ -140,6 +149,58 @@ static bool out_of_d3(device_t device, enum igt_acpi_d_state state)
 
 	return true;
 }
+
+/**
+ * SUBTEST: %s-basic
+ * Description: set GPU state to %arg[1] and test suspend/autoresume
+ * GPU requirements: D3 feature should be supported
+ *
+ * SUBTEST: %s-basic-exec
+ * Description: test exec on %arg[1] state once without RPM
+ * GPU requirements: D3 feature should be supported
+ *
+ * SUBTEST: %s-multiple-execs
+ * Description: test exec on %arg[1] state multiple times without RPM
+ * GPU requirements: D3 feature should be supported
+ *
+ * arg[1]:
+ *
+ * @s2idle:	s2idle
+ * @s3:		s3
+ * @s4:		s4
+ * @d3hot:	d3hot
+ * @d3cold:	d3cold
+ */
+
+/**
+ * SUBTEST: %s-exec-after
+ * Description: suspend/autoresume on %arg[1] state and exec after RPM
+ *
+ * arg[1]:
+ *
+ * @s2idle:	s2idle
+ * @s3:		s3
+ * @s4:		s4
+ */
+
+/**
+ * SUBTEST: %s-%s-basic-exec
+ * Description:
+ *	Setup GPU on %arg[2] state then test exec on %arg[1] state
+ * 	without RPM
+ * GPU requirements: D3 feature should be supported
+ *
+ * arg[1]:
+ *
+ * @s2idle:	s2idle
+ * @s3:		s3
+ * @s4:		s4
+ *
+ * arg[2]:
+ *
+ * @d3hot:	d3hot
+ * @d3cold:	d3cold
+ */
 
 static void
 test_exec(device_t device, struct drm_xe_engine_class_instance *eci,

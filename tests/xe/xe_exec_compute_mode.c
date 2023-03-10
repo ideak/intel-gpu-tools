@@ -67,6 +67,8 @@
  *
  * SUBTEST: many-engines-%s
  * Description: Run %arg[1] compute machine test on many engines
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category*
  *
  * arg[1]:
  *

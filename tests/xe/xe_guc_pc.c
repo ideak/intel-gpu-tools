@@ -3,6 +3,14 @@
  * Copyright © 2022 Intel Corporation
  */
 
+/**
+ * TEST: Test GuC frequency request functionality
+ * Category: Firmware building block
+ * Sub-category: GuC
+ * Functionality: frequency request
+ * Test category: functionality test
+ */
+
 #include "igt.h"
 #include "lib/igt_syncobj.h"
 #include "igt_sysfs.h"
@@ -147,6 +155,13 @@ static uint32_t get_freq(int sysfs, int gt_id, const char *freq_name)
 	return freq;
 }
 
+
+/**
+ * SUBTEST: freq_basic_api
+ * Description: Test basic get and set frequency API
+ * Run type: BAT
+ */
+
 static void test_freq_basic_api(int sysfs, int gt_id)
 {
 	uint32_t rpn = get_freq(sysfs, gt_id, "rpn");
@@ -179,6 +194,17 @@ static void test_freq_basic_api(int sysfs, int gt_id)
 	igt_assert(set_freq(sysfs, gt_id, "max", rp0) > 0);
 	igt_assert(get_freq(sysfs, gt_id, "max") == rp0);
 }
+
+/**
+ * SUBTEST: freq_fixed_idle
+ * Description: Test fixed frequency request with engine in idle state
+ * Run type: BAT
+ *
+ * SUBTEST: freq_fixed_exec
+ * Description: Test fixed frequency request when engine is doing some work
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ */
 
 static void test_freq_fixed(int sysfs, int gt_id)
 {
@@ -218,6 +244,17 @@ static void test_freq_fixed(int sysfs, int gt_id)
 	igt_debug("Finished testing fixed request\n");
 }
 
+/**
+ * SUBTEST: freq_range_idle
+ * Description: Test range frequency request with engine in idle state
+ * Run type: BAT
+ *
+ * SUBTEST: freq_range_exec
+ * Description: Test range frequency request when engine is doing some work
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ */
+
 static void test_freq_range(int sysfs, int gt_id)
 {
 	uint32_t rpn = get_freq(sysfs, gt_id, "rpn");
@@ -237,6 +274,13 @@ static void test_freq_range(int sysfs, int gt_id)
 	igt_debug("Finished testing range request\n");
 }
 
+/**
+ * SUBTEST: freq_low_max
+ * Description: Test frequency request to minimal and maximum values
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ */
+
 static void test_freq_low_max(int sysfs, int gt_id)
 {
 	uint32_t rpn = get_freq(sysfs, gt_id, "rpn");
@@ -253,6 +297,13 @@ static void test_freq_low_max(int sysfs, int gt_id)
 	igt_assert(get_freq(sysfs, gt_id, "act") == rpe);
 }
 
+/**
+ * SUBTEST: freq_suspend
+ * Description: Check frequency after returning from suspend
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ */
+
 static void test_suspend(int sysfs, int gt_id)
 {
 	uint32_t rpn = get_freq(sysfs, gt_id, "rpn");
@@ -268,6 +319,18 @@ static void test_suspend(int sysfs, int gt_id)
 	igt_assert(get_freq(sysfs, gt_id, "min") == rpn);
 	igt_assert(get_freq(sysfs, gt_id, "max") == rpn);
 }
+
+/**
+ * SUBTEST: freq_reset
+ * Description: test frequency reset only once
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * SUBTEST: freq_reset_multiple
+ * Description: test frequency reset multiple times
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ */
 
 static void test_reset(int fd, int sysfs, int gt_id, int cycles)
 {
@@ -290,6 +353,17 @@ static void test_reset(int fd, int sysfs, int gt_id, int cycles)
 			     "Failed after %d good cycles\n", i);
 	}
 }
+
+
+/**
+ * SUBTEST: rc6_on_idle
+ * Description: check if GPU is in RC6 on idle
+ * Run type: BAT
+ *
+ * SUBTEST: rc0_on_exec
+ * Description: check if GPU is in RC0 on when doing some work
+ * Run type: BAT
+ */
 
 static bool in_rc6(int sysfs, int gt_id)
 {

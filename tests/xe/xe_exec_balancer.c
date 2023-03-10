@@ -366,8 +366,7 @@ test_exec(int fd, int gt, int class, int n_engines, int n_execs,
  *
  * SUBTEST: twice-cm-%s
  * Description: Run compute mode virtual engine arg[1] test twice
- * Run type: FULL
- * TODO: change ``'Run type' == FULL`` to a better category
+ * Run type: BAT
  *
  * SUBTEST: many-cm-%s
  * Description: Run compute mode virtual engine arg[1] test many times
@@ -379,10 +378,10 @@ test_exec(int fd, int gt, int class, int n_engines, int n_execs,
  * Run type: FULL
  * TODO: change ``'Run type' == FULL`` to a better category
  *
+ *
  * SUBTEST: no-exec-cm-%s
  * Description: Run compute mode virtual engine arg[1] no-exec test
- * Run type: FULL
- * TODO: change ``'Run type' == FULL`` to a better category
+ * Run type: BAT
  *
  * arg[1]:
  *
