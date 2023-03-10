@@ -760,7 +760,7 @@ class TestList:
             result = subprocess.run([ f"{IGT_BUILD_PATH}/{IGT_RUNNER}",
                                     "-L", "-t",  self.min_test_prefix,
                                     f"{IGT_BUILD_PATH}/tests"], check = True,
-                                    capture_output = True, text = True)
+                                    stdout=subprocess.PIPE, universal_newlines=True)
         except subprocess.CalledProcessError as sub_err:
             print(sub_err.stderr)
             print("Error:", sub_err)
