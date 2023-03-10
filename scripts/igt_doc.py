@@ -109,7 +109,6 @@ class TestList:
     SUBTEST as those variables are locally processed on each comment line.
     """
 
-
     def __init__(self):
         self.doc = {}
         self.test_number = 0
@@ -238,7 +237,7 @@ class TestList:
 
     def print_test(self):
 
-        """Print tests and subtests ordered by tests"""
+        """Print tests and subtests"""
 
         for test in sorted(self.doc.keys()):
             fname = self.doc[test]["File"]
@@ -368,7 +367,7 @@ class TestList:
     # File handling methods
     #
 
-    def add_file_documentation(self, fname, field_re):
+    def add_file_documentation(self, fname):
 
         """Adds the contents of test/subtest documentation form a file"""
 
