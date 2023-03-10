@@ -193,7 +193,7 @@ test_query_engines(int fd)
 /**
  * SUBTEST: query-mem-usage
  * Description: Display memory information like memory class, size
- * and alignment.
+ *	and alignment.
  */
 static void
 test_query_mem_usage(int fd)

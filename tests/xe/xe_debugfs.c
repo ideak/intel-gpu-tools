@@ -23,6 +23,10 @@
 #include <sys/types.h>
 #include <dirent.h>
 
+struct {
+	bool warn_on_not_hit;
+} opt = { 0 };
+
 static int validate_entries(int fd, const char *add_path, const char * const str_val[], int str_cnt)
 {
 	int i;
@@ -53,7 +57,7 @@ static int validate_entries(int fd, const char *add_path, const char * const str
 		}
 		if (hit) {
 			found++;
-		} else {
+		} else if (opt.warn_on_not_hit) {
 			not_found++;
 			igt_warn("no test for: %s/%s\n", path, de->d_name);
 		}
@@ -146,14 +150,9 @@ test_base(int fd)
 }
 
 /**
- * SUBTEST: %s
- * Description: Check %arg[1] debugfs devnodes
+ * SUBTEST: gt
+ * Description: Check all gt debugfs devnodes
  * TODO: add support for ``force_reset`` entries
- *
- * arg[1]:
- *
- * @gt0: gt0
- * @gt1: gt1
  */
 static void
 test_gt(int fd, int gt_id)
@@ -222,9 +221,32 @@ test_forcewake(int fd)
 	close(handle);
 }
 
-igt_main
+const char *help_str =
+	"  -w\t--warn-not-hit Produce warnings if it founds a devfs node without tests";
+
+struct option long_options[] = {
+	{ "--warn-not-hit", no_argument, NULL, 'w'},
+	{ 0, 0, 0, 0 }
+};
+
+static int opt_handler(int option, int option_index, void *input)
 {
+	switch (option) {
+	case 'w':
+		opt.warn_on_not_hit = true;
+		break;
+	default:
+		return IGT_OPT_HANDLER_ERROR;
+	}
+
+	return IGT_OPT_HANDLER_SUCCESS;
+}
+
+igt_main_args("", long_options, help_str, opt_handler, NULL)
+{
+	char devnode[PATH_MAX];
 	int fd;
+	int gt;
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_XE);
@@ -236,14 +258,13 @@ igt_main
 		test_base(fd);
 	}
 
-	igt_subtest("gt0") {
-		igt_require(igt_debugfs_exists(fd, "gt0", O_RDONLY));
-		test_gt(fd, 0);
-	}
 
-	igt_subtest("gt1") {
-		igt_require(igt_debugfs_exists(fd, "gt1", O_RDONLY));
-		test_gt(fd, 1);
+	igt_subtest("gt") {
+		for_each_gt(fd, gt) {
+			snprintf(devnode, sizeof(devnode), "gt%d", gt);
+			igt_require(igt_debugfs_exists(fd, devnode, O_RDONLY));
+			test_gt(fd, gt);
+		}
 	}
 
 	igt_subtest("forcewake") {

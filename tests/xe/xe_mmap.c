@@ -21,16 +21,20 @@
 
 
 /**
+ * SUBTEST: system
+ * Description: Test mmap on system memory
+ */
+
+/**
  * SUBTEST: %s
- * Description: Test mmap on %s memory
+ * Description: Test mmap on %arg[1] memory
+ * GPU requirements: GPU needs to have dedicated VRAM
  *
  * arg[1]:
  *
- * @system:		system
  * @vram:		vram
  * @vram-system:	system vram
  */
-
 static void
 test_mmap(int fd, uint32_t flags)
 {

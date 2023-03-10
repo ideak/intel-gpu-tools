@@ -3,6 +3,13 @@
  * Copyright © 2021 Intel Corporation
  */
 
+/**
+ * TEST: Check if VMA functionality is working
+ * Category: Software building block
+ * Sub-category: VMA
+ * Test category: functionality test
+ */
+
 #include "igt.h"
 #include "lib/igt_syncobj.h"
 #include "lib/intel_reg.h"
@@ -72,6 +79,12 @@ write_dwords(int fd, uint32_t vm, int n_dwords, uint64_t *addrs)
 	xe_engine_destroy(fd, engine);
 }
 
+/**
+ * SUBTEST: scratch
+ * Description: Test scratch page creation and write
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ */
 
 static void
 test_scratch(int fd)
@@ -188,6 +201,13 @@ uint64_t addrs_57b[] = {
 	0x1fffffffffffff4ull,
 };
 
+/**
+ * SUBTEST: bind-once
+ * Description: bind once on one BO
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ */
+
 static void
 test_bind_once(int fd)
 {
@@ -197,6 +217,13 @@ test_bind_once(int fd)
 			   xe_vm_create(fd, DRM_XE_VM_CREATE_SCRATCH_PAGE, 0),
 			   1, &addr);
 }
+
+/**
+ * SUBTEST: bind-one-bo-many-times
+ * Description: bind many times on one BO
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ */
 
 static void
 test_bind_one_bo_many_times(int fd)
@@ -211,6 +238,13 @@ test_bind_one_bo_many_times(int fd)
 			   addrs_size, addrs);
 }
 
+/**
+ * SUBTEST: bind-one-bo-many-times-many-vm
+ * Description: Test bind many times and many VM on one BO
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ */
+
 static void
 test_bind_one_bo_many_times_many_vm(int fd)
 {
@@ -221,6 +255,15 @@ test_bind_one_bo_many_times_many_vm(int fd)
 
 	__test_bind_one_bo(fd, 0, addrs_size, addrs);
 }
+
+/**
+ * SUBTEST: unbind-all-%d-vmas
+ * Description: Test unbind all with %arg[1] VMAs
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * arg[1].values: 2, 8
+ */
 
 static void unbind_all(int fd, int n_vmas)
 {
@@ -258,6 +301,18 @@ struct vm_thread_data {
 	size_t bo_size;
 	bool destroy;
 };
+
+/**
+ * SUBTEST: vm-async-ops-err
+ * Description: Test VM async ops error
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * SUBTEST: vm-async-ops-err-destroy
+ * Description: Test VM async ops error destroy
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ */
 
 static void *vm_async_ops_err_thread(void *data)
 {
@@ -412,6 +467,15 @@ static void vm_async_ops_err(int fd, bool destroy)
 
 	pthread_join(thread.thread, NULL);
 }
+
+/**
+ * SUBTEST: shared-%s-page
+ * Description: Test shared arg[1] page
+ * Run type: BAT
+ *
+ * arg[1].values: pte, pde, pde2, pde3
+ */
+
 
 struct shared_pte_page_data {
 	uint32_t batch[16];
@@ -588,6 +652,13 @@ shared_pte_page(int fd, struct drm_xe_engine_class_instance *eci, int n_bo,
 	xe_vm_destroy(fd, vm);
 }
 
+
+/**
+ * SUBTEST: bind-engines-independent
+ * Description: Test independent bind engines
+ * Run type: BAT
+ */
+
 static void
 test_bind_engines_independent(int fd, struct drm_xe_engine_class_instance *eci)
 {
@@ -722,6 +793,28 @@ test_bind_engines_independent(int fd, struct drm_xe_engine_class_instance *eci)
 
 #define BIND_ARRAY_BIND_ENGINE_FLAG	(0x1 << 0)
 
+
+/**
+ * SUBTEST: bind-array-twice
+ * Description: Test bind array twice
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * SUBTEST: bind-array-many
+ * Description: Test bind array many times
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * SUBTEST: bind-array-engine-twice
+ * Description: Test bind array engine twice
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * SUBTEST: bind-array-engine-many
+ * Description: Test bind array engine many times
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ */
 static void
 test_bind_array(int fd, struct drm_xe_engine_class_instance *eci, int n_execs,
 		unsigned int flags)
@@ -840,6 +933,59 @@ test_bind_array(int fd, struct drm_xe_engine_class_instance *eci, int n_execs,
 #define LARGE_BIND_FLAG_MISALIGNED	(0x1 << 0)
 #define LARGE_BIND_FLAG_SPLIT		(0x1 << 1)
 #define LARGE_BIND_FLAG_USERPTR		(0x1 << 2)
+
+/**
+ * SUBTEST: %s-%ld
+ * Description: Test %arg[1] with %arg[2] bind size
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * arg[1]:
+ *
+ * @large-binds: large-binds
+ * @large-split-binds: large-split-binds
+ * @large-misaligned-binds: large-misaligned-binds
+ * @large-split-misaligned-binds: large-split-misaligned-binds
+ * @large-userptr-binds: large-userptr-binds
+ * @large-userptr-split-binds: large-userptr-split-binds
+ * @large-userptr-misaligned-binds: large-userptr-misaligned-binds
+ * @large-userptr-split-misaligned-binds: large-userptr-split-misaligned-binds
+ *
+ * arg[2].values: 2097152, 4194304, 8388608, 16777216, 33554432
+ * arg[2].values: 67108864, 134217728, 268435456, 536870912, 1073741824
+ * arg[2].values: 2147483648
+ */
+
+/**
+ *
+ * SUBTEST: %s-%ld
+ * Description: Test %arg[1] with %arg[2] bind size
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * arg[1]:
+ *
+ * @mixed-binds: mixed-binds
+ * @mixed-misaligned-binds: mixed-misaligned-binds
+ *
+ * arg[2].values: 3145728, 1611661312
+ */
+
+/**
+ *
+ * SUBTEST: %s-%ld
+ * Description: Test %arg[1] with %arg[2] bind size
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * arg[1]:
+ *
+ * @mixed-userptr-binds: mixed-userptr-binds
+ * @mixed-userptr-misaligned-binds: mixed-userptr-misaligned-binds
+ * @mixed-userptr-binds: mixed-userptr-binds
+ *
+ * arg[2].values: 3145728, 1611661312
+ */
 
 static void
 test_large_binds(int fd, struct drm_xe_engine_class_instance *eci,
@@ -1060,6 +1206,59 @@ static void *hammer_thread(void *tdata)
 #define MUNMAP_FLAG_USERPTR		(0x1 << 0)
 #define MUNMAP_FLAG_INVALIDATE		(0x1 << 1)
 #define MUNMAP_FLAG_HAMMER_FIRST_PAGE	(0x1 << 2)
+
+
+/**
+ * SUBTEST: munmap-style-unbind-%s
+ * Description: Test munmap style unbind with %arg[1]
+ *
+ * arg[1]:
+ *
+ * @one-partial:			one partial
+ * @end:				end
+ * @front:				front
+ * @userptr-one-partial:		userptr one partial
+ * @userptr-end:			userptr end
+ * @userptr-front:			userptr front
+ * @userptr-inval-end:			userptr inval end
+ * @userptr-inval-front:		userptr inval front
+ * Run type: BAT
+ */
+
+/**
+ * SUBTEST: munmap-style-unbind-%s
+ * Description: Test munmap style unbind with %arg[1]
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * arg[1]:
+ *
+ * @all:				all
+ * @either-side-partial:		either side partial
+ * @either-side-partial-hammer:		either side partial hammer
+ * @either-side-full:			either side full
+ * @many-all:				many all
+ * @many-either-side-partial:		many either side partial
+ * @many-either-side-partial-hammer:	many either side partial hammer
+ * @many-either-side-full:		many either side full
+ * @many-end:				many end
+ * @many-front:				many front
+ * @userptr-all:			userptr all
+ * @userptr-either-side-partial:	userptr either side partial
+ * @userptr-either-side-full:		userptr either side full
+ * @userptr-many-all:			userptr many all
+ * @userptr-many-either-side-full:	userptr many either side full
+ * @userptr-many-end:			userptr many end
+ * @userptr-many-front:			userptr many front
+ * @userptr-inval-either-side-full:	userptr inval either side full
+ * @userptr-inval-many-all:		userptr inval many all
+ * @userptr-inval-many-either-side-partial:
+ *					userptr inval many either side partial
+ * @userptr-inval-many-either-side-full:
+ *					userptr inval many either side full
+ * @userptr-inval-many-end:		userptr inval many end
+ * @userptr-inval-many-front:		userptr inval many front
+ */
 
 static void
 test_munmap_style_unbind(int fd, struct drm_xe_engine_class_instance *eci,

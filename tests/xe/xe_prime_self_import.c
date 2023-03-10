@@ -25,10 +25,15 @@
  *    Matthew Brost <matthew.brost@intel.com>
  */
 
-/*
- * Testcase: Check whether prime import/export works on the same device
+/**
+ * TEST: Check whether prime import/export works on the same device
+ * Category: Software building block
+ * Sub-category: drm prime
+ * Test category: functionality test
  *
- * ... but with different fds, i.e. the wayland usecase.
+ * Description:
+ *	Check whether prime import/export works on the same device
+ *	but with different fds, i.e. the wayland usecase.
  */
 
 #include "igt.h"
@@ -83,6 +88,12 @@ check_bo(int fd1, uint32_t handle1, int fd2, uint32_t handle2)
 	munmap(ptr2, BO_SIZE);
 }
 
+/**
+ * SUBTEST: basic-with_fd_dup
+ * Description: basic prime import/export with fd_dup
+ * Run type: BAT
+ */
+
 static void test_with_fd_dup(void)
 {
 	int fd1, fd2;
@@ -114,6 +125,13 @@ static void test_with_fd_dup(void)
 	xe_device_put(fd2);
 	close(fd2);
 }
+
+/**
+ * SUBTEST: basic-with_two_bos
+ * Description: basic prime import/export with two BOs
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ */
 
 static void test_with_two_bos(void)
 {
@@ -152,6 +170,13 @@ static void test_with_two_bos(void)
 	close(fd2);
 }
 
+/**
+ * SUBTEST: basic-with_one_bo_two_files
+ * Description: basic prime import/export with one BO and two files
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ */
+
 static void test_with_one_bo_two_files(void)
 {
 	int fd1, fd2;
@@ -182,6 +207,12 @@ static void test_with_one_bo_two_files(void)
 	close(dma_buf_fd1);
 	close(dma_buf_fd2);
 }
+
+/**
+ * SUBTEST: basic-with_one_bo
+ * Description: basic prime import/export with one BO
+ * Run type: BAT
+ */
 
 static void test_with_one_bo(void)
 {
@@ -251,7 +282,13 @@ static void *thread_fn_reimport_vs_close(void *p)
 	return (void *)0;
 }
 
-static void test_reimport_close_race(void)
+/**
+ * SUBTEST: reimport-vs-gem_close-race
+ * Description: Reimport versus gem_close race
+ * Run type: BAT
+ */
+
+ static void test_reimport_close_race(void)
 {
 	pthread_t *threads;
 	int r, i, num_threads;
@@ -342,6 +379,12 @@ static void *thread_fn_export_vs_close(void *p)
 	return (void *)0;
 }
 
+/**
+ * SUBTEST: export-vs-gem_close-race
+ * Description: Export versus gem_close race test
+ * Run type: BAT
+ */
+
 static void test_export_close_race(void)
 {
 	pthread_t *threads;
@@ -396,6 +439,13 @@ static void test_export_close_race(void)
 	igt_assert_eq(obj_count, 0);
 }
 
+/**
+ * SUBTEST: basic-llseek-size
+ * Description: basic BO llseek size test
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ */
+
 static void test_llseek_size(void)
 {
 	int fd, i;
@@ -423,6 +473,13 @@ static void test_llseek_size(void)
 	xe_device_put(fd);
 	close(fd);
 }
+
+/**
+ * SUBTEST: basic-llseek-bad
+ * Description: basid bad BO llseek size test
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ */
 
 static void test_llseek_bad(void)
 {

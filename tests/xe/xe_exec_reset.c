@@ -3,6 +3,14 @@
  * Copyright © 2021 Intel Corporation
  */
 
+/**
+ * TEST: Basic tests for execbuf functionality for virtual and parallel engines
+ * Category: Hardware building block
+ * Sub-category: execbuf
+ * Functionality: reset
+ * Test category: functionality test
+ */
+
 #include "igt.h"
 #include "lib/igt_syncobj.h"
 #include "lib/intel_reg.h"
@@ -13,6 +21,12 @@
 #include "xe/xe_spin.h"
 #include <string.h>
 
+/**
+ * SUBTEST: spin
+ * Description: test spin
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ */
 static void test_spin(int fd, struct drm_xe_engine_class_instance *eci)
 {
 	uint32_t vm;
@@ -87,6 +101,52 @@ static void test_spin(int fd, struct drm_xe_engine_class_instance *eci)
 #define VIRTUAL		(0x1 << 5)
 #define PARALLEL	(0x1 << 6)
 #define CAT_ERROR	(0x1 << 7)
+
+/**
+ * SUBTEST: %s-cancel
+ * Description: Test %arg[1] cancel
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * SUBTEST: %s-engine-reset
+ * Description: Test %arg[1] engine reset
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * SUBTEST: %s-cat-error
+ * Description: Test %arg[1] cat error
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * SUBTEST: %s-gt-reset
+ * Description: Test %arg[1] GT reset
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * SUBTEST: virtual-close-fd-no-exec
+ * Description: Test virtual close fd no-exec
+ * Run type: BAT
+ *
+ * SUBTEST: parallel-close-fd-no-exec
+ * Description: Test parallel close fd no-exec
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * SUBTEST: %s-close-fd
+ * Description: Test %arg[1] close fd
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * SUBTEST: %s-close-engines-close-fd
+ * Description: Test %arg[1] close engines close fd
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * arg[1]:
+ *
+ * @virtual:	virtual
+ * @parallel:	parallel
+ */
 
 static void
 test_balancer(int fd, int gt, int class, int n_engines, int n_execs,
@@ -263,6 +323,42 @@ test_balancer(int fd, int gt, int class, int n_engines, int n_execs,
 	xe_vm_destroy(fd, vm);
 }
 
+/**
+ * SUBTEST: cancel
+ * Description: Test cancel
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * SUBTEST: engine-reset
+ * Description: Test engine reset
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * SUBTEST: cat-error
+ * Description: Test cat error
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * SUBTEST: gt-reset
+ * Description: Test GT reset
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * SUBTEST: close-fd-no-exec
+ * Description: Test close fd no-exec
+ * Run type: BAT
+ *
+ * SUBTEST: close-fd
+ * Description: Test close fd
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * SUBTEST: close-engines-close-fd
+ * Description: Test close engines close fd
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ */
+
 static void
 test_legacy_mode(int fd, struct drm_xe_engine_class_instance *eci,
 		 int n_engines, int n_execs, unsigned int flags)
@@ -407,6 +503,37 @@ test_legacy_mode(int fd, struct drm_xe_engine_class_instance *eci,
 	gem_close(fd, bo);
 	xe_vm_destroy(fd, vm);
 }
+
+/**
+ * SUBTEST: cm-engine-reset
+ * Description: Test compute mode engine reset
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * SUBTEST: cm-cat-error
+ * Description: Test compute mode cat-error
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * SUBTEST: cm-gt-reset
+ * Description: Test compute mode GT reset
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * SUBTEST: cm-close-fd-no-exec
+ * Description: Test compute mode close fd no-exec
+ * Run type: BAT
+ *
+ * SUBTEST: cm-close-fd
+ * Description: Test compute mode close fd
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ *
+ * SUBTEST: cm-close-engines-close-fd
+ * Description: Test compute mode close engines close fd
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ */
 
 static void
 test_compute_mode(int fd, struct drm_xe_engine_class_instance *eci,
@@ -638,6 +765,13 @@ static void *gt_reset_thread(void *data)
 	return NULL;
 }
 
+/**
+ * SUBTEST: gt-reset-stress
+ * Description: Stress GT reset
+ * Test category: stress test
+ * Run type: stress
+ *
+ */
 static void
 gt_reset(int fd, int n_threads, int n_sec)
 {

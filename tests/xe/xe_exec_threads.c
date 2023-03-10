@@ -3,6 +3,14 @@
  * Copyright © 2021 Intel Corporation
  */
 
+/**
+ * TEST: Basic tests for execbuf functionality
+ * Category: Hardware building block
+ * Sub-category: execbuf
+ * Functionality: multi-threads
+ * Test category: functionality test
+ */
+
 #include <fcntl.h>
 
 #include "igt.h"
@@ -778,6 +786,240 @@ static void *vm_async_ops_err_thread(void *data)
 
 	return NULL;
 }
+
+/**
+ * SUBTEST: threads-%s
+ * Description: Run threads %arg[1] test with multi threads
+ * Run type: BAT
+ *
+ * arg[1]:
+ *
+ * @shared-vm-basic:		shared vm basic
+ * @fd-basic:			fd basic
+ * @bal-basic:			bal basic
+ * @cm-basic:			cm basic
+ * @cm-fd-basic:		cm fd basic
+ * @mixed-basic:		mixed basic
+ * @mixed-shared-vm-basic:	mixed shared vm basic
+ * @mixed-fd-basic:		mixed fd basic
+ * @bal-mixed-basic:		bal mixed basic
+ * @bal-mixed-shared-vm-basic:	bal mixed shared vm basic
+ * @bal-mixed-fd-basic:		bal mixed fd basic
+ */
+
+/**
+ * SUBTEST: threads-%s
+ * Description: Run threads %arg[1] test with multi threads
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
+ * arg[1]:
+ * @basic:
+ *	basic
+ * @userptr:
+ *	userptr
+ * @rebind:
+ *	rebind
+ * @rebind-bindengine:
+ *	rebind bindengine
+ * @userptr-rebind:
+ *	userptr rebind
+ * @userptr-invalidate:
+ *	userptr invalidate
+ * @userptr-invalidate-race:
+ *	userptr invalidate race
+ * @shared-vm-userptr:
+ *	shared vm userptr
+ * @shared-vm-rebind:
+ *	shared vm rebind
+ * @shared-vm-rebind-bindengine:
+ *	shared vm rebind bindengine
+ * @shared-vm-userptr-rebind:
+ *	shared vm userptr rebind
+ * @shared-vm-rebind-err:
+ *	shared vm rebind err
+ * @shared-vm-userptr-rebind-err:
+ *	shared vm userptr rebind err
+ * @shared-vm-userptr-invalidate:
+ *	shared vm userptr invalidate
+ * @shared-vm-userptr-invalidate-race:
+ *	shared vm userptr invalidate race
+ * @fd-userptr:
+ *	fd userptr
+ * @fd-rebind:
+ *	fd rebind
+ * @fd-userptr-rebind:
+ *	fd userptr rebind
+ * @fd-userptr-invalidate:
+ *	fd userptr invalidate
+ * @fd-userptr-invalidate-race:
+ *	fd userptr invalidate race
+ * @hang-basic:
+ *	hang basic
+  * @hang-userptr:
+ *	hang userptr
+ * @hang-rebind:
+ *	hang rebind
+ * @hang-userptr-rebind:
+ *	hang userptr rebind
+ * @hang-userptr-invalidate:
+ *	hang userptr invalidate
+ * @hang-userptr-invalidate-race:
+ *	hang userptr invalidate race
+ * @hang-shared-vm-basic:
+ *	hang shared vm basic
+ * @hang-shared-vm-userptr:
+ *	hang shared vm userptr
+ * @hang-shared-vm-rebind:
+ *	hang shared vm rebind
+ * @hang-shared-vm-userptr-rebind:
+ *	hang shared vm userptr rebind
+ * @hang-shared-vm-rebind-err:
+ *	hang shared vm rebind err
+ * @hang-shared-vm-userptr-rebind-err:
+ *	hang shared vm userptr rebind err
+ * @hang-shared-vm-userptr-invalidate:
+ *	hang shared vm userptr invalidate
+ * @hang-shared-vm-userptr-invalidate-race:
+ *	hang shared vm userptr invalidate race
+ * @hang-fd-basic:
+ *	hang fd basic
+ * @hang-fd-userptr:
+ *	hang fd userptr
+ * @hang-fd-rebind:
+ *	hang fd rebind
+ * @hang-fd-userptr-rebind:
+ *	hang fd userptr rebind
+ * @hang-fd-userptr-invalidate:
+ *	hang fd userptr invalidate
+ * @hang-fd-userptr-invalidate-race:
+ *	hang fd userptr invalidate race
+ * @bal-userptr:
+ *	balancer userptr
+ * @bal-rebind:
+ *	balancer rebind
+ * @bal-userptr-rebind:
+ *	balancer userptr rebind
+ * @bal-userptr-invalidate:
+ *	balancer userptr invalidate
+ * @bal-userptr-invalidate-race:
+ *	balancer userptr invalidate race
+ * @bal-shared-vm-basic:
+ *	balancer shared vm basic
+ * @bal-shared-vm-userptr:
+ *	balancer shared vm userptr
+ * @bal-shared-vm-rebind:
+ *	balancer shared vm rebind
+ * @bal-shared-vm-userptr-rebind:
+ *	balancer shared vm userptr rebind
+ * @bal-shared-vm-userptr-invalidate:
+ *	balancer shared vm userptr invalidate
+ * @bal-shared-vm-userptr-invalidate-race:
+ *	balancer shared vm userptr invalidate race
+ * @bal-fd-basic:
+ *	balancer fd basic
+ * @bal-fd-userptr:
+ *	balancer fd userptr
+ * @bal-fd-rebind:
+ *	balancer fd rebind
+ * @bal-fd-userptr-rebind:
+ *	balancer fd userptr rebind
+ * @bal-fd-userptr-invalidate:
+ *	balancer fd userptr invalidate
+ * @bal-fd-userptr-invalidate-race:
+ *	balancer fd userptr invalidate race
+ * @cm-userptr:
+ *	compute mode userptr
+ * @cm-rebind:
+ *	compute mode rebind
+ * @cm-userptr-rebind:
+ *	compute mode userptr rebind
+ * @cm-userptr-invalidate:
+ *	compute mode userptr invalidate
+ * @cm-userptr-invalidate-race:
+ *	compute mode userptr invalidate race
+ * @cm-shared-vm-basic:
+ *	compute mode shared vm basic
+ * @cm-shared-vm-userptr:
+ *	compute mode shared vm userptr
+ * @cm-shared-vm-rebind:
+ *	compute mode shared vm rebind
+ * @cm-shared-vm-userptr-rebind:
+ *	compute mode shared vm userptr rebind
+ * @cm-shared-vm-userptr-invalidate:
+ *	compute mode shared vm userptr invalidate
+ * @cm-shared-vm-userptr-invalidate-race:
+ *	compute mode shared vm userptr invalidate race
+ * @cm-fd-userptr:
+ *	compute mode fd userptr
+ * @cm-fd-rebind:
+ *	compute mode fd rebind
+ * @cm-fd-userptr-rebind:
+ *	compute mode fd userptr rebind
+ * @cm-fd-userptr-invalidate:
+ *	compute mode fd userptr invalidate
+ * @cm-fd-userptr-invalidate-race:
+ *	compute mode fd userptr invalidate race
+ * @mixed-userptr:
+ *	mixed userptr
+ * @mixed-rebind:
+ *	mixed rebind
+ * @mixed-userptr-rebind:
+ *	mixed userptr rebind
+ * @mixed-userptr-invalidate:
+ *	mixed userptr invalidate
+ * @mixed-userptr-invalidate-race:
+ *	mixed userptr invalidate race
+ * @mixed-shared-vm-userptr:
+ *	mixed shared vm userptr
+ * @mixed-shared-vm-rebind:
+ *	mixed shared vm rebind
+ * @mixed-shared-vm-userptr-rebind:
+ *	mixed shared vm userptr rebind
+ * @mixed-shared-vm-userptr-invalidate:
+ *	mixed shared vm userptr invalidate
+ * @mixed-shared-vm-userptr-invalidate-race:
+ *	mixed shared vm userptr invalidate race
+ * @mixed-fd-userptr:
+ *	mixed fd userptr
+ * @mixed-fd-rebind:
+ *	mixed fd rebind
+ * @mixed-fd-userptr-rebind:
+ *	mixed fd userptr rebind
+ * @mixed-fd-userptr-invalidate:
+ *	mixed fd userptr invalidate
+ * @mixed-fd-userptr-invalidate-race:
+ *	mixed fd userptr invalidate race
+ * @bal-mixed-userptr:
+ *	balancer mixed userptr
+ * @bal-mixed-rebind:
+ *	balancer mixed rebind
+ * @bal-mixed-userptr-rebind:
+ *	balancer mixed userptr rebind
+ * @bal-mixed-userptr-invalidate:
+ *	balancer mixed userptr invalidate
+ * @bal-mixed-userptr-invalidate-race:
+ *	balancer mixed userptr invalidate race
+ * @bal-mixed-shared-vm-userptr:
+ *	balancer mixed shared vm userptr
+ * @bal-mixed-shared-vm-rebind:
+ *	balancer mixed shared vm rebind
+ * @bal-mixed-shared-vm-userptr-rebind:
+ *	balancer mixed shared vm userptr rebind
+ * @bal-mixed-shared-vm-userptr-invalidate:
+ *	balancer mixed shared vm userptr invalidate
+ * @bal-mixed-shared-vm-userptr-invalidate-race:
+ *	balancer mixed shared vm userptr invalidate race
+ * @bal-mixed-fd-userptr:
+ *	balancer mixed fd userptr
+ * @bal-mixed-fd-rebind:
+ *	balancer mixed fd rebind
+ * @bal-mixed-fd-userptr-rebind:
+ *	balancer mixed fd userptr rebind
+ * @bal-mixed-fd-userptr-invalidate:
+ *	balancer mixed fd userptr invalidate
+ * @bal-mixed-fd-userptr-invalidate-race:
+ *	balancer mixed fd userptr invalidate race
+ */
 
 static void threads(int fd, int flags)
 {
