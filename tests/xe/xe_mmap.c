@@ -42,8 +42,7 @@ test_mmap(int fd, uint32_t flags)
 	uint64_t mmo;
 	void *map;
 
-	if (flags & vram_memory(fd, 0))
-		igt_require(xe_has_vram(fd));
+	igt_require_f(flags, "Device doesn't support such memory region\n");
 
 	bo = xe_bo_create_flags(fd, 0, 4096, flags);
 	mmo = xe_bo_mmap_offset(fd, bo);
