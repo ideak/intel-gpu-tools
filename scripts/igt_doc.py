@@ -754,14 +754,15 @@ class TestList:
             doc_subtests[i] = re.sub(r'\<[^\>]+\>', r'\\d+', doc_subtests[i])
 
         # Get a list of tests from
-        result = subprocess.run([ f"{IGT_BUILD_PATH}/{IGT_RUNNER}",  # pylint: disable=W1510
-                                "-L", "-t",  self.min_test_prefix,
-                                f"{IGT_BUILD_PATH}/tests"],
-                                capture_output = True, text = True)
-        if result.returncode:
-            print( result.stdout)
-            print("Error:", result.stderr)
-            sys.exit(result.returncode)
+        try:
+            result = subprocess.run([ f"{IGT_BUILD_PATH}/{IGT_RUNNER}",
+                                    "-L", "-t",  self.min_test_prefix,
+                                    f"{IGT_BUILD_PATH}/tests"], check = True,
+                                    capture_output = True, text = True)
+        except subprocess.CalledProcessError as sub_err:
+            print(sub_err.stderr)
+            print("Error:", sub_err)
+            sys.exit(1)
 
         run_subtests = sorted(result.stdout.splitlines())
 
