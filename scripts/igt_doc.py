@@ -147,6 +147,27 @@ class TestList:
          * @userptr-misaligned-binds:	userptr misaligned
          */
 
+    It is also possible to define a list of values that will actually be
+    used by the test and no string replacement is needed.
+    This is done by using one or multiple arg[n].values lines:
+
+        /**
+         * SUBTEST: unbind-all-%d-vmas
+         * Description: unbind all with %arg[1] VMAs
+         *
+         * arg[1].values: 2, 8
+         * arg[1].values: 16, 32
+         */
+
+        /**
+         * SUBTEST: unbind-all-%d-vmas
+         * Description: unbind all with %arg[1] VMAs
+         *
+         * arg[1].values: 64, 128
+         */
+
+    Such feature is specially useful for numeric parameters
+
     The valid `field` values are defined on a JSON configuration file.
 
     The TEST documents the common fields present on all tests. Typically,
@@ -902,6 +923,21 @@ class TestList:
                     else:
                         print(f"{fname}:{file_ln + 1}: Warning: invalid argument: @%s: %s" %
                             (match.group(1), match.group(2)))
+
+                    continue
+
+                # We don't need a multi-lined version here
+                if (match := re.match(r'arg\[(\d+)\]\.values:\s*(.*)', file_line)):
+                    cur_arg = int(match.group(1)) - 1
+
+                    if cur_arg not in self.doc[current_test]["arg"][arg_ref]:
+                        self.doc[current_test]["arg"][arg_ref][cur_arg] = {}
+
+                    values = match.group(2).split(",")
+                    for split_val in values:
+                        if split_val == "":
+                            continue
+                        self.doc[current_test]["arg"][arg_ref][cur_arg][split_val.strip()] = split_val.strip()
 
                     continue
 
