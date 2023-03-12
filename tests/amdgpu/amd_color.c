@@ -196,14 +196,6 @@ static void test_init(data_t *data)
 
 	igt_output_set_pipe(data->output, data->pipe_id);
 
-	data->degamma_lut_size =
-		igt_pipe_obj_get_prop(data->pipe, IGT_CRTC_DEGAMMA_LUT_SIZE);
-	igt_assert_lt(0, data->degamma_lut_size);
-
-	data->regamma_lut_size =
-		igt_pipe_obj_get_prop(data->pipe, IGT_CRTC_GAMMA_LUT_SIZE);
-	igt_assert_lt(0, data->regamma_lut_size);
-
 	data->w = data->mode->hdisplay;
 	data->h = data->mode->vdisplay;
 }
@@ -221,6 +213,8 @@ static void test_fini(data_t *data)
  * matrix if not passed any. The whole pipe should be in linear bypass mode
  * when all the matrices are NULL - CRCs for a linear degamma matrix and
  * a NULL one should match.
+ *
+ * This test skips on DCE because it doesn't support user degamma.
  */
 static void test_crtc_linear_degamma(data_t *data)
 {
@@ -231,6 +225,12 @@ static void test_crtc_linear_degamma(data_t *data)
 
 	test_init(data);
 
+	igt_require(igt_pipe_obj_has_prop(data->pipe, IGT_CRTC_DEGAMMA_LUT));
+
+	data->degamma_lut_size =
+		igt_pipe_obj_get_prop(data->pipe, IGT_CRTC_DEGAMMA_LUT_SIZE);
+	igt_assert_lt(0, data->degamma_lut_size);
+
 	lut_init(&lut_linear, data->degamma_lut_size);
 	lut_gen_linear(&lut_linear, 0xffff);
 
@@ -239,7 +239,6 @@ static void test_crtc_linear_degamma(data_t *data)
 
 	/* Draw the reference image. */
 	igt_plane_set_fb(data->primary, &afb);
-	set_regamma_lut(data, NULL);
 	set_degamma_lut(data, NULL);
 	igt_display_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
 
@@ -252,6 +251,7 @@ static void test_crtc_linear_degamma(data_t *data)
 	igt_pipe_crc_collect_crc(data->pipe_crc, &new_crc);
 	igt_assert_crc_equal(&ref_crc, &new_crc);
 
+	set_degamma_lut(data, NULL);
 	test_fini(data);
 	igt_remove_fb(data->fd, &afb);
 	lut_free(&lut_linear);
@@ -273,6 +273,12 @@ static void test_crtc_linear_regamma(data_t *data)
 
 	test_init(data);
 
+	igt_require(igt_pipe_obj_has_prop(data->pipe, IGT_CRTC_GAMMA_LUT));
+
+	data->regamma_lut_size =
+		igt_pipe_obj_get_prop(data->pipe, IGT_CRTC_GAMMA_LUT_SIZE);
+	igt_assert_lt(0, data->regamma_lut_size);
+
 	lut_init(&lut_linear, data->regamma_lut_size);
 	lut_gen_linear(&lut_linear, 0xffff);
 
@@ -282,7 +288,6 @@ static void test_crtc_linear_regamma(data_t *data)
 	/* Draw the reference image. */
 	igt_plane_set_fb(data->primary, &afb);
 	set_regamma_lut(data, NULL);
-	set_degamma_lut(data, NULL);
 	igt_display_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
 
 	igt_pipe_crc_collect_crc(data->pipe_crc, &ref_crc);
@@ -294,6 +299,7 @@ static void test_crtc_linear_regamma(data_t *data)
 	igt_pipe_crc_collect_crc(data->pipe_crc, &new_crc);
 	igt_assert_crc_equal(&ref_crc, &new_crc);
 
+	set_regamma_lut(data, NULL);
 	test_fini(data);
 	igt_remove_fb(data->fd, &afb);
 	lut_free(&lut_linear);
@@ -305,7 +311,7 @@ static void test_crtc_linear_regamma(data_t *data)
  * being CRC level accurate across a full test gradient but most values should
  * still match.
  *
- * This test can't pass on DCE because it doesn't support non-linear degamma.
+ * This test skips on DCE because it doesn't support user degamma.
  */
 static void test_crtc_lut_accuracy(data_t *data)
 {
@@ -330,6 +336,9 @@ static void test_crtc_lut_accuracy(data_t *data)
 	int i, w, h;
 
 	test_init(data);
+
+	igt_require(igt_pipe_obj_has_prop(data->pipe, IGT_CRTC_DEGAMMA_LUT));
+	igt_require(igt_pipe_obj_has_prop(data->pipe, IGT_CRTC_GAMMA_LUT));
 
 	lut_init(&lut_degamma, data->degamma_lut_size);
 	lut_gen_degamma_srgb(&lut_degamma, 0xffff);
@@ -369,6 +378,8 @@ static void test_crtc_lut_accuracy(data_t *data)
 		igt_assert_crc_equal(&ref_crc, &new_crc);
 	}
 
+	set_degamma_lut(data, NULL);
+	set_regamma_lut(data, NULL);
 	test_fini(data);
 	igt_remove_fb(data->fd, &afb);
 	lut_free(&lut_regamma);
