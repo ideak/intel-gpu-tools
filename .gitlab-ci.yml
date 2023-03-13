@@ -164,8 +164,6 @@ build:tests-debian-meson-mips:
 #################### TEST ##########################
 
 test:ninja-test:
-  tags:
-    - gstreamer
   retry: 2
   dependencies:
     - build:tests-fedora
@@ -173,8 +171,6 @@ test:ninja-test:
   script: meson test -C build --num-processes ${FDO_CI_CONCURRENT:-4}
 
 test:ninja-test-clang:
-  tags:
-    - gstreamer
   retry: 2
   dependencies:
     - build:tests-fedora-clang
@@ -184,8 +180,6 @@ test:ninja-test-clang:
   script: meson test -C build --num-processes ${FDO_CI_CONCURRENT:-4}
 
 test:ninja-test-minimal:
-  tags:
-    - gstreamer
   retry: 2
   image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-minimal:commit-$CI_COMMIT_SHA
   dependencies:
@@ -195,8 +189,6 @@ test:ninja-test-minimal:
 
 # arm testing temporarily disabled until converted to run on native arm HW
 # test:ninja-test-arm64:
-#   tags:
-#     - gstreamer
 #   retry: 2
 #   image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-arm64:commit-$CI_COMMIT_SHA
 #   dependencies:
@@ -212,8 +204,6 @@ test:ninja-test-minimal:
 #     when: on_failure
 #
 # test:ninja-test-armhf:
-#   tags:
-#     - gstreamer
 #   retry: 2
 #   image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-armhf:commit-$CI_COMMIT_SHA
 #   dependencies:
@@ -230,8 +220,6 @@ test:ninja-test-minimal:
 
 # mips testing temporarily disabled
 # test:ninja-test-mips:
-#   tags:
-#     - gstreamer
 #   retry: 2
 #   image: $CI_REGISTRY/$CI_PROJECT_PATH/build-debian-mips:commit-$CI_COMMIT_SHA
 #   dependencies:
