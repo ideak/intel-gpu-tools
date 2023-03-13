@@ -613,7 +613,7 @@ cursor_leak_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 	/* Black background FB */
 	igt_create_color_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
 			    DRM_FORMAT_XRGB8888,
-			    false,
+			    DRM_FORMAT_MOD_LINEAR,
 			    0.0, 0.0, 0.0,
 			    &background_fb);
 
@@ -624,7 +624,7 @@ cursor_leak_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 		b = rand() % 0xFF;
 		igt_create_color_fb(data->drm_fd, 64, 64,
 				    DRM_FORMAT_ARGB8888,
-				    false,
+				    DRM_FORMAT_MOD_LINEAR,
 				    (double)r / 0xFF,
 				    (double)g / 0xFF,
 				    (double)b / 0xFF,

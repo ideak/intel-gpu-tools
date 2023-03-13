@@ -169,7 +169,7 @@ static void run_test_linear_tiling(data_t *data, int pipe, const drmModeModeInfo
 
 		igt_create_color_fb(display->drm_fd, mode->hdisplay,
 				    mode->vdisplay, DRM_FORMAT_XRGB8888,
-				    DRM_FORMAT_MOD_NONE, 1.f, 0.f, 0.f,
+				    DRM_FORMAT_MOD_LINEAR, 1.f, 0.f, 0.f,
 				    &buffer[i]);
 
 		igt_output_set_pipe(output, i);

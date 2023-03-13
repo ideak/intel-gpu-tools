@@ -305,12 +305,12 @@ plane_primary_overlay_mutable_zpos(igt_pipe_t *pipe, igt_output_t *output,
 	uint32_t h_overlay = mode->vdisplay / 2;
 
 	igt_create_color_pattern_fb(pipe->display->drm_fd,
-				    w, h, format_primary, I915_TILING_NONE,
+				    w, h, format_primary, DRM_FORMAT_MOD_LINEAR,
 				    0.2, 0.2, 0.2, &fb_primary);
 
 	igt_create_color_pattern_fb(pipe->display->drm_fd,
 				    w_overlay, h_overlay,
-				    format_overlay, I915_TILING_NONE,
+				    format_overlay, DRM_FORMAT_MOD_LINEAR,
 				    0.2, 0.2, 0.2, &fb_overlay);
 
 	/* Draw a hole in the overlay */
@@ -404,7 +404,7 @@ plane_immutable_zpos(igt_display_t *display, igt_pipe_t *pipe,
 	igt_create_color_fb(display->drm_fd,
 			    w_lower, h_lower,
 			    DRM_FORMAT_XRGB8888,
-			    I915_TILING_NONE,
+			    DRM_FORMAT_MOD_LINEAR,
 			    0.0, 0.0, 0.0, &fb_ref);
 
 	/* create reference image */
@@ -444,14 +444,14 @@ plane_immutable_zpos(igt_display_t *display, igt_pipe_t *pipe,
 	fb_id_lower = igt_create_color_fb(display->drm_fd,
 					  w_lower, h_lower,
 					  DRM_FORMAT_XRGB8888,
-					  I915_TILING_NONE,
+					  DRM_FORMAT_MOD_LINEAR,
 					  0.0, 0.0, 1.0, &fb_lower);
 	igt_assert(fb_id_lower);
 
 	fb_id_upper = igt_create_color_fb(display->drm_fd,
 					  w_upper, h_upper,
 					  DRM_FORMAT_XRGB8888,
-					  I915_TILING_NONE,
+					  DRM_FORMAT_MOD_LINEAR,
 					  1.0, 1.0, 0.0, &fb_upper);
 	igt_assert(fb_id_upper);
 
@@ -516,7 +516,7 @@ static void plane_overlay(igt_pipe_t *pipe, igt_output_t *output, igt_plane_t *p
 	igt_require(format != 0);
 
 	igt_create_pattern_fb(pipe->display->drm_fd, w, h,
-			      format, I915_TILING_NONE, &fb);
+			      format, DRM_FORMAT_MOD_LINEAR, &fb);
 
 	igt_plane_set_fb(plane, &fb);
 	igt_plane_set_position(plane, w/2, h/2);
@@ -551,7 +551,7 @@ static void plane_primary(igt_pipe_t *pipe, igt_plane_t *plane, struct igt_fb *f
 
 	igt_create_color_pattern_fb(pipe->display->drm_fd,
 				    fb->width, fb->height,
-				    fb->drm_format, I915_TILING_NONE,
+				    fb->drm_format, DRM_FORMAT_MOD_LINEAR,
 				    0.2, 0.2, 0.2, &fb2);
 
 	/* Flip the primary plane using the atomic API, and double-check
@@ -600,7 +600,7 @@ static void test_only(igt_pipe_t *pipe_obj,
 
 	igt_create_pattern_fb(pipe_obj->display->drm_fd,
 			     mode->hdisplay, mode->vdisplay,
-			     format, I915_TILING_NONE, &fb);
+			     format, DRM_FORMAT_MOD_LINEAR, &fb);
 	igt_plane_set_fb(primary, &fb);
 	igt_output_set_pipe(output, pipe_obj->pipe);
 
@@ -737,7 +737,7 @@ static void plane_invalid_params(igt_pipe_t *pipe,
 	/* Create a framebuffer too small for the plane configuration. */
 	igt_create_pattern_fb(pipe->display->drm_fd,
 			      fb->width - 1, fb->height - 1,
-			      fb->drm_format, I915_TILING_NONE, &fb2);
+			      fb->drm_format, DRM_FORMAT_MOD_LINEAR, &fb2);
 
 	igt_plane_set_prop_value(plane, IGT_PLANE_FB_ID, fb2.fb_id);
 	plane_commit_atomic_err(plane, ATOMIC_RELAX_NONE, ENOSPC);
@@ -1072,7 +1072,7 @@ static void atomic_plane_damage(igt_pipe_t *pipe, igt_plane_t *plane, struct igt
 
 	/* Color fb with white rect at center */
 	igt_create_color_fb(pipe->display->drm_fd, fb->width, fb->height,
-			    fb->drm_format, I915_TILING_NONE, 0.2, 0.2, 0.2,
+			    fb->drm_format, DRM_FORMAT_MOD_LINEAR, 0.2, 0.2, 0.2,
 			    &fb_1);
 	cr_1 = igt_get_cairo_ctx(pipe->display->drm_fd, &fb_1);
 	igt_paint_color(cr_1, fb->width/4, fb->height/4, fb->width/2,
@@ -1111,7 +1111,7 @@ static void atomic_plane_damage(igt_pipe_t *pipe, igt_plane_t *plane, struct igt
 	 * issue plane update with damage and verify the state.
 	 */
 	igt_create_color_fb(pipe->display->drm_fd, fb->width, fb->height,
-			    fb->drm_format, I915_TILING_NONE, 0.2, 0.2, 0.2,
+			    fb->drm_format, DRM_FORMAT_MOD_LINEAR, 0.2, 0.2, 0.2,
 			    &fb_2);
 
 	damage[0].x1 = fb->width/2;
@@ -1141,7 +1141,7 @@ static void atomic_plane_damage(igt_pipe_t *pipe, igt_plane_t *plane, struct igt
 	/* Reszie fb_1 to be bigger than plane */
 	igt_remove_fb(pipe->display->drm_fd, &fb_1);
 	igt_create_color_fb(pipe->display->drm_fd, fb->width * 2, fb->height,
-			    fb->drm_format, I915_TILING_NONE, 0.2, 0.2, 0.2,
+			    fb->drm_format, DRM_FORMAT_MOD_LINEAR, 0.2, 0.2, 0.2,
 			    &fb_1);
 
 	damage[0].x1 = fb->width;

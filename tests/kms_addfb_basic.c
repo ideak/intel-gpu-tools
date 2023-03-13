@@ -68,10 +68,10 @@ static void invalid_tests(int fd)
 
 	igt_fixture {
 		gem_bo = igt_create_bo_with_dimensions(fd, 1024, 1024,
-			DRM_FORMAT_XRGB8888, 0, 0, NULL, NULL, NULL);
+			DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, 0, NULL, NULL, NULL);
 		igt_assert(gem_bo);
 		gem_bo_small = igt_create_bo_with_dimensions(fd, 1024, 1023,
-			DRM_FORMAT_XRGB8888, 0, 0, NULL, NULL, NULL);
+			DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, 0, NULL, NULL, NULL);
 		igt_assert(gem_bo_small);
 
 		f.handles[0] = gem_bo;
@@ -276,7 +276,7 @@ static void pitch_tests(int fd)
 
 	igt_fixture {
 		gem_bo = igt_create_bo_with_dimensions(fd, 1024, 1024,
-			DRM_FORMAT_XRGB8888, 0, 0, NULL, NULL, NULL);
+			DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, 0, NULL, NULL, NULL);
 		igt_assert(gem_bo);
 	}
 
@@ -417,10 +417,10 @@ static void size_tests(int fd)
 		igt_display_require(&display, fd);
 
 		gem_bo = igt_create_bo_with_dimensions(fd, 1024, 1024,
-			DRM_FORMAT_XRGB8888, 0, 0, NULL, NULL, NULL);
+			DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, 0, NULL, NULL, NULL);
 		igt_assert(gem_bo);
 		gem_bo_small = igt_create_bo_with_dimensions(fd, 1024, 1023,
-			DRM_FORMAT_XRGB8888, 0, 0, NULL, NULL, NULL);
+			DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, 0, NULL, NULL, NULL);
 		igt_assert(gem_bo_small);
 	}
 
@@ -513,7 +513,7 @@ static void addfb25_tests(int fd)
 
 	igt_fixture {
 		gem_bo = igt_create_bo_with_dimensions(fd, 1024, 1024,
-			DRM_FORMAT_XRGB8888, 0, 0, NULL, NULL, NULL);
+			DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, 0, NULL, NULL, NULL);
 		igt_assert(gem_bo);
 
 		memset(&f, 0, sizeof(f));
@@ -597,10 +597,10 @@ static void addfb25_ytile(int fd)
 		igt_display_require(&display, fd);
 
 		gem_bo = igt_create_bo_with_dimensions(fd, 1024, 1024,
-			DRM_FORMAT_XRGB8888, 0, 0, NULL, NULL, NULL);
+			DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, 0, NULL, NULL, NULL);
 		igt_assert(gem_bo);
 		gem_bo_small = igt_create_bo_with_dimensions(fd, 1024, 1023,
-			DRM_FORMAT_XRGB8888, 0, 0, NULL, NULL, NULL);
+			DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, 0, NULL, NULL, NULL);
 		igt_assert(gem_bo_small);
 
 		memset(&f, 0, sizeof(f));
@@ -670,7 +670,7 @@ static void addfb25_4tile(int fd)
 		igt_display_require(&display, fd);
 
 		gem_bo = igt_create_bo_with_dimensions(fd, 1024, 1024,
-				DRM_FORMAT_XRGB8888, 0, 0, NULL, NULL, NULL);
+				DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, 0, NULL, NULL, NULL);
 		igt_assert(gem_bo);
 
 		memset(&f, 0, sizeof(f));
@@ -719,7 +719,7 @@ static void prop_tests(int fd)
 
 	igt_fixture {
 		gem_bo = igt_create_bo_with_dimensions(fd, 1024, 1024,
-			DRM_FORMAT_XRGB8888, 0, 0, NULL, NULL, NULL);
+			DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, 0, NULL, NULL, NULL);
 		igt_assert(gem_bo);
 
 		f.handles[0] = gem_bo;
@@ -780,7 +780,7 @@ static void master_tests(int fd)
 
 	igt_fixture {
 		gem_bo = igt_create_bo_with_dimensions(fd, 1024, 1024,
-			DRM_FORMAT_XRGB8888, 0, 0, NULL, NULL, NULL);
+			DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, 0, NULL, NULL, NULL);
 		igt_assert(gem_bo);
 
 		f.handles[0] = gem_bo;

@@ -64,9 +64,9 @@ static void run_extendedmode_basic(data_t *data, int pipe1, int pipe2)
 	pipe_crc[1] = igt_pipe_crc_new(data->drm_fd, pipe2, IGT_PIPE_CRC_SOURCE_AUTO);
 
 	igt_create_color_fb(data->drm_fd, mode[0]->hdisplay, mode[0]->vdisplay,
-			     DRM_FORMAT_XRGB8888, 0, 1, 0, 0, &fbs[0]);
+			    DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, 1, 0, 0, &fbs[0]);
 	igt_create_color_fb(data->drm_fd, mode[1]->hdisplay, mode[1]->vdisplay,
-			     DRM_FORMAT_XRGB8888, 0, 0, 0, 1, &fbs[1]);
+			    DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, 0, 0, 1, &fbs[1]);
 
 	plane[0] = igt_pipe_get_plane_type(&display->pipes[pipe1], DRM_PLANE_TYPE_PRIMARY);
 	plane[1] = igt_pipe_get_plane_type(&display->pipes[pipe2], DRM_PLANE_TYPE_PRIMARY);
@@ -88,7 +88,8 @@ static void run_extendedmode_basic(data_t *data, int pipe1, int pipe2)
 	width = mode[0]->hdisplay + mode[1]->hdisplay;
 	height = max(mode[0]->vdisplay, mode[1]->vdisplay);
 
-	igt_create_fb(data->drm_fd, width, height, DRM_FORMAT_XRGB8888, 0, &fb);
+	igt_create_fb(data->drm_fd, width, height,
+		      DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, &fb);
 	cr = igt_get_cairo_ctx(data->drm_fd, &fb);
 	igt_paint_color(cr, 0, 0, mode[0]->hdisplay, mode[0]->vdisplay, 1, 0, 0);
 	igt_paint_color(cr, mode[0]->hdisplay, 0, mode[1]->hdisplay, mode[1]->vdisplay, 0, 0, 1);

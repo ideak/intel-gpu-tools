@@ -174,7 +174,7 @@ static void test_handle_input(int fd)
 		add.pixel_format = DRM_FORMAT_XRGB8888;
 		add.pitches[0] = 1024*4;
 		add.handles[0] = igt_create_bo_with_dimensions(fd, 1024, 1024,
-			DRM_FORMAT_XRGB8888, 0, 0, NULL, NULL, NULL);
+			DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, 0, NULL, NULL, NULL);
 		igt_require(add.handles[0] != 0);
 		do_ioctl(fd, DRM_IOCTL_MODE_ADDFB2, &add);
 	}
@@ -229,7 +229,7 @@ static void test_duplicate_handles(int fd)
 		add.pixel_format = DRM_FORMAT_XRGB8888;
 		add.pitches[0] = 1024*4;
 		add.handles[0] = igt_create_bo_with_dimensions(fd, 1024, 1024,
-			DRM_FORMAT_XRGB8888, 0, 0, NULL, NULL, NULL);
+			DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, 0, NULL, NULL, NULL);
 		igt_assert(add.handles[0]);
 		do_ioctl(fd, DRM_IOCTL_MODE_ADDFB2, &add);
 	}
@@ -296,7 +296,7 @@ static void test_getfb2(int fd)
 		add_basic.pixel_format = DRM_FORMAT_XRGB8888;
 		add_basic.pitches[0] = 1024*4;
 		add_basic.handles[0] = igt_create_bo_with_dimensions(fd, 1024, 1024,
-			DRM_FORMAT_XRGB8888, 0, 0, NULL, NULL, NULL);
+			DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, 0, NULL, NULL, NULL);
 		igt_assert(add_basic.handles[0]);
 		do_ioctl(fd, DRM_IOCTL_MODE_ADDFB2, &add_basic);
 
@@ -403,7 +403,7 @@ static void test_handle_protection(void) {
 		non_master_add.pixel_format = DRM_FORMAT_XRGB8888;
 		non_master_add.pitches[0] = 1024*4;
 		non_master_add.handles[0] = igt_create_bo_with_dimensions(non_master_fd, 1024, 1024,
-			DRM_FORMAT_XRGB8888, 0, 0, NULL, NULL, NULL);
+			DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, 0, NULL, NULL, NULL);
 		igt_require(non_master_add.handles[0] != 0);
 		do_ioctl(non_master_fd, DRM_IOCTL_MODE_ADDFB2, &non_master_add);
 	}

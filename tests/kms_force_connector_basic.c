@@ -68,8 +68,8 @@ static void force_load_detect(int drm_fd, drmModeConnectorPtr connector, drmMode
 	/* No load detect on HDMI. */
 	igt_require(connector->connector_type == DRM_MODE_CONNECTOR_VGA);
 
-	igt_create_fb(drm_fd, w, h, DRM_FORMAT_XRGB8888, 0, &xrgb_fb);
-	igt_create_fb(drm_fd, w, h, DRM_FORMAT_ARGB8888, 0, &argb_fb);
+	igt_create_fb(drm_fd, w, h, DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, &xrgb_fb);
+	igt_create_fb(drm_fd, w, h, DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_LINEAR, &argb_fb);
 	igt_assert(drmSetClientCap(drm_fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1) == 0);
 
 	/*

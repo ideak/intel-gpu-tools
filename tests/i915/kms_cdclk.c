@@ -158,7 +158,7 @@ static void test_plane_scaling(data_t *data, enum pipe pipe, igt_output_t *outpu
 		igt_create_color_pattern_fb(display->drm_fd,
 					    mode->hdisplay, mode->vdisplay,
 					    DRM_FORMAT_XRGB8888,
-					    I915_TILING_NONE,
+					    DRM_FORMAT_MOD_LINEAR,
 					    0.0, 0.0, 0.0, &fb);
 		igt_plane_set_fb(primary, &fb);
 
@@ -212,7 +212,7 @@ static void test_mode_transition(data_t *data, enum pipe pipe, igt_output_t *out
 	igt_create_color_pattern_fb(display->drm_fd,
 				    mode->hdisplay, mode->vdisplay,
 				    DRM_FORMAT_XRGB8888,
-				    I915_TILING_NONE,
+				    DRM_FORMAT_MOD_LINEAR,
 				    0.0, 0.0, 0.0, &fb);
 
 	/* switch to lower resolution */

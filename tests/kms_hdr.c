@@ -148,7 +148,8 @@ static void test_bpc_switch_on_output(data_t *data, enum pipe pipe,
 	int afb_id, ret;
 
 	/* 10-bit formats are slow, so limit the size. */
-	afb_id = igt_create_fb(data->fd, 512, 512, DRM_FORMAT_XRGB2101010, 0, &afb);
+	afb_id = igt_create_fb(data->fd, 512, 512,
+			       DRM_FORMAT_XRGB2101010, DRM_FORMAT_MOD_LINEAR, &afb);
 	igt_assert(afb_id);
 
 	draw_hdr_pattern(&afb);
@@ -396,7 +397,8 @@ static void test_static_toggle(data_t *data, enum pipe pipe,
 	int afb_id;
 
 	/* 10-bit formats are slow, so limit the size. */
-	afb_id = igt_create_fb(data->fd, 512, 512, DRM_FORMAT_XRGB2101010, 0, &afb);
+	afb_id = igt_create_fb(data->fd, 512, 512,
+			       DRM_FORMAT_XRGB2101010, DRM_FORMAT_MOD_LINEAR, &afb);
 	igt_assert(afb_id);
 
 	draw_hdr_pattern(&afb);
@@ -478,7 +480,8 @@ static void test_static_swap(data_t *data, enum pipe pipe, igt_output_t *output)
 	struct hdr_output_metadata hdr;
 
 	/* 10-bit formats are slow, so limit the size. */
-	afb_id = igt_create_fb(data->fd, 512, 512, DRM_FORMAT_XRGB2101010, 0, &afb);
+	afb_id = igt_create_fb(data->fd, 512, 512,
+			       DRM_FORMAT_XRGB2101010, DRM_FORMAT_MOD_LINEAR, &afb);
 	igt_assert(afb_id);
 
 	draw_hdr_pattern(&afb);

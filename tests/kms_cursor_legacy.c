@@ -193,7 +193,7 @@ static igt_output_t *set_fb_on_crtc(igt_display_t *display, enum pipe pipe, stru
 
 		igt_create_pattern_fb(display->drm_fd,
 			      mode->hdisplay, mode->vdisplay,
-			      DRM_FORMAT_XRGB8888, I915_TILING_NONE, fb_info);
+			      DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, fb_info);
 
 		primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 		igt_plane_set_fb(primary, fb_info);
@@ -386,7 +386,7 @@ static void prepare_flip_test(igt_display_t *display,
 
 		igt_skip_on(width <= 64 && height <= 64);
 		igt_create_color_fb(display->drm_fd, width, height,
-				    DRM_FORMAT_ARGB8888, 0, 1., 0., .7, cursor_fb2);
+				    DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_LINEAR, 1., 0., .7, cursor_fb2);
 
 		arg[0].flags = arg[1].flags = DRM_MODE_CURSOR_BO;
 		arg[1].handle = cursor_fb2->gem_handle;
@@ -412,7 +412,7 @@ static void prepare_flip_test(igt_display_t *display,
 		            display->pipes[flip_pipe].planes[1].type != DRM_PLANE_TYPE_CURSOR);
 
 		igt_create_color_pattern_fb(display->drm_fd, prim_fb->width, prim_fb->height,
-					    DRM_FORMAT_ARGB8888, 0, .1, .1, .1, argb_fb);
+					    DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_LINEAR, .1, .1, .1, argb_fb);
 	}
 }
 
@@ -458,9 +458,11 @@ static void flip(igt_display_t *display,
 		}
 	}
 
-	igt_create_color_fb(display->drm_fd, fb_info.width, fb_info.height, DRM_FORMAT_ARGB8888, 0, .5, .5, .5, &cursor_fb);
+	igt_create_color_fb(display->drm_fd, fb_info.width, fb_info.height,
+			    DRM_FORMAT_ARGB8888, DRM_FORMAT_MOD_LINEAR, .5, .5, .5, &cursor_fb);
 
-	igt_create_color_fb(display->drm_fd, 64, 64, DRM_FORMAT_ARGB8888, 0, 1., 1., 1., &cursor_fb);
+	igt_create_color_fb(display->drm_fd, 64, 64, DRM_FORMAT_ARGB8888,
+			    DRM_FORMAT_MOD_LINEAR, 1., 1., 1., &cursor_fb);
 	cursor = set_cursor_on_pipe(display, cursor_pipe, &cursor_fb);
 	populate_cursor_args(display, cursor_pipe, arg, &cursor_fb);
 
@@ -564,7 +566,8 @@ static void basic_flip_cursor(igt_display_t *display,
 
 	igt_require((output = set_fb_on_crtc(display, pipe, &fb_info)));
 
-	igt_create_color_fb(display->drm_fd, 64, 64, DRM_FORMAT_ARGB8888, 0, 1., 1., 1., &cursor_fb);
+	igt_create_color_fb(display->drm_fd, 64, 64, DRM_FORMAT_ARGB8888,
+			    DRM_FORMAT_MOD_LINEAR, 1., 1., 1., &cursor_fb);
 	cursor = set_cursor_on_pipe(display, pipe, &cursor_fb);
 	populate_cursor_args(display, pipe, arg, &cursor_fb);
 
@@ -728,7 +731,8 @@ static void flip_vs_cursor(igt_display_t *display, enum flip_test mode, int nloo
 
 	igt_require((output = set_fb_on_crtc(display, pipe, &fb_info)));
 
-	igt_create_color_fb(display->drm_fd, 64, 64, DRM_FORMAT_ARGB8888, 0, 1., 1., 1., &cursor_fb);
+	igt_create_color_fb(display->drm_fd, 64, 64, DRM_FORMAT_ARGB8888,
+			    DRM_FORMAT_MOD_LINEAR, 1., 1., 1., &cursor_fb);
 	cursor = set_cursor_on_pipe(display, pipe, &cursor_fb);
 	populate_cursor_args(display, pipe, arg, &cursor_fb);
 
@@ -852,7 +856,8 @@ static void nonblocking_modeset_vs_cursor(igt_display_t *display, int loops)
 	igt_require(display->is_atomic);
 	igt_require((output = set_fb_on_crtc(display, pipe, &fb_info)));
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
-	igt_create_color_fb(display->drm_fd, 64, 64, DRM_FORMAT_ARGB8888, 0, 1., 1., 1., &cursor_fb);
+	igt_create_color_fb(display->drm_fd, 64, 64, DRM_FORMAT_ARGB8888,
+			    DRM_FORMAT_MOD_LINEAR, 1., 1., 1., &cursor_fb);
 	cursor = set_cursor_on_pipe(display, pipe, &cursor_fb);
 	populate_cursor_args(display, pipe, arg, &cursor_fb);
 	arg[0].flags |= DRM_MODE_CURSOR_BO;
@@ -972,7 +977,8 @@ static void two_screens_flip_vs_cursor(igt_display_t *display, int nloops, bool 
 		igt_require((output2 = set_fb_on_crtc(display, pipe2, &fb2_info)));
 	}
 
-	igt_create_color_fb(display->drm_fd, 64, 64, DRM_FORMAT_ARGB8888, 0, 1., 1., 1., &cursor_fb);
+	igt_create_color_fb(display->drm_fd, 64, 64, DRM_FORMAT_ARGB8888,
+			    DRM_FORMAT_MOD_LINEAR, 1., 1., 1., &cursor_fb);
 	cursor = set_cursor_on_pipe(display, pipe, &cursor_fb);
 	populate_cursor_args(display, pipe, arg1, &cursor_fb);
 
@@ -1137,7 +1143,8 @@ static void cursor_vs_flip(igt_display_t *display, enum flip_test mode, int nloo
 	igt_require((output = set_fb_on_crtc(display, pipe, &fb_info)));
 	vrefresh = igt_output_get_mode(output)->vrefresh;
 
-	igt_create_color_fb(display->drm_fd, 64, 64, DRM_FORMAT_ARGB8888, 0, 1., 1., 1., &cursor_fb);
+	igt_create_color_fb(display->drm_fd, 64, 64, DRM_FORMAT_ARGB8888,
+			    DRM_FORMAT_MOD_LINEAR, 1., 1., 1., &cursor_fb);
 	cursor = set_cursor_on_pipe(display, pipe, &cursor_fb);
 	populate_cursor_args(display, pipe, arg, &cursor_fb);
 
@@ -1249,7 +1256,8 @@ static void two_screens_cursor_vs_flip(igt_display_t *display, int nloops, bool 
 		igt_require((outputs[1] = set_fb_on_crtc(display, pipe[1], &fb_info[1])));
 	}
 
-	igt_create_color_fb(display->drm_fd, 64, 64, DRM_FORMAT_ARGB8888, 0, 1., 1., 1., &cursor_fb);
+	igt_create_color_fb(display->drm_fd, 64, 64, DRM_FORMAT_ARGB8888,
+			    DRM_FORMAT_MOD_LINEAR, 1., 1., 1., &cursor_fb);
 
 	cursors[0] = set_cursor_on_pipe(display, pipe[0], &cursor_fb);
 	populate_cursor_args(display, pipe[0], arg[0], &cursor_fb);
@@ -1357,7 +1365,8 @@ static void flip_vs_cursor_crc(igt_display_t *display, bool atomic)
 
 	igt_require((output = set_fb_on_crtc(display, pipe, &fb_info)));
 
-	igt_create_color_fb(display->drm_fd, 64, 64, DRM_FORMAT_ARGB8888, 0, 1., 1., 1., &cursor_fb);
+	igt_create_color_fb(display->drm_fd, 64, 64, DRM_FORMAT_ARGB8888,
+			    DRM_FORMAT_MOD_LINEAR, 1., 1., 1., &cursor_fb);
 	populate_cursor_args(display, pipe, arg, &cursor_fb);
 
 	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
@@ -1430,7 +1439,8 @@ static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
 	igt_create_color_pattern_fb(display->drm_fd, fb_info[0].width, fb_info[0].height,
 				    DRM_FORMAT_XRGB8888, I915_FORMAT_MOD_X_TILED, .1, .1, .1, &fb_info[1]);
 
-	igt_create_color_fb(display->drm_fd, 64, 64, DRM_FORMAT_ARGB8888, 0, 1., 1., 1., &cursor_fb);
+	igt_create_color_fb(display->drm_fd, 64, 64, DRM_FORMAT_ARGB8888,
+			    DRM_FORMAT_MOD_LINEAR, 1., 1., 1., &cursor_fb);
 	populate_cursor_args(display, pipe, arg, &cursor_fb);
 
 	igt_display_commit2(display, display->is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);

@@ -702,7 +702,7 @@ static void setup_fb(int fd, int width, int height,
 {
 	igt_create_color_pattern_fb(fd, width, height,
 				    DRM_FORMAT_XRGB8888,
-				    I915_TILING_NONE,
+				    DRM_FORMAT_MOD_LINEAR,
 				    r, g, b, fb);
 }
 
@@ -787,17 +787,17 @@ test_invalid_num_scalers(data_t *d, enum pipe pipe, igt_output_t *output)
 	igt_create_color_pattern_fb(display->drm_fd,
                                     width, height,
                                     DRM_FORMAT_XRGB8888,
-                                    I915_TILING_NONE,
+                                    DRM_FORMAT_MOD_LINEAR,
                                     1.0, 0.0, 0.0, &d->fb[0]);
 	igt_create_color_pattern_fb(display->drm_fd,
                                     width, height,
                                     DRM_FORMAT_XRGB8888,
-                                    I915_TILING_NONE,
+                                    DRM_FORMAT_MOD_LINEAR,
                                     0.0, 1.0, 0.0, &d->fb[1]);
 	igt_create_color_pattern_fb(display->drm_fd,
                                     width, height,
                                     DRM_FORMAT_XRGB8888,
-                                    I915_TILING_NONE,
+                                    DRM_FORMAT_MOD_LINEAR,
                                     0.0, 0.0, 1.0, &d->fb[2]);
 
 	igt_plane_set_fb(plane[0], &d->fb[0]);
@@ -854,16 +854,16 @@ static void test_scaler_with_multi_pipe_plane(data_t *d)
 
 	igt_create_pattern_fb(d->drm_fd, 600, 600,
 			      DRM_FORMAT_XRGB8888,
-			      I915_TILING_NONE, &d->fb[0]);
+			      DRM_FORMAT_MOD_LINEAR, &d->fb[0]);
 	igt_create_pattern_fb(d->drm_fd, 500, 500,
 			      DRM_FORMAT_XRGB8888,
-			      I915_TILING_NONE, &d->fb[1]);
+			      DRM_FORMAT_MOD_LINEAR, &d->fb[1]);
 	igt_create_pattern_fb(d->drm_fd, 700, 700,
 			      DRM_FORMAT_XRGB8888,
-			      I915_TILING_NONE, &d->fb[2]);
+			      DRM_FORMAT_MOD_LINEAR, &d->fb[2]);
 	igt_create_pattern_fb(d->drm_fd, 400, 400,
 			      DRM_FORMAT_XRGB8888,
-			      I915_TILING_NONE, &d->fb[3]);
+			      DRM_FORMAT_MOD_LINEAR, &d->fb[3]);
 
 	igt_plane_set_fb(plane[0], &d->fb[0]);
 	igt_plane_set_fb(plane[1], &d->fb[1]);
@@ -935,7 +935,7 @@ static void invalid_parameter_tests(data_t *d)
 
 		igt_create_fb(d->drm_fd, 256, 256,
 			      DRM_FORMAT_XRGB8888,
-			      DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_MOD_LINEAR,
 			      &fb);
 	}
 
@@ -1045,7 +1045,7 @@ static void i915_max_source_size_test(data_t *d)
 
 		igt_create_fb(d->drm_fd, 5120, 4320,
 			      DRM_FORMAT_XRGB8888,
-			      DRM_FORMAT_MOD_NONE,
+			      DRM_FORMAT_MOD_LINEAR,
 			      &fb);
 	}
 

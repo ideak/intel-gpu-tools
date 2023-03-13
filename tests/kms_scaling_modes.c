@@ -49,11 +49,11 @@ static void test_scaling_mode_on_output(igt_display_t *display, const enum pipe 
 	sprite = igt_output_get_plane_type(output, DRM_PLANE_TYPE_OVERLAY);
 
 	igt_create_color_fb(display->drm_fd, mode.hdisplay, mode.vdisplay,
-			    DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR,
 			    0.f, 0.f, 1.f, &blue);
 
 	igt_create_color_fb(display->drm_fd, 640, 480,
-			    DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_NONE,
+			    DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR,
 			    1.f, 0.f, 0.f, &red);
 
 	igt_plane_set_fb(primary, &blue);

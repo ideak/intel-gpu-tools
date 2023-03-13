@@ -92,7 +92,7 @@ set_mode_on_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 
 	fb_id = igt_create_color_fb(data->drm_fd,
 				    mode->hdisplay, mode->vdisplay,
-				    DRM_FORMAT_XRGB8888, I915_TILING_NONE,
+				    DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR,
 				    1.0, 1.0, 1.0, &fb);
 	igt_assert_lte(0, fb_id);
 

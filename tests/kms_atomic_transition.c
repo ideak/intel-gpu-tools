@@ -824,9 +824,9 @@ retry:
 	}
 
 	igt_create_pattern_fb(data->drm_fd, width, height,
-				   DRM_FORMAT_XRGB8888, 0, &data->fbs[0]);
+				   DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, &data->fbs[0]);
 	igt_create_color_pattern_fb(data->drm_fd, width, height,
-				    DRM_FORMAT_XRGB8888, 0, .5, .5, .5, &data->fbs[1]);
+				    DRM_FORMAT_XRGB8888, DRM_FORMAT_MOD_LINEAR, .5, .5, .5, &data->fbs[1]);
 
 	for_each_pipe(&data->display, i) {
 		igt_pipe_t *pipe = &data->display.pipes[i];

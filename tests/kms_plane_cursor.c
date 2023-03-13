@@ -236,19 +236,19 @@ static void test_cursor(data_t *data, int size, unsigned int flags)
 
 	test_cleanup(data);
 
-	igt_create_color_fb(data->drm_fd, sw, sh, DRM_FORMAT_XRGB8888, 0,
-			    1.0, 1.0, 1.0, &data->pfb);
+	igt_create_color_fb(data->drm_fd, sw, sh, DRM_FORMAT_XRGB8888,
+			    DRM_FORMAT_MOD_LINEAR, 1.0, 1.0, 1.0, &data->pfb);
 
 	if (flags & TEST_OVERLAY) {
 		int width = (flags & TEST_VIEWPORT) ? data->or.w + pad : data->or.w;
 		int height = (flags & TEST_VIEWPORT) ? data->or.h + pad : data->or.h;
 
-		igt_create_color_fb(data->drm_fd, width, height,
-				    DRM_FORMAT_XRGB8888, 0, 0.5, 0.5, 0.5, &data->ofb);
+		igt_create_color_fb(data->drm_fd, width, height, DRM_FORMAT_XRGB8888,
+				    DRM_FORMAT_MOD_LINEAR, 0.5, 0.5, 0.5, &data->ofb);
 	}
 
-	igt_create_color_fb(data->drm_fd, size, size, DRM_FORMAT_ARGB8888, 0,
-			    1.0, 0.0, 1.0, &data->cfb);
+	igt_create_color_fb(data->drm_fd, size, size, DRM_FORMAT_ARGB8888,
+			    DRM_FORMAT_MOD_LINEAR, 1.0, 0.0, 1.0, &data->cfb);
 
 	igt_plane_set_fb(data->primary, &data->pfb);
 	igt_output_set_pipe(data->output, data->pipe_id);
