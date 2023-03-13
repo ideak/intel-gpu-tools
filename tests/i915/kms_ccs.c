@@ -393,10 +393,8 @@ static void generate_fb(data_t *data, struct igt_fb *fb,
 	 */
 	if (fb_flags & FB_COMPRESSED)
 		modifier = data->ccs_modifier;
-	else if (!(fb_flags & FB_HAS_PLANE))
-		modifier = DRM_FORMAT_MOD_LINEAR;
 	else
-		modifier = 0;
+		modifier = DRM_FORMAT_MOD_LINEAR;
 
 	create_fb_prepare_add(data->drm_fd, width, height,
 			      data->format, modifier,
