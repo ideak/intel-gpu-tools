@@ -494,9 +494,11 @@ static void test_crc(data_t *data)
 
 	cr = igt_get_cairo_ctx(data->drm_fd, &data->bufs[frame]);
 	igt_paint_color(cr, 0, 0, data->bufs[frame].width, data->bufs[frame].height, 1.0, 0.0, 0.0);
+	igt_put_cairo_ctx(cr);
 
 	cr = igt_get_cairo_ctx(data->drm_fd, &data->bufs[!frame]);
 	igt_paint_color(cr, 0, 0, data->bufs[!frame].width, data->bufs[!frame].height, 1.0, 0.0, 0.0);
+	igt_put_cairo_ctx(cr);
 
 	ret = drmModeSetCrtc(data->drm_fd, data->crtc_id, data->bufs[frame].fb_id, 0, 0,
 			     &data->output->config.connector->connector_id, 1,
@@ -518,6 +520,7 @@ static void test_crc(data_t *data)
 		/* fill the next fb with the expected color */
 		cr = igt_get_cairo_ctx(data->drm_fd, &data->bufs[frame]);
 		igt_paint_color(cr, 0, 0, 1, data->bufs[frame].height, 1.0, 0.0, 0.0);
+		igt_put_cairo_ctx(cr);
 
 		data->flip_pending = true;
 		ret = drmModePageFlip(data->drm_fd, data->crtc_id, data->bufs[frame].fb_id,
@@ -530,6 +533,7 @@ static void test_crc(data_t *data)
 		frame = !frame;
 		cr = igt_get_cairo_ctx(data->drm_fd, &data->bufs[frame]);
 		igt_paint_color_rand(cr, 0, 0, 1, data->bufs[frame].height);
+		igt_put_cairo_ctx(cr);
 	}
 
 	igt_pipe_crc_stop(data->pipe_crc);

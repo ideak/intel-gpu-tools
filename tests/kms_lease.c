@@ -207,7 +207,7 @@ static int paint_fb(int drm_fd, struct igt_fb *fb, const char *test_name,
 	igt_cairo_printf_line(cr, align_hcenter, 10, "%s", connector_str);
 	igt_cairo_printf_line(cr, align_hcenter, 10, "%s", pipe_str);
 
-	cairo_destroy(cr);
+	igt_put_cairo_ctx(cr);
 
 	return 0;
 }

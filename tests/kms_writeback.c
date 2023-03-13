@@ -414,6 +414,7 @@ static void commit_and_dump_fb(igt_display_t *display, igt_output_t *output, igt
 	snprintf(filepath_out, PATH_MAX, "%s/%s.png", path_name, file_name);
 	status = cairo_surface_write_to_png(fb_surface_out, filepath_out);
 	igt_assert_eq(status, CAIRO_STATUS_SUCCESS);
+	cairo_surface_destroy(fb_surface_out);
 
 	igt_remove_fb(display->drm_fd, &output_fb);
 }
