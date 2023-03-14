@@ -59,6 +59,7 @@
 #include "igt_device.h"
 #include "igt_sysfs.h"
 #include "sw_sync.h"
+#include "xe/xe_query.h"
 #ifdef HAVE_CHAMELIUM
 #include "igt_chamelium.h"
 #endif
@@ -2541,6 +2542,9 @@ void igt_display_require(igt_display_t *display, int drm_fd)
 	}
 #endif
 
+	if (is_xe_device(drm_fd))
+		xe_device_get(drm_fd);
+
 	/*
 	 * With non-contiguous pipes display, crtc mapping is not always same
 	 * as pipe mapping, In i915 pipe is enum id of i915's crtc object.
@@ -2889,6 +2893,10 @@ static void igt_output_fini(igt_output_t *output)
 void igt_display_fini(igt_display_t *display)
 {
 	int i;
+	int drm_fd = display->drm_fd;
+
+	if (is_xe_device(drm_fd))
+		xe_device_put(drm_fd);
 
 	for (i = 0; i < display->n_planes; ++i) {
 		igt_plane_t *plane = &display->planes[i];
