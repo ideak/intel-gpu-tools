@@ -99,8 +99,10 @@ int __drm_open_driver_render(int chipset);
 
 void igt_require_amdgpu(int fd);
 void igt_require_intel(int fd);
+void igt_require_i915(int fd);
 void igt_require_nouveau(int fd);
 void igt_require_vc4(int fd);
+void igt_require_xe(int fd);
 
 bool is_amdgpu_device(int fd);
 bool is_i915_device(int fd);
@@ -108,6 +110,8 @@ bool is_mtk_device(int fd);
 bool is_msm_device(int fd);
 bool is_nouveau_device(int fd);
 bool is_vc4_device(int fd);
+bool is_xe_device(int fd);
+bool is_intel_device(int fd);
 
 /**
  * do_or_die:

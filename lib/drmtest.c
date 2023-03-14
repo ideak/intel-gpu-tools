@@ -139,6 +139,16 @@ bool is_vc4_device(int fd)
 	return __is_device(fd, "vc4");
 }
 
+bool is_xe_device(int fd)
+{
+	return __is_device(fd, "xe");
+}
+
+bool is_intel_device(int fd)
+{
+	return is_i915_device(fd) || is_xe_device(fd);
+}
+
 static char _forced_driver[16] = "";
 
 /**
@@ -646,6 +656,11 @@ void igt_require_amdgpu(int fd)
 
 void igt_require_intel(int fd)
 {
+	igt_require(is_intel_device(fd));
+}
+
+void igt_require_i915(int fd)
+{
 	igt_require(is_i915_device(fd));
 }
 
@@ -657,4 +672,9 @@ void igt_require_nouveau(int fd)
 void igt_require_vc4(int fd)
 {
 	igt_require(is_vc4_device(fd));
+}
+
+void igt_require_xe(int fd)
+{
+	igt_require(is_xe_device(fd));
 }
