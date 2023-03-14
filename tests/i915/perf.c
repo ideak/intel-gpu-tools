@@ -4946,7 +4946,7 @@ test_i915_ref_count(void)
 	igt_debug("baseline ref count (drm fd closed) = %u\n", baseline);
 
 	drm_fd = __drm_open_driver(DRIVER_INTEL);
-	igt_require_intel(drm_fd);
+	igt_require_i915(drm_fd);
 	devid = intel_get_drm_devid(drm_fd);
 	sysfs = perf_sysfs_open(drm_fd);
 

@@ -1458,7 +1458,7 @@ bool kmstest_force_connector(int drm_fd, drmModeConnector *connector,
 	 * Forcing DP connectors doesn't currently work, so
 	 * fail early to allow the test to skip if required.
 	 */
-	if (is_i915_device(drm_fd) &&
+	if (is_intel_device(drm_fd) &&
 	    connector->connector_type == DRM_MODE_CONNECTOR_DisplayPort)
 		return false;
 

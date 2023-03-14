@@ -442,7 +442,7 @@ void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 		*height_ret = 1;
 		break;
 	case I915_FORMAT_MOD_X_TILED:
-		igt_require_intel(fd);
+		igt_require_i915(fd);
 		if (intel_display_ver(intel_get_drm_devid(fd)) == 2) {
 			*width_ret = 128;
 			*height_ret = 16;
@@ -460,7 +460,7 @@ void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 	case I915_FORMAT_MOD_4_TILED_DG2_RC_CCS:
 	case I915_FORMAT_MOD_4_TILED_DG2_MC_CCS:
 	case I915_FORMAT_MOD_4_TILED_DG2_RC_CCS_CC:
-		igt_require_intel(fd);
+		igt_require_i915(fd);
 		if (intel_display_ver(intel_get_drm_devid(fd)) == 2) {
 			*width_ret = 128;
 			*height_ret = 16;
@@ -474,7 +474,7 @@ void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 		break;
 	case I915_FORMAT_MOD_Yf_TILED:
 	case I915_FORMAT_MOD_Yf_TILED_CCS:
-		igt_require_intel(fd);
+		igt_require_i915(fd);
 		switch (fb_bpp) {
 		case 8:
 			*width_ret = 64;

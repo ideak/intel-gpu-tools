@@ -140,7 +140,7 @@ void igt_require_gem(int i915)
 {
 	int err;
 
-	igt_require_intel(i915);
+	igt_require_i915(i915);
 
 	/*
 	 * We only want to use the throttle-ioctl for its -EIO reporting
