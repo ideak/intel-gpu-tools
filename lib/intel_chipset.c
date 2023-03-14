@@ -41,6 +41,8 @@
 #include "drmtest.h"
 #include "intel_chipset.h"
 #include "igt_core.h"
+#include "ioctl_wrappers.h"
+#include "xe/xe_query.h"
 
 /**
  * SECTION:intel_chipset
@@ -112,9 +114,45 @@ intel_get_pci_device(void)
 	return pci_dev;
 }
 
+static uint32_t __i915_get_drm_devid(int fd)
+{
+	struct drm_i915_getparam gp;
+	int devid = 0;
+
+	memset(&gp, 0, sizeof(gp));
+	gp.param = I915_PARAM_CHIPSET_ID;
+	gp.value = &devid;
+	ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp, sizeof(gp));
+
+	return devid;
+}
+
+static uint32_t __xe_get_drm_devid(int fd)
+{
+	struct drm_xe_query_config *config;
+	struct drm_xe_device_query query = {
+		.extensions = 0,
+		.query = DRM_XE_DEVICE_QUERY_CONFIG,
+		.size = 0,
+		.data = 0,
+	};
+
+	igt_assert_eq(igt_ioctl(fd, DRM_IOCTL_XE_DEVICE_QUERY, &query), 0);
+
+	config = malloc(query.size);
+	igt_assert(config);
+
+	query.data = to_user_pointer(config);
+	igt_assert_eq(igt_ioctl(fd, DRM_IOCTL_XE_DEVICE_QUERY, &query), 0);
+
+	igt_assert(config->num_params > 0);
+
+	return config->info[XE_QUERY_CONFIG_REV_AND_DEVICE_ID] & 0xffff;
+}
+
 /**
  * intel_get_drm_devid:
- * @fd: open i915 drm file descriptor
+ * @fd: open i915/xe drm file descriptor
  *
  * Queries the kernel for the pci device id corresponding to the drm file
  * descriptor.
@@ -125,22 +163,18 @@ intel_get_pci_device(void)
 uint32_t
 intel_get_drm_devid(int fd)
 {
-	struct drm_i915_getparam gp;
 	const char *override;
-	int devid = 0;
 
-	igt_assert(is_i915_device(fd));
+	igt_assert(is_intel_device(fd));
 
 	override = getenv("INTEL_DEVID_OVERRIDE");
 	if (override)
 		return strtol(override, NULL, 0);
 
-	memset(&gp, 0, sizeof(gp));
-	gp.param = I915_PARAM_CHIPSET_ID;
-	gp.value = &devid;
-	ioctl(fd, DRM_IOCTL_I915_GETPARAM, &gp, sizeof(gp));
-
-	return devid;
+	if (is_i915_device(fd))
+		return __i915_get_drm_devid(fd);
+	else
+		return __xe_get_drm_devid(fd);
 }
 
 /**
