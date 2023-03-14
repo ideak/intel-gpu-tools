@@ -43,6 +43,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 #include <termios.h>
+#include <time.h>
 #include <sys/sysmacros.h>
 
 #include "igt_perf.h"
@@ -2524,6 +2525,34 @@ static void show_help_screen(void)
 "\n");
 }
 
+static int gettime(struct timespec *ts)
+{
+	memset(ts, 0, sizeof(*ts));
+
+#ifdef CLOCK_MONOTONIC_RAW
+	if (!clock_gettime(CLOCK_MONOTONIC_RAW, ts))
+		return 0;
+#endif
+
+	return clock_gettime(CLOCK_MONOTONIC, ts);
+}
+
+static unsigned long elapsed_us(struct timespec *prev, unsigned int period_us)
+{
+	unsigned long elapsed;
+	struct timespec now;
+
+	if (gettime(&now))
+		return period_us;
+
+	elapsed = ((now.tv_nsec - prev->tv_nsec) / 1000 +
+	           (unsigned long)USEC_PER_SEC * (now.tv_sec - prev->tv_sec));
+
+	*prev = now;
+
+	return elapsed;
+}
+
 int main(int argc, char **argv)
 {
 	unsigned int period_us = DEFAULT_PERIOD_MS * 1000;
@@ -2537,6 +2566,7 @@ int main(int argc, char **argv)
 	char *pmu_device, *opt_device = NULL;
 	struct igt_device_card card;
 	char *codename = NULL;
+	struct timespec ts;
 
 	/* Parse options */
 	while ((ch = getopt(argc, argv, "o:s:d:pcJLlh")) != -1) {
@@ -2690,6 +2720,7 @@ int main(int argc, char **argv)
 
 	pmu_sample(engines);
 	scan_clients(clients, false);
+	gettime(&ts);
 	codename = igt_device_get_pretty_name(&card, false);
 
 	if (output_mode == JSON)
@@ -2698,6 +2729,7 @@ int main(int argc, char **argv)
 	while (!stop_top) {
 		struct clients *disp_clients;
 		bool consumed = false;
+		unsigned int scan_us;
 		int j, lines = 0;
 		struct winsize ws;
 		struct client *c;
@@ -2720,6 +2752,7 @@ int main(int argc, char **argv)
 		t = (double)(engines->ts.cur - engines->ts.prev) / 1e9;
 
 		disp_clients = scan_clients(clients, true);
+		scan_us = elapsed_us(&ts, period_us);
 
 		if (stop_top)
 			break;
@@ -2757,7 +2790,7 @@ int main(int argc, char **argv)
 
 					lines = print_client(c, engines, t,
 							     lines, con_w,
-							     con_h, period_us,
+							     con_h, scan_us,
 							     &class_w);
 				}
 
