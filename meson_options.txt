@@ -20,6 +20,14 @@ option('man',
        type : 'feature',
        description : 'Build man pages')
 
+option('testplan',
+       type : 'feature',
+       description : 'Build testplan documentation pages in ReST and html')
+
+option('sphinx',
+       type : 'feature',
+       description : 'Build testplan documentation using Sphinx')
+
 option('docs',
        type : 'feature',
        description : 'Build documentation')

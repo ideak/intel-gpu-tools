@@ -1,0 +1,43 @@
+#!/bin/bash -e
+# SPDX-License-Identifier: (GPL-2.0 OR MIT)
+
+## Copyright (C) 2023    Intel Corporation                 ##
+## Author: Mauro Carvalho Chehab <mchehab@kernel.org>      ##
+##                                                         ##
+## Small script to produce a ReST index file               ##
+
+if [ $# -lt 3 ]; then
+	echo 'Usage: $0: <title> <files> <dest_dir>' >&2
+	exit 1
+fi
+
+title=$1
+shift
+
+args=( "$@" )
+
+dest_dir=${args[${#args[@]}-1]}
+unset args[${#args[@]}-1]
+
+if [ ! -d $dest_dir ]; then
+	echo "Error: $dest_dir directory doesn't exist" >&2
+	exit 1
+fi
+
+dest_file="$dest_dir/index.rst"
+
+echo $title > "$dest_file"
+len=${#title}
+for i in $(seq 1 $len); do
+	echo -n "=" >> "$dest_file"
+done
+echo >> "$dest_file"
+echo >> "$dest_file"
+
+echo ".. toctree::" >> "$dest_file"
+echo "   :maxdepth: 1" >> "$dest_file"
+echo >> "$dest_file"
+
+for i in "${!args[@]}"; do
+	echo "   ${args[$i]}" >> "$dest_file"
+done

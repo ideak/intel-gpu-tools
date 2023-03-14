@@ -1,1 +1,2 @@
 subdir('reference')
+subdir('testplan')

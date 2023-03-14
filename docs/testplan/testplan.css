@@ -1,0 +1,7 @@
+@import url(html4css1.css);
+
+.literal {
+	background: lightgrey;
+        color: darkblue;
+        font-size: 14px;
+}

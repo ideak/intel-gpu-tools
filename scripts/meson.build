@@ -11,3 +11,6 @@ if build_tests
 		install_data(prog, install_dir : bindir, install_mode : 'r-xr-xr-x')
 	endforeach
 endif
+
+igt_doc_script = find_program('igt_doc.py')
+gen_rst_index = find_program('gen_rst_index')
