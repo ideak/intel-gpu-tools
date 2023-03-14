@@ -58,6 +58,9 @@ struct xe_device {
 
 	/** @va_bits: va length in bits */
 	uint32_t va_bits;
+
+	/** @dev_id: Device id of xe device */
+	uint16_t dev_id;
 };
 
 #define for_each_hw_engine(__fd, __hwe) \
@@ -85,6 +88,7 @@ bool xe_has_vram(int fd);
 uint64_t xe_vram_size(int fd, int gt);
 uint32_t xe_get_default_alignment(int fd);
 uint32_t xe_va_bits(int fd);
+uint32_t xe_dev_id(int fd);
 bool xe_supports_faults(int fd);
 const char *xe_engine_class_string(uint32_t engine_class);
 

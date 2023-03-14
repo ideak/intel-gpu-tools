@@ -247,6 +247,7 @@ struct xe_device *xe_device_get(int fd)
 	xe_dev->config = xe_query_config_new(fd);
 	xe_dev->number_gt = xe_dev->config->info[XE_QUERY_CONFIG_GT_COUNT];
 	xe_dev->va_bits = xe_dev->config->info[XE_QUERY_CONFIG_VA_BITS];
+	xe_dev->dev_id = xe_dev->config->info[XE_QUERY_CONFIG_REV_AND_DEVICE_ID] & 0xffff;
 	xe_dev->gts = xe_query_gts_new(fd);
 	xe_dev->memory_regions = __memory_regions(xe_dev->gts);
 	xe_dev->hw_engines = xe_query_engines_new(fd, &xe_dev->number_hw_engines);
@@ -464,6 +465,14 @@ xe_dev_FN(xe_supports_faults, supports_faults, bool);
  * Returns number of virtual address bits used in xe device @fd.
  */
 xe_dev_FN(xe_va_bits, va_bits, uint32_t);
+
+/**
+ * xe_dev_id:
+ * @fd: xe device fd
+ *
+ * Returns Device id of xe device @fd.
+ */
+xe_dev_FN(xe_dev_id, dev_id, uint32_t);
 
 igt_constructor
 {
