@@ -146,7 +146,7 @@ test_base(int fd)
 
 	validate_entries(fd, "", expected_files, ARRAY_SIZE(expected_files));
 
-	free(config);
+	xe_device_put(fd);
 }
 
 /**
@@ -250,7 +250,6 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_XE);
-		xe_device_get(fd);
 		__igt_debugfs_dump(fd, "info", IGT_LOG_INFO);
 	}
 
@@ -272,7 +271,6 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 	}
 
 	igt_fixture {
-		xe_device_put(fd);
 		close(fd);
 	}
 }
