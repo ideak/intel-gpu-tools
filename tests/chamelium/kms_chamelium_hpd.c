@@ -190,6 +190,7 @@ static void test_hotplug_for_each_pipe(chamelium_data_t *data,
 						   DRM_MODE_DISCONNECTED);
 
 	for_each_pipe(&data->display, pipe) {
+		igt_modeset_disable_all_outputs(&data->display);
 		igt_flush_uevents(mon);
 		/* Check if we get a sysfs hotplug event */
 		chamelium_plug(data->chamelium, port);
