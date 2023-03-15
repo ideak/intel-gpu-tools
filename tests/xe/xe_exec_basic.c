@@ -93,6 +93,7 @@ test_exec(int fd, struct drm_xe_engine_class_instance *eci,
 	uint32_t engines[MAX_N_ENGINES];
 	uint32_t bind_engines[MAX_N_ENGINES];
 	uint32_t syncobjs[MAX_N_ENGINES];
+	uint32_t bind_syncobjs[MAX_N_ENGINES];
 	size_t bo_size;
 	uint32_t bo = 0;
 	struct {
@@ -150,10 +151,11 @@ test_exec(int fd, struct drm_xe_engine_class_instance *eci,
 		else
 			bind_engines[i] = 0;
 		syncobjs[i] = syncobj_create(fd, 0);
+		bind_syncobjs[i] = syncobj_create(fd, 0);
 	};
 
-	sync[0].handle = syncobj_create(fd, 0);
 	for (i = 0; i < n_vm; ++i) {
+		sync[0].handle = bind_syncobjs[i];
 		if (bo)
 			xe_vm_bind_async(fd, vm[i], bind_engines[i], bo, 0,
 					 addr[i], bo_size, sync, 1);
@@ -167,7 +169,8 @@ test_exec(int fd, struct drm_xe_engine_class_instance *eci,
 		data = xe_bo_map(fd, bo, bo_size);
 
 	for (i = 0; i < n_execs; i++) {
-		uint64_t __addr = addr[i % n_vm];
+		int cur_vm = i % n_vm;
+		uint64_t __addr = addr[cur_vm];
 		uint64_t batch_offset = (char *)&data[i].batch - (char *)data;
 		uint64_t batch_addr = __addr + batch_offset;
 		uint64_t sdi_offset = (char *)&data[i].data - (char *)data;
@@ -183,6 +186,7 @@ test_exec(int fd, struct drm_xe_engine_class_instance *eci,
 		igt_assert(b <= ARRAY_SIZE(data[i].batch));
 
 		sync[0].flags &= ~DRM_XE_SYNC_SIGNAL;
+		sync[0].handle = bind_syncobjs[cur_vm];
 		sync[1].flags |= DRM_XE_SYNC_SIGNAL;
 		sync[1].handle = syncobjs[e];
 
@@ -193,7 +197,7 @@ test_exec(int fd, struct drm_xe_engine_class_instance *eci,
 		xe_exec(fd, &exec);
 
 		if (flags & REBIND && i + 1 != n_execs) {
-			uint32_t __vm = vm[i % n_vm];
+			uint32_t __vm = vm[cur_vm];
 
 			sync[1].flags &= ~DRM_XE_SYNC_SIGNAL;
 			xe_vm_unbind_async(fd, __vm, bind_engines[e], 0,
@@ -243,7 +247,10 @@ test_exec(int fd, struct drm_xe_engine_class_instance *eci,
 	for (i = 0; i < n_engines && n_execs; i++)
 		igt_assert(syncobj_wait(fd, &syncobjs[i], 1, INT64_MAX, 0,
 					NULL));
-	igt_assert(syncobj_wait(fd, &sync[0].handle, 1, INT64_MAX, 0, NULL));
+
+	for (i = 0; i < n_vm; i++)
+		igt_assert(syncobj_wait(fd, &bind_syncobjs[i], 1, INT64_MAX, 0,
+					NULL));
 
 	sync[0].flags |= DRM_XE_SYNC_SIGNAL;
 	for (i = 0; i < n_vm; ++i) {
@@ -258,7 +265,6 @@ test_exec(int fd, struct drm_xe_engine_class_instance *eci,
 	     i < n_execs; i++)
 		igt_assert_eq(data[i].data, 0xc0ffee);
 
-	syncobj_destroy(fd, sync[0].handle);
 	for (i = 0; i < n_engines; i++) {
 		syncobj_destroy(fd, syncobjs[i]);
 		xe_engine_destroy(fd, engines[i]);
@@ -272,8 +278,10 @@ test_exec(int fd, struct drm_xe_engine_class_instance *eci,
 	} else if (!(flags & INVALIDATE)) {
 		free(data);
 	}
-	for (i = 0; i < n_vm; ++i)
+	for (i = 0; i < n_vm; ++i) {
+		syncobj_destroy(fd, bind_syncobjs[i]);
 		xe_vm_destroy(fd, vm[i]);
+	}
 }
 
 igt_main
