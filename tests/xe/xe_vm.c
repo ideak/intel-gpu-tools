@@ -292,6 +292,32 @@ static void unbind_all(int fd, int n_vmas)
 	xe_vm_destroy(fd, vm);
 }
 
+#define	MAP_ADDRESS	0x00007fadeadbe000
+
+/*
+ * This tests verifies that mapping an invalid userptr returns -EFAULT,
+ * and that it is correctly handled.
+ */
+static void userptr_invalid(int fd)
+{
+	size_t size = xe_get_default_alignment(fd);
+	uint32_t vm;
+	void *data;
+	int ret;
+
+	data = mmap((void *)MAP_ADDRESS, size, PROT_READ |
+		    PROT_WRITE, MAP_SHARED | MAP_FIXED | MAP_ANONYMOUS, -1, 0);
+	igt_assert(data != MAP_FAILED);
+
+	vm = xe_vm_create(fd, 0, 0);
+	munmap(data, size);
+	ret = __xe_vm_bind(fd, vm, 0, 0, to_user_pointer(data), 0x40000,
+			   size, XE_VM_BIND_OP_MAP_USERPTR, NULL, 0, 0, 0);
+	igt_assert(ret == -EFAULT);
+
+	xe_vm_destroy(fd, vm);
+}
+
 struct vm_thread_data {
 	pthread_t thread;
 	struct drm_xe_vm_bind_op_error_capture *capture;
@@ -1617,6 +1643,9 @@ igt_main
 
 	igt_subtest("unbind-all-8-vmas")
 		unbind_all(fd, 8);
+
+	igt_subtest("userptr-invalid")
+		userptr_invalid(fd);
 
 	igt_subtest("vm-async-ops-err")
 		vm_async_ops_err(fd, false);
