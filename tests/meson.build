@@ -256,6 +256,7 @@ xe_progs = [
 	'xe_huc_copy',
 	'xe_mmap',
 	'xe_mmio',
+	'xe_noexec_ping_pong',
 	'xe_pm',
 	'xe_prime_self_import',
 	'xe_query',
