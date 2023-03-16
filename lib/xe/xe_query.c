@@ -472,7 +472,7 @@ xe_dev_FN(xe_va_bits, va_bits, uint32_t);
  *
  * Returns Device id of xe device @fd.
  */
-xe_dev_FN(xe_dev_id, dev_id, uint32_t);
+xe_dev_FN(xe_dev_id, dev_id, uint16_t);
 
 igt_constructor
 {
