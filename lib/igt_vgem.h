@@ -26,6 +26,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "vgem_drm.h"
 
 struct vgem_bo {
 	uint32_t handle;
@@ -43,7 +44,6 @@ void *vgem_mmap(int fd, struct vgem_bo *bo, unsigned prot);
 bool vgem_has_fences(int fd);
 bool vgem_fence_has_flag(int fd, unsigned flags);
 uint32_t vgem_fence_attach(int fd, struct vgem_bo *bo, unsigned flags);
-#define VGEM_FENCE_WRITE 0x1
 #define WIP_VGEM_FENCE_NOTIMEOUT 0x2
 int __vgem_fence_signal(int fd, uint32_t fence);
 void vgem_fence_signal(int fd, uint32_t fence);
