@@ -16,6 +16,12 @@
 #define BITRANGE(start, end) (end - start + 1)
 #define GET_CMDS_INFO(__fd) intel_get_cmds_info(intel_get_drm_devid(__fd))
 
+/* Blitter tiling definitions sanity checks */
+static_assert(T_LINEAR == I915_TILING_NONE, "Linear definitions have to match");
+static_assert(T_XMAJOR == I915_TILING_X, "TileX definitions have to match");
+static_assert(T_YMAJOR == I915_TILING_Y, "TileY definitions have to match");
+static_assert(T_YFMAJOR == I915_TILING_Yf, "TileYf definitions have to match");
+
 enum blt_special_mode {
 	SM_NONE,
 	SM_FULL_RESOLVE,

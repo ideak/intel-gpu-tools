@@ -70,7 +70,7 @@ get_tiling_stride(const struct device *device,
 	if (tiling) {
 		if (device->gen < 3)
 			stride = ALIGN(stride, 128);
-		else if (device->gen < 4 || tiling == I915_TILING_X)
+		else if (device->gen < 4 || tiling == T_XMAJOR)
 			stride = ALIGN(stride, 512);
 		else
 			stride = ALIGN(stride, 128);
@@ -94,7 +94,7 @@ get_tiling_height(const struct device *device,
 
 	if (device->gen < 3)
 		return ALIGN(height, 16);
-	else if (device->gen < 4 || tiling == I915_TILING_X)
+	else if (device->gen < 4 || tiling == T_XMAJOR)
 		return ALIGN(height, 8);
 	else
 		return ALIGN(height, 32);
@@ -115,8 +115,8 @@ static struct buffer *buffer_create(const struct device *device,
 	buffer->width = width;
 	buffer->height = height;
 
-	buffer->tiling = I915_TILING_NONE;
-	buffer->stride = get_tiling_stride(device, width, I915_TILING_NONE);
+	buffer->tiling = T_LINEAR;
+	buffer->stride = get_tiling_stride(device, width, T_LINEAR);
 	buffer->size = ALIGN(buffer->stride * height, 4096);
 	buffer->handle = gem_create(device->fd, buffer->size);
 	buffer->caching = device->llc;
@@ -194,16 +194,16 @@ static void buffer_set_tiling(const struct device *device,
 
 	i = 0;
 
-	if ((tiling | buffer->tiling) >= I915_TILING_Y) {
+	if ((tiling | buffer->tiling) >= T_YMAJOR) {
 		unsigned int mask;
 
 		batch[i++] = MI_LOAD_REGISTER_IMM(1);
 		batch[i++] = BCS_SWCTRL;
 
 		mask = (BCS_SRC_Y | BCS_DST_Y) << 16;
-		if (buffer->tiling == I915_TILING_Y)
+		if (buffer->tiling == T_YMAJOR)
 			mask |= BCS_SRC_Y;
-		if (tiling == I915_TILING_Y)
+		if (tiling == T_YMAJOR)
 			mask |= BCS_DST_Y;
 		batch[i++] = mask;
 	}
@@ -255,7 +255,7 @@ static void buffer_set_tiling(const struct device *device,
 	if (has_64b_reloc)
 		batch[i++] = obj[1].offset >> 32;
 
-	if ((tiling | buffer->tiling) >= I915_TILING_Y) {
+	if ((tiling | buffer->tiling) >= T_YMAJOR) {
 		igt_assert(device->gen >= 6);
 		batch[i++] = MI_FLUSH_DW_CMD | 2;
 		batch[i++] = 0;
@@ -350,14 +350,14 @@ static bool blit_to_linear(const struct device *device,
 
 	batch = gem_mmap__cpu(device->fd, obj[2].handle, 0, 4096, PROT_WRITE);
 
-	if (buffer->tiling >= I915_TILING_Y) {
+	if (buffer->tiling >= T_YMAJOR) {
 		unsigned int mask;
 
 		batch[i++] = MI_LOAD_REGISTER_IMM(1);
 		batch[i++] = BCS_SWCTRL;
 
 		mask = (BCS_SRC_Y | BCS_DST_Y) << 16;
-		if (buffer->tiling == I915_TILING_Y)
+		if (buffer->tiling == T_YMAJOR)
 			mask |= BCS_SRC_Y;
 		batch[i++] = mask;
 	}
@@ -371,9 +371,9 @@ static bool blit_to_linear(const struct device *device,
 		batch[i++] |= 6 + 2 * has_64b_reloc;
 		batch[i++] = 3 << 24 | 0xcc << 16 | buffer->stride;
 	} else if (blt_has_fast_copy(device->fd)) {
-		batch[i++] = fast_copy_dword0(buffer->tiling, I915_TILING_NONE);
+		batch[i++] = fast_copy_dword0(buffer->tiling, T_LINEAR);
 		dword1 = fast_copy_dword1(device->fd, buffer->tiling,
-					  I915_TILING_NONE, 32);
+					  T_LINEAR, 32);
 		batch[i++] = dword1 | buffer->stride;
 	} else {
 		igt_assert_f(0, "No supported blit command found\n");
@@ -403,7 +403,7 @@ static bool blit_to_linear(const struct device *device,
 	if (has_64b_reloc)
 		batch[i++] = obj[1].offset >> 32;
 
-	if (buffer->tiling >= I915_TILING_Y) {
+	if (buffer->tiling >= T_YMAJOR) {
 		igt_assert(device->gen >= 6);
 		batch[i++] = MI_FLUSH_DW_CMD | 2;
 		batch[i++] = 0;
@@ -691,16 +691,16 @@ blit(const struct device *device,
 	}
 	batch = gem_mmap__cpu(device->fd, obj[2].handle, 0, 4096, PROT_WRITE);
 
-	if ((src->tiling | dst->tiling) >= I915_TILING_Y) {
+	if ((src->tiling | dst->tiling) >= T_YMAJOR) {
 		unsigned int mask;
 
 		batch[i++] = MI_LOAD_REGISTER_IMM(1);
 		batch[i++] = BCS_SWCTRL;
 
 		mask = (BCS_SRC_Y | BCS_DST_Y) << 16;
-		if (src->tiling == I915_TILING_Y)
+		if (src->tiling == T_YMAJOR)
 			mask |= BCS_SRC_Y;
-		if (dst->tiling == I915_TILING_Y)
+		if (dst->tiling == T_YMAJOR)
 			mask |= BCS_DST_Y;
 		batch[i++] = mask;
 	}
@@ -752,7 +752,7 @@ blit(const struct device *device,
 	if (has_64b_reloc)
 		batch[i++] = obj[1].offset >> 32;
 
-	if ((src->tiling | dst->tiling) >= I915_TILING_Y) {
+	if ((src->tiling | dst->tiling) >= T_YMAJOR) {
 		igt_assert(device->gen >= 6);
 		batch[i++] = MI_FLUSH_DW_CMD | 2;
 		batch[i++] = 0;
@@ -800,6 +800,17 @@ static int start_at(int x, enum start s)
 	}
 }
 
+static bool blit_supports_tiling(int fd, enum blt_tiling_type tiling)
+{
+	if (blt_has_xy_src_copy(fd)) {
+		return blt_xy_src_copy_supports_tiling(fd, tiling);
+	} else if (blt_has_fast_copy(fd)) {
+		return blt_fast_copy_supports_tiling(fd, tiling);
+	} else {
+		igt_assert_f(0, "No supported blit command found\n");
+	}
+}
+
 igt_main
 {
 	struct device device;
@@ -830,15 +841,20 @@ igt_main
 								    width * 16, height * 4);
 
 						y = start_at(height, y0);
-						for (unsigned int src_tiling = I915_TILING_NONE;
-						     src_tiling <= (device.gen >= 6 ? I915_TILING_Y : I915_TILING_X);
-						     src_tiling++) {
+
+						for (unsigned int src_tiling = T_LINEAR;
+						     src_tiling <= T_YMAJOR; src_tiling++) {
+							if (!blit_supports_tiling(device.fd, src_tiling))
+								continue;
+
 							buffer_set_tiling(&device, src, src_tiling);
 
 							x = start_at(width, x0);
-							for (unsigned int dst_tiling = I915_TILING_NONE;
-							     dst_tiling <= (device.gen >= 6 ? I915_TILING_Y : I915_TILING_X);
-							     dst_tiling++) {
+							for (unsigned int dst_tiling = T_LINEAR;
+							     dst_tiling <= T_YMAJOR; dst_tiling++) {
+								if (!blit_supports_tiling(device.fd, dst_tiling))
+									continue;
+
 								buffer_set_tiling(&device, dst, dst_tiling);
 
 								for (enum mode down = CPU; down <= WC; down++) {
