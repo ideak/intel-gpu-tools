@@ -25,35 +25,21 @@
  *
  **************************************************************************/
 
-#include <inttypes.h>
-#include <poll.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <assert.h>
 #include <search.h>
+#include <glib.h>
 
-#include "drm.h"
-#include "drmtest.h"
 #include "i915/gem_create.h"
 #include "intel_batchbuffer.h"
 #include "intel_bufops.h"
 #include "intel_chipset.h"
-#include "intel_reg.h"
-#include "veboxcopy.h"
 #include "rendercopy.h"
 #include "media_fill.h"
-#include "ioctl_wrappers.h"
-#include "sw_sync.h"
-#include "i915/gem_mman.h"
 #include "media_spin.h"
+#include "i915/gem_mman.h"
+#include "veboxcopy.h"
+#include "sw_sync.h"
 #include "gpgpu_fill.h"
-#include "igt_aux.h"
-#include "i830_reg.h"
 #include "huc_copy.h"
-#include <glib.h>
-
-#include <i915_drm.h>
 
 #define BCS_SWCTRL 0x22200
 #define BCS_SRC_Y (1 << 0)
