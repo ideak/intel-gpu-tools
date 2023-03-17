@@ -152,6 +152,27 @@ static void test_dmabuf_export(int fd)
 	close(other);
 }
 
+static void test_busy_fence(int fd)
+{
+	struct drm_vgem_fence_attach arg = {};
+	struct vgem_bo bo;
+
+	bo.width = 1024;
+	bo.height = 1;
+	bo.bpp = 32;
+	vgem_create(fd, &bo);
+
+	/* Attach a fence for reading */
+	vgem_fence_attach(fd, &bo, 0);
+
+	/* Attach a fence for writing, so it should be an exclusive fence */
+	arg.handle = bo.handle;
+	arg.flags = VGEM_FENCE_WRITE;
+
+	/* As the fence is not exclusive, return -EBUSY, indicating a conflicting fence */
+	do_ioctl_err(fd, DRM_IOCTL_VGEM_FENCE_ATTACH, &arg, EBUSY);
+}
+
 static void test_dmabuf_mmap(int fd)
 {
 	struct vgem_bo bo;
@@ -433,6 +454,48 @@ igt_main
 	igt_describe("Create a vgem handle and check if it can be mmaped.");
 	igt_subtest_f("mmap")
 		test_mmap(fd);
+
+	igt_describe("Make sure a fence cannot be attached and signaled with invalid flags.");
+	igt_subtest("bad-flag") {
+		struct drm_vgem_fence_attach attach = {
+			.flags = 0xff,
+		};
+
+		struct drm_vgem_fence_signal signal = {
+			.flags = 0xff,
+		};
+
+		do_ioctl_err(fd, DRM_IOCTL_VGEM_FENCE_ATTACH, &attach, EINVAL);
+		do_ioctl_err(fd, DRM_IOCTL_VGEM_FENCE_SIGNAL, &signal, EINVAL);
+	}
+
+	igt_describe("Make sure a non-zero pad is rejected.");
+	igt_subtest("bad-pad") {
+		struct drm_vgem_fence_attach arg = {
+			.pad = 0x01,
+		};
+		do_ioctl_err(fd, DRM_IOCTL_VGEM_FENCE_ATTACH, &arg, EINVAL);
+	}
+
+	igt_describe("Make sure a fence cannot be attached to a invalid handle.");
+	igt_subtest("bad-handle") {
+		struct drm_vgem_fence_attach arg = {
+			.handle = 0xff,
+		};
+		do_ioctl_err(fd, DRM_IOCTL_VGEM_FENCE_ATTACH, &arg, ENOENT);
+	}
+
+	igt_describe("Make sure a non-existent fence cannot be signaled.");
+	igt_subtest("bad-fence") {
+		struct drm_vgem_fence_signal arg = {
+			.fence = 0xff,
+		};
+		do_ioctl_err(fd, DRM_IOCTL_VGEM_FENCE_SIGNAL, &arg, ENOENT);
+	}
+
+	igt_describe("Make sure a conflicting fence cannot be attached.");
+	igt_subtest("busy-fence")
+		test_busy_fence(fd);
 
 	igt_subtest_group {
 		igt_fixture {
