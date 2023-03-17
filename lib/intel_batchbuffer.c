@@ -92,8 +92,8 @@ static uint32_t fast_copy_pitch(unsigned int stride, unsigned int tiling)
 		return stride;
 }
 
-static uint32_t fast_copy_dword0(unsigned int src_tiling,
-				 unsigned int dst_tiling)
+uint32_t fast_copy_dword0(unsigned int src_tiling,
+			  unsigned int dst_tiling)
 {
 	uint32_t dword0 = 0;
 
@@ -136,9 +136,9 @@ static uint32_t fast_copy_dword0(unsigned int src_tiling,
 	return dword0;
 }
 
-static uint32_t fast_copy_dword1(unsigned int src_tiling,
-				 unsigned int dst_tiling,
-				 int bpp)
+uint32_t fast_copy_dword1(unsigned int src_tiling,
+			  unsigned int dst_tiling,
+			  int bpp)
 {
 	uint32_t dword1 = 0;
 

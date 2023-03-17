@@ -22,10 +22,12 @@
  *
  */
 
+#include "intel_batchbuffer.h"
 #include "i915/gem.h"
 #include "i915/gem_create.h"
 #include "igt.h"
 #include "igt_x86.h"
+#include "i915/i915_blt.h"
 
 #define BCS_SWCTRL 0x22200
 #define BCS_SRC_Y (1 << 0)
@@ -145,8 +147,7 @@ static void buffer_set_tiling(const struct device *device,
 	struct drm_i915_gem_relocation_entry reloc[2];
 	struct drm_i915_gem_execbuffer2 execbuf;
 	const bool has_64b_reloc = device->gen >= 8;
-	uint32_t stride, size, pitch;
-	uint32_t *batch;
+	uint32_t stride, size, pitch, *batch, dword1;
 	int i;
 
 	if (buffer->tiling == tiling)
@@ -207,19 +208,28 @@ static void buffer_set_tiling(const struct device *device,
 		batch[i++] = mask;
 	}
 
-	batch[i] = (XY_SRC_COPY_BLT_CMD |
-		    XY_SRC_COPY_BLT_WRITE_ALPHA |
-		    XY_SRC_COPY_BLT_WRITE_RGB);
-	if (device->gen >= 4 && buffer->tiling)
-		batch[i] |= XY_SRC_COPY_BLT_SRC_TILED;
-	if (device->gen >= 4 && tiling)
-		batch[i] |= XY_SRC_COPY_BLT_DST_TILED;
-	batch[i++] |= 6 + 2 * has_64b_reloc;
-
 	pitch = stride;
 	if (device->gen >= 4 && tiling)
 		pitch /= 4;
-	batch[i++] = 3 << 24 | 0xcc << 16 | pitch;
+
+	if (blt_has_xy_src_copy(device->fd)) {
+		batch[i] = (XY_SRC_COPY_BLT_CMD |
+			    XY_SRC_COPY_BLT_WRITE_ALPHA |
+			    XY_SRC_COPY_BLT_WRITE_RGB);
+		if (device->gen >= 4 && buffer->tiling)
+			batch[i] |= XY_SRC_COPY_BLT_SRC_TILED;
+		if (device->gen >= 4 && tiling)
+			batch[i] |= XY_SRC_COPY_BLT_DST_TILED;
+		batch[i++] |= 6 + 2 * has_64b_reloc;
+		batch[i++] = 3 << 24 | 0xcc << 16 | pitch;
+	} else if (blt_has_fast_copy(device->fd)) {
+		batch[i++] = fast_copy_dword0(buffer->tiling, tiling);
+		dword1 = fast_copy_dword1(buffer->tiling, tiling, 32);
+		batch[i++] = dword1 | pitch;
+	} else {
+		igt_assert_f(0, "No supported blit command found\n");
+	}
+
 	batch[i++] = 0;
 	batch[i++] = buffer->height << 16 | buffer->width;
 	reloc[0].target_handle = obj[0].handle;
@@ -296,8 +306,7 @@ static bool blit_to_linear(const struct device *device,
 	struct drm_i915_gem_relocation_entry reloc[2];
 	struct drm_i915_gem_execbuffer2 execbuf;
 	const bool has_64b_reloc = device->gen >= 8;
-	uint32_t *batch;
-	uint32_t pitch;
+	uint32_t *batch, pitch, dword1;
 	int i = 0;
 
 	igt_assert(buffer->tiling);
@@ -352,14 +361,22 @@ static bool blit_to_linear(const struct device *device,
 		batch[i++] = mask;
 	}
 
-	batch[i] = (XY_SRC_COPY_BLT_CMD |
-		    XY_SRC_COPY_BLT_WRITE_ALPHA |
-		    XY_SRC_COPY_BLT_WRITE_RGB);
-	if (device->gen >= 4 && buffer->tiling)
-		batch[i] |= XY_SRC_COPY_BLT_SRC_TILED;
-	batch[i++] |= 6 + 2 * has_64b_reloc;
+	if (blt_has_xy_src_copy(device->fd)) {
+		batch[i] = (XY_SRC_COPY_BLT_CMD |
+			    XY_SRC_COPY_BLT_WRITE_ALPHA |
+			    XY_SRC_COPY_BLT_WRITE_RGB);
+		if (device->gen >= 4 && buffer->tiling)
+			batch[i] |= XY_SRC_COPY_BLT_SRC_TILED;
+		batch[i++] |= 6 + 2 * has_64b_reloc;
+		batch[i++] = 3 << 24 | 0xcc << 16 | buffer->stride;
+	} else if (blt_has_fast_copy(device->fd)) {
+		batch[i++] = fast_copy_dword0(buffer->tiling, I915_TILING_NONE);
+		dword1 = fast_copy_dword1(buffer->tiling, I915_TILING_NONE, 32);
+		batch[i++] = dword1 | buffer->stride;
+	} else {
+		igt_assert_f(0, "No supported blit command found\n");
+	}
 
-	batch[i++] = 3 << 24 | 0xcc << 16 | buffer->stride;
 	batch[i++] = 0;
 	batch[i++] = buffer->height << 16 | buffer->width;
 	reloc[0].target_handle = obj[0].handle;
@@ -598,8 +615,7 @@ blit(const struct device *device,
 	struct drm_i915_gem_relocation_entry reloc[2];
 	struct drm_i915_gem_execbuffer2 execbuf;
 	const bool has_64b_reloc = device->gen >= 8;
-	uint32_t *batch;
-	uint32_t pitch;
+	uint32_t *batch, dword1, pitch;
 	int i = 0;
 
 	if (src_x < 0) {
@@ -687,19 +703,27 @@ blit(const struct device *device,
 		batch[i++] = mask;
 	}
 
-	batch[i] = (XY_SRC_COPY_BLT_CMD |
-		    XY_SRC_COPY_BLT_WRITE_ALPHA |
-		    XY_SRC_COPY_BLT_WRITE_RGB);
-	if (device->gen >= 4 && src->tiling)
-		batch[i] |= XY_SRC_COPY_BLT_SRC_TILED;
-	if (device->gen >= 4 && dst->tiling)
-		batch[i] |= XY_SRC_COPY_BLT_DST_TILED;
-	batch[i++] |= 6 + 2 * has_64b_reloc;
-
 	pitch = dst->stride;
 	if (device->gen >= 4 && dst->tiling)
 		pitch /= 4;
-	batch[i++] = 3 << 24 | 0xcc << 16 | pitch;
+
+	if (blt_has_xy_src_copy(device->fd)) {
+		batch[i] = (XY_SRC_COPY_BLT_CMD |
+			    XY_SRC_COPY_BLT_WRITE_ALPHA |
+			    XY_SRC_COPY_BLT_WRITE_RGB);
+		if (device->gen >= 4 && src->tiling)
+			batch[i] |= XY_SRC_COPY_BLT_SRC_TILED;
+		if (device->gen >= 4 && dst->tiling)
+			batch[i] |= XY_SRC_COPY_BLT_DST_TILED;
+		batch[i++] |= 6 + 2 * has_64b_reloc;
+		batch[i++] = 3 << 24 | 0xcc << 16 | pitch;
+	} else if (blt_has_fast_copy(device->fd)) {
+		batch[i++] = fast_copy_dword0(src->tiling, dst->tiling);
+		dword1 = fast_copy_dword1(src->tiling, dst->tiling, 32);
+		batch[i++] = dword1 | pitch;
+	} else {
+		igt_assert_f(0, "No supported blit command found\n");
+	}
 
 	batch[i++] = dst_y << 16 | dst_x;
 	batch[i++] = (height + dst_y) << 16 | (width + dst_x);
