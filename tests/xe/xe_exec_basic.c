@@ -318,36 +318,36 @@ igt_main
 
 	for (const struct section *s = sections; s->name; s++) {
 		igt_subtest_f("once-%s", s->name)
-			for_each_hw_engine(fd, hwe)
+			xe_for_each_hw_engine(fd, hwe)
 				test_exec(fd, hwe, 1, 1, 1, s->flags);
 
 		igt_subtest_f("twice-%s", s->name)
-			for_each_hw_engine(fd, hwe)
+			xe_for_each_hw_engine(fd, hwe)
 				test_exec(fd, hwe, 1, 2, 1, s->flags);
 
 		igt_subtest_f("many-%s", s->name)
-			for_each_hw_engine(fd, hwe)
+			xe_for_each_hw_engine(fd, hwe)
 				test_exec(fd, hwe, 1,
 					  s->flags & (REBIND | INVALIDATE) ?
 					  64 : 1024, 1,
 					  s->flags);
 
 		igt_subtest_f("many-engines-%s", s->name)
-			for_each_hw_engine(fd, hwe)
+			xe_for_each_hw_engine(fd, hwe)
 				test_exec(fd, hwe, 16,
 					  s->flags & (REBIND | INVALIDATE) ?
 					  64 : 1024, 1,
 					  s->flags);
 
 		igt_subtest_f("many-engines-many-vm-%s", s->name)
-			for_each_hw_engine(fd, hwe)
+			xe_for_each_hw_engine(fd, hwe)
 				test_exec(fd, hwe, 16,
 					  s->flags & (REBIND | INVALIDATE) ?
 					  64 : 1024, 16,
 					  s->flags);
 
 		igt_subtest_f("no-exec-%s", s->name)
-			for_each_hw_engine(fd, hwe)
+			xe_for_each_hw_engine(fd, hwe)
 				test_exec(fd, hwe, 1, 0, 1, s->flags);
 	}
 

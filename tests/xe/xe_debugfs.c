@@ -260,7 +260,7 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 
 
 	igt_subtest("gt") {
-		for_each_gt(fd, gt) {
+		xe_for_each_gt(fd, gt) {
 			snprintf(devnode, sizeof(devnode), "gt%d", gt);
 			igt_require(igt_debugfs_exists(fd, devnode, O_RDONLY));
 			test_gt(fd, gt);

@@ -181,7 +181,7 @@ test_query_engines(int fd)
 	struct drm_xe_engine_class_instance *hwe;
 	int i = 0;
 
-	for_each_hw_engine(fd, hwe) {
+	xe_for_each_hw_engine(fd, hwe) {
 		igt_assert(hwe);
 		igt_info("engine %d: %s\n", i++,
 			xe_engine_class_string(hwe->engine_class));

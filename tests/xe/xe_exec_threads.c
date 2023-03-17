@@ -82,7 +82,7 @@ test_balancer(int fd, int gt, uint32_t vm, uint64_t addr, uint64_t userptr,
 		owns_vm = true;
 	}
 
-	for_each_hw_engine(fd, hwe) {
+	xe_for_each_hw_engine(fd, hwe) {
 		if (hwe->engine_class != class || hwe->gt_id != gt)
 			continue;
 
@@ -1038,15 +1038,15 @@ static void threads(int fd, int flags)
 	int n_threads = 0;
 	int gt;
 
-	for_each_hw_engine(fd, hwe)
+	xe_for_each_hw_engine(fd, hwe)
 		++n_hw_engines;
 
 	if (flags & BALANCER) {
-		for_each_gt(fd, gt)
-			for_each_hw_engine_class(class) {
+		xe_for_each_gt(fd, gt)
+			xe_for_each_hw_engine_class(class) {
 				int num_placements = 0;
 
-				for_each_hw_engine(fd, hwe) {
+				xe_for_each_hw_engine(fd, hwe) {
 					if (hwe->engine_class != class ||
 					    hwe->gt_id != gt)
 						continue;
@@ -1089,7 +1089,7 @@ static void threads(int fd, int flags)
 
 	}
 
-	for_each_hw_engine(fd, hwe) {
+	xe_for_each_hw_engine(fd, hwe) {
 		threads_data[i].mutex = &mutex;
 		threads_data[i].cond = &cond;
 #define ADDRESS_SHIFT	39
@@ -1126,11 +1126,11 @@ static void threads(int fd, int flags)
 	}
 
 	if (flags & BALANCER) {
-		for_each_gt(fd, gt)
-			for_each_hw_engine_class(class) {
+		xe_for_each_gt(fd, gt)
+			xe_for_each_hw_engine_class(class) {
 				int num_placements = 0;
 
-				for_each_hw_engine(fd, hwe) {
+				xe_for_each_hw_engine(fd, hwe) {
 					if (hwe->engine_class != class ||
 					    hwe->gt_id != gt)
 						continue;

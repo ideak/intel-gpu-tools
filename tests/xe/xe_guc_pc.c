@@ -398,19 +398,19 @@ igt_main
 	}
 
 	igt_subtest("freq_basic_api") {
-		for_each_gt(fd, gt)
+		xe_for_each_gt(fd, gt)
 			test_freq_basic_api(sysfs, gt);
 	}
 
 	igt_subtest("freq_fixed_idle") {
-		for_each_gt(fd, gt) {
+		xe_for_each_gt(fd, gt) {
 			test_freq_fixed(sysfs, gt);
 		}
 	}
 
 	igt_subtest("freq_fixed_exec") {
-		for_each_gt(fd, gt) {
-			for_each_hw_engine(fd, hwe)
+		xe_for_each_gt(fd, gt) {
+			xe_for_each_hw_engine(fd, hwe)
 				igt_fork(child, ncpus) {
 					igt_debug("Execution Started\n");
 					exec_basic(fd, hwe, MAX_N_ENGINES, 16);
@@ -423,14 +423,14 @@ igt_main
 	}
 
 	igt_subtest("freq_range_idle") {
-		for_each_gt(fd, gt) {
+		xe_for_each_gt(fd, gt) {
 			test_freq_range(sysfs, gt);
 		}
 	}
 
 	igt_subtest("freq_range_exec") {
-		for_each_gt(fd, gt) {
-			for_each_hw_engine(fd, hwe)
+		xe_for_each_gt(fd, gt) {
+			xe_for_each_hw_engine(fd, hwe)
 				igt_fork(child, ncpus) {
 					igt_debug("Execution Started\n");
 					exec_basic(fd, hwe, MAX_N_ENGINES, 16);
@@ -443,39 +443,39 @@ igt_main
 	}
 
 	igt_subtest("freq_low_max") {
-		for_each_gt(fd, gt) {
+		xe_for_each_gt(fd, gt) {
 			test_freq_low_max(sysfs, gt);
 		}
 	}
 
 	igt_subtest("freq_suspend") {
-		for_each_gt(fd, gt) {
+		xe_for_each_gt(fd, gt) {
 			test_suspend(sysfs, gt);
 		}
 	}
 
 	igt_subtest("freq_reset") {
-		for_each_gt(fd, gt) {
+		xe_for_each_gt(fd, gt) {
 			test_reset(fd, sysfs, gt, 1);
 		}
 	}
 
 	igt_subtest("freq_reset_multiple") {
-		for_each_gt(fd, gt) {
+		xe_for_each_gt(fd, gt) {
 			test_reset(fd, sysfs, gt, 50);
 		}
 	}
 
 	igt_subtest("rc6_on_idle") {
-		for_each_gt(fd, gt) {
+		xe_for_each_gt(fd, gt) {
 			assert(igt_wait(in_rc6(sysfs, gt), 1000, 1));
 		}
 	}
 
 	igt_subtest("rc0_on_exec") {
-		for_each_gt(fd, gt) {
+		xe_for_each_gt(fd, gt) {
 			assert(igt_wait(in_rc6(sysfs, gt), 1000, 1));
-			for_each_hw_engine(fd, hwe)
+			xe_for_each_hw_engine(fd, hwe)
 				igt_fork(child, ncpus) {
 					igt_debug("Execution Started\n");
 					exec_basic(fd, hwe, MAX_N_ENGINES, 16);
@@ -488,7 +488,7 @@ igt_main
 	}
 
 	igt_fixture {
-		for_each_gt(fd, gt) {
+		xe_for_each_gt(fd, gt) {
 			set_freq(sysfs, gt, "min", stash_min);
 			set_freq(sysfs, gt, "max", stash_max);
 		}
