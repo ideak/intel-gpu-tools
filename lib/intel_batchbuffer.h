@@ -36,6 +36,28 @@ uint32_t fast_copy_dword0(unsigned int src_tiling,
 uint32_t fast_copy_dword1(unsigned int src_tiling,
 			  unsigned int dst_tiling,
 			  int bpp);
+void igt_blitter_copy(int fd,
+		      uint64_t ahnd,
+		      uint32_t ctx,
+		      const intel_ctx_cfg_t *cfg,
+		      /* src */
+		      uint32_t src_handle,
+		      uint32_t src_delta,
+		      uint32_t src_stride,
+		      uint32_t src_tiling,
+		      uint32_t src_x, uint32_t src_y,
+		      uint64_t src_size,
+		      /* size */
+		      uint32_t width, uint32_t height,
+		      /* bpp */
+		      uint32_t bpp,
+		      /* dst */
+		      uint32_t dst_handle,
+		      uint32_t dst_delta,
+		      uint32_t dst_stride,
+		      uint32_t dst_tiling,
+		      uint32_t dst_x, uint32_t dst_y,
+		      uint64_t dst_size);
 
 void igt_blitter_src_copy(int fd,
 			  uint64_t ahnd,

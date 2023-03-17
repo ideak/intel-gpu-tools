@@ -278,6 +278,78 @@ static uint32_t src_copy_dword1(uint32_t dst_pitch, uint32_t bpp)
 }
 
 /**
+ * igt_blitter_copy:
+ * @fd: file descriptor of the i915 driver
+ * @ahnd: handle to an allocator
+ * @ctx: context within which execute copy blit
+ * @src_handle: GEM handle of the source buffer
+ * @src_delta: offset into the source GEM bo, in bytes
+ * @src_stride: Stride (in bytes) of the source buffer
+ * @src_tiling: Tiling mode of the source buffer
+ * @src_x: X coordinate of the source region to copy
+ * @src_y: Y coordinate of the source region to copy
+ * @src_size: size of the src bo required for allocator and softpin
+ * @width: Width of the region to copy
+ * @height: Height of the region to copy
+ * @bpp: source and destination bits per pixel
+ * @dst_handle: GEM handle of the destination buffer
+ * @dst_delta: offset into the destination GEM bo, in bytes
+ * @dst_stride: Stride (in bytes) of the destination buffer
+ * @dst_tiling: Tiling mode of the destination buffer
+ * @dst_x: X coordinate of destination
+ * @dst_y: Y coordinate of destination
+ * @dst_size: size of the dst bo required for allocator and softpin
+ *
+ * Wrapper API to call appropriate blitter copy function.
+ */
+
+void igt_blitter_copy(int fd,
+		      uint64_t ahnd,
+		      uint32_t ctx,
+		      const intel_ctx_cfg_t *cfg,
+		      /* src */
+		      uint32_t src_handle,
+		      uint32_t src_delta,
+		      uint32_t src_stride,
+		      uint32_t src_tiling,
+		      uint32_t src_x, uint32_t src_y,
+		      uint64_t src_size,
+		      /* size */
+		      uint32_t width, uint32_t height,
+		      /* bpp */
+		      uint32_t bpp,
+		      /* dst */
+		      uint32_t dst_handle,
+		      uint32_t dst_delta,
+		      uint32_t dst_stride,
+		      uint32_t dst_tiling,
+		      uint32_t dst_x, uint32_t dst_y,
+		      uint64_t dst_size)
+{
+	uint32_t devid;
+
+	devid = intel_get_drm_devid(fd);
+
+	if (intel_graphics_ver(devid) >= IP_VER(12, 60))
+		igt_blitter_fast_copy__raw(fd, ahnd, ctx, NULL,
+					   src_handle, src_delta,
+					   src_stride, src_tiling,
+					   src_x, src_y, src_size,
+					   width, height, bpp,
+					   dst_handle, dst_delta,
+					   dst_stride, dst_tiling,
+					   dst_x, dst_y, dst_size);
+	else
+		igt_blitter_src_copy(fd, ahnd, ctx, NULL,
+				     src_handle, src_delta,
+				     src_stride, src_tiling,
+				     src_x, src_y, src_size,
+				     width, height, bpp,
+				     dst_handle, dst_delta,
+				     dst_stride, dst_tiling,
+				     dst_x, dst_y, dst_size);
+}
+/**
  * igt_blitter_src_copy:
  * @fd: file descriptor of the i915 driver
  * @ahnd: handle to an allocator
