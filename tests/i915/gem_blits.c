@@ -224,7 +224,8 @@ static void buffer_set_tiling(const struct device *device,
 		batch[i++] = 3 << 24 | 0xcc << 16 | pitch;
 	} else if (blt_has_fast_copy(device->fd)) {
 		batch[i++] = fast_copy_dword0(buffer->tiling, tiling);
-		dword1 = fast_copy_dword1(buffer->tiling, tiling, 32);
+		dword1 = fast_copy_dword1(device->fd, buffer->tiling,
+					  tiling, 32);
 		batch[i++] = dword1 | pitch;
 	} else {
 		igt_assert_f(0, "No supported blit command found\n");
@@ -371,7 +372,8 @@ static bool blit_to_linear(const struct device *device,
 		batch[i++] = 3 << 24 | 0xcc << 16 | buffer->stride;
 	} else if (blt_has_fast_copy(device->fd)) {
 		batch[i++] = fast_copy_dword0(buffer->tiling, I915_TILING_NONE);
-		dword1 = fast_copy_dword1(buffer->tiling, I915_TILING_NONE, 32);
+		dword1 = fast_copy_dword1(device->fd, buffer->tiling,
+					  I915_TILING_NONE, 32);
 		batch[i++] = dword1 | buffer->stride;
 	} else {
 		igt_assert_f(0, "No supported blit command found\n");
@@ -719,7 +721,8 @@ blit(const struct device *device,
 		batch[i++] = 3 << 24 | 0xcc << 16 | pitch;
 	} else if (blt_has_fast_copy(device->fd)) {
 		batch[i++] = fast_copy_dword0(src->tiling, dst->tiling);
-		dword1 = fast_copy_dword1(src->tiling, dst->tiling, 32);
+		dword1 = fast_copy_dword1(device->fd, src->tiling,
+					  dst->tiling, 32);
 		batch[i++] = dword1 | pitch;
 	} else {
 		igt_assert_f(0, "No supported blit command found\n");

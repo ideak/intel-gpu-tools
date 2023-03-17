@@ -33,7 +33,7 @@ enum i915_compression {
 
 uint32_t fast_copy_dword0(unsigned int src_tiling,
 			  unsigned int dst_tiling);
-uint32_t fast_copy_dword1(unsigned int src_tiling,
+uint32_t fast_copy_dword1(int fd, unsigned int src_tiling,
 			  unsigned int dst_tiling,
 			  int bpp);
 void igt_blitter_copy(int fd,

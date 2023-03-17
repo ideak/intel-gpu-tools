@@ -32,7 +32,6 @@
 #include "intel_batchbuffer.h"
 #include "intel_bufops.h"
 #include "intel_chipset.h"
-#include "rendercopy.h"
 #include "media_fill.h"
 #include "media_spin.h"
 #include "i915/gem_mman.h"
@@ -40,6 +39,7 @@
 #include "sw_sync.h"
 #include "gpgpu_fill.h"
 #include "huc_copy.h"
+#include "i915/i915_blt.h"
 
 #define BCS_SWCTRL 0x22200
 #define BCS_SRC_Y (1 << 0)
@@ -122,18 +122,26 @@ uint32_t fast_copy_dword0(unsigned int src_tiling,
 	return dword0;
 }
 
-uint32_t fast_copy_dword1(unsigned int src_tiling,
+static bool new_tile_y_format(unsigned int tiling)
+{
+	return tiling == T_YFMAJOR || tiling == T_TILE4;
+}
+
+uint32_t fast_copy_dword1(int fd, unsigned int src_tiling,
 			  unsigned int dst_tiling,
 			  int bpp)
 {
 	uint32_t dword1 = 0;
 
-	if (src_tiling == I915_TILING_Yf || src_tiling == I915_TILING_4)
-		/* Repurposed as Tile-4 on DG2 */
-		dword1 |= XY_FAST_COPY_SRC_TILING_Yf;
-	if (dst_tiling == I915_TILING_Yf || dst_tiling == I915_TILING_4)
-		/* Repurposed as Tile-4 on DG2 */
-		dword1 |= XY_FAST_COPY_DST_TILING_Yf;
+	if (blt_fast_copy_supports_tiling(fd, T_YMAJOR)) {
+		dword1 |= new_tile_y_format(src_tiling)
+				? XY_FAST_COPY_SRC_TILING_Yf : 0;
+		dword1 |= new_tile_y_format(dst_tiling)
+				? XY_FAST_COPY_DST_TILING_Yf : 0;
+	} else {
+		/* Always set bits for platforms that don't support legacy TileY */
+		dword1 |= XY_FAST_COPY_SRC_TILING_Yf | XY_FAST_COPY_DST_TILING_Yf;
+	}
 
 	switch (bpp) {
 	case 8:
@@ -582,7 +590,7 @@ void igt_blitter_fast_copy__raw(int fd,
 	src_pitch = fast_copy_pitch(src_stride, src_tiling);
 	dst_pitch = fast_copy_pitch(dst_stride, dst_tiling);
 	dword0 = fast_copy_dword0(src_tiling, dst_tiling);
-	dword1 = fast_copy_dword1(src_tiling, dst_tiling, bpp);
+	dword1 = fast_copy_dword1(fd, src_tiling, dst_tiling, bpp);
 
 	CHECK_RANGE(src_x); CHECK_RANGE(src_y);
 	CHECK_RANGE(dst_x); CHECK_RANGE(dst_y);
