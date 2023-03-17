@@ -411,28 +411,6 @@ bool igt_debugfs_search(int device, const char *filename, const char *substring)
 	return matched;
 }
 
-/**
- * igt_ignore_long_hpd:
- *
- * Set / unset ignore long HPD events from the panels. Some panels
- * generate long HPDs even while connected to the ports causing
- * unexpected CI execution issues. Set this to ignore such unexpected
- * long HPDs where we dont expect to disconnect the displays.
- */
-void igt_ignore_long_hpd(int drm_fd, bool enable)
-{
-	int fd = igt_debugfs_open(drm_fd, "i915_ignore_long_hpd", O_WRONLY);
-
-	if (fd < 0) {
-		igt_debug("couldn't open ignore long hpd file\n");
-		return;
-	}
-
-	igt_assert_eq(write(fd, enable ? "1" : "0", 1), 1);
-
-	close(fd);
-}
-
 static void igt_hpd_storm_exit_handler(int sig)
 {
 	int fd = drm_open_driver(DRIVER_INTEL);
