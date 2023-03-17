@@ -145,7 +145,7 @@ static const struct intel_device_info intel_sandybridge_info = {
 	.graphics_ver = 6,
 	.display_ver = 6,
 	.is_sandybridge = true,
-	.cmds_info = &pre_gen8_cmds_info,
+	.cmds_info = &gen6_cmds_info,
 	.codename = "sandybridge"
 };
 static const struct intel_device_info intel_sandybridge_m_info = {
@@ -153,7 +153,7 @@ static const struct intel_device_info intel_sandybridge_m_info = {
 	.display_ver = 6,
 	.is_mobile = true,
 	.is_sandybridge = true,
-	.cmds_info = &pre_gen8_cmds_info,
+	.cmds_info = &gen6_cmds_info,
 	.codename = "sandybridge"
 };
 
@@ -161,7 +161,7 @@ static const struct intel_device_info intel_ivybridge_info = {
 	.graphics_ver = 7,
 	.display_ver = 7,
 	.is_ivybridge = true,
-	.cmds_info = &pre_gen8_cmds_info,
+	.cmds_info = &gen6_cmds_info,
 	.codename = "ivybridge"
 };
 static const struct intel_device_info intel_ivybridge_m_info = {
@@ -169,7 +169,7 @@ static const struct intel_device_info intel_ivybridge_m_info = {
 	.display_ver = 7,
 	.is_mobile = true,
 	.is_ivybridge = true,
-	.cmds_info = &pre_gen8_cmds_info,
+	.cmds_info = &gen6_cmds_info,
 	.codename = "ivybridge"
 };
 
@@ -177,7 +177,7 @@ static const struct intel_device_info intel_valleyview_info = {
 	.graphics_ver = 7,
 	.display_ver = 7,
 	.is_valleyview = true,
-	.cmds_info = &pre_gen8_cmds_info,
+	.cmds_info = &gen6_cmds_info,
 	.codename = "valleyview"
 };
 
@@ -185,7 +185,7 @@ static const struct intel_device_info intel_valleyview_info = {
 	.graphics_ver = 7, \
 	.display_ver = 7, \
 	.is_haswell = true, \
-	.cmds_info = &pre_gen8_cmds_info, \
+	.cmds_info = &gen6_cmds_info, \
 	.codename = "haswell"
 
 static const struct intel_device_info intel_haswell_gt1_info = {

@@ -39,7 +39,8 @@ struct intel_cmds_info {
 	struct blt_cmd_info const *blt_cmds[__BLT_MAX_CMD];
 };
 
-extern const struct intel_cmds_info pre_gen8_cmds_info;
+extern const struct intel_cmds_info pre_gen6_cmds_info;
+extern const struct intel_cmds_info gen6_cmds_info;
 extern const struct intel_cmds_info gen8_cmds_info;
 extern const struct intel_cmds_info gen11_cmds_info;
 extern const struct intel_cmds_info gen12_cmds_info;

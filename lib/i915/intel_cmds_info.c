@@ -22,11 +22,11 @@
 
 static const struct blt_cmd_info src_copy = BLT_INFO(SRC_COPY, BIT(T_LINEAR));
 static const struct blt_cmd_info
-		pre_gen8_xy_src_copy = BLT_INFO(XY_SRC_COPY,
+		pre_gen6_xy_src_copy = BLT_INFO(XY_SRC_COPY,
 						BIT(T_LINEAR) |
 						BIT(T_XMAJOR));
 static const struct blt_cmd_info
-		gen8_xy_src_copy = BLT_INFO(XY_SRC_COPY,
+		gen6_xy_src_copy = BLT_INFO(XY_SRC_COPY,
 					    BIT(T_LINEAR) |
 					    BIT(T_XMAJOR) |
 					    BIT(T_YMAJOR));
@@ -69,29 +69,37 @@ static const struct blt_cmd_info
 						 BIT(T_TILE64),
 						 BLT_CMD_EXTENDED);
 
-const struct intel_cmds_info pre_gen8_cmds_info = {
+const struct intel_cmds_info pre_gen6_cmds_info = {
 	.blt_cmds = {
 		[SRC_COPY] = &src_copy,
-		[XY_SRC_COPY] = &pre_gen8_xy_src_copy
+		[XY_SRC_COPY] = &pre_gen6_xy_src_copy
 	}
+};
+
+const struct intel_cmds_info gen6_cmds_info =  {
+	.blt_cmds = {
+		[SRC_COPY] = &src_copy,
+		[XY_SRC_COPY] = &gen6_xy_src_copy
+	}
+
 };
 
 const struct intel_cmds_info gen8_cmds_info = {
 	.blt_cmds = {
-		[XY_SRC_COPY] = &gen8_xy_src_copy,
+		[XY_SRC_COPY] = &gen6_xy_src_copy,
 	}
 };
 
 const struct intel_cmds_info gen11_cmds_info = {
 	.blt_cmds = {
-		[XY_SRC_COPY] = &gen8_xy_src_copy,
+		[XY_SRC_COPY] = &gen6_xy_src_copy,
 		[XY_FAST_COPY] = &gen11_xy_fast_copy,
 	}
 };
 
 const struct intel_cmds_info gen12_cmds_info = {
 	.blt_cmds = {
-		[XY_SRC_COPY] = &gen8_xy_src_copy,
+		[XY_SRC_COPY] = &gen6_xy_src_copy,
 		[XY_FAST_COPY] = &gen12_xy_fast_copy,
 		[XY_BLOCK_COPY] = &gen12_xy_block_copy,
 	}
@@ -99,7 +107,7 @@ const struct intel_cmds_info gen12_cmds_info = {
 
 const struct intel_cmds_info gen12_dg2_cmds_info = {
 	.blt_cmds = {
-		[XY_SRC_COPY] = &gen8_xy_src_copy,
+		[XY_SRC_COPY] = &gen6_xy_src_copy,
 		[XY_FAST_COPY] = &dg2_xy_fast_copy,
 		[XY_BLOCK_COPY] = &dg2_xy_block_copy,
 	}
