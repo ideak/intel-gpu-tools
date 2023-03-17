@@ -168,9 +168,11 @@ bool blt_cmd_has_property(const struct intel_cmds_info *cmds_info,
 
 bool blt_has_block_copy(int i915);
 bool blt_has_fast_copy(int i915);
+bool blt_has_xy_src_copy(int i915);
 
 bool blt_fast_copy_supports_tiling(int i915, enum blt_tiling_type tiling);
 bool blt_block_copy_supports_tiling(int i915, enum blt_tiling_type tiling);
+bool blt_xy_src_copy_supports_tiling(int i915, enum blt_tiling_type tiling);
 bool blt_block_copy_supports_compression(int i915);
 bool blt_uses_extended_block_copy(int i915);
 

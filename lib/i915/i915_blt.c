@@ -296,6 +296,22 @@ bool blt_has_fast_copy(int i915)
 }
 
 /**
+ * blt_has_xy_src_copy
+ * @i915: drm fd
+ *
+ * Check if XY src copy is supported by @i915 device
+ *
+ * Returns:
+ * true if it does, false otherwise.
+ */
+bool blt_has_xy_src_copy(int i915)
+{
+	const struct intel_cmds_info *cmds_info = GET_CMDS_INFO(i915);
+
+	return blt_supports_command(cmds_info, XY_SRC_COPY);
+}
+
+/**
  * blt_fast_copy_supports_tiling
  * @i915: drm fd
  * @tiling: tiling format
@@ -327,6 +343,23 @@ bool blt_block_copy_supports_tiling(int i915, enum blt_tiling_type tiling)
 	const struct intel_cmds_info *cmds_info = GET_CMDS_INFO(i915);
 
 	return blt_cmd_supports_tiling(cmds_info, XY_BLOCK_COPY, tiling);
+}
+
+/**
+ * blt_xy_src_copy_supports_tiling
+ * @i915: drm fd
+ * @tiling: tiling format
+ *
+ * Check if XY src copy provided by @i915 device supports @tiling format
+ *
+ * Returns:
+ * true if it does, false otherwise.
+ */
+bool blt_xy_src_copy_supports_tiling(int i915, enum blt_tiling_type tiling)
+{
+	const struct intel_cmds_info *cmds_info = GET_CMDS_INFO(i915);
+
+	return blt_cmd_supports_tiling(cmds_info, XY_SRC_COPY, tiling);
 }
 
 /**
