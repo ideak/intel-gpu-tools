@@ -183,7 +183,7 @@ test_balancer(int fd, int gt, int class, int n_engines, int n_execs,
 		xe_device_get(fd);
 	}
 
-	for_each_hw_engine(fd, hwe) {
+	xe_for_each_hw_engine(fd, hwe) {
 		if (hwe->engine_class != class || hwe->gt_id != gt)
 			continue;
 
@@ -837,106 +837,106 @@ igt_main
 	}
 
 	igt_subtest("spin")
-		for_each_hw_engine(fd, hwe)
+		xe_for_each_hw_engine(fd, hwe)
 			test_spin(fd, hwe);
 
 	igt_subtest("cancel")
-		for_each_hw_engine(fd, hwe)
+		xe_for_each_hw_engine(fd, hwe)
 			test_legacy_mode(fd, hwe, 1, 1, CANCEL);
 
 	igt_subtest("engine-reset")
-		for_each_hw_engine(fd, hwe)
+		xe_for_each_hw_engine(fd, hwe)
 			test_legacy_mode(fd, hwe, 2, 2, ENGINE_RESET);
 
 	igt_subtest("cat-error")
-		for_each_hw_engine(fd, hwe)
+		xe_for_each_hw_engine(fd, hwe)
 			test_legacy_mode(fd, hwe, 2, 2, CAT_ERROR);
 
 	igt_subtest("gt-reset")
-		for_each_hw_engine(fd, hwe)
+		xe_for_each_hw_engine(fd, hwe)
 			test_legacy_mode(fd, hwe, 2, 2, GT_RESET);
 
 	igt_subtest("close-fd-no-exec")
-		for_each_hw_engine(fd, hwe)
+		xe_for_each_hw_engine(fd, hwe)
 			test_legacy_mode(-1, hwe, 16, 0, CLOSE_FD);
 
 	igt_subtest("close-fd")
-		for_each_hw_engine(fd, hwe)
+		xe_for_each_hw_engine(fd, hwe)
 			test_legacy_mode(-1, hwe, 16, 256, CLOSE_FD);
 
 	igt_subtest("close-engines-close-fd")
-		for_each_hw_engine(fd, hwe)
+		xe_for_each_hw_engine(fd, hwe)
 			test_legacy_mode(-1, hwe, 16, 256, CLOSE_FD |
 					 CLOSE_ENGINES);
 
 	igt_subtest("cm-engine-reset")
-		for_each_hw_engine(fd, hwe)
+		xe_for_each_hw_engine(fd, hwe)
 			test_compute_mode(fd, hwe, 2, 2, ENGINE_RESET);
 
 	igt_subtest("cm-cat-error")
-		for_each_hw_engine(fd, hwe)
+		xe_for_each_hw_engine(fd, hwe)
 			test_compute_mode(fd, hwe, 2, 2, CAT_ERROR);
 
 	igt_subtest("cm-gt-reset")
-		for_each_hw_engine(fd, hwe)
+		xe_for_each_hw_engine(fd, hwe)
 			test_compute_mode(fd, hwe, 2, 2, GT_RESET);
 
 	igt_subtest("cm-close-fd-no-exec")
-		for_each_hw_engine(fd, hwe)
+		xe_for_each_hw_engine(fd, hwe)
 			test_compute_mode(-1, hwe, 16, 0, CLOSE_FD);
 
 	igt_subtest("cm-close-fd")
-		for_each_hw_engine(fd, hwe)
+		xe_for_each_hw_engine(fd, hwe)
 			test_compute_mode(-1, hwe, 16, 256, CLOSE_FD);
 
 	igt_subtest("cm-close-engines-close-fd")
-		for_each_hw_engine(fd, hwe)
+		xe_for_each_hw_engine(fd, hwe)
 			test_compute_mode(-1, hwe, 16, 256, CLOSE_FD |
 					  CLOSE_ENGINES);
 
 	for (const struct section *s = sections; s->name; s++) {
 		igt_subtest_f("%s-cancel", s->name)
-			for_each_gt(fd, gt)
-				for_each_hw_engine_class(class)
+			xe_for_each_gt(fd, gt)
+				xe_for_each_hw_engine_class(class)
 					test_balancer(fd, gt, class, 1, 1,
 						      CANCEL | s->flags);
 
 		igt_subtest_f("%s-engine-reset", s->name)
-			for_each_gt(fd, gt)
-				for_each_hw_engine_class(class)
+			xe_for_each_gt(fd, gt)
+				xe_for_each_hw_engine_class(class)
 					test_balancer(fd, gt, class, MAX_INSTANCE + 1,
 						      MAX_INSTANCE + 1,
 						      ENGINE_RESET | s->flags);
 
 		igt_subtest_f("%s-cat-error", s->name)
-			for_each_gt(fd, gt)
-				for_each_hw_engine_class(class)
+			xe_for_each_gt(fd, gt)
+				xe_for_each_hw_engine_class(class)
 					test_balancer(fd, gt, class, MAX_INSTANCE + 1,
 						      MAX_INSTANCE + 1,
 						      CAT_ERROR | s->flags);
 
 		igt_subtest_f("%s-gt-reset", s->name)
-			for_each_gt(fd, gt)
-				for_each_hw_engine_class(class)
+			xe_for_each_gt(fd, gt)
+				xe_for_each_hw_engine_class(class)
 					test_balancer(fd, gt, class, MAX_INSTANCE + 1,
 						      MAX_INSTANCE + 1,
 						      GT_RESET | s->flags);
 
 		igt_subtest_f("%s-close-fd-no-exec", s->name)
-			for_each_gt(fd, gt)
-				for_each_hw_engine_class(class)
+			xe_for_each_gt(fd, gt)
+				xe_for_each_hw_engine_class(class)
 					test_balancer(-1, gt, class, 16, 0,
 						      CLOSE_FD | s->flags);
 
 		igt_subtest_f("%s-close-fd", s->name)
-			for_each_gt(fd, gt)
-				for_each_hw_engine_class(class)
+			xe_for_each_gt(fd, gt)
+				xe_for_each_hw_engine_class(class)
 					test_balancer(-1, gt, class, 16, 256,
 						      CLOSE_FD | s->flags);
 
 		igt_subtest_f("%s-close-engines-close-fd", s->name)
-			for_each_gt(fd, gt)
-				for_each_hw_engine_class(class)
+			xe_for_each_gt(fd, gt)
+				xe_for_each_hw_engine_class(class)
 					test_balancer(-1, gt, class, 16, 256, CLOSE_FD |
 						      CLOSE_ENGINES | s->flags);
 	}
