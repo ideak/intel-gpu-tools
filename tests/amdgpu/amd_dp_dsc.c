@@ -110,7 +110,7 @@ static void test_dsc_enable(data_t *data)
 	test_init(data);
 	igt_enable_connectors(data->fd);
 
-	for (i = 0; i < display->n_outputs; i++) {
+	for_each_pipe(&data->display, i) {
 		/* Setup the output */
 		output = data->output[i];
 		if (!output || !igt_output_is_connected(output))
@@ -248,7 +248,7 @@ static void test_dsc_slice_dimensions_change(data_t *data)
 	test_init(data);
 	igt_enable_connectors(data->fd);
 
-	for (i = 0; i < display->n_outputs; i++) {
+	for_each_pipe(&data->display, i) {
 		/* Setup the output */
 		output = data->output[i];
 		if (!output || !igt_output_is_connected(output))
@@ -341,7 +341,7 @@ static void test_dsc_link_settings(data_t *data)
     test_init(data);
 
     /* Setup all outputs */
-	for (i = 0; i < display->n_outputs; i++) {
+	for_each_pipe(&data->display, i) {
 		output = data->output[i];
 		if (!output || !igt_output_is_connected(output))
 			continue;
@@ -358,7 +358,7 @@ static void test_dsc_link_settings(data_t *data)
 	igt_display_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, 0);
 
     /* Collect reference CRCs */
-	for (i = 0; i < display->n_outputs; i++) {
+	for_each_pipe(&data->display, i) {
 		output = data->output[i];
 		if (!output || !igt_output_is_connected(output))
 			continue;
@@ -369,7 +369,7 @@ static void test_dsc_link_settings(data_t *data)
 	for (lc = 0; lc < ARRAY_SIZE(lane_count_vals); lc++) {
 		for (lr = 0; lr < ARRAY_SIZE(link_rate_vals); lr++) {
 			/* Write new link_settings */
-			for (i = 0; i < display->n_outputs; i++) {
+			for_each_pipe(&data->display, i) {
 				output = data->output[i];
 				if (!output || !igt_output_is_connected(output))
 					continue;
@@ -387,7 +387,7 @@ static void test_dsc_link_settings(data_t *data)
 			/* Trigger commit after writing new link settings */
 			igt_display_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
 
-			for (i = 0; i < display->n_outputs; i++) {
+			for_each_pipe(&data->display, i) {
 				output = data->output[i];
 				if (!output || !igt_output_is_connected(output))
 					continue;
@@ -416,7 +416,7 @@ static void test_dsc_link_settings(data_t *data)
 	}
 
 	/* Cleanup all fbs */
-	for (i = 0; i < display->n_outputs; i++) {
+	for_each_pipe(&data->display, i) {
 		output = data->output[i];
 		if (!output || !igt_output_is_connected(output))
 			continue;
@@ -439,7 +439,7 @@ static void test_dsc_bpc(data_t *data)
     test_init(data);
 
 	/* Find max supported bpc */
-	for (i = 0; i < display->n_outputs; i++) {
+	for_each_pipe(&data->display, i) {
 		output = data->output[i];
 		if (!output || !igt_output_is_connected(output))
 			continue;
@@ -451,7 +451,7 @@ static void test_dsc_bpc(data_t *data)
 	for (bpc = 0; bpc < ARRAY_SIZE(bpc_vals); bpc++) {
 		igt_info("Testing bpc = %d\n", bpc_vals[bpc]);
 
-		for (i = 0; i < display->n_outputs; i++) {
+		for_each_pipe(&data->display, i) {
 			output = data->output[i];
 			if (!output || !igt_output_is_connected(output))
 				continue;
@@ -474,7 +474,7 @@ static void test_dsc_bpc(data_t *data)
 
 		igt_display_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, 0);
 
-		for (i = 0; i < display->n_outputs; i++) {
+		for_each_pipe(&data->display, i) {
 			output = data->output[i];
 			if (!output || !igt_output_is_connected(output))
 				continue;
@@ -501,7 +501,7 @@ static void test_dsc_bpc(data_t *data)
 		}
 
 		/* Cleanup all fbs */
-		for (i = 0; i < display->n_outputs; i++) {
+		for_each_pipe(&data->display, i) {
 			output = data->output[i];
 			if (!output || !igt_output_is_connected(output))
 				continue;
