@@ -34,9 +34,16 @@
 #include <libudev.h>
 
 struct igt_hotplug_handler_ctx {
+	int drm_fd;
+
 	struct udev_monitor *uevent_monitor;
 	struct udev *udev;
 	GIOChannel *udevchannel;
+
+	struct {
+		void (*fn)(void *data);
+		void *data;
+	} callback;
 };
 
 static struct igt_hotplug_handler_ctx hotplug_handler_ctx;
@@ -55,13 +62,13 @@ static gboolean hotplug_event(GIOChannel *source, GIOCondition condition,
 		goto out;
 
 	udev_devnum = udev_device_get_devnum(dev);
-	fstat(drm_fd, &s);
+	fstat(ctx->drm_fd, &s);
 
 	hotplug = udev_device_get_property_value(dev, "HOTPLUG");
 
 	if (memcmp(&s.st_rdev, &udev_devnum, sizeof(dev_t)) == 0 &&
 	    hotplug && atoi(hotplug) == 1)
-		update_display(0, false);
+		ctx->callback.fn(ctx->callback.data);
 
 	udev_device_unref(dev);
 out:
@@ -69,10 +76,16 @@ out:
 }
 
 
-gboolean igt_dp_compliance_setup_hotplug(void)
+gboolean
+igt_dp_compliance_setup_hotplug(int drm_fd,
+				void (*callback_fn)(void *data), void *callback_data)
 {
 	struct igt_hotplug_handler_ctx *ctx = &hotplug_handler_ctx;
 	int ret;
+
+	ctx->drm_fd = drm_fd;
+	ctx->callback.fn = callback_fn;
+	ctx->callback.data = callback_data;
 
 	ctx->udev = udev_new();
 	if (!ctx->udev) {

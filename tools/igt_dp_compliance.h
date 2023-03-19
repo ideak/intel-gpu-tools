@@ -30,15 +30,13 @@
 #include <stdlib.h>
 #include <glib.h>
 
-extern int drm_fd;
-
-gboolean igt_dp_compliance_setup_hotplug(void);
+gboolean
+igt_dp_compliance_setup_hotplug(int drm_fd,
+				void (*callback_fn)(void *data),
+				void *callback_data);
 void igt_dp_compliance_cleanup_hotplug(void);
 
 void enter_exec_path(char **argv);
 void set_termio_mode(void);
-
-/* called by the hotplug code */
-int update_display(int mode, bool is_compliance_test);
 
 #endif /* __IGT_DP_COMPLIANCE_H__ */

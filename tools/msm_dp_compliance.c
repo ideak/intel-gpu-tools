@@ -277,6 +277,8 @@ static void get_test_videopattern_data(void)
 	igt_info("pattern = %d\n", pattern);
 }
 
+static int update_display(int mode, bool is_compliance_test);
+
 static int process_test_request(int test_type)
 {
 	int mode;
@@ -587,7 +589,7 @@ static uint32_t find_crtc_for_connector(drmModeConnector *c)
  * 0: On Success
  * -1: On failure
  */
-int update_display(int mode, bool is_compliance_test)
+static int update_display(int mode, bool is_compliance_test)
 {
 	struct connector *connectors, *conn;
 	int cnt, ret = 0;
@@ -712,6 +714,11 @@ static gboolean test_handler(GIOChannel *source, GIOCondition condition,
 	return TRUE;
 }
 
+static void hotplug_event_handler(void *data)
+{
+	update_display(0, false);
+}
+
 static gboolean input_event(GIOChannel *source, GIOCondition condition,
 				gpointer data)
 {
@@ -783,7 +790,8 @@ int main(int argc, char **argv)
 		goto out_close;
 	}
 
-	if (!igt_dp_compliance_setup_hotplug()) {
+	if (!igt_dp_compliance_setup_hotplug(drm_fd,
+					     hotplug_event_handler, NULL)) {
 		igt_warn("Failed to initialize hotplug support\n");
 		goto out_mainloop;
 	}
