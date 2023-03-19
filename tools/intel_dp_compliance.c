@@ -788,14 +788,6 @@ static void cleanup_debugfs(void)
 	fclose(test_type_fp);
 }
 
-static void __attribute__((noreturn)) cleanup_and_exit(int ret)
-{
-	cleanup_debugfs();
-	close(drm_fd);
-	igt_info("Compliance testing application exiting\n");
-	exit(ret);
-}
-
 static void cleanup_test(void)
 {
 	video_pattern_flag = false;
@@ -839,12 +831,13 @@ static void hotplug_event_handler(void *data)
 static gboolean input_event(GIOChannel *source, GIOCondition condition,
 				gpointer data)
 {
+	GMainLoop *loop = data;
 	gchar buf[2];
 	gsize count;
 
 	count = read(g_io_channel_unix_get_fd(source), buf, sizeof(buf));
 	if (buf[0] == 'q' && (count == 1 || buf[1] == '\n')) {
-		cleanup_and_exit(0);
+		g_main_loop_quit(loop);
 	}
 
 	return TRUE;
@@ -939,7 +932,7 @@ int main(int argc, char **argv)
 	}
 
 	ret = g_io_add_watch(stdinchannel, G_IO_IN | G_IO_ERR, input_event,
-			     NULL);
+			     mainloop);
 	if (ret < 0) {
 		igt_warn("Failed to add watch on stdin GIOChannel\n");
 		goto out_stdio;
