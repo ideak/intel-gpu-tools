@@ -843,6 +843,33 @@ static gboolean input_event(GIOChannel *source, GIOCondition condition,
 	return TRUE;
 }
 
+static bool crash_sig(int sig)
+{
+	switch (sig) {
+	case SIGINT:
+	case SIGHUP:
+	case SIGPIPE:
+	case SIGTERM:
+	case SIGQUIT:
+		return false;
+	default:
+		return true;
+	}
+}
+
+static void *exit_handler_data;
+static void exit_handler(int sig)
+{
+	GMainLoop *loop = exit_handler_data;
+
+	if (crash_sig(sig))
+		return;
+
+	/* Allow for cleanup after main loop exits. */
+	signal(sig, SIG_IGN);
+	g_main_loop_quit(loop);
+}
+
 int main(int argc, char **argv)
 {
 	int c;
@@ -937,6 +964,9 @@ int main(int argc, char **argv)
 		igt_warn("Failed to add watch on stdin GIOChannel\n");
 		goto out_stdio;
 	}
+
+	exit_handler_data = mainloop;
+	igt_install_exit_handler(exit_handler);
 
 	ret = 0;
 
