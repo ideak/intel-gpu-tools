@@ -75,6 +75,8 @@
  * active in the kernel. This flag is polled by userspace and once set, invokes
  * the test handler in the user app. This flag is set by the test handler in the
  * kernel after reading the registers requested by the test appliance.
+ * After setting the flag the driver generates a hotplug udev event, which
+ * userspace can wait on before reading this flag.
  *
  * i915_dp_test_data
  * Test data is used by the kernel to pass parameters to the user app. Eg: In
@@ -806,8 +808,7 @@ static void read_test_request(void)
 	clear_test_active();
 }
 
-static gboolean test_handler(GIOChannel *source, GIOCondition condition,
-			     gpointer data)
+static gboolean test_handler(void)
 {
 	unsigned long test_active;
 	int ret;
@@ -818,14 +819,18 @@ static gboolean test_handler(GIOChannel *source, GIOCondition condition,
 	if (ret < 1)
 		return FALSE;
 
-	if (test_active)
-		read_test_request();
+	if (!test_active)
+		return FALSE;
+
+	read_test_request();
+
 	return TRUE;
 }
 
 static void hotplug_event_handler(void *data)
 {
-	update_display(0, false);
+	if (!test_handler())
+		update_display(INTEL_MODE_NONE, false);
 }
 
 static gboolean input_event(GIOChannel *source, GIOCondition condition,
@@ -874,7 +879,7 @@ int main(int argc, char **argv)
 {
 	int c;
 	int ret = 0;
-	GIOChannel *stdinchannel, *testactive_channel;
+	GIOChannel *stdinchannel;
 	GMainLoop *mainloop;
 	struct igt_hotplug_handler_ctx *hctx;
 	bool opt_dump_info = false;
@@ -937,19 +942,6 @@ int main(int argc, char **argv)
 	if (!hctx) {
 		igt_warn("Failed to initialize hotplug support\n");
 		goto out_mainloop;
-	}
-
-	testactive_channel = g_io_channel_unix_new(fileno(test_active_fp));
-	if (!testactive_channel) {
-		igt_warn("Failed to create test_active GIOChannel\n");
-		goto out_close;
-	}
-
-	ret = g_io_add_watch(testactive_channel, G_IO_IN | G_IO_ERR,
-			     test_handler, NULL);
-	if (ret < 0) {
-		igt_warn("Failed to add watch on udev GIOChannel\n");
-		goto out_close;
 	}
 
 	stdinchannel = g_io_channel_unix_new(0);
