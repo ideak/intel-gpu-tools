@@ -114,6 +114,7 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <string.h>
 #include <strings.h>
 #include <unistd.h>
 #include <termios.h>
@@ -335,36 +336,56 @@ static void get_test_videopattern_data(void)
 	igt_info("  BitDepth = %u\n", bitdepth);
 }
 
+static void dump_test_data(const char *test_name)
+{
+	char line[1024];
+
+	print_test_banner(test_name);
+
+	rewind(test_data_fp);
+	while (fgets(line, sizeof(line), test_data_fp))
+		igt_info("  %.*s\n", (int)strcspn(line, "\n"), line);
+}
+
 static int update_display(int mode, bool is_compliance_test);
 
 static int process_test_request(int test_type)
 {
-	int mode;
+	int mode = INTEL_MODE_INVALID;
 	unsigned long test_data_edid;
-	bool valid = false;
+
 	switch (test_type) {
 	case DP_TEST_LINK_VIDEO_PATTERN:
 		video_pattern_flag = true;
 		get_test_videopattern_data();
 		mode = INTEL_MODE_VIDEO_PATTERN_TEST;
-		valid = true;
 		break;
 	case DP_TEST_LINK_EDID_READ:
 		test_data_edid = get_test_edid_data();
 		mode = (test_data_edid & DP_COMPLIANCE_VIDEO_MODE_MASK) >>
 			INTEL_DP_RESOLUTION_SHIFT_MASK;
-		valid = true;
+		break;
+	case DP_TEST_LINK_PHY_TEST_PATTERN:
+		dump_test_data("PHY pattern");
+		/**
+		 * Keep the driver's test_active flag set, to let it complete
+		 * enabling the PHY test pattern.
+		 * TODO: add support for setting a PHY test pattern via the
+		 * atomic modeset IOCTL, and clear the test_active flag for
+		 * this test case as well.
+		 */
 		break;
 	default:
 		/* Unknown test type */
 		fprintf(stderr, "Invalid test request, ignored.\n");
-		break;
+
+		return -1;
 	}
 
-	if (valid)
-		return update_display(mode, true);
+	if (mode == INTEL_MODE_INVALID)
+		return 0;
 
-	return -1;
+	return update_display(mode, true);
 }
 
 static void dump_info(void)
@@ -967,6 +988,7 @@ int main(int argc, char **argv)
 
 	g_main_loop_run(mainloop);
 
+	clear_test_active();
 out_stdio:
 	g_io_channel_shutdown(stdinchannel, TRUE, NULL);
 out_hotplug:
