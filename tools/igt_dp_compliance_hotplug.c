@@ -32,9 +32,14 @@
 
 #include "igt_dp_compliance.h"
 #include <libudev.h>
-static struct udev_monitor *uevent_monitor;
-static struct udev *udev;
-static GIOChannel *udevchannel;
+
+struct igt_hotplug_handler_ctx {
+	struct udev_monitor *uevent_monitor;
+	struct udev *udev;
+	GIOChannel *udevchannel;
+};
+
+static struct igt_hotplug_handler_ctx hotplug_handler_ctx;
 
 static gboolean hotplug_event(GIOChannel *source, GIOCondition condition,
 			      gpointer data)
@@ -43,8 +48,9 @@ static gboolean hotplug_event(GIOChannel *source, GIOCondition condition,
 	dev_t udev_devnum;
 	struct stat s;
 	const char *hotplug;
+	const struct igt_hotplug_handler_ctx *ctx = data;
 
-	dev = udev_monitor_receive_device(uevent_monitor);
+	dev = udev_monitor_receive_device(ctx->uevent_monitor);
 	if (!dev)
 		goto out;
 
@@ -65,21 +71,22 @@ out:
 
 gboolean igt_dp_compliance_setup_hotplug(void)
 {
+	struct igt_hotplug_handler_ctx *ctx = &hotplug_handler_ctx;
 	int ret;
 
-	udev = udev_new();
-	if (!udev) {
+	ctx->udev = udev_new();
+	if (!ctx->udev) {
 		igt_warn("Failed to create udev object\n");
 		goto out;
 	}
 
-	uevent_monitor = udev_monitor_new_from_netlink(udev, "udev");
-	if (!uevent_monitor) {
+	ctx->uevent_monitor = udev_monitor_new_from_netlink(ctx->udev, "udev");
+	if (!ctx->uevent_monitor) {
 		igt_warn("Failed to create udev event monitor\n");
 		goto out;
 	}
 
-	ret = udev_monitor_filter_add_match_subsystem_devtype(uevent_monitor,
+	ret = udev_monitor_filter_add_match_subsystem_devtype(ctx->uevent_monitor,
 							      "drm",
 							      "drm_minor");
 	if (ret < 0) {
@@ -87,21 +94,21 @@ gboolean igt_dp_compliance_setup_hotplug(void)
 		goto out;
 	}
 
-	ret = udev_monitor_enable_receiving(uevent_monitor);
+	ret = udev_monitor_enable_receiving(ctx->uevent_monitor);
 	if (ret < 0) {
 		igt_warn("Failed to enable udev event reception\n");
 		goto out;
 	}
 
-	udevchannel =
-		g_io_channel_unix_new(udev_monitor_get_fd(uevent_monitor));
-	if (!udevchannel) {
+	ctx->udevchannel =
+		g_io_channel_unix_new(udev_monitor_get_fd(ctx->uevent_monitor));
+	if (!ctx->udevchannel) {
 		igt_warn("Failed to create udev GIOChannel\n");
 		goto out;
 	}
 
-	ret = g_io_add_watch(udevchannel, G_IO_IN | G_IO_ERR, hotplug_event,
-			     udev);
+	ret = g_io_add_watch(ctx->udevchannel, G_IO_IN | G_IO_ERR, hotplug_event,
+			     ctx);
 	if (ret < 0) {
 		igt_warn("Failed to add watch on udev GIOChannel\n");
 		goto out;
@@ -116,12 +123,14 @@ out:
 
 void igt_dp_compliance_cleanup_hotplug(void)
 {
-	if (udevchannel) {
-		g_io_channel_flush(udevchannel, NULL);
-		g_io_channel_unref(udevchannel);
+	struct igt_hotplug_handler_ctx *ctx = &hotplug_handler_ctx;
+
+	if (ctx->udevchannel) {
+		g_io_channel_flush(ctx->udevchannel, NULL);
+		g_io_channel_unref(ctx->udevchannel);
 	}
-	if (uevent_monitor)
-		udev_monitor_unref(uevent_monitor);
-	if (udev)
-		udev_unref(udev);
+	if (ctx->uevent_monitor)
+		udev_monitor_unref(ctx->uevent_monitor);
+	if (ctx->udev)
+		udev_unref(ctx->udev);
 }
