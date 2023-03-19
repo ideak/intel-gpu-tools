@@ -355,6 +355,10 @@ static int process_test_request(int test_type)
 	unsigned long test_data_edid;
 
 	switch (test_type) {
+	case DP_TEST_LINK_TRAINING:
+		dump_test_data("link training");
+		mode = INTEL_MODE_PREFERRED;
+		break;
 	case DP_TEST_LINK_VIDEO_PATTERN:
 		video_pattern_flag = true;
 		get_test_videopattern_data();
