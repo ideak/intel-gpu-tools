@@ -228,21 +228,29 @@ static void clear_test_active(void)
 static FILE *fopenat(int dir, const char *name, const char *mode)
 {
 	int fd = openat(dir, name, O_RDWR);
-	return fdopen(fd, mode);
+	FILE *f;
+	int ret;
+
+	igt_require(fd >= 0);
+
+	f = fdopen(fd, mode);
+	igt_require(f);
+
+	ret = setvbuf(f, NULL, _IONBF, 0);
+	igt_require(ret == 0);
+
+	return f;
 }
 
 static void setup_debugfs_files(void)
 {
 	int dir = igt_debugfs_dir(drm_fd);
 
+	igt_require(dir >= 0);
+
 	test_type_fp = fopenat(dir, INTEL_DP_TEST_TYPE_FILE, "r");
-	igt_require(test_type_fp);
-
 	test_data_fp = fopenat(dir, INTEL_DP_TEST_DATA_FILE, "r");
-	igt_require(test_data_fp);
-
 	test_active_fp = fopenat(dir, INTEL_DP_TEST_ACTIVE_FILE, "w+");
-	igt_require(test_active_fp);
 
 	close(dir);
 
