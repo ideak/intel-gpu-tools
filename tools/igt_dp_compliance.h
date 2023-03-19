@@ -30,11 +30,13 @@
 #include <stdlib.h>
 #include <glib.h>
 
-gboolean
+struct igt_hotplug_handler_ctx;
+
+struct igt_hotplug_handler_ctx *
 igt_dp_compliance_setup_hotplug(int drm_fd,
 				void (*callback_fn)(void *data),
 				void *callback_data);
-void igt_dp_compliance_cleanup_hotplug(void);
+void igt_dp_compliance_cleanup_hotplug(struct igt_hotplug_handler_ctx *ctx);
 
 void enter_exec_path(char **argv);
 void set_termio_mode(void);

@@ -738,6 +738,7 @@ int main(int argc, char **argv)
 	int ret = 0;
 	GIOChannel *stdinchannel, *testactive_channel;
 	GMainLoop *mainloop;
+	struct igt_hotplug_handler_ctx *hctx;
 	bool opt_dump_info = false;
 	struct option long_opts[] = {
 		{"help-description", 0, 0, HELP_DESCRIPTION},
@@ -790,8 +791,9 @@ int main(int argc, char **argv)
 		goto out_close;
 	}
 
-	if (!igt_dp_compliance_setup_hotplug(drm_fd,
-					     hotplug_event_handler, NULL)) {
+	hctx = igt_dp_compliance_setup_hotplug(drm_fd,
+					       hotplug_event_handler, NULL);
+	if (!hctx) {
 		igt_warn("Failed to initialize hotplug support\n");
 		goto out_mainloop;
 	}
@@ -832,7 +834,7 @@ int main(int argc, char **argv)
 out_stdio:
 	g_io_channel_shutdown(stdinchannel, TRUE, NULL);
 out_hotplug:
-	igt_dp_compliance_cleanup_hotplug();
+	igt_dp_compliance_cleanup_hotplug(hctx);
 out_mainloop:
 	g_main_loop_unref(mainloop);
 out_close:

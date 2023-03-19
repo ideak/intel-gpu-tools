@@ -46,8 +46,6 @@ struct igt_hotplug_handler_ctx {
 	} callback;
 };
 
-static struct igt_hotplug_handler_ctx hotplug_handler_ctx;
-
 static gboolean hotplug_event(GIOChannel *source, GIOCondition condition,
 			      gpointer data)
 {
@@ -75,13 +73,16 @@ out:
 	return TRUE;
 }
 
-
-gboolean
+struct igt_hotplug_handler_ctx *
 igt_dp_compliance_setup_hotplug(int drm_fd,
 				void (*callback_fn)(void *data), void *callback_data)
 {
-	struct igt_hotplug_handler_ctx *ctx = &hotplug_handler_ctx;
+	struct igt_hotplug_handler_ctx *ctx;
 	int ret;
+
+	ctx = calloc(1, sizeof(*ctx));
+	if (!ctx)
+		return NULL;
 
 	ctx->drm_fd = drm_fd;
 	ctx->callback.fn = callback_fn;
@@ -127,17 +128,16 @@ igt_dp_compliance_setup_hotplug(int drm_fd,
 		goto out;
 	}
 
-	return TRUE;
+	return ctx;
 
 out:
-	igt_dp_compliance_cleanup_hotplug();
-	return FALSE;
+	igt_dp_compliance_cleanup_hotplug(ctx);
+
+	return NULL;
 }
 
-void igt_dp_compliance_cleanup_hotplug(void)
+void igt_dp_compliance_cleanup_hotplug(struct igt_hotplug_handler_ctx *ctx)
 {
-	struct igt_hotplug_handler_ctx *ctx = &hotplug_handler_ctx;
-
 	if (ctx->udevchannel) {
 		g_io_channel_flush(ctx->udevchannel, NULL);
 		g_io_channel_unref(ctx->udevchannel);
@@ -146,4 +146,6 @@ void igt_dp_compliance_cleanup_hotplug(void)
 		udev_monitor_unref(ctx->uevent_monitor);
 	if (ctx->udev)
 		udev_unref(ctx->udev);
+
+	free(ctx);
 }
