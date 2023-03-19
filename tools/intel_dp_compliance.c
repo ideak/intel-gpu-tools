@@ -275,6 +275,11 @@ static unsigned long get_test_type(void)
 	return test_type;
 }
 
+static void print_test_banner(const char *test_name)
+{
+	igt_info("Test \"%s\", using parameters:\n", test_name);
+}
+
 static unsigned long get_test_edid_data(void)
 {
 	unsigned long test_data;
@@ -289,6 +294,10 @@ static unsigned long get_test_edid_data(void)
 		igt_warn("test_data read failed - %lx\r\n", test_data);
 		return 0;
 	}
+
+	print_test_banner("EDID read");
+
+	igt_info("  %lx\n", test_data);
 
 	return test_data;
 }
@@ -316,10 +325,12 @@ static void get_test_videopattern_data(void)
 	hdisplay = video_pattern_value[0];
 	vdisplay = video_pattern_value[1];
 	bitdepth = video_pattern_value[2];
-	igt_info("Hdisplay = %d\n", hdisplay);
-	igt_info("Vdisplay = %d\n", vdisplay);
-	igt_info("BitDepth = %u\n", bitdepth);
 
+	print_test_banner("video pattern");
+
+	igt_info("  Hdisplay = %d\n", hdisplay);
+	igt_info("  Vdisplay = %d\n", vdisplay);
+	igt_info("  BitDepth = %u\n", bitdepth);
 }
 
 static int update_display(int mode, bool is_compliance_test);
