@@ -63,13 +63,13 @@ struct xe_device {
 	uint16_t dev_id;
 };
 
-#define xe_for_each_hw_engine(__fd, __hwe) \
+#define for_each_hw_engine(__fd, __hwe) \
 	for (int __i = 0; __i < xe_number_hw_engines(__fd) && \
 	     (__hwe = xe_hw_engine(__fd, __i)); ++__i)
-#define xe_for_each_hw_engine_class(__class) \
+#define for_each_hw_engine_class(__class) \
 	for (__class = 0; __class < DRM_XE_ENGINE_CLASS_COMPUTE + 1; \
 	     ++__class)
-#define xe_for_each_gt(__fd, __gt) \
+#define for_each_gt(__fd, __gt) \
 	for (__gt = 0; __gt < xe_number_gt(__fd); ++__gt)
 
 #define XE_IS_CLASS_SYSMEM(__region) ((__region)->mem_class == XE_MEM_REGION_CLASS_SYSMEM)
