@@ -12,5 +12,5 @@ if build_tests
 	endforeach
 endif
 
-igt_doc_script = find_program('igt_doc.py')
-gen_rst_index = find_program('gen_rst_index')
+igt_doc_script = find_program('igt_doc.py', required : build_testplan)
+gen_rst_index = find_program('gen_rst_index', required : build_sphinx)

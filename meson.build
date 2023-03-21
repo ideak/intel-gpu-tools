@@ -328,6 +328,9 @@ else
 endif
 build_info += 'Build tests: @0@'.format(build_tests)
 
+build_testplan = get_option('testplan')
+build_sphinx = get_option('sphinx')
+
 subdir('benchmarks')
 subdir('tools')
 subdir('runner')

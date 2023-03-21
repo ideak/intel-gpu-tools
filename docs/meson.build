@@ -1,2 +1,5 @@
 subdir('reference')
-subdir('testplan')
+
+if igt_doc_script.found()
+	subdir('testplan')
+endif
