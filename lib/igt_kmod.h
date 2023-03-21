@@ -38,9 +38,35 @@ int igt_kmod_unload(const char *mod_name, unsigned int flags);
 
 int igt_audio_driver_unload(char **whom);
 
-int igt_i915_driver_load(const char *opts);
-int igt_i915_driver_unload(void);
-int __igt_i915_driver_unload(char **whom);
+int igt_intel_driver_load(const char *opts, const char *driver);
+int igt_intel_driver_unload(const char *driver);
+int __igt_intel_driver_unload(char **who, const char *driver);
+
+static inline int igt_i915_driver_load(const char *opts)
+{
+	return igt_intel_driver_load(opts, "i915");
+}
+
+static inline int igt_i915_driver_unload(void)
+{
+	return igt_intel_driver_unload("i915");
+}
+
+static inline int __igt_i915_driver_unload(char **whom)
+{
+	return __igt_intel_driver_unload(whom, "i915");
+};
+
+static inline int igt_xe_driver_load(const char *opts)
+{
+	return igt_intel_driver_load(opts, "xe");
+}
+
+
+static inline int igt_xe_driver_unload(void)
+{
+	return igt_intel_driver_unload("xe");
+}
 
 int igt_amdgpu_driver_load(const char *opts);
 int igt_amdgpu_driver_unload(void);

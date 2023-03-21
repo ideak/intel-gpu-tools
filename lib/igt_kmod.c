@@ -404,23 +404,23 @@ static void *strdup_realloc(char *origptr, const char *strdata)
 }
 
 /**
- * igt_i915_driver_load:
- * @opts: options to pass to i915 driver
+ * igt_intel_driver_load:
+ * @opts: options to pass to Intel driver
  *
- * Loads the i915 driver and its dependencies.
+ * Loads an Intel driver and its dependencies.
  *
  */
 int
-igt_i915_driver_load(const char *opts)
+igt_intel_driver_load(const char *opts, const char *driver)
 {
 	int ret;
 
 	if (opts)
-		igt_info("Reloading i915 with %s\n\n", opts);
+		igt_info("Reloading %s with %s\n\n", driver, opts);
 
-	ret = igt_kmod_load("i915", opts);
+	ret = igt_kmod_load(driver, opts);
 	if (ret) {
-		igt_debug("Could not load i915\n");
+		igt_debug("Could not load %s\n", driver);
 		return ret;
 	}
 
@@ -496,7 +496,7 @@ int igt_audio_driver_unload(char **who)
 	return igt_always_unload_audio_driver(who);
 }
 
-int __igt_i915_driver_unload(char **who)
+int __igt_intel_driver_unload(char **who, const char *driver)
 {
 	int ret;
 
@@ -530,11 +530,11 @@ int __igt_i915_driver_unload(char **who)
 		}
 	}
 
-	if (igt_kmod_is_loaded("i915")) {
-		ret = igt_kmod_unload("i915", 0);
+	if (igt_kmod_is_loaded(driver)) {
+		ret = igt_kmod_unload(driver, 0);
 		if (ret) {
 			if (who)
-				*who = strdup_realloc(*who, "i915");
+				*who = strdup_realloc(*who, driver);
 
 			return ret;
 		}
@@ -544,18 +544,18 @@ int __igt_i915_driver_unload(char **who)
 }
 
 /**
- * igt_i915_driver_unload:
+ * igt_intel_driver_unload:
  *
- * Unloads the i915 driver and its dependencies.
+ * Unloads an Intel driver and its dependencies.
  *
  */
 int
-igt_i915_driver_unload(void)
+igt_intel_driver_unload(const char *driver)
 {
 	char *who = NULL;
 	int ret;
 
-	ret = __igt_i915_driver_unload(&who);
+	ret = __igt_intel_driver_unload(&who, driver);
 	if (ret) {
 		igt_warn("Could not unload %s\n", who);
 		igt_kmod_list_loaded();
@@ -572,8 +572,8 @@ igt_i915_driver_unload(void)
 	igt_kmod_unload("drm_kms_helper", 0);
 	igt_kmod_unload("drm", 0);
 
-	if (igt_kmod_is_loaded("i915")) {
-		igt_warn("i915.ko still loaded!\n");
+	if (igt_kmod_is_loaded("driver")) {
+		igt_warn("%s.ko still loaded!\n", driver);
 		return -EBUSY;
 	}
 
