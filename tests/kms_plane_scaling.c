@@ -719,10 +719,10 @@ static void setup_fb(int fd, int width, int height,
 		     double r, double g, double b,
 		     struct igt_fb *fb)
 {
-	igt_create_color_pattern_fb(fd, width, height,
-				    DRM_FORMAT_XRGB8888,
-				    DRM_FORMAT_MOD_LINEAR,
-				    r, g, b, fb);
+	igt_create_fb(fd, width, height,
+		      DRM_FORMAT_XRGB8888,
+		      DRM_FORMAT_MOD_LINEAR,
+		      fb);
 }
 
 static void
@@ -807,21 +807,21 @@ test_invalid_num_scalers(data_t *d, enum pipe pipe, igt_output_t *output)
 	plane[2] = igt_pipe_get_plane_type_index(pipe_obj, DRM_PLANE_TYPE_OVERLAY, 2);
 	igt_require(plane[2]);
 
-	igt_create_color_pattern_fb(display->drm_fd,
-                                    width, height,
-                                    DRM_FORMAT_XRGB8888,
-                                    DRM_FORMAT_MOD_LINEAR,
-                                    1.0, 0.0, 0.0, &d->fb[0]);
-	igt_create_color_pattern_fb(display->drm_fd,
-                                    width, height,
-                                    DRM_FORMAT_XRGB8888,
-                                    DRM_FORMAT_MOD_LINEAR,
-                                    0.0, 1.0, 0.0, &d->fb[1]);
-	igt_create_color_pattern_fb(display->drm_fd,
-                                    width, height,
-                                    DRM_FORMAT_XRGB8888,
-                                    DRM_FORMAT_MOD_LINEAR,
-                                    0.0, 0.0, 1.0, &d->fb[2]);
+	igt_create_fb(display->drm_fd,
+		      width, height,
+		      DRM_FORMAT_XRGB8888,
+		      DRM_FORMAT_MOD_LINEAR,
+		      &d->fb[0]);
+	igt_create_fb(display->drm_fd,
+		      width, height,
+		      DRM_FORMAT_XRGB8888,
+		      DRM_FORMAT_MOD_LINEAR,
+		      &d->fb[1]);
+	igt_create_fb(display->drm_fd,
+		      width, height,
+		      DRM_FORMAT_XRGB8888,
+		      DRM_FORMAT_MOD_LINEAR,
+		      &d->fb[2]);
 
 	igt_plane_set_fb(plane[0], &d->fb[0]);
 	igt_plane_set_fb(plane[1], &d->fb[1]);
