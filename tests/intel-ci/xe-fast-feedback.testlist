@@ -1,3 +1,6 @@
+# Should be the first test
+igt@xe_module_load@force-load
+
 igt@xe_compute@compute-square
 igt@xe_debugfs@base
 igt@xe_debugfs@gt
