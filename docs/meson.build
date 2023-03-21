@@ -1,2 +1,5 @@
 subdir('reference')
-subdir('testplan')
+
+if xe_test_config != ''
+	subdir('testplan')
+endif

@@ -320,6 +320,8 @@ endif
 subdir('lib')
 if build_tests
 	subdir('tests')
+else
+	xe_test_config = ''
 endif
 build_info += 'Build tests: @0@'.format(build_tests)
 
@@ -332,14 +334,7 @@ endif
 subdir('overlay')
 subdir('man')
 subdir('scripts')
-
-gtk_doc = dependency('gtk-doc', required : build_docs)
-if build_tests and gtk_doc.found()
-	subdir('docs')
-elif build_docs.enabled()
-	error('Documentation requires building tests')
-endif
-build_info += 'Build documentation: @0@'.format(build_tests and gtk_doc.found())
+subdir('docs')
 
 message('Build options')
 message('=============')
