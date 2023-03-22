@@ -4,9 +4,9 @@ sphinx = find_program('sphinx-build', required: build_sphinx)
 rst2html = find_program('rst2html-3', 'rst2html', required : false)
 rst2pdf = find_program('rst2pdf', required: false)
 
-stylesheet = meson.current_source_dir() + '/testplan.css'
+stylesheet = join_paths(meson.current_source_dir(), 'testplan.css')
 
-xe_test_config = source_root + '/tests/xe/xe_test_config.json'
+xe_test_config = join_paths(source_root, 'tests', 'xe', 'xe_test_config.json')
 
 if not build_tests
     test_executables = []
