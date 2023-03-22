@@ -9,6 +9,12 @@ rst2pdf = find_program('rst2pdf', required: false)
 
 stylesheet = meson.current_source_dir() + '/testplan.css'
 
+xe_test_config = source_root + '/tests/xe/xe_test_config.json'
+
+if not build_tests
+    test_executables = []
+endif
+
 test_dict = { 'xe_tests': {
                  'input': xe_test_config, 'extra_args': []
               }

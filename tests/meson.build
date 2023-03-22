@@ -504,7 +504,6 @@ test_executables += executable('sw_sync', 'sw_sync.c',
 test_list += 'sw_sync'
 
 subdir('amdgpu')
-subdir('xe')
 
 subdir('v3d')
 
