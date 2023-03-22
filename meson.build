@@ -13,6 +13,9 @@ if get_option('b_ndebug') != 'false'
 	error('Building without -Db_ndebug=false is not supported')
 endif
 
+# meson.source_root is marked as a future-deprecated feature
+source_root = meson.current_source_dir()
+
 cc = meson.get_compiler('c')
 
 # Also make sure that the user doesn't have -DNDEBUG defined in their config

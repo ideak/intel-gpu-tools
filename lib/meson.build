@@ -178,7 +178,7 @@ endif
 if get_option('srcdir') != ''
     srcdir = join_paths(get_option('srcdir'), 'tests')
 else
-    srcdir = join_paths(meson.source_root(), 'tests')
+    srcdir = join_paths(source_root, 'tests')
 endif
 
 if get_option('version_hash') != ''
