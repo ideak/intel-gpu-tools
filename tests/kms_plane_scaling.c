@@ -130,7 +130,7 @@ const struct {
 	{
 		"Tests downscaling with rotation for 0.5 scaling factor.",
 		"plane-downscale-with-rotation-factor-0-5",
-		0.25,
+		0.5,
 		false,
 	},
 	{
@@ -1181,9 +1181,9 @@ igt_main_args("", long_opts, help_str, opt_handler, &data)
 							drmModeModeInfo *mode = igt_output_get_mode(output);
 
 							test_scaler_with_modifier_pipe(&data,
-								get_width(mode, scaler_with_rotation_tests[index].sf),
-								get_height(mode, scaler_with_rotation_tests[index].sf),
-								scaler_with_rotation_tests[index].is_upscale,
+								get_width(mode, scaler_with_modifiers_tests[index].sf),
+								get_height(mode, scaler_with_modifiers_tests[index].sf),
+								scaler_with_modifiers_tests[index].is_upscale,
 								pipe, output);
 						}
 						break;
