@@ -42,6 +42,19 @@ static bool is_mst_connector(int drm_fd, uint32_t connector_id)
 				    NULL, NULL);
 }
 
+static bool sink_detect_error(int drm_fd, uint32_t connector_id, int error_code)
+{
+	switch (error_code) {
+	case ETIMEDOUT:
+		return true;
+	case EIO:
+		return is_mst_connector(drm_fd, connector_id) ||
+		       is_amdgpu_device(drm_fd);
+	default:
+		return false;
+	};
+}
+
 static bool test(int drm_fd, uint32_t connector_id)
 {
 	drmModeConnector *connector;
@@ -85,9 +98,7 @@ static bool test(int drm_fd, uint32_t connector_id)
 			 ret > 0 ? "success" : strerror(errno));
 
 		igt_assert(ret == sizeof(buf) ||
-			   errno == ETIMEDOUT ||
-			   (errno == EIO && (is_mst_connector(drm_fd, connector_id) ||
-			    is_amdgpu_device(drm_fd))));
+			   sink_detect_error(drm_fd, connector_id, errno));
 
 		close(fd);
 
