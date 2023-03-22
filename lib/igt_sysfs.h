@@ -38,6 +38,11 @@
 	     (dirfd__ = igt_sysfs_gt_open(i915__, gt__)) != -1; \
 	     close(dirfd__), gt__++)
 
+#define i915_for_each_gt(i915, gtid, dir) \
+	for ((gtid) = 0; \
+	     ((dir) = igt_sysfs_gt_open((i915), (gtid))) != -1; \
+	     close(dir), (gtid)++)
+
 #define igt_sysfs_rps_write(dir, id, data, len) \
 	igt_sysfs_write(dir, igt_sysfs_dir_id_to_name(dir, id), data, len)
 
