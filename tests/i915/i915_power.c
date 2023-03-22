@@ -6,6 +6,7 @@
 #include "igt.h"
 #include "i915/gem.h"
 #include "igt_power.h"
+#include "igt_sysfs.h"
 
 IGT_TEST_DESCRIPTION("i915 power measurement tests");
 
@@ -27,6 +28,7 @@ static void sanity(int i915)
 	double idle, busy;
 	igt_spin_t *spin;
 	uint64_t ahnd;
+	int dir, gt, req, act;
 
 #define DURATION_SEC 2
 
@@ -34,6 +36,7 @@ static void sanity(int i915)
 	igt_require(!igt_power_open(i915, &pwr, "gpu"));
 	gem_quiescent_gpu(i915);
 	idle = measure_power(&pwr, DURATION_SEC);
+	igt_info("Measured idle power: %g mW\n", idle);
 
 	/* Busy power */
 	ctx = intel_ctx_create_all_physical(i915);
@@ -44,12 +47,17 @@ static void sanity(int i915)
 	/* Wait till at least one spinner starts */
 	igt_spin_busywait_until_started(spin);
 	busy = measure_power(&pwr, DURATION_SEC);
+	i915_for_each_gt(i915, gt, dir) {
+		req = igt_sysfs_get_u32(dir, "rps_cur_freq_mhz");
+		act = igt_sysfs_get_u32(dir, "rps_act_freq_mhz");
+		igt_info("gt %d: req MHz: %d, act MHz: %d\n", gt, req, act);
+	}
 	igt_free_spins(i915);
 	put_ahnd(ahnd);
 	intel_ctx_destroy(i915, ctx);
 	igt_power_close(&pwr);
 
-	igt_info("Measured power: idle: %g mW, busy: %g mW\n", idle, busy);
+	igt_info("Measured busy power: %g mW\n", busy);
 	igt_assert(idle >= 0 && busy > 0 && busy > idle);
 }
 
