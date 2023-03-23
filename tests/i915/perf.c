@@ -91,6 +91,7 @@ struct accumulator {
 enum {
 	OAG,
 	OAR,
+	OAM,
 
 	MAX_OA_TYPE,
 };
@@ -1022,7 +1023,7 @@ gen8_sanity_check_test_oa_reports(const uint32_t *oa_report0,
 	/* The TestOa metric set defines all B counters to be a
 	 * multiple of the gpu clock
 	 */
-	if (format.n_b) {
+	if (format.n_b && (format.oa_type == OAG || format.oa_type == OAR)) {
 		if (clock_delta > 0) {
 			b = rpt1_b[0] - rpt0_b[0];
 			igt_debug("B0: delta = %"PRIu32"\n", b);
