@@ -4440,11 +4440,12 @@ make_valid_reduced_sseu_config(struct drm_i915_gem_context_param_sseu default_ss
 }
 
 static void
-test_global_sseu_config_invalid(void)
+test_global_sseu_config_invalid(const intel_ctx_t *ctx)
 {
 	struct drm_i915_gem_context_param_sseu default_sseu;
 	struct drm_i915_gem_context_param_sseu sseu_param;
 	struct drm_i915_gem_context_param ctx_gp = {
+		.ctx_id = ctx->id,
 		.param = I915_CONTEXT_PARAM_SSEU,
 		.size = sizeof(default_sseu),
 		.value = to_user_pointer(&default_sseu),
@@ -4469,6 +4470,9 @@ test_global_sseu_config_invalid(void)
 	};
 
 	memset(&default_sseu, 0, sizeof(default_sseu));
+	default_sseu.flags = I915_CONTEXT_SSEU_FLAG_ENGINE_INDEX;
+	default_sseu.engine.engine_class = default_e2.class;
+	default_sseu.engine.engine_instance = default_e2.flags;
 	igt_require(__gem_context_get_param(drm_fd, &ctx_gp) == 0);
 
 	igt_debug("Default context sseu:\n");
@@ -4515,11 +4519,12 @@ test_global_sseu_config_invalid(void)
 }
 
 static void
-test_global_sseu_config(void)
+test_global_sseu_config(const intel_ctx_t *ctx)
 {
 	struct drm_i915_gem_context_param_sseu default_sseu;
 	struct drm_i915_gem_context_param_sseu sseu_param;
 	struct drm_i915_gem_context_param ctx_gp = {
+		.ctx_id = ctx->id,
 		.param = I915_CONTEXT_PARAM_SSEU,
 		.size = sizeof(default_sseu),
 		.value = to_user_pointer(&default_sseu),
@@ -4544,6 +4549,9 @@ test_global_sseu_config(void)
 	};
 
 	memset(&default_sseu, 0, sizeof(default_sseu));
+	default_sseu.flags = I915_CONTEXT_SSEU_FLAG_ENGINE_INDEX;
+	default_sseu.engine.engine_class = default_e2.class;
+	default_sseu.engine.engine_instance = default_e2.flags;
 	igt_require(__gem_context_get_param(drm_fd, &ctx_gp) == 0);
 
 	igt_debug("Default context sseu:\n");
@@ -5297,11 +5305,11 @@ igt_main
 
 		igt_describe("Verify invalid SSEU opening parameters");
 		igt_subtest("global-sseu-config-invalid")
-			test_global_sseu_config_invalid();
+			test_global_sseu_config_invalid(ctx);
 
 		igt_describe("Verify specifying SSEU opening parameters");
 		igt_subtest("global-sseu-config")
-			test_global_sseu_config();
+			test_global_sseu_config(ctx);
 	}
 
 	igt_subtest("invalid-create-userspace-config")
