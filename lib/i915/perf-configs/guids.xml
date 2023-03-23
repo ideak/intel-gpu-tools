@@ -2357,7 +2357,7 @@
     <guid config_hash="321ffd18a528dd67798e8a8476f632fe" mdapi_config_hash="7984537ffe8ca547d3583a56edf26bbd" id="fc82db3d-d6a7-413a-8349-b31f02251d2f" chipset="mtlgt2" name="Ext1" />
     <guid config_hash="28f18aeeb865c4bf1d8d82d77f571085" mdapi_config_hash="bba07ef452c6a67f0a8ff04fa9b4d93d" id="3479a81d-9017-4930-af0c-14f7fabadb38" chipset="mtlgt2" name="Ext4" />
     <guid config_hash="0955d0036c6b2b4afe94cb4d8115c577" mdapi_config_hash="38688d5ff152f82f150d9c569caf2351" id="e4701256-cd06-48f7-a005-d4d1f9e895c1" chipset="mtlgt2" name="Ext5" />
-    <guid config_hash="d93bc60082d0b69a8f0d430732d63f94" mdapi_config_hash="dc7a66d4de8f704f44b50c10b9dff1de" id="3e47d0e8-5414-4496-8746-37e36fefc777" chipset="mtlgt2" name="Ext7" />
+    <guid config_hash="dcdb3b48b18515e0a0f7d2179c89bda6" mdapi_config_hash="a4f1512b26ca4c3ed1d8d818cfedcd65" id="3e47d0e8-5414-4496-8746-37e36fefc777" chipset="mtlgt2" name="Ext7" />
     <guid config_hash="3de00cb5cc6f1598d624b9d4c2d072cf" mdapi_config_hash="0237dfeb5d300cab42cc36a64552ebe7" id="5aa36c1f-c6da-45ab-ab21-397d9a4b6a06" chipset="mtlgt2" name="Ext8" />
     <guid config_hash="f66aff20b452fc6746f6f345aa996b63" mdapi_config_hash="14b2a444cc752fd4946c11906f5a7486" id="1df59d79-16d8-471c-b3da-f0f62862f89e" chipset="mtlgt2" name="Ext10" />
     <guid config_hash="f27eef4bd1b25e14f598ff04fe69a511" mdapi_config_hash="1f4b2bf31f456235f289cf7eba5039c2" id="d05d3d84-ba16-41b5-b825-5a3d2aaabbfc" chipset="mtlgt2" name="Ext11" />
@@ -2463,10 +2463,10 @@
     <guid config_hash="a68a66449827d355064d3db9473b4df5" mdapi_config_hash="129fbcf33c8f25a6c15935e5aeaef3b4" id="8e09a7a1-b0e8-464a-a28d-90250f64ec9e" chipset="mtlgt2" name="Ext501" />
     <guid config_hash="b66b6fe10d453212eb1bd501ae6a29bd" mdapi_config_hash="17c05f7a6933e3fcf7669b142bb55705" id="57a19b6a-1b7d-4337-a9c9-710c56c46f84" chipset="mtlgt2" name="Ext502" />
     <guid config_hash="610d0cdc34fe0442b0c8e6277703f21a" mdapi_config_hash="32ce7dfe4ea7f5e79c69cc04d41d3f01" id="394b21ab-311c-47a5-9b10-88159f5ac999" chipset="mtlgt2" name="Ext503" />
-    <guid config_hash="92ba0e22539647cf0eb2bc7f10cd4cf8" mdapi_config_hash="41e11d55b96e18999fad3efe5f8bf16a" id="143440a0-d7e2-4f41-8372-8fdca1ecc2a8" chipset="mtlgt2" name="Ext508" />
-    <guid config_hash="e36ab792e7756ea6ea71e387c873dfdd" mdapi_config_hash="18af689ecd1d15e707c0192ea02f5824" id="7c5d3f41-b690-44b2-8352-00215ac94bae" chipset="mtlgt2" name="Ext509" />
-    <guid config_hash="25febf37102198080c0e680e94beaced" mdapi_config_hash="bb8ff9dfe34ad6197c7540e7ddee356b" id="02f43996-feff-4e13-a8fd-eea9de2f13fc" chipset="mtlgt2" name="Ext510" />
-    <guid config_hash="29bcf55f5b34e961768cd5cbbd828532" mdapi_config_hash="670a9e1fd79cd9610418c85d13df3436" id="2cbd327c-40e2-452b-a9fc-c7787869a352" chipset="mtlgt2" name="Ext511" />
+    <guid config_hash="3c81d715dab552c96a708e5561cddf32" mdapi_config_hash="2ef3813b66f81eda0cb04dbe437234d8" id="143440a0-d7e2-4f41-8372-8fdca1ecc2a8" chipset="mtlgt2" name="Ext508" />
+    <guid config_hash="15984b5fb58b51a666ece004db6ae774" mdapi_config_hash="26232e447ea7dcf0c3a97e4353250a53" id="7c5d3f41-b690-44b2-8352-00215ac94bae" chipset="mtlgt2" name="Ext509" />
+    <guid config_hash="d44c98ea5ef5bff89e9ceb275d0da118" mdapi_config_hash="a8071d6fc9bd3959731ab78598f80294" id="02f43996-feff-4e13-a8fd-eea9de2f13fc" chipset="mtlgt2" name="Ext510" />
+    <guid config_hash="df750e7700406492d3bcd261c4af73e6" mdapi_config_hash="c2e0e09a27bb2ad5f80b0766ab56b37b" id="2cbd327c-40e2-452b-a9fc-c7787869a352" chipset="mtlgt2" name="Ext511" />
     <guid config_hash="6d9b68c2c4b89d9a952160fe503ac6a6" mdapi_config_hash="4508de639c858687559dd85a870d624f" id="3a9dba68-9402-48b0-a8ec-28e4e4a534de" chipset="mtlgt2" name="Ext516" />
     <guid config_hash="039124a8e61c2e323aace525da916ab0" mdapi_config_hash="ac8b6cf6d21ba83fe04789064b2caa97" id="ea503506-9afa-42dc-b85b-1237dce6e8af" chipset="mtlgt2" name="Ext517" />
     <guid config_hash="589d2f86e9b14cf16b9c8c33e473d1e4" mdapi_config_hash="1184ac825d3d0cba18e7ca501e515fc9" id="5056524c-12e3-4ba6-8788-eb934f284753" chipset="mtlgt2" name="Ext518" />
@@ -2740,4 +2740,7 @@
     <guid config_hash="e7efe91c7aeb591043358c1b5e3c019d" mdapi_config_hash="94ecec147a25de742814fbb01fd4e9c3" id="f739508f-51b2-48df-839c-e92c14d14c64" chipset="mtlgt3" name="Ext1006" />
     <guid config_hash="a96fb9e9d0949e6cc372ef445fded872" mdapi_config_hash="7fb3e6405e4b54b8566589aa79cd960e" id="926b1773-807e-4ee5-8561-30c9eb0a6344" chipset="mtlgt3" name="Ext1007" />
     <guid config_hash="310dddcb04d1088a3865f698d758cbc2" mdapi_config_hash="c6a3be7d49b5697074021ca673a39a57" id="82f69b49-772a-4169-bf9a-b1ef08e0823b" chipset="mtlgt3" name="Ext1010" />
+    <guid config_hash="482cebdeeb78bb56e67b42d24644c8db" mdapi_config_hash="11e33e01a371bf15e59b9786f4fe1050" id="de84260e-32ac-4863-ba4f-998a685174a2" chipset="mtlgt2" name="MediaSet1" />
+    <guid config_hash="5bfab887a79b99cf34a606dcca5f4f8a" mdapi_config_hash="1c238e39e5c73eefd870cef2fb7a18af" id="b9d5c6d5-39f2-4069-b343-e7a886353b89" chipset="mtlgt2" name="MediaSet2" />
+    <guid config_hash="44bcb438bea8b46b57779739bebfbd69" mdapi_config_hash="fbbd97d1f3b60c17eae57bbd3c42e7fe" id="a1700053-56bc-4b7e-87b9-e29b07a08f62" chipset="mtlgt2" name="TestOam" />
 </guids>
