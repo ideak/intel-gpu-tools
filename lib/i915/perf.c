@@ -1003,6 +1003,11 @@ uint64_t intel_perf_read_record_timestamp_raw(const struct intel_perf *perf,
                assert(0);
        }
 
+       if (perf->devinfo.oa_timestamp_shift >= 0)
+	       ts <<= perf->devinfo.oa_timestamp_shift;
+       else
+	       ts >>= -perf->devinfo.oa_timestamp_shift;
+
        return ts;
 }
 
