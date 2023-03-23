@@ -23,6 +23,9 @@ extern "C" {
 
 #define DRM_I915_QUERY_GEOMETRY_SUBSLICES      6
 
+#define DRM_I915_PERF_PROP_OA_ENGINE_CLASS	9
+#define DRM_I915_PERF_PROP_OA_ENGINE_INSTANCE	10
+
 #if defined(__cplusplus)
 }
 #endif

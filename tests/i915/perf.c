@@ -1176,6 +1176,47 @@ test_invalid_open_flags(void)
 }
 
 static void
+test_invalid_class_instance(void)
+{
+	uint64_t properties[] = {
+		DRM_I915_PERF_PROP_SAMPLE_OA, true,
+		DRM_I915_PERF_PROP_OA_METRICS_SET, test_set->perf_oa_metrics_set,
+		DRM_I915_PERF_PROP_OA_FORMAT, test_set->perf_oa_format,
+		DRM_I915_PERF_PROP_OA_EXPONENT, oa_exp_1_millisec,
+		DRM_I915_PERF_PROP_OA_ENGINE_CLASS, 0,
+		DRM_I915_PERF_PROP_OA_ENGINE_INSTANCE, 0,
+	};
+	struct drm_i915_perf_open_param param = {
+		.flags = I915_PERF_FLAG_FD_CLOEXEC,
+		.num_properties = ARRAY_SIZE(properties) / 2,
+		.properties_ptr = to_user_pointer(properties),
+	};
+
+#define OA_E_CLASS 9
+#define OA_E_INSTANCE 11
+
+	properties[OA_E_CLASS] = I915_ENGINE_CLASS_COPY;
+	do_ioctl_err(drm_fd, DRM_IOCTL_I915_PERF_OPEN, &param, EINVAL);
+
+	properties[OA_E_CLASS] = 10;
+	do_ioctl_err(drm_fd, DRM_IOCTL_I915_PERF_OPEN, &param, EINVAL);
+
+	properties[OA_E_CLASS] = I915_ENGINE_CLASS_RENDER;
+
+	properties[OA_E_INSTANCE] = 100;
+	do_ioctl_err(drm_fd, DRM_IOCTL_I915_PERF_OPEN, &param, EINVAL);
+
+	properties[OA_E_INSTANCE] = 248;
+	do_ioctl_err(drm_fd, DRM_IOCTL_I915_PERF_OPEN, &param, EINVAL);
+
+	properties[OA_E_CLASS] = default_e2.class;
+	properties[OA_E_INSTANCE] = default_e2.instance;
+
+	stream_fd = __perf_open(drm_fd, &param, false);
+	__perf_close(stream_fd);
+}
+
+static void
 test_invalid_oa_metric_set_id(void)
 {
 	uint64_t properties[] = {
@@ -5292,6 +5333,14 @@ igt_main
 			igt_require_f(render_copy, "no render-copy function\n");
 			gen12_test_single_ctx_render_target_writes_a_counter();
 		}
+	}
+
+	igt_subtest_group {
+		igt_fixture igt_require(i915_perf_revision(drm_fd) >= 6);
+
+		igt_describe("Verify invalid class instance");
+		igt_subtest("gen12-invalid-class-instance")
+			test_invalid_class_instance();
 	}
 
 	igt_subtest("rc6-disable")
