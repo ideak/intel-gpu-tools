@@ -216,6 +216,12 @@ correlate_gpu_timestamp(struct intel_perf_data_reader *reader,
 	uint64_t mask = reader->perf->devinfo.oa_timestamp_mask;
 	int corr_idx = -1;
 
+	/* On some OA formats, gpu_ts is a 64 bit value and the shift can
+	 * result in bit[31] being set. This throws off the correlation and the
+	 * timelines. Apply the mask on gpu_ts as well.
+	 */
+	gpu_ts = gpu_ts & mask;
+
 	for (uint32_t i = 0; i < reader->n_correlation_chunks; i++) {
 		if (gpu_ts >= (reader->correlation_chunks[i].gpu_ts_begin & mask) &&
 		    gpu_ts <= (reader->correlation_chunks[i].gpu_ts_end & mask)) {
