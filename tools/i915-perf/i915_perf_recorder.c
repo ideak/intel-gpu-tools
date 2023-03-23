@@ -26,6 +26,7 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <poll.h>
 #include <signal.h>
 #include <stdbool.h>
@@ -42,6 +43,8 @@
 #include <unistd.h>
 
 #include <i915_drm.h>
+
+#include "i915/i915_drm_local.h"
 
 #include "igt_core.h"
 #include "intel_chipset.h"
@@ -408,6 +411,9 @@ struct recording_context {
 	int command_fifo_fd;
 
 	uint64_t poll_period;
+
+	struct i915_engine_class_instance engine;
+	int gt;
 };
 
 static int
@@ -447,6 +453,13 @@ perf_open(struct recording_context *ctx)
 	if (revision >= 5) {
 		properties[p++] = DRM_I915_PERF_PROP_POLL_OA_PERIOD;
 		properties[p++] = ctx->poll_period;
+	}
+
+	if (revision >= 6 && ctx->engine.engine_class >= 0 && ctx->engine.engine_instance >= 0) {
+		properties[p++] = DRM_I915_PERF_PROP_OA_ENGINE_CLASS;
+		properties[p++] = ctx->engine.engine_class;
+		properties[p++] = DRM_I915_PERF_PROP_OA_ENGINE_INSTANCE;
+		properties[p++] = ctx->engine.engine_instance;
 	}
 
 	memset(&param, 0, sizeof(param));
@@ -497,8 +510,8 @@ write_header(FILE *output, struct recording_context *ctx)
 		.gt_min_frequency = ctx->perf->devinfo.gt_min_freq,
 		.gt_max_frequency = ctx->perf->devinfo.gt_max_freq,
 		.oa_format = ctx->metric_set->perf_oa_format,
-		.engine_class = I915_ENGINE_CLASS_RENDER,
-		.engine_instance = 0,
+		.engine_class = ctx->engine.engine_class,
+		.engine_instance = ctx->engine.engine_instance,
 	};
 	struct drm_i915_perf_record_header header = {
 		.type = INTEL_PERF_RECORD_TYPE_DEVICE_INFO,
@@ -805,7 +818,9 @@ usage(const char *name)
 		"                                       Values: boot, mono, mono_raw (default = mono)\n"
 		"     --poll-period         -P <value>  Polling interval in microseconds used by a timer in the driver to query\n"
 		"                                       for OA reports periodically\n"
-		"                                       (default = 5000), Minimum = 100.\n",
+		"                                       (default = 5000), Minimum = 100.\n"
+		"     --engine-class        -e <value>  Engine class used for the OA capture.\n"
+		"     --engine-instance     -i <value>  Engine instance used for the OA capture.\n",
 		name);
 }
 
@@ -834,6 +849,33 @@ teardown_recording_context(struct recording_context *ctx)
 		close(ctx->drm_fd);
 }
 
+static int
+mtl_engine_to_gt(const struct i915_engine_class_instance *engine)
+{
+        switch (engine->engine_class) {
+        case I915_ENGINE_CLASS_RENDER:
+                return 0;
+        case I915_ENGINE_CLASS_VIDEO:
+        case I915_ENGINE_CLASS_VIDEO_ENHANCE:
+                return 1;
+        default:
+                return -1;
+        }
+}
+
+/* static mapping as in igt core library until a different way is available */
+static int
+engine_to_gt(struct recording_context *ctx)
+{
+	if (ctx->devinfo->is_meteorlake)
+		return mtl_engine_to_gt(&ctx->engine);
+	else if (ctx->engine.engine_class == I915_ENGINE_CLASS_RENDER &&
+		 ctx->engine.engine_instance == 0)
+		return 0;
+
+	return -1;
+}
+
 int
 main(int argc, char *argv[])
 {
@@ -849,6 +891,8 @@ main(int argc, char *argv[])
 		{"command-fifo",         required_argument, 0, 'f'},
 		{"cpu-clock",            required_argument, 0, 'k'},
 		{"poll-period",          required_argument, 0, 'P'},
+		{"engine-class",         required_argument, 0, 'e'},
+		{"engine-instance",      required_argument, 0, 'i'},
 		{0, 0, 0, 0}
 	};
 	const struct {
@@ -878,9 +922,10 @@ main(int argc, char *argv[])
 
 		/* 5 ms poll period */
 		.poll_period = 5 * 1000 * 1000,
+		.engine = { USHRT_MAX, USHRT_MAX },
 	};
 
-	while ((opt = getopt_long(argc, argv, "hc:d:p:m:Co:s:f:k:P:", long_options, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "hc:d:p:m:Co:s:f:k:P:e:i:", long_options, NULL)) != -1) {
 		switch (opt) {
 		case 'h':
 			usage(argv[0]);
@@ -931,6 +976,12 @@ main(int argc, char *argv[])
 		case 'P':
 			ctx.poll_period = MAX(100, atol(optarg)) * 1000;
 			break;
+		case 'e':
+			ctx.engine.engine_class = atoi(optarg);
+			break;
+		case 'i':
+			ctx.engine.engine_instance = atoi(optarg);
+			break;
 		default:
 			fprintf(stderr, "Internal error: "
 				"unexpected getopt value: %d\n", opt);
@@ -942,6 +993,12 @@ main(int argc, char *argv[])
 	if (dev_node_id == -2) {
 		print_intel_devices();
 		return EXIT_SUCCESS;
+	}
+
+	if (ctx.engine.engine_class == USHRT_MAX ||
+	    ctx.engine.engine_instance == USHRT_MAX) {
+		ctx.engine.engine_class = I915_ENGINE_CLASS_RENDER;
+		ctx.engine.engine_instance = 0;
 	}
 
 	ctx.drm_fd = open_render_node(&ctx.devid, dev_node_id);
@@ -956,6 +1013,13 @@ main(int argc, char *argv[])
 		goto fail;
 	}
 
+	ctx.gt = engine_to_gt(&ctx);
+	if (ctx.gt < 0) {
+		fprintf(stderr, "Unsupported engine class:instance %d:%d.\n",
+			ctx.engine.engine_class, ctx.engine.engine_instance);
+		goto fail;
+	}
+
 	fprintf(stdout, "Device name=%s gen=%i gt=%i id=0x%x\n",
 		ctx.devinfo->codename, ctx.devinfo->graphics_ver, ctx.devinfo->gt, ctx.devid);
 
@@ -965,7 +1029,7 @@ main(int argc, char *argv[])
 		goto fail;
 	}
 
-	ctx.perf = intel_perf_for_fd(ctx.drm_fd);
+	ctx.perf = intel_perf_for_fd(ctx.drm_fd, ctx.gt);
 	if (!ctx.perf) {
 		fprintf(stderr, "No perf data found.\n");
 		goto fail;

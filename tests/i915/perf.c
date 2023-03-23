@@ -1123,7 +1123,7 @@ init_sys_info(void)
 {
 	igt_assert_neq(devid, 0);
 
-	intel_perf = intel_perf_for_fd(drm_fd);
+	intel_perf = intel_perf_for_fd(drm_fd, 0);
 	igt_require(intel_perf);
 
 	igt_debug("n_eu_slices: %"PRIu64"\n", intel_perf->devinfo.n_eu_slices);

@@ -377,7 +377,7 @@ static bool local_i915_perf_healthcheck(int i915)
 {
 	struct intel_perf *intel_perf;
 
-	intel_perf = intel_perf_for_fd(i915);
+	intel_perf = intel_perf_for_fd(i915, 0);
 	if (intel_perf)
 		intel_perf_free(intel_perf);
 	return intel_perf;

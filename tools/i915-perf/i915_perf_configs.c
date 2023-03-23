@@ -230,7 +230,7 @@ main(int argc, char *argv[])
 
 	fprintf(stdout, "Device graphics_ver=%i gt=%i\n", devinfo->graphics_ver, devinfo->gt);
 
-	perf = intel_perf_for_fd(drm_fd);
+	perf = intel_perf_for_fd(drm_fd, 0);
 	if (!perf) {
 		fprintf(stderr, "No perf data found.\n");
 		return EXIT_FAILURE;

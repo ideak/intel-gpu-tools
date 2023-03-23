@@ -29,7 +29,7 @@ static void remote_request_workload(int fd, int *done)
 	 * Based on code patterns found in tests/i915/perf.c
 	 */
 	struct intel_perf_metric_set *metric_set = NULL, *metric_set_iter;
-	struct intel_perf *intel_perf = intel_perf_for_fd(fd);
+	struct intel_perf *intel_perf = intel_perf_for_fd(fd, 0);
 	uint64_t properties[] = {
 		DRM_I915_PERF_PROP_SAMPLE_OA, true,
 		DRM_I915_PERF_PROP_OA_METRICS_SET, 0,

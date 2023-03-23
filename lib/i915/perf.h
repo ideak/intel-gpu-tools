@@ -316,7 +316,7 @@ intel_perf_devinfo_eu_available(const struct intel_perf_devinfo *devinfo,
 	return (devinfo->eu_masks[subslice_offset + eu / 8] & (1U << eu % 8)) != 0;
 }
 
-struct intel_perf *intel_perf_for_fd(int drm_fd);
+struct intel_perf *intel_perf_for_fd(int drm_fd, int gt);
 struct intel_perf *intel_perf_for_devinfo(uint32_t device_id,
 					  uint32_t revision,
 					  uint64_t timestamp_frequency,
