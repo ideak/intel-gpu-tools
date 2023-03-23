@@ -58,11 +58,15 @@ oa_report_ctx_is_valid(const struct intel_perf_devinfo *devinfo,
 }
 
 static uint32_t
-oa_report_ctx_id(const struct intel_perf_devinfo *devinfo, const uint8_t *report)
+oa_report_ctx_id(struct intel_perf_data_reader *reader, const uint8_t *report)
 {
-	if (!oa_report_ctx_is_valid(devinfo, report))
+	if (!oa_report_ctx_is_valid(&reader->devinfo, report))
 		return 0xffffffff;
-	return ((const uint32_t *) report)[2];
+
+	if (reader->metric_set->perf_oa_format == I915_OAM_FORMAT_MPEC8u32_B8_C8)
+		return ((const uint32_t *) report)[4];
+	else
+		return ((const uint32_t *) report)[2];
 }
 
 static void
@@ -289,8 +293,8 @@ generate_cpu_events(struct intel_perf_data_reader *reader)
 		start_report = (const uint8_t *) (last_header + 1);
 		end_report = (const uint8_t *) (current_header + 1);
 
-		last_ctx_id = oa_report_ctx_id(&reader->devinfo, start_report);
-		current_ctx_id = oa_report_ctx_id(&reader->devinfo, end_report);
+		last_ctx_id = oa_report_ctx_id(reader, start_report);
+		current_ctx_id = oa_report_ctx_id(reader, end_report);
 
 		gpu_ts_start = intel_perf_read_record_timestamp(reader->perf,
 								reader->metric_set,

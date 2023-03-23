@@ -915,6 +915,34 @@ void intel_perf_accumulate_reports(struct intel_perf_accumulator *acc,
 		for (i = 0; i < 61; i++)
 			accumulate_uint32(start + 3 + i, end + 3 + i, deltas + 1 + i);
 		break;
+
+	case I915_OAM_FORMAT_MPEC8u32_B8_C8: {
+		const uint64_t *start64 = (const uint64_t *)(record0 + 1);
+		const uint64_t *end64 = (const uint64_t *)(record1 + 1);
+
+		/* 64 bit timestamp */
+		if (perf->devinfo.oa_timestamp_shift >= 0)
+			deltas[idx++] += (end64[1] - start64[1]) << perf->devinfo.oa_timestamp_shift;
+		else
+			deltas[idx++] += (end64[1] - start64[1]) >> (-perf->devinfo.oa_timestamp_shift);
+
+		/* 64 bit clock */
+		deltas[idx++] = end64[3] - start64[3];
+
+		/* 8x 32bit MPEC counters */
+		for (i = 0; i < 8; i++)
+			accumulate_uint32(start + 8 + i, end + 8 + i, deltas + idx++);
+
+		/* 8x 32bit B counters */
+		for (i = 0; i < 8; i++)
+			accumulate_uint32(start + 16 + i, end + 16 + i, deltas + idx++);
+
+		/* 8x 32bit C counters */
+		for (i = 0; i < 8; i++)
+			accumulate_uint32(start + 24 + i, end + 24 + i, deltas + idx++);
+
+		break;
+		}
 	default:
 		assert(0);
 	}
@@ -926,6 +954,7 @@ uint64_t intel_perf_read_record_timestamp(const struct intel_perf *perf,
 					  const struct drm_i915_perf_record_header *record)
 {
        const uint32_t *report32 = (const uint32_t *)(record + 1);
+       const uint64_t *report64 = (const uint64_t *)(record + 1);
        uint64_t ts;
 
        switch (metric_set->perf_oa_format) {
@@ -933,6 +962,10 @@ uint64_t intel_perf_read_record_timestamp(const struct intel_perf *perf,
        case I915_OA_FORMAT_A32u40_A4u32_B8_C8:
        case I915_OA_FORMAT_A45_B8_C8:
                ts = report32[1];
+               break;
+
+       case I915_OAM_FORMAT_MPEC8u32_B8_C8:
+               ts = report64[1];
                break;
 
        default:
@@ -952,6 +985,7 @@ uint64_t intel_perf_read_record_timestamp_raw(const struct intel_perf *perf,
 					  const struct drm_i915_perf_record_header *record)
 {
        const uint32_t *report32 = (const uint32_t *)(record + 1);
+       const uint64_t *report64 = (const uint64_t *)(record + 1);
        uint64_t ts;
 
        switch (metric_set->perf_oa_format) {
@@ -959,6 +993,10 @@ uint64_t intel_perf_read_record_timestamp_raw(const struct intel_perf *perf,
        case I915_OA_FORMAT_A32u40_A4u32_B8_C8:
        case I915_OA_FORMAT_A45_B8_C8:
                ts = report32[1];
+               break;
+
+       case I915_OAM_FORMAT_MPEC8u32_B8_C8:
+               ts = report64[1];
                break;
 
        default:
