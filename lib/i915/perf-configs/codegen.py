@@ -117,6 +117,10 @@ class Set:
     def underscore_name(self):
         return self.xml.get('underscore_name')
 
+    @property
+    def oa_format(self):
+        return self.xml.get('oa_format')
+
     def findall(self, path):
         return self.xml.findall(path)
 

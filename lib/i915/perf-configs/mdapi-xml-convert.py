@@ -659,6 +659,7 @@ for arg in args.xml:
         set.set('symbol_name', set_symbol_name)
         set.set('underscore_name', underscore(mdapi_set.get('SymbolName')))
         set.set('mdapi_supported_apis', strip_dx_apis(mdapi_set.get('SupportedAPI')))
+        set.set('oa_format', oa_format)
 
 
         # Look at the hardware register config before looking at the counters.
