@@ -5276,8 +5276,12 @@ igt_main
 		igt_fixture igt_require(intel_gen(devid) >= 12);
 
 		igt_describe("Test MI REPORT PERF COUNT for Gen 12");
-		igt_subtest("gen12-mi-rpc")
+		igt_subtest("gen12-mi-rpc") {
+			igt_require_f(has_class_instance(drm_fd,
+							 I915_ENGINE_CLASS_RENDER,
+							 0), "no render engine\n");
 			gen12_test_mi_rpc();
+		}
 
 		igt_describe("Test OA TLB invalidate");
 		igt_subtest("gen12-oa-tlb-invalidate")
