@@ -846,10 +846,10 @@ static void cleanup(data_t *data)
 		igt_plane_set_fb(sprite, NULL);
 	}
 
-	if (data->coexist_feature & FEATURE_DSC) {
+	if (data->coexist_feature & FEATURE_DSC)
 		restore_force_dsc_en();
-		igt_output_set_pipe(output, PIPE_NONE);
-	}
+
+	igt_output_set_pipe(output, PIPE_NONE);
 
 	igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
