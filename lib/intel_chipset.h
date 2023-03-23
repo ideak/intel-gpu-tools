@@ -45,6 +45,7 @@ struct intel_device_info {
 	unsigned gt; /* 0 if unknown */
 	bool has_4tile : 1;
 	bool has_flatccs : 1;
+	bool has_oam : 1;
 	bool is_mobile : 1;
 	bool is_whitney : 1;
 	bool is_almador : 1;
@@ -230,5 +231,7 @@ void intel_check_pch(void);
 #define HAS_4TILE(devid)	(intel_get_device_info(devid)->has_4tile)
 
 #define HAS_FLATCCS(devid)	(intel_get_device_info(devid)->has_flatccs)
+
+#define HAS_OAM(devid)		(intel_get_device_info(devid)->has_oam)
 
 #endif /* _INTEL_CHIPSET_H */

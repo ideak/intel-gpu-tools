@@ -489,6 +489,7 @@ static const struct intel_device_info intel_meteorlake_info = {
 	.graphics_rel = 70,
 	.display_ver = 14,
 	.has_4tile = true,
+	.has_oam = true,
 	.is_meteorlake = true,
 	.codename = "meteorlake",
 	.cmds_info = &gen12_mtl_cmds_info,
