@@ -46,6 +46,7 @@ static bool sink_detect_error(int drm_fd, uint32_t connector_id, int error_code)
 {
 	switch (error_code) {
 	case ETIMEDOUT:
+	case ENXIO:
 		return true;
 	case EIO:
 		return is_mst_connector(drm_fd, connector_id) ||
