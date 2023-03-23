@@ -100,7 +100,8 @@ class Registry:
                            'RKL',
                            'DG1',
                            'ACM',
-                           'PVC' )
+                           'PVC',
+                           'MTL', )
         if name in known_chipsets:
             return name
 
