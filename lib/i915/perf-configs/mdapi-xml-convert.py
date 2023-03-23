@@ -819,9 +819,14 @@ for arg in args.xml:
             # XXX Not sure why EU metrics tend to just be bundled under 'gpu'
             counter.set('mdapi_hw_unit_type', mdapi_counter.get('HWUnitType').lower())
 
+            # Some counters do not have MetricUnits, treat them as number.
+            if mdapi_counter.get('MetricUnits') == None:
+                units = "number"
+            else:
+                units = mdapi_counter.get('MetricUnits').lower()
+
             # There are counters representing cycle counts that have a semantic
             # type of 'duration' which doesn't seem to make sense...
-            units = mdapi_counter.get('MetricUnits').lower()
             if units == "cycles":
                 semantic_type = "event"
             else:
