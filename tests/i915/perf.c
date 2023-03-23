@@ -215,6 +215,7 @@ static int sysfs = -1;
 static int pm_fd = -1;
 static int stream_fd = -1;
 static uint32_t devid;
+static struct intel_execution_engine2 default_e2;
 
 static uint64_t gt_max_freq_mhz = 0;
 static struct intel_perf *intel_perf = NULL;
@@ -5084,8 +5085,19 @@ static bool has_class_instance(int i915, uint16_t class, uint16_t instance)
 	return false;
 }
 
+static void set_default_engine(const intel_ctx_t *ctx)
+{
+	const struct intel_execution_engine2 *e;
+
+	for_each_ctx_engine(drm_fd, ctx, e)
+		if (e->class == I915_ENGINE_CLASS_RENDER && e->instance == 0)
+			default_e2 = *e;
+}
+
 igt_main
 {
+	const intel_ctx_t *ctx;
+
 	igt_fixture {
 		struct stat sb;
 
@@ -5123,6 +5135,8 @@ igt_main
 
 		igt_require(init_sys_info());
 
+		ctx = intel_ctx_create_all_physical(drm_fd);
+		set_default_engine(ctx);
 		write_u64_file("/proc/sys/dev/i915/perf_stream_paranoid", 1);
 		write_u64_file("/proc/sys/dev/i915/oa_max_sample_rate", 100000);
 
@@ -5310,6 +5324,7 @@ igt_main
 		if (intel_perf)
 			intel_perf_free(intel_perf);
 
+		intel_ctx_destroy(drm_fd, ctx);
 		close(drm_fd);
 	}
 }
