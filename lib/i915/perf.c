@@ -432,6 +432,14 @@ intel_perf_for_devinfo(uint32_t device_id,
 		else
 			return unsupported_i915_perf_platform(perf);
 	} else if (devinfo->is_meteorlake) {
+		perf->devinfo.eu_threads_count = 8;
+		/* OA reports have the timestamp value shifted to the
+		 * right by 1 bits, it also means we cannot use the
+		 * top bit for comparison.
+		 */
+		perf->devinfo.oa_timestamp_shift = -1;
+		perf->devinfo.oa_timestamp_mask = 0x7fffffff;
+
 		if (is_mtl_gt2(&perf->devinfo))
 			intel_perf_load_metrics_mtlgt2(perf);
 		else if (is_mtl_gt3(&perf->devinfo))
