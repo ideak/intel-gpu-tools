@@ -1067,6 +1067,54 @@ void kmstest_dump_mode(drmModeModeInfo *mode)
 		 aspect ? aspect : "", aspect ? ")" : "");
 }
 
+/*
+ * With non-contiguous pipes display, crtc mapping is not always same
+ * as pipe mapping, In i915 pipe is enum id of i915's crtc object.
+ * hence allocating upper bound igt_pipe array to support non-contiguos
+ * pipe display and reading pipe enum for a crtc using GET_PIPE_FROM_CRTC_ID
+ * ioctl for a pipe to do pipe ordering with respect to crtc list.
+ */
+static int __intel_get_pipe_from_crtc_id(int fd, int crtc_id, int crtc_idx)
+{
+	char buf[2];
+	int debugfs_fd, res = 0;
+
+	/*
+	 * No GET_PIPE_FROM_CRTC_ID ioctl support for XE. Instead read
+	 * from the debugfs "i915_pipe".
+	 *
+	 * This debugfs is applicable for both i915 & XE. For i915, still
+	 * we can fallback to ioctl method to support older kernels.
+	 */
+	debugfs_fd = igt_debugfs_pipe_dir(fd, crtc_idx, O_RDONLY);
+
+	if (debugfs_fd >= 0) {
+		res = igt_debugfs_simple_read(debugfs_fd, "i915_pipe", buf, sizeof(buf));
+		close(debugfs_fd);
+	}
+
+	if (res <= 0) {
+		/* Fallback to older ioctl method. */
+		if (is_i915_device(fd)) {
+			struct drm_i915_get_pipe_from_crtc_id get_pipe;
+
+			get_pipe.pipe = 0;
+			get_pipe.crtc_id =  crtc_id;
+
+			do_ioctl(fd, DRM_IOCTL_I915_GET_PIPE_FROM_CRTC_ID,
+				 &get_pipe);
+
+			return get_pipe.pipe;
+		} else
+			igt_assert_f(false, "XE: Failed to read the debugfs i915_pipe.\n");
+	} else {
+		char pipe;
+
+		igt_assert_eq(sscanf(buf, "%c", &pipe), 1);
+		return kmstest_pipe_to_index(pipe);
+	}
+}
+
 /**
  * kmstest_get_pipe_from_crtc_id:
  * @fd: DRM fd
@@ -1100,7 +1148,8 @@ int kmstest_get_pipe_from_crtc_id(int fd, int crtc_id)
 
 	drmModeFreeResources(res);
 
-	return i;
+	return is_intel_device(fd) ?
+		__intel_get_pipe_from_crtc_id(fd, crtc_id, i) : i;
 }
 
 /**
@@ -2558,14 +2607,14 @@ void igt_display_require(igt_display_t *display, int drm_fd)
 	drmModeRes *resources;
 	drmModePlaneRes *plane_resources;
 	int i;
-	bool is_i915_dev;
+	bool is_intel_dev;
 
 	memset(display, 0, sizeof(igt_display_t));
 
 	LOG_INDENT(display, "init");
 
 	display->drm_fd = drm_fd;
-	is_i915_dev = is_i915_device(drm_fd);
+	is_intel_dev = is_intel_device(drm_fd);
 
 	drmSetClientCap(drm_fd, DRM_CLIENT_CAP_WRITEBACK_CONNECTORS, 1);
 
@@ -2593,34 +2642,18 @@ void igt_display_require(igt_display_t *display, int drm_fd)
 	if (is_xe_device(drm_fd))
 		xe_device_get(drm_fd);
 
-	/*
-	 * With non-contiguous pipes display, crtc mapping is not always same
-	 * as pipe mapping, In i915 pipe is enum id of i915's crtc object.
-	 * hence allocating upper bound igt_pipe array to support non-contiguos
-	 * pipe display and reading pipe enum for a crtc using GET_PIPE_FROM_CRTC_ID ioctl
-	 * for a pipe to do pipe ordering with respect to crtc list.
-	 */
 	display->n_pipes = IGT_MAX_PIPES;
 	display->pipes = calloc(sizeof(igt_pipe_t), display->n_pipes);
 	igt_assert_f(display->pipes, "Failed to allocate memory for %d pipes\n", display->n_pipes);
 
 	for (i = 0; i < resources->count_crtcs; i++) {
 		igt_pipe_t *pipe;
+		int pipe_enum = (is_intel_dev)?
+			__intel_get_pipe_from_crtc_id(drm_fd,
+						      resources->crtcs[i], i) : i;
 
-		if (is_i915_dev) {
-			struct drm_i915_get_pipe_from_crtc_id get_pipe;
-
-			get_pipe.pipe = 0;
-			get_pipe.crtc_id =  resources->crtcs[i];
-			do_ioctl(display->drm_fd,
-					DRM_IOCTL_I915_GET_PIPE_FROM_CRTC_ID, &get_pipe);
-			pipe = &display->pipes[get_pipe.pipe];
-			pipe->pipe = get_pipe.pipe;
-		}
-		else {
-			pipe = &display->pipes[i];
-			pipe->pipe = i;
-		}
+		pipe = &display->pipes[pipe_enum];
+		pipe->pipe = pipe_enum;
 
 		/* pipe is enabled/disabled */
 		pipe->enabled = true;
