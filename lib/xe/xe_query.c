@@ -223,6 +223,16 @@ static struct xe_device *find_in_cache(int fd)
 	return xe_dev;
 }
 
+static void xe_device_free(struct xe_device *xe_dev)
+{
+	free(xe_dev->config);
+	free(xe_dev->gts);
+	free(xe_dev->hw_engines);
+	free(xe_dev->mem_usage);
+	free(xe_dev->vram_size);
+	free(xe_dev);
+}
+
 /**
  * xe_device_get:
  * @fd: xe device fd
@@ -234,7 +244,7 @@ static struct xe_device *find_in_cache(int fd)
  */
 struct xe_device *xe_device_get(int fd)
 {
-	struct xe_device *xe_dev;
+	struct xe_device *xe_dev, *prev;
 
 	xe_dev = find_in_cache(fd);
 	if (xe_dev)
@@ -260,19 +270,18 @@ struct xe_device *xe_device_get(int fd)
 	xe_dev->has_vram = __mem_has_vram(xe_dev->mem_usage);
 	xe_dev->supports_faults = xe_check_supports_faults(fd);
 
-	igt_map_insert(cache.map, &xe_dev->fd, xe_dev);
+	/* We may get here from multiple threads, use first cached xe_dev */
+	pthread_mutex_lock(&cache.cache_mutex);
+	prev = find_in_cache_unlocked(fd);
+	if (!prev) {
+		igt_map_insert(cache.map, &xe_dev->fd, xe_dev);
+	} else {
+		xe_device_free(xe_dev);
+		xe_dev = prev;
+	}
+	pthread_mutex_unlock(&cache.cache_mutex);
 
 	return xe_dev;
-}
-
-static void xe_device_free(struct xe_device *xe_dev)
-{
-	free(xe_dev->config);
-	free(xe_dev->gts);
-	free(xe_dev->hw_engines);
-	free(xe_dev->mem_usage);
-	free(xe_dev->vram_size);
-	free(xe_dev);
 }
 
 static void delete_in_cache(struct igt_map_entry *entry)
