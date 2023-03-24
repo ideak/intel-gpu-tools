@@ -47,7 +47,7 @@ static void sanity(int i915)
 	/* Wait till at least one spinner starts */
 	igt_spin_busywait_until_started(spin);
 	busy = measure_power(&pwr, DURATION_SEC);
-	i915_for_each_gt(i915, gt, dir) {
+	i915_for_each_gt(i915, dir, gt) {
 		req = igt_sysfs_get_u32(dir, "rps_cur_freq_mhz");
 		act = igt_sysfs_get_u32(dir, "rps_act_freq_mhz");
 		igt_info("gt %d: req MHz: %d, act MHz: %d\n", gt, req, act);
