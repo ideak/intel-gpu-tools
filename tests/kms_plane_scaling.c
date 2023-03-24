@@ -732,11 +732,15 @@ test_planes_scaling_combo(data_t *d, int w1, int h1, int w2, int h2,
 {
 	igt_display_t *display = &d->display;
 	drmModeModeInfo *mode;
+	int n_planes;
 
 	cleanup_crtc(d);
 
 	igt_output_set_pipe(output, pipe);
 	mode = igt_output_get_mode(output);
+
+	n_planes = display->pipes[pipe].n_planes;
+	igt_require(n_planes >= 2);
 
 	switch (test_type) {
 	case TEST_PLANES_UPSCALE:
@@ -759,7 +763,7 @@ test_planes_scaling_combo(data_t *d, int w1, int h1, int w2, int h2,
 		igt_assert(0);
 	}
 
-	for (int k = 0; k < display->pipes[pipe].n_planes - 1; k += 2) {
+	for (int k = 0; k < n_planes - 1; k += 2) {
 		igt_plane_t *p1, *p2;
 
 		p1 = &display->pipes[pipe].planes[k];
