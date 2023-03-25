@@ -109,7 +109,6 @@ static void setup_output(data_t *data)
 
 		data->crtc_id = output->config.crtc->crtc_id;
 		data->output = output;
-		data->mode = igt_output_get_mode(output);
 
 		return;
 	}
@@ -369,6 +368,8 @@ static void test_cleanup(data_t *data)
 {
 	igt_plane_t *primary;
 
+	igt_output_override_mode(data->output, NULL);
+
 	primary = igt_output_get_plane_type(data->output,
 					    DRM_PLANE_TYPE_PRIMARY);
 	igt_plane_set_fb(primary, NULL);
@@ -440,17 +441,33 @@ static void setup_test_plane(data_t *data, int test_plane)
 
 static void test_setup(data_t *data)
 {
+	drmModeConnectorPtr connector;
+	bool psr_entered = false;
+
 	igt_require_f(data->output,
 		      "No available output found\n");
-	igt_require_f(data->mode,
-		      "No available mode found on %s\n",
-		      data->output->name);
-	if (data->op_psr_mode == PSR_MODE_2)
-		igt_require(data->supports_psr2);
 
-	psr_enable_if_enabled(data);
-	setup_test_plane(data, data->test_plane_id);
-	igt_assert(psr_wait_entry_if_enabled(data));
+	connector = data->output->config.connector;
+
+	for (int i = 0; i < connector->count_modes; i++) {
+		data->mode = &connector->modes[i];
+		igt_info("Testing mode:\n");
+		kmstest_dump_mode(data->mode);
+
+		igt_output_override_mode(data->output, data->mode);
+
+		if (data->op_psr_mode == PSR_MODE_2)
+			igt_require(data->supports_psr2);
+
+		psr_enable_if_enabled(data);
+		setup_test_plane(data, data->test_plane_id);
+		if (psr_wait_entry_if_enabled(data)) {
+			psr_entered = true;
+			break;
+		}
+	}
+
+	igt_assert(psr_entered);
 }
 
 static void dpms_off_on(data_t *data)
