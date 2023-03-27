@@ -1037,6 +1037,35 @@ class TestList:
             for sub in tests.get_subtests(sort_field, filter_field)[""]:
                 print (sub)
 
+    def gen_testlist(self, directory, sort_field, filter_field):
+
+        """Generate testlists from the test documentation"""
+
+        test_prefix = os.path.commonprefix(self.get_subtests()[""])
+        test_prefix = re.sub(r'^igt@', '', test_prefix)
+
+        test_subtests = self.get_subtests(sort_field, filter_field)
+
+        for test in test_subtests.keys():  # pylint: disable=C0201,C0206
+            if not test_subtests[test]:
+                continue
+
+            testlist = test.lower()
+            if testlist == "":
+                fname = "other"
+            elif testlist == "bat":
+                fname = "fast-feedback"
+            else:
+                fname = testlist
+
+            fname = directory + "/" + test_prefix + fname + ".testlist"
+            fname = re.sub(r"[\s_]+", "-", fname)
+
+            with open(fname, 'w', encoding='utf8') as handler:
+                for sub in test_subtests[test]:
+                    handler.write (f"{sub}\n")
+                print(f"{fname} created.")
+
 #
 # Main
 #
@@ -1065,6 +1094,8 @@ parser.add_argument("--include-plan", action="store_true",
 parser.add_argument("--igt-build-path",
                     help="Path where the IGT runner is sitting. Used by --check-testlist.",
                     default=IGT_BUILD_PATH)
+parser.add_argument("--gen-testlist",
+                    help="Generate documentation at the GEN_TESTLIST directory, using SORT_FIELD to split the tests. Requires --sort-field.")
 parser.add_argument('--files', nargs='+',
                     help="File name(s) to be processed")
 
@@ -1080,6 +1111,12 @@ if parse_args.show_subtests:
 if parse_args.check_testlist:
     RUN = 1
     tests.check_tests()
+
+if parse_args.gen_testlist:
+    RUN = 1
+    if not parse_args.sort_field:
+        sys.exit("Need a field to split the testlists")
+    tests.gen_testlist(parse_args.gen_testlist, parse_args.sort_field, parse_args.filter_field)
 
 if parse_args.to_json:
     RUN = 1
