@@ -20,20 +20,22 @@
  * Category: Software building block
  * Sub-category: compute
  * Test category: functionality test
- */
-
-/*
- * This test creates compute vms, binds a couple of bos and an engine each,
- * thus redying it for execution. However, VRAM memory is over-
- * committed and while there is still nothing to execute, an eviction
- * will trigger the VM's rebind worker to rebind the evicted bo, which
- * will in turn trigger another eviction and so on.
  *
- * Since we don't have eviction stats yet we need to watch "top" for
- * the rebind kworkers using a lot of CPU while the test idles.
+ * SUBTEST:
+ * Description:
+ *	This test creates compute vms, binds a couple of bos and an engine each,
+ *	thus redying it for execution. However, VRAM memory is over-
+ *	committed and while there is still nothing to execute, an eviction
+ *	will trigger the VM's rebind worker to rebind the evicted bo, which
+ *	will in turn trigger another eviction and so on.
  *
- * The correct driver behaviour should be not to rebind anything unless
- * there is worked queued on one of the VM's compute engines.
+ *	Since we don't have eviction stats yet we need to watch "top" for
+ *	the rebind kworkers using a lot of CPU while the test idles.
+ *
+ *	The correct driver behaviour should be not to rebind anything unless
+ *	there is worked queued on one of the VM's compute engines.
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
  */
 static void test_ping_pong(int fd, struct drm_xe_engine_class_instance *eci)
 {
