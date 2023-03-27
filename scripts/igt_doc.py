@@ -1018,6 +1018,25 @@ class TestList:
                 sys.exit(f"{fname}:{file_ln + 1}: Error: unrecognized line. Need to add field at %s?\n\t==> %s" %
                          (self.config_fname, file_line))
 
+    def show_subtests(self, sort_field, filter_field):
+
+        """Show subtests, allowing sort and filter a field """
+
+        if sort_field:
+            test_subtests = tests.get_subtests(sort_field, filter_field)
+            for val_key in sorted(test_subtests.keys()):
+                if not test_subtests[val_key]:
+                    continue
+                if val_key == "":
+                    print("not defined:")
+                else:
+                    print(f"{val_key}:")
+                    for sub in test_subtests[val_key]:
+                        print (f"  {sub}")
+        else:
+            for sub in tests.get_subtests(sort_field, filter_field)[""]:
+                print (sub)
+
 #
 # Main
 #
@@ -1056,20 +1075,7 @@ tests = TestList(parse_args.config, parse_args.include_plan, parse_args.files)
 RUN = 0
 if parse_args.show_subtests:
     RUN = 1
-    if parse_args.sort_field:
-        test_subtests = tests.get_subtests(parse_args.sort_field, parse_args.filter_field)
-        for val_key in sorted(test_subtests.keys()):
-            if not test_subtests[val_key]:
-                continue
-            if val_key == "":
-                print("not defined:")
-            else:
-                print(f"{val_key}:")
-            for sub in test_subtests[val_key]:
-                print (f"  {sub}")
-    else:
-        for sub in tests.get_subtests(parse_args.sort_field, parse_args.filter_field)[""]:
-            print (sub)
+    tests.show_subtests(parse_args.sort_field, parse_args.filter_field)
 
 if parse_args.check_testlist:
     RUN = 1
