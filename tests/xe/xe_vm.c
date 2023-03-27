@@ -294,9 +294,13 @@ static void unbind_all(int fd, int n_vmas)
 
 #define	MAP_ADDRESS	0x00007fadeadbe000
 
-/*
- * This tests verifies that mapping an invalid userptr returns -EFAULT,
- * and that it is correctly handled.
+/**
+ * SUBTEST: userptr-invalid
+ * Description:
+ *	Verifies that mapping an invalid userptr returns -EFAULT,
+ *	and that it is correctly handled.
+ * Run type: FULL
+ * TODO: change ``'Run type' == FULL`` to a better category
  */
 static void userptr_invalid(int fd)
 {
