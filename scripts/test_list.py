@@ -803,16 +803,14 @@ class TestList:
                 run_missing.append(run_test)
 
         if doc_uneeded:
-            print("Unused documentation")
             for test_name in doc_uneeded:
-                print(test_name)
+                print(f"Warning: Documented {test_name} doesn't exist on source files")
 
         if run_missing:
-            if doc_uneeded:
-                print()
-            print("Missing documentation")
             for test_name in run_missing:
-                print(test_name)
+                print(f'Warning: Missing documentation for {test_name}')
+        if doc_uneeded or run_missing:
+            sys.exit(1)
 
     #
     # File handling methods
