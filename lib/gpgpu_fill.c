@@ -99,6 +99,19 @@ static const uint32_t gen12_gpgpu_kernel[][4] = {
 	{ 0x00040131, 0x00000004, 0x7020700c, 0x10000000 },
 };
 
+static const uint32_t xehp_gpgpu_kernel[][4] = {
+	{ 0x00020061, 0x01050000, 0x00000104, 0x00000000 },
+	{ 0x00000069, 0x02058220, 0x02000024, 0x00000004 },
+	{ 0x00000061, 0x02250220, 0x000000c4, 0x00000000 },
+	{ 0x00030061, 0x04050220, 0x00460005, 0x00000000 },
+	{ 0x00011a61, 0x04050220, 0x00220205, 0x00000000 },
+	{ 0x00000061, 0x04454220, 0x00000000, 0x0000000f },
+	{ 0x00041e61, 0x05050220, 0x00000104, 0x00000000 },
+	{ 0x80001901, 0x00010000, 0x00000000, 0x00000000 },
+	{ 0x00044031, 0x00000000, 0xc0000414, 0x02a00000 },
+	{ 0x00030031, 0x00000004, 0x3000500c, 0x00000000 },
+};
+
 /*
  * This sets up the gpgpu pipeline,
  *
@@ -280,6 +293,47 @@ __gen9_gpgpu_fillfunc(int i915,
 	intel_bb_destroy(ibb);
 }
 
+static void
+__xehp_gpgpu_fillfunc(int i915,
+		      struct intel_buf *buf,
+		      unsigned int x, unsigned int y,
+		      unsigned int width, unsigned int height,
+		      uint8_t color, const uint32_t kernel[][4],
+		      size_t kernel_size)
+{
+	struct intel_bb *ibb;
+	struct xehp_interface_descriptor_data idd;
+	(void) x;
+	(void) y;
+
+	ibb = intel_bb_create(i915, PAGE_SIZE);
+	intel_bb_add_intel_buf(ibb, buf, true);
+
+	intel_bb_ptr_set(ibb, BATCH_STATE_SPLIT);
+
+	xehp_fill_interface_descriptor(ibb, buf,
+				       kernel, kernel_size, &idd);
+
+	intel_bb_ptr_set(ibb, 0);
+
+	/* GPGPU pipeline */
+	intel_bb_out(ibb, GEN7_PIPELINE_SELECT | GEN9_PIPELINE_SELECTION_MASK |
+		  PIPELINE_SELECT_GPGPU);
+	xehp_emit_state_base_address(ibb);
+	xehp_emit_state_compute_mode(ibb);
+	xehp_emit_state_binding_table_pool_alloc(ibb);
+	xehp_emit_cfe_state(ibb, THREADS);
+	xehp_emit_compute_walk(ibb, width, height, &idd, color);
+
+	intel_bb_out(ibb, MI_BATCH_BUFFER_END);
+	intel_bb_ptr_align(ibb, 32);
+
+	intel_bb_exec(ibb, intel_bb_offset(ibb),
+		      I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC, true);
+
+	intel_bb_destroy(ibb);
+}
+
 void gen9_gpgpu_fillfunc(int i915,
 			 struct intel_buf *buf,
 			 unsigned x, unsigned y,
@@ -311,4 +365,15 @@ void gen12_gpgpu_fillfunc(int i915,
 	__gen9_gpgpu_fillfunc(i915, buf, x, y, width, height, color,
 			      gen12_gpgpu_kernel,
 			      sizeof(gen12_gpgpu_kernel));
+}
+
+void xehp_gpgpu_fillfunc(int i915,
+			 struct intel_buf *buf,
+			 unsigned int x, unsigned int y,
+			 unsigned int width, unsigned int height,
+			 uint8_t color)
+{
+	__xehp_gpgpu_fillfunc(i915, buf, x, y, width, height, color,
+			      xehp_gpgpu_kernel,
+			      sizeof(xehp_gpgpu_kernel));
 }

@@ -262,6 +262,10 @@ gen7_fill_binding_table(struct intel_bb *ibb,
 		binding_table[0] = gen7_fill_surface_state(ibb, buf,
 							   SURFACEFORMAT_R8_UNORM, 1);
 
+	else if (intel_graphics_ver(devid) >= IP_VER(12, 50))
+		binding_table[0] = xehp_fill_surface_state(ibb, buf,
+							   SURFACEFORMAT_R8_UNORM, 1);
+
 	else
 		binding_table[0] = gen8_fill_surface_state(ibb, buf,
 							   SURFACEFORMAT_R8_UNORM, 1);
@@ -772,4 +776,251 @@ gen7_emit_media_objects(struct intel_bb *ibb,
 	for (i = 0; i < width / 16; i++)
 		for (j = 0; j < height / 16; j++)
 			gen_emit_media_object(ibb, x + i * 16, y + j * 16);
+}
+
+/*
+ * XEHP
+ */
+void
+xehp_fill_interface_descriptor(struct intel_bb *ibb,
+			       struct intel_buf *dst,
+			       const uint32_t kernel[][4],
+			       size_t size,
+			       struct xehp_interface_descriptor_data *idd)
+{
+	uint32_t binding_table_offset, kernel_offset;
+
+	binding_table_offset = gen7_fill_binding_table(ibb, dst);
+	kernel_offset = gen7_fill_kernel(ibb, kernel, size);
+
+	memset(idd, 0, sizeof(*idd));
+	idd->desc0.kernel_start_pointer = (kernel_offset >> 6);
+
+	idd->desc2.single_program_flow = 1;
+	idd->desc2.floating_point_mode = GEN8_FLOATING_POINT_IEEE_754;
+
+	idd->desc3.sampler_count = 0;      /* 0 samplers used */
+	idd->desc3.sampler_state_pointer = 0;
+
+	idd->desc4.binding_table_entry_count = 0;
+	idd->desc4.binding_table_pointer = (binding_table_offset >> 5);
+
+	idd->desc5.num_threads_in_tg = 1;
+}
+
+uint32_t
+xehp_fill_surface_state(struct intel_bb *ibb,
+			struct intel_buf *buf,
+			uint32_t format,
+			int is_dst)
+{
+	struct xehp_surface_state *ss;
+	uint32_t write_domain, read_domain, offset;
+	uint64_t address;
+
+	if (is_dst) {
+		write_domain = read_domain = I915_GEM_DOMAIN_RENDER;
+	} else {
+		write_domain = 0;
+		read_domain = I915_GEM_DOMAIN_SAMPLER;
+	}
+
+	intel_bb_ptr_align(ibb, 64);
+	offset = intel_bb_offset(ibb);
+	ss = intel_bb_ptr(ibb);
+	intel_bb_ptr_add(ibb, 64);
+
+	ss->ss0.surface_type = SURFACE_2D;
+	ss->ss0.surface_format = format;
+	ss->ss0.render_cache_read_write = 1;
+	ss->ss0.vertical_alignment = 1; /* align 4 */
+	ss->ss0.horizontal_alignment = 1; /* align 4 */
+
+	if (buf->tiling == I915_TILING_X)
+		ss->ss0.tiled_mode = 2;
+	else if (buf->tiling == I915_TILING_Y || buf->tiling == I915_TILING_4)
+		ss->ss0.tiled_mode = 3;
+
+	address = intel_bb_offset_reloc(ibb, buf->handle,
+					read_domain, write_domain,
+					offset + 4 * 8, 0x0);
+
+	ss->ss8.base_addr_lo = (uint32_t) address;
+	ss->ss9.base_addr_hi = address >> 32;
+
+	ss->ss2.height = intel_buf_height(buf) - 1;
+	ss->ss2.width  = intel_buf_width(buf) - 1;
+	ss->ss3.pitch  = buf->surface[0].stride - 1;
+
+	ss->ss7.shader_channel_select_r = 4;
+	ss->ss7.shader_channel_select_g = 5;
+	ss->ss7.shader_channel_select_b = 6;
+	ss->ss7.shader_channel_select_a = 7;
+
+	return offset;
+}
+
+void
+xehp_emit_cfe_state(struct intel_bb *ibb, uint32_t threads)
+{
+	bool dfeud = CFE_CAN_DISABLE_FUSED_EU_DISPATCH(ibb->devid);
+
+	intel_bb_out(ibb, XEHP_CFE_STATE | (6 - 2));
+
+	/* scratch buffer */
+	intel_bb_out(ibb, 0);
+	intel_bb_out(ibb, 0);
+
+#define _LEGACY_MODE (1 << 6)
+	/* number of threads & urb entries */
+	intel_bb_out(ibb, (max_t(threads, threads, 64) - 1) << 16 | (dfeud ? _LEGACY_MODE : 0));
+
+	intel_bb_out(ibb, 0);
+	intel_bb_out(ibb, 0);
+}
+
+void
+xehp_emit_state_compute_mode(struct intel_bb *ibb)
+{
+	intel_bb_out(ibb, XEHP_STATE_COMPUTE_MODE);
+	intel_bb_out(ibb, 0);
+}
+
+void
+xehp_emit_state_binding_table_pool_alloc(struct intel_bb *ibb)
+{
+	intel_bb_out(ibb, GEN8_3DSTATE_BINDING_TABLE_POOL_ALLOC | 2);
+	intel_bb_emit_reloc(ibb, ibb->handle,
+			    I915_GEM_DOMAIN_RENDER | I915_GEM_DOMAIN_INSTRUCTION,
+			    0, 0, 0x0);
+	intel_bb_out(ibb, 1 << 12);
+}
+
+void
+xehp_emit_state_base_address(struct intel_bb *ibb)
+{
+	intel_bb_out(ibb, GEN8_STATE_BASE_ADDRESS | 0x14);            //dw0
+
+	/* general */
+	intel_bb_out(ibb, 0 | BASE_ADDRESS_MODIFY);                   //dw1-dw2
+	intel_bb_out(ibb, 0);
+
+	/* stateless data port */
+	intel_bb_out(ibb, 0 | BASE_ADDRESS_MODIFY);                   //dw3
+
+	/* surface */
+	intel_bb_emit_reloc(ibb, ibb->handle, I915_GEM_DOMAIN_SAMPLER, //dw4-dw5
+			    0, BASE_ADDRESS_MODIFY, 0x0);
+
+	/* dynamic */
+	intel_bb_emit_reloc(ibb, ibb->handle,                          //dw6-dw7
+			    I915_GEM_DOMAIN_RENDER | I915_GEM_DOMAIN_INSTRUCTION,
+			    0, BASE_ADDRESS_MODIFY, 0x0);
+
+	/* indirect */
+	intel_bb_out(ibb, 0);                                       //dw8-dw9
+	intel_bb_out(ibb, 0);
+
+	/* instruction */
+	intel_bb_emit_reloc(ibb, ibb->handle,
+			    I915_GEM_DOMAIN_INSTRUCTION,            //dw10-dw11
+			    0, BASE_ADDRESS_MODIFY, 0x0);
+
+	/* general state buffer size */
+	intel_bb_out(ibb, 0xfffff000 | 1);                          //dw12
+	/* dynamic state buffer size */
+	intel_bb_out(ibb, 1 << 12 | 1);                             //dw13
+	/* indirect object buffer size */
+	intel_bb_out(ibb, 0xfffff000 | 1);                          //dw14
+	/* intruction buffer size */
+	intel_bb_out(ibb, 1 << 12 | 1);                             //dw15
+
+	/* Bindless surface state base address */
+	intel_bb_out(ibb, 0 | BASE_ADDRESS_MODIFY);                 //dw16
+	intel_bb_out(ibb, 0);                                       //dw17
+	intel_bb_out(ibb, 0xfffff000);                              //dw18
+
+	/* Bindless sampler state base address */
+	intel_bb_out(ibb, 0 | BASE_ADDRESS_MODIFY);                 //dw19
+	intel_bb_out(ibb, 0);                                       //dw20
+	intel_bb_out(ibb, 0);                                       //dw21
+}
+
+void
+xehp_emit_compute_walk(struct intel_bb *ibb,
+		       unsigned int width, unsigned int height,
+		       struct xehp_interface_descriptor_data *pidd,
+		       uint8_t color)
+{
+	uint32_t x_dim, y_dim;
+
+	/*
+	 * Simply do SIMD16 based dispatch, so every thread uses
+	 * SIMD16 channels.
+	 *
+	 * Define our own thread group size, e.g 16x1 for every group, then
+	 * will have 1 thread each group in SIMD16 dispatch. So thread
+	 * width/height/depth are all 1.
+	 *
+	 * Then thread group X = width / 16 (aligned to 16)
+	 * thread group Y = height;
+	 */
+	x_dim = (width + 15) / 16;
+	y_dim = height;
+
+	intel_bb_out(ibb, XEHP_COMPUTE_WALKER | 0x25);
+
+	intel_bb_out(ibb, 0); /* debug object */		//dw1
+	intel_bb_out(ibb, 0); /* indirect data length */	//dw2
+	intel_bb_out(ibb, 0); /* indirect data offset */	//dw3
+
+	/* SIMD size */
+	intel_bb_out(ibb, 1 << 30 | 1 << 25); /* SIMD16 | enable inline */ //dw4
+
+	/* Execution mask */
+	intel_bb_out(ibb, 0xffffffff);				//dw5
+
+	/* x/y/z max */
+	intel_bb_out(ibb, (x_dim << 20) | (y_dim << 10) | 1);	//dw6
+
+	/* x dim */
+	intel_bb_out(ibb, x_dim);				//dw7
+
+	/* y dim */
+	intel_bb_out(ibb, y_dim);				//dw8
+
+	/* z dim */
+	intel_bb_out(ibb, 1);					//dw9
+
+	/* group id x/y/z */
+	intel_bb_out(ibb, 0);					//dw10
+	intel_bb_out(ibb, 0);					//dw11
+	intel_bb_out(ibb, 0);					//dw12
+
+	/* partition id / partition size */
+	intel_bb_out(ibb, 0);					//dw13
+	intel_bb_out(ibb, 0);					//dw14
+
+	/* preempt x/y/z */
+	intel_bb_out(ibb, 0);					//dw15
+	intel_bb_out(ibb, 0);					//dw16
+	intel_bb_out(ibb, 0);					//dw17
+
+	/* Interface descriptor data */
+	for (int i = 0; i < 8; i++) {			       //dw18-25
+		intel_bb_out(ibb, ((uint32_t *) pidd)[i]);
+	}
+
+	/* Postsync data */
+	intel_bb_out(ibb, 0);					//dw26
+	intel_bb_out(ibb, 0);					//dw27
+	intel_bb_out(ibb, 0);					//dw28
+	intel_bb_out(ibb, 0);					//dw29
+	intel_bb_out(ibb, 0);					//dw30
+
+	/* Inline data */
+	intel_bb_out(ibb, (uint32_t) color);			//dw31
+	for (int i = 0; i < 7; i++) {			        //dw32-38
+		intel_bb_out(ibb, 0x0);
+	}
 }

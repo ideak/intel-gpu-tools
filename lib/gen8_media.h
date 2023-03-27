@@ -23,6 +23,8 @@
 #define GEN8_MEDIA_STATE_FLUSH			GFXPIPE(2, 0, 4)
 #define GEN8_MEDIA_OBJECT			GFXPIPE(2, 1, 0)
 
+#define GEN8_3DSTATE_BINDING_TABLE_POOL_ALLOC	GFXPIPE(3, 1, 25)
+
 struct gen8_interface_descriptor_data
 {
 	struct {

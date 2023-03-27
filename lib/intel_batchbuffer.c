@@ -747,16 +747,18 @@ igt_fillfunc_t igt_get_gpgpu_fillfunc(int devid)
 {
 	igt_fillfunc_t fill = NULL;
 
-	if (IS_GEN7(devid))
-		fill = gen7_gpgpu_fillfunc;
-	else if (IS_GEN8(devid))
-		fill = gen8_gpgpu_fillfunc;
-	else if (IS_GEN9(devid) || IS_GEN10(devid))
-		fill = gen9_gpgpu_fillfunc;
-	else if (IS_GEN11(devid))
-		fill = gen11_gpgpu_fillfunc;
+	if (intel_graphics_ver(devid) >= IP_VER(12, 50))
+		fill = xehp_gpgpu_fillfunc;
 	else if (IS_GEN12(devid))
 		fill = gen12_gpgpu_fillfunc;
+	else if (IS_GEN11(devid))
+		fill = gen11_gpgpu_fillfunc;
+	else if (IS_GEN9(devid) || IS_GEN10(devid))
+		fill = gen9_gpgpu_fillfunc;
+	else if (IS_GEN8(devid))
+		fill = gen8_gpgpu_fillfunc;
+	else if (IS_GEN7(devid))
+		fill = gen7_gpgpu_fillfunc;
 
 	return fill;
 }

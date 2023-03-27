@@ -30,6 +30,7 @@
 #include "media_fill.h"
 #include "gen7_media.h"
 #include "gen8_media.h"
+#include "xehp_media.h"
 #include "intel_reg.h"
 #include "drmtest.h"
 #include "intel_batchbuffer.h"
@@ -107,4 +108,38 @@ void
 gen7_emit_media_objects(struct intel_bb *ibb,
 			unsigned int x, unsigned int y,
 			unsigned int width, unsigned int height);
+
+void
+xehp_fill_interface_descriptor(struct intel_bb *ibb,
+			       struct intel_buf *dst,
+			       const uint32_t kernel[][4],
+			       size_t size,
+			       struct xehp_interface_descriptor_data *idd);
+
+uint32_t
+xehp_fill_surface_state(struct intel_bb *ibb,
+			struct intel_buf *buf,
+			uint32_t format,
+			int is_dst);
+
+void
+xehp_emit_state_compute_mode(struct intel_bb *ibb);
+
+void
+xehp_emit_state_binding_table_pool_alloc(struct intel_bb *ibb);
+
+void
+xehp_emit_cfe_state(struct intel_bb *ibb, uint32_t threads);
+
+#define CFE_CAN_DISABLE_FUSED_EU_DISPATCH(devid)	(IS_DG2(devid))
+
+void
+xehp_emit_state_base_address(struct intel_bb *ibb);
+
+void
+xehp_emit_compute_walk(struct intel_bb *ibb,
+		       unsigned int width, unsigned int height,
+		       struct xehp_interface_descriptor_data *pidd,
+		       uint8_t color);
+
 #endif /* GPU_CMDS_H */
