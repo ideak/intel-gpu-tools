@@ -15,6 +15,7 @@ endif
 
 # meson.source_root is marked as a future-deprecated feature
 source_root = meson.current_source_dir()
+build_root = meson.current_build_dir()
 
 cc = meson.get_compiler('c')
 

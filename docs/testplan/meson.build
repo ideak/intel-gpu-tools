@@ -8,12 +8,16 @@ stylesheet = join_paths(meson.current_source_dir(), 'testplan.css')
 
 xe_test_config = join_paths(source_root, 'tests', 'xe', 'xe_test_config.json')
 
-if not build_tests
+check_testlist = []
+if build_tests
+	# Check if documentation matches the actual tests
+	check_testlist = [ '--check-testlist', '--igt-build-path', build_root ]
+else
 	test_executables = []
 endif
 
 test_dict = { 'xe_tests':
-		{ 'input': xe_test_config, 'extra_args': [] }
+		{ 'input': xe_test_config, 'extra_args': check_testlist }
 	    }
 
 foreach testplan, fields: test_dict
