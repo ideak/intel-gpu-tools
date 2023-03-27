@@ -176,6 +176,22 @@ class TestList:
 
     The SUBTEST contains the fields that are specific to each subtest.
 
+    Note: when igt_simple_main is used, there will be a single nameless
+    subtest. On such case, "SUBTEST:" is still needed, but without a
+    test name on it, e. g., it would be documented as:
+
+        /**
+         * TEST: some test that uses igt_simple_main
+         * Category: Software build block
+         * Sub-category: documentation
+         * Functionality: test documentation
+         * Issue: none
+         * Description: Complete description of this test
+         *
+         * SUBTEST:
+         * Description: do foo things
+         */
+
     Some IGT tests may have strings or integer wildcards, like:
         test-%s-%ld-size
 
@@ -376,8 +392,9 @@ class TestList:
         subtest_array = []
 
         for subtest in self.doc[test]["subtest"].keys():
-            summary = test_name + '@' + self.doc[test]["subtest"][subtest]["Summary"]
-
+            summary = test_name
+            if self.doc[test]["subtest"][subtest]["Summary"] != '':
+                 summary += '@' + self.doc[test]["subtest"][subtest]["Summary"]
             if not summary:
                 continue
 
