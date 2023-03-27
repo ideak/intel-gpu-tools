@@ -4,26 +4,26 @@
     "fields": {
         "Category": {
             "_properties_": {
-                "description": "Contains the major group for the tested functionality"
-            },
-            "Sub-category": {
-                "_properties_": {
-                    "description": "Contains the minor group of the functionality"
-                },
-                "Functionality": {
-                    "_properties_": {
-                        "description": "Groups page table tests per functionality"
-                    }
-                },
-                "Run type": {
-                    "_properties_": {
-                        "description": "Defines what category of testlist it belongs"
-                    }
-                }
+                "description": "Contains the major group for the tested functionality, being hardware, software or firmware"
             },
             "Mega feature": {
                 "_properties_": {
-                    "description": "Contains the mega feature for E2E use case"
+                    "description": "Contains the mega feature for end to end use case, e. g. the 'sellable' feature."
+                },
+                "Sub-category": {
+                    "_properties_": {
+                        "description": "Contains the the technical feature/functionality"
+                    },
+                    "Functionality": {
+                        "_properties_": {
+                            "description": "Groups page table tests on buckets containg more detailed functionality"
+                        }
+                    },
+                    "Run type": {
+                        "_properties_": {
+                            "description": "Defines what category of testlist it belongs"
+                        }
+                    }
                 }
             }
         },
