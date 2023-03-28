@@ -160,23 +160,6 @@ static uint32_t __mem_default_alignment(struct drm_xe_query_mem_usage *mem_usage
 	return alignment;
 }
 
-static bool xe_check_supports_faults(int fd)
-{
-	bool supports_faults;
-
-	struct drm_xe_vm_create create = {
-		.flags = DRM_XE_VM_CREATE_ASYNC_BIND_OPS |
-			 DRM_XE_VM_CREATE_FAULT_MODE,
-	};
-
-	supports_faults = !igt_ioctl(fd, DRM_IOCTL_XE_VM_CREATE, &create);
-
-	if (supports_faults)
-		xe_vm_destroy(fd, create.vm_id);
-
-	return supports_faults;
-}
-
 /**
  * xe_engine_class_string:
  * @engine_class: engine class
@@ -268,7 +251,6 @@ struct xe_device *xe_device_get(int fd)
 						     xe_dev->gts, gt);
 	xe_dev->default_alignment = __mem_default_alignment(xe_dev->mem_usage);
 	xe_dev->has_vram = __mem_has_vram(xe_dev->mem_usage);
-	xe_dev->supports_faults = xe_check_supports_faults(fd);
 
 	/* We may get here from multiple threads, use first cached xe_dev */
 	pthread_mutex_lock(&cache.cache_mutex);
@@ -301,6 +283,33 @@ void xe_device_put(int fd)
 	if (find_in_cache_unlocked(fd))
 		igt_map_remove(cache.map, &fd, delete_in_cache);
 	pthread_mutex_unlock(&cache.cache_mutex);
+}
+
+/**
+ * xe_supports_faults:
+ * @fd: xe device fd
+ *
+ * Returns true if xe device @fd allows creating vm in fault mode otherwise
+ * false.
+ *
+ * NOTE: This function temporarily creates a VM in fault mode. Hence, while
+ * this function is executing, no non-fault mode VMs can be created.
+ */
+bool xe_supports_faults(int fd)
+{
+	bool supports_faults;
+
+	struct drm_xe_vm_create create = {
+		.flags = DRM_XE_VM_CREATE_ASYNC_BIND_OPS |
+			 DRM_XE_VM_CREATE_FAULT_MODE,
+	};
+
+	supports_faults = !igt_ioctl(fd, DRM_IOCTL_XE_VM_CREATE, &create);
+
+	if (supports_faults)
+		xe_vm_destroy(fd, create.vm_id);
+
+	return supports_faults;
 }
 
 static void xe_device_destroy_cache(void)
@@ -457,15 +466,6 @@ uint64_t xe_vram_size(int fd, int gt)
  * Returns default alignment of objects for xe device @fd.
  */
 xe_dev_FN(xe_get_default_alignment, default_alignment, uint32_t);
-
-/**
- * xe_supports_faults:
- * @fd: xe device fd
- *
- * Returns true if xe device @fd allows creating vm in fault mode otherwise
- * false.
- */
-xe_dev_FN(xe_supports_faults, supports_faults, bool);
 
 /**
  * xe_va_bits:

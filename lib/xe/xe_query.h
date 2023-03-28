@@ -53,9 +53,6 @@ struct xe_device {
 	/** @has_vram: true if gpu has vram, false if system memory only */
 	bool has_vram;
 
-	/** @supports_faults: true if gpu supports faults, otherwise false */
-	bool supports_faults;
-
 	/** @va_bits: va length in bits */
 	uint32_t va_bits;
 
