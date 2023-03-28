@@ -152,42 +152,6 @@ test_huc_copy(int fd)
 	xe_vm_destroy(fd, vm);
 }
 
-static bool
-is_device_supported(int fd)
-{
-	struct drm_xe_query_config *config;
-	struct drm_xe_device_query query = {
-		.extensions = 0,
-		.query = DRM_XE_DEVICE_QUERY_CONFIG,
-		.size = 0,
-		.data = 0,
-	};
-	uint16_t devid;
-
-	igt_assert_eq(igt_ioctl(fd, DRM_IOCTL_XE_DEVICE_QUERY, &query), 0);
-
-	config = malloc(query.size);
-	igt_assert(config);
-
-	query.data = to_user_pointer(config);
-	igt_assert_eq(igt_ioctl(fd, DRM_IOCTL_XE_DEVICE_QUERY, &query), 0);
-
-	devid = config->info[XE_QUERY_CONFIG_REV_AND_DEVICE_ID] & 0xffff;
-	return (
-			devid == 0x9A60 ||
-			devid == 0x9A68 ||
-			devid == 0x9A70 ||
-			devid == 0x9A40 ||
-			devid == 0x9A49 ||
-			devid == 0x9A59 ||
-			devid == 0x9A78 ||
-			devid == 0x9AC0 ||
-			devid == 0x9AC9 ||
-			devid == 0x9AD9 ||
-			devid == 0x9AF8
-		);
-}
-
 igt_main
 {
 	int xe;
@@ -198,7 +162,7 @@ igt_main
 	}
 
 	igt_subtest("huc_copy") {
-		igt_skip_on(!is_device_supported(xe));
+		igt_skip_on(!IS_TIGERLAKE(intel_get_drm_devid(xe)));
 		test_huc_copy(xe);
 	}
 
