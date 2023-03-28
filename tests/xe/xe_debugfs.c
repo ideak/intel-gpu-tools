@@ -71,7 +71,7 @@ static int validate_entries(int fd, const char *add_path, const char * const str
  * Description: Check if various debugfs devnodes exist and test reading them.
  */
 static void
-test_base(int fd)
+test_base(int fd, struct drm_xe_query_config *config)
 {
 	static const char * const expected_files[] = {
 		"gt0",
@@ -88,8 +88,6 @@ test_base(int fd)
 
 	char reference[4096];
 	int val = 0;
-	struct xe_device *xe_dev = xe_device_get(fd);
-	struct drm_xe_query_config *config = xe_dev->config;
 
 	igt_assert(config);
 	sprintf(reference, "devid 0x%llx",
@@ -145,8 +143,6 @@ test_base(int fd)
 	igt_debugfs_dump(fd, "gem_names");
 
 	validate_entries(fd, "", expected_files, ARRAY_SIZE(expected_files));
-
-	xe_device_put(fd);
 }
 
 /**
@@ -244,17 +240,19 @@ static int opt_handler(int option, int option_index, void *input)
 
 igt_main_args("", long_options, help_str, opt_handler, NULL)
 {
+	struct xe_device *xe_dev;
 	char devnode[PATH_MAX];
 	int fd;
 	int gt;
 
 	igt_fixture {
 		fd = drm_open_driver(DRIVER_XE);
+		xe_dev = xe_device_get(fd);
 		__igt_debugfs_dump(fd, "info", IGT_LOG_INFO);
 	}
 
 	igt_subtest("base") {
-		test_base(fd);
+		test_base(fd, xe_dev->config);
 	}
 
 
@@ -271,6 +269,7 @@ igt_main_args("", long_options, help_str, opt_handler, NULL)
 	}
 
 	igt_fixture {
+		xe_device_put(fd);
 		close(fd);
 	}
 }
