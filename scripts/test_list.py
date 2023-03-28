@@ -845,6 +845,7 @@ class TestList:
         arg_number = 1
         cur_arg = -1
         cur_arg_element = 0
+        has_test_or_subtest = 0
 
         with open(fname, 'r', encoding='utf8') as handle:
             arg_ref = None
@@ -862,6 +863,7 @@ class TestList:
                     current_subtest = None
                     arg_ref = None
                     cur_arg = -1
+                    has_test_or_subtest = 0
 
                     continue
 
@@ -881,6 +883,7 @@ class TestList:
                     # Check if it is a new TEST section
                     match = re.match(r'^TEST:\s*(.*)', file_line)
                     if match:
+                        has_test_or_subtest = 1
                         current_test = self.test_number
                         self.test_number += 1
 
@@ -901,6 +904,7 @@ class TestList:
                 # Check if it is a new SUBTEST section
                 match = re.match(r'^SUBTESTS?:\s*(.*)', file_line)
                 if match:
+                    has_test_or_subtest = 1
                     current_subtest = subtest_number
                     subtest_number += 1
 
@@ -949,6 +953,9 @@ class TestList:
 
                     cur_arg = -1
 
+                    continue
+
+                if not has_test_or_subtest:
                     continue
 
                 # Use hashes for arguments to avoid duplication
