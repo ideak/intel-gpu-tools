@@ -1960,8 +1960,7 @@ print_engines_header(struct engines *engines, double t,
 				a = "          ENGINE     BUSY  ";
 
 			printf("\033[7m%s%*s%s\033[0m\n",
-			       a, (int)(con_w - 1 - strlen(a) - strlen(b)),
-			       " ", b);
+			       a, (int)(con_w - strlen(a) - strlen(b)), " ", b);
 
 			lines++;
 		}
@@ -2000,7 +1999,6 @@ print_engine(struct engines *engines, unsigned int i, double t,
 	print_groups(groups);
 
 	if (output_mode == INTERACTIVE) {
-		unsigned int max_w = con_w - 1;
 		unsigned int len;
 		char buf[128];
 		double val;
@@ -2012,7 +2010,7 @@ print_engine(struct engines *engines, unsigned int i, double t,
 			      engine->display_name, engine_items[0].buf);
 
 		val = pmu_calc(&engine->busy.val, 1e9, t, 100);
-		print_percentage_bar(val, max_w > len ? max_w - len : 0, false);
+		print_percentage_bar(val, con_w > len ? con_w - len : 0, false);
 
 		printf("%s\n", buf);
 
