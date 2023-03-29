@@ -5,12 +5,27 @@ import os
 import sphinx
 import sys
 
-from shutil import which
-
 # Get Sphinx version
 major, minor, patch = sphinx.version_info[:3]
 
 extensions = []
+
+def which(program):
+    import os
+    def is_exe(fpath):
+        return os.path.isfile(fpath) and os.access(fpath, os.X_OK)
+
+    fpath, fname = os.path.split(program)
+    if fpath:
+        if is_exe(program):
+            return program
+    else:
+        for path in os.environ["PATH"].split(os.pathsep):
+            exe_file = os.path.join(path, program)
+            if is_exe(exe_file):
+                return exe_file
+
+    return None
 
 if which('rst2pdf'):
     extensions.append('rst2pdf.pdfbuilder')
