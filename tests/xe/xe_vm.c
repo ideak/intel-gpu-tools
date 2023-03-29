@@ -549,7 +549,7 @@ shared_pte_page(int fd, struct drm_xe_engine_class_instance *eci, int n_bo,
 			xe_get_default_alignment(fd));
 
 	for (i = 0; i < n_bo; ++i) {
-		bo[i] = xe_bo_create(fd, 0, vm, bo_size);
+		bo[i] = xe_bo_create(fd, eci->gt_id, vm, bo_size);
 		data[i] = xe_bo_map(fd, bo[i], bo_size);
 	}
 
@@ -717,7 +717,7 @@ test_bind_engines_independent(int fd, struct drm_xe_engine_class_instance *eci)
 	bo_size = sizeof(*data) * N_ENGINES;
 	bo_size = ALIGN(bo_size + xe_cs_prefetch_size(fd),
 			xe_get_default_alignment(fd));
-	bo = xe_bo_create(fd, 0, vm, bo_size);
+	bo = xe_bo_create(fd, eci->gt_id, vm, bo_size);
 	data = xe_bo_map(fd, bo, bo_size);
 
 	for (i = 0; i < N_ENGINES; i++) {
@@ -874,7 +874,7 @@ test_bind_array(int fd, struct drm_xe_engine_class_instance *eci, int n_execs,
 	bo_size = ALIGN(bo_size + xe_cs_prefetch_size(fd),
 			xe_get_default_alignment(fd));
 
-	bo = xe_bo_create(fd, 0, vm, bo_size);
+	bo = xe_bo_create(fd, eci->gt_id, vm, bo_size);
 	data = xe_bo_map(fd, bo, bo_size);
 
 	if (flags & BIND_ARRAY_BIND_ENGINE_FLAG)
@@ -1052,7 +1052,7 @@ test_large_binds(int fd, struct drm_xe_engine_class_instance *eci,
 		map = aligned_alloc(xe_get_default_alignment(fd), bo_size);
 		igt_assert(map);
 	} else {
-		bo = xe_bo_create(fd, 0, vm, bo_size);
+		bo = xe_bo_create(fd, eci->gt_id, vm, bo_size);
 		map = xe_bo_map(fd, bo, bo_size);
 	}
 
@@ -1329,7 +1329,7 @@ test_munmap_style_unbind(int fd, struct drm_xe_engine_class_instance *eci,
 			    MAP_ANONYMOUS, -1, 0);
 		igt_assert(data != MAP_FAILED);
 	} else {
-		bo = xe_bo_create(fd, 0, vm, bo_size);
+		bo = xe_bo_create(fd, eci->gt_id, vm, bo_size);
 		map = xe_bo_map(fd, bo, bo_size);
 	}
 	memset(map, 0, bo_size);
