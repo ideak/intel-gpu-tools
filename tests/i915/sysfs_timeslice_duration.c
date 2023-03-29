@@ -44,7 +44,7 @@
 #include "sw_sync.h"
 
 #define ATTR "timeslice_duration_ms"
-#define RESET_TIMEOUT 50 /* milliseconds, at least one jiffie for kworker */
+#define RESET_TIMEOUT 1000 /* milliseconds, long enough for error capture */
 
 static bool __enable_hangcheck(int dir, bool state)
 {
