@@ -24,11 +24,7 @@ if liboping.found()
 	runner_c_args += '-DHAVE_OPING=1'
 endif
 
-if not build_tests and jsonc.found()
-	error('Building test runner requires building tests')
-endif
-
-if jsonc.found()
+if jsonc.found() and build_tests
 	subdir('testdata')
 
 	runnerlib = static_library('igt_runner', runnerlib_sources,
