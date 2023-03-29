@@ -1,9 +1,14 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: (GPL-2.0 OR MIT)
 
-import sys
 import os
+import sphinx
+import sys
+
 from shutil import which
+
+# Get Sphinx version
+major, minor, patch = sphinx.version_info[:3]
 
 extensions = []
 
@@ -21,20 +26,30 @@ language = 'en'
 exclude_patterns = []
 todo_include_todos = False
 
+if major < 2 and minor < 6:
+    html_use_smartypants = False
+else:
+    smartquotes = False
+
 html_theme = "nature"
+
+# body_max_width causes build error with nature theme on version < 1.7
+if major < 2 and minor < 7:
+    html_theme_options = {
+        "sidebarwidth": "400px",
+    }
+else:
+    html_theme_options = {
+        "body_max_width": "1520px",
+        "sidebarwidth": "400px",
+    }
 
 html_css_files = []
 html_static_path = ['.']
 html_copy_source = False
 
-html_use_smartypants = False
 html_sidebars = { '**': ['searchbox.html', 'localtoc.html']}
 htmlhelp_basename = 'IGT'
-
-html_theme_options = {
-    "body_max_width": "1520px",
-    "sidebarwidth": "400px",
-}
 
 # rst2pdf
 pdf_documents = [
