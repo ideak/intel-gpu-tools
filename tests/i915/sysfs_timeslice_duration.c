@@ -29,6 +29,7 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "igt.h"
 #include "igt_params.h"
 #include "drmtest.h"
 #include "i915/gem.h"
@@ -474,6 +475,13 @@ static void test_off(int i915, int engine)
 
 	gem_quiescent_gpu(i915);
 	igt_require(enable_hangcheck(i915, false));
+
+	/* GuC does not handle dynamic change in timeslice
+	 * duration from 'off' to 'on' on a currently
+	 * running context. Hence add below check.
+	 */
+
+	igt_require(!gem_using_guc_submission(i915));
 
 	igt_assert(igt_sysfs_scanf(engine, "class", "%u", &class) == 1);
 	igt_assert(igt_sysfs_scanf(engine, "instance", "%u", &inst) == 1);
