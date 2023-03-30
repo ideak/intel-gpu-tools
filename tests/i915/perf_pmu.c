@@ -2119,6 +2119,7 @@ static void test_unload(unsigned int num_engines)
 		igt_debug("Read %d events from perf and trial unload\n", count);
 		pmu_read_multi(fd[0], count, buf);
 		ret = __igt_i915_driver_unload(&who);
+		igt_debug("__igt_i915_driver_unload: ret %d who %s\n", ret, who);
 		igt_assert(ret != 0 && !strcmp(who, "i915"));
 		free(who);
 		pmu_read_multi(fd[0], count, buf);
