@@ -49,6 +49,12 @@ static const struct blt_cmd_info
 					    BIT(T_TILE4)  |
 					    BIT(T_TILE64));
 static const struct blt_cmd_info
+		pvc_xy_fast_copy = BLT_INFO(XY_FAST_COPY,
+					    BIT(T_LINEAR) |
+					    BIT(T_TILE4)  |
+					    BIT(T_TILE64));
+
+static const struct blt_cmd_info
 		gen12_xy_block_copy = BLT_INFO(XY_BLOCK_COPY,
 					       BIT(T_LINEAR) |
 					       BIT(T_YMAJOR));
@@ -65,6 +71,13 @@ static const struct blt_cmd_info
 		mtl_xy_block_copy = BLT_INFO_EXT(XY_BLOCK_COPY,
 						 BIT(T_LINEAR) |
 						 BIT(T_XMAJOR) |
+						 BIT(T_TILE4)  |
+						 BIT(T_TILE64),
+						 BLT_CMD_EXTENDED);
+
+static const struct blt_cmd_info
+		pvc_xy_block_copy = BLT_INFO_EXT(XY_BLOCK_COPY,
+						 BIT(T_LINEAR) |
 						 BIT(T_TILE4)  |
 						 BIT(T_TILE64),
 						 BLT_CMD_EXTENDED);
@@ -117,6 +130,13 @@ const struct intel_cmds_info gen12_mtl_cmds_info = {
 	.blt_cmds = {
 		[XY_FAST_COPY] = &dg2_xy_fast_copy,
 		[XY_BLOCK_COPY] = &mtl_xy_block_copy,
+	}
+};
+
+const struct intel_cmds_info gen12_pvc_cmds_info = {
+	.blt_cmds = {
+		[XY_FAST_COPY] = &pvc_xy_fast_copy,
+		[XY_BLOCK_COPY] = &pvc_xy_block_copy,
 	}
 };
 

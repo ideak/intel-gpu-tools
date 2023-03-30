@@ -46,6 +46,7 @@ extern const struct intel_cmds_info gen11_cmds_info;
 extern const struct intel_cmds_info gen12_cmds_info;
 extern const struct intel_cmds_info gen12_dg2_cmds_info;
 extern const struct intel_cmds_info gen12_mtl_cmds_info;
+extern const struct intel_cmds_info gen12_pvc_cmds_info;
 
 #define for_each_tiling(__tiling) \
 	for (__tiling = T_LINEAR; __tiling < __BLT_MAX_TILING; __tiling++)
