@@ -504,13 +504,10 @@ static bool test_pipe_ctm(data_t *data,
 	 * rounding issues and inaccuracies leading to crc mismatch.
 	 */
 	if (is_intel_device(data->drm_fd) && memcmp(before, after, sizeof(color_t))) {
-		igt_require(igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_DEGAMMA_LUT));
 		igt_require(igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_GAMMA_LUT));
 
-		degamma_linear = generate_table(data->degamma_lut_size, 1.0);
-		gamma_linear = generate_table(data->gamma_lut_size, 1.0);
+		gamma_linear = generate_table(256, 1.0);
 
-		set_degamma(data, primary->pipe, degamma_linear);
 		set_gamma(data, primary->pipe, gamma_linear);
 	}
 
