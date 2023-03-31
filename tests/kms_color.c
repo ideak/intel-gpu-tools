@@ -959,6 +959,11 @@ run_tests_for_pipe(data_t *data)
 		{ 0.0, 1.0, 0.0 },
 		{ 0.0, 0.0, 1.0 },
 	};
+	static const color_t colors_cmy[] = {
+		{ 0.0, 1.0, 1.0 },
+		{ 1.0, 0.0, 1.0 },
+		{ 1.0, 1.0, 0.0 }
+	};
 	static const struct {
 		const char *name;
 		int iter;
@@ -1039,6 +1044,16 @@ run_tests_for_pipe(data_t *data)
 			  0.0,  0.0,  0.75,
 		  },
 		  .desc = "Check the color transformation for 0.75 transparency",
+		},
+		{ .name = "ctm-signed",
+		  .fb_colors = colors_cmy,
+		  .iter = 3,
+		  .ctm = {
+			  -0.25,  0.75,  0.75,
+			   0.75, -0.25,  0.75,
+			   0.75,  0.75, -0.25,
+		  },
+		  .desc = "Check the color transformation for correct signed handling",
 		},
 	};
 	int i;
