@@ -68,9 +68,19 @@ def generate_register_configs(set):
             set.gen.output_availability(set, availability, register_config.get('type') + ' register config')
             c.indent(4)
 
+        c("{")
+        c.indent(4)
+        c("static const struct intel_perf_register_prog _%s[] = {" % t)
+        c.indent(4)
         for register in register_config.findall('register'):
-            c("metric_set->%s[metric_set->n_%s++] = (struct intel_perf_register_prog) { .reg = %s, .val = %s };" %
-              (t, t, register.get('address'), register.get('value')))
+            c("{ .reg = %s, .val = %s }," %
+              (register.get('address'), register.get('value')))
+        c.outdent(4)
+        c("};")
+        c("memcpy(metric_set->%s, _%s, sizeof(_%s));" % (t, t, t))
+        c("metric_set->n_%s = sizeof(_%s) / sizeof(_%s[0]);" % (t, t, t))
+        c.outdent(4)
+        c("}")
 
         if availability:
             c.outdent(4)
@@ -146,6 +156,7 @@ def main():
     c(copyright)
     c("\n")
     c("#include <stdlib.h>")
+    c("#include <string.h>")
     c("\n")
     c("#include \"%s\"" % header_file)
     c("#include \"i915/perf.h\"")
