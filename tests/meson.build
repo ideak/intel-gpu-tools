@@ -242,6 +242,7 @@ i915_progs = [
 ]
 
 xe_progs = [
+	'xe_create',
 	'xe_compute',
 	'xe_dma_buf_sync',
 	'xe_debugfs',
