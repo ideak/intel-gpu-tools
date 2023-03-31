@@ -69,6 +69,10 @@ struct xe_device {
 #define xe_for_each_gt(__fd, __gt) \
 	for (__gt = 0; __gt < xe_number_gt(__fd); ++__gt)
 
+#define xe_for_each_mem_region(__fd, __memreg, __r) \
+	for (uint64_t __i = 0; __i < igt_fls(__memreg); __i++) \
+		for_if(__r = (__memreg & (1ull << __i)))
+
 #define XE_IS_CLASS_SYSMEM(__region) ((__region)->mem_class == XE_MEM_REGION_CLASS_SYSMEM)
 #define XE_IS_CLASS_VRAM(__region) ((__region)->mem_class == XE_MEM_REGION_CLASS_VRAM)
 
