@@ -145,6 +145,7 @@ void prime_sync_end(int dma_buf_fd, bool write);
 bool igt_has_fb_modifiers(int fd);
 void igt_require_fb_modifiers(int fd);
 bool igt_has_drm_cap(int fd, uint64_t capability);
+bool igt_has_set_caching(uint32_t devid);
 
 /**
  * __kms_addfb:

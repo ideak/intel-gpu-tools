@@ -1995,8 +1995,8 @@ static void pm_test_caching(void)
 
 	for (i = 0; i < ARRAY_SIZE(cache_levels); i++) {
 		igt_assert(wait_for_suspended());
-		gem_set_caching(drm_fd, handle, default_cache_level);
-
+		if (igt_has_set_caching(intel_get_drm_devid(drm_fd)))
+			gem_set_caching(drm_fd, handle, default_cache_level);
 		/* Ensure we bind the vma into the GGTT */
 		memset(gem_buf, 16 << i, gtt_obj_max_size);
 
@@ -2008,7 +2008,8 @@ static void pm_test_caching(void)
 		 */
 		igt_debug("Setting cache level %u\n", cache_levels[i]);
 		igt_assert(wait_for_suspended());
-		gem_set_caching(drm_fd, handle, cache_levels[i]);
+		if (igt_has_set_caching(intel_get_drm_devid(drm_fd)))
+			gem_set_caching(drm_fd, handle, cache_levels[i]);
 	}
 
 	igt_assert(munmap(gem_buf, gtt_obj_max_size) == 0);

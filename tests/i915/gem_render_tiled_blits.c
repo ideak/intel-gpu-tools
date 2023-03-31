@@ -117,7 +117,8 @@ static void run_test (int fd, int count)
 	intel_buf_init(bops, &linear, WIDTH, HEIGHT, 32, 0,
 		       I915_TILING_NONE, I915_COMPRESSION_NONE);
 	if (snoop) {
-		gem_set_caching(fd, linear.handle, 1);
+		if (igt_has_set_caching(intel_get_drm_devid(fd)))
+			gem_set_caching(fd, linear.handle, 1);
 		igt_info("Using a snoop linear buffer for comparisons\n");
 	}
 

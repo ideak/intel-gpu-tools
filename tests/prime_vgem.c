@@ -330,7 +330,8 @@ static void test_userptr(int vgem, int i915)
 	*ptr = MI_BATCH_BUFFER_END;
 
 	gem_userptr(i915, ptr, scratch.size, 0, 0, &obj.handle);
-	gem_set_caching(i915, obj.handle, I915_CACHING_NONE); /* for !llc exec */
+	if (igt_has_set_caching(intel_get_drm_devid(i915)))
+		gem_set_caching(i915, obj.handle, I915_CACHING_NONE); /* for !llc exec */
 
 	gem_execbuf(i915, &execbuf);
 	gem_close(i915, obj.handle);

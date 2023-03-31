@@ -106,8 +106,10 @@ static int workaround_fail_count(int i915, const intel_ctx_t *ctx)
 
 	memset(obj, 0, sizeof(obj));
 	obj[0].handle = gem_create(i915, result_sz);
-	if (!gem_has_lmem(i915))
-		gem_set_caching(i915, obj[0].handle, I915_CACHING_CACHED);
+	if (!gem_has_lmem(i915)) {
+		if (igt_has_set_caching(intel_get_drm_devid(i915)))
+			gem_set_caching(i915, obj[0].handle, I915_CACHING_CACHED);
+	}
 	obj[1].handle = gem_create(i915, batch_sz);
 	obj[1].relocs_ptr = to_user_pointer(reloc);
 	obj[1].relocation_count = !ahnd ? num_wa_regs : 0;

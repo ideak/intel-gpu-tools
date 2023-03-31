@@ -158,6 +158,11 @@ igt_main
 			igt_info("coherency broken on i965g/gm\n");
 			flags = 0;
 		}
+
+		if (!gem_has_lmem(data.fd))
+			igt_require_f(igt_has_set_caching(data.devid),
+				      " cache setting not supported on this target\n");
+
 		data.bops = buf_ops_create(data.fd);
 
 		scratch_buf = intel_buf_create(data.bops, BO_SIZE/4, 1,

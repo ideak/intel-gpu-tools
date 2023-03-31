@@ -525,7 +525,8 @@ static void test_evict_snoop(int fd, unsigned int flags)
 	/* Create a snoop + uncached pair */
 	object[0].handle = gem_create(fd, 4096);
 	object[0].flags = EXEC_OBJECT_PINNED;
-	gem_set_caching(fd, object[0].handle, 1);
+	if (igt_has_set_caching(intel_get_drm_devid(fd)))
+		gem_set_caching(fd, object[0].handle, 1);
 	object[1].handle = gem_create(fd, 4096);
 	object[1].flags = EXEC_OBJECT_PINNED;
 	gem_write(fd, object[1].handle, 4096-sizeof(bbe), &bbe, sizeof(bbe));

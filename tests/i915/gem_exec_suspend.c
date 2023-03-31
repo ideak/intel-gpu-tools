@@ -116,8 +116,10 @@ static void run_test(int fd, const intel_ctx_t *ctx,
 
 	memset(obj, 0, sizeof(obj));
 	obj[0].handle = gem_create_in_memory_regions(fd, 4096, region);
-	if (!gem_has_lmem(fd))
-		gem_set_caching(fd, obj[0].handle, !!(flags & CACHED));
+	if (!gem_has_lmem(fd)) {
+		if (igt_has_set_caching(intel_get_drm_devid(fd)))
+			gem_set_caching(fd, obj[0].handle, !!(flags & CACHED));
+	}
 	obj[0].flags |= EXEC_OBJECT_WRITE;
 	obj[1].handle = gem_create_in_memory_regions(fd, 4096, region);
 	gem_write(fd, obj[1].handle, 0, &bbe, sizeof(bbe));

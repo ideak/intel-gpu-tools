@@ -1297,3 +1297,17 @@ bool igt_has_drm_cap(int fd, uint64_t capability)
 	igt_assert(drmIoctl(fd, DRM_IOCTL_GET_CAP, &cap) == 0);
 	return cap.value;
 }
+
+/**
+ * igt_has_set_caching:
+ * @devid: platform id.
+ *
+ * This helper verifies if the passed platform id
+ * has support for setting cache.
+ *
+ * Returns: Whether the cache setting  is supported or not.
+ */
+bool igt_has_set_caching(uint32_t devid)
+{
+	return IS_METEORLAKE(devid) ? false : true;
+}

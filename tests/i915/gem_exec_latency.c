@@ -770,7 +770,8 @@ static void context_switch(int i915, const intel_ctx_t *ctx,
 
 	memset(obj, 0, sizeof(obj));
 	obj[0].handle = gem_create(i915, 4096);
-	gem_set_caching(i915, obj[0].handle, 1);
+	if (igt_has_set_caching(intel_get_drm_devid(i915)))
+		gem_set_caching(i915, obj[0].handle, 1);
 	results = gem_mmap__cpu(i915, obj[0].handle, 0, 4096, PROT_READ);
 	gem_set_domain(i915, obj[0].handle, I915_GEM_DOMAIN_CPU, 0);
 

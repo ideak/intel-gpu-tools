@@ -1147,8 +1147,10 @@ static void test_relocations(int fd)
 	memset(&obj, 0, sizeof(obj));
 	igt_assert(posix_memalign(&ptr, PAGE_SIZE, size) == 0);
 	gem_userptr(fd, ptr, size, 0, userptr_flags, &obj.handle);
-	if (!gem_has_llc(fd))
-		gem_set_caching(fd, obj.handle, 0);
+	if (!gem_has_llc(fd)) {
+		if (igt_has_set_caching(intel_get_drm_devid(fd)))
+			gem_set_caching(fd, obj.handle, 0);
+	}
 	*(uint32_t *)ptr = MI_BATCH_BUFFER_END;
 
 	reloc = (typeof(reloc))((char *)ptr + PAGE_SIZE);
@@ -2417,8 +2419,11 @@ igt_main_args("c:", NULL, help_str, opt_handler, NULL)
 			test_sd_probe(fd);
 		}
 
-		igt_subtest("set-cache-level")
+		igt_subtest("set-cache-level") {
+			igt_require_f(igt_has_set_caching(intel_get_drm_devid(fd)),
+				      "set_caching not supported on this platform");
 			test_set_caching(fd);
+		}
 
 		igt_subtest("userfault")
 			test_userfault(fd);

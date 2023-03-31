@@ -142,7 +142,8 @@ static void run(int fd, unsigned ring, int nchild, int timeout,
 				       I915_GEM_DOMAIN_WC);
 		} else {
 			snoop = flags & COHERENT;
-			gem_set_caching(fd, obj[0].handle, snoop);
+			if (igt_has_set_caching(intel_get_drm_devid(fd)))
+				gem_set_caching(fd, obj[0].handle, snoop);
 			map = gem_mmap__cpu(fd, obj[0].handle, 0, 4096, PROT_WRITE);
 			gem_set_domain(fd, obj[0].handle,
 				       I915_GEM_DOMAIN_CPU,
@@ -401,7 +402,8 @@ static void batch(int fd, unsigned ring, int nchild, int timeout,
 		obj[0].handle = gem_create(fd, 4096);
 		obj[0].flags |= EXEC_OBJECT_WRITE;
 
-		gem_set_caching(fd, obj[0].handle, !!(flags & COHERENT));
+		if (igt_has_set_caching(intel_get_drm_devid(fd)))
+			gem_set_caching(fd, obj[0].handle, !!(flags & COHERENT));
 		map = gem_mmap__cpu(fd, obj[0].handle, 0, 4096, PROT_WRITE);
 
 		gem_set_domain(fd, obj[0].handle,
