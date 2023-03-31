@@ -207,6 +207,8 @@ struct intel_perf_logical_counter {
 	const char *name;
 	const char *symbol_name;
 	const char *desc;
+	const char *group;
+	bool (*availability)(const struct intel_perf *perf);
 	intel_perf_logical_counter_storage_t storage;
 	intel_perf_logical_counter_type_t type;
 	intel_perf_logical_counter_unit_t unit;

@@ -39,6 +39,22 @@ semantic_type_map = {
 def output_units(unit):
     return unit.replace(' ', '_').upper()
 
+def availability_func_name(set, counter):
+    return set.gen.chipset + "_" + set.underscore_name + "_" + counter.get('symbol_name') + "_availability"
+
+def output_availability_funcs(set, counter):
+    availability = counter.get('availability')
+    if availability:
+        c("static bool " + availability_func_name(set, counter) + "(const struct intel_perf *perf) {")
+        c.indent(4)
+        set.gen.output_availability(set, availability, counter.get('name'))
+        c.indent(4)
+        c("return true;")
+        c.outdent(4)
+        c("}")
+        c("return false;")
+        c.outdent(4)
+        c("}")
 
 def output_counter_report(set, counter):
     data_type = counter.get('data_type')
@@ -56,26 +72,22 @@ def output_counter_report(set, counter):
 
     c("\n")
 
+    c("{")
+    c.indent(4)
+    c(".name = \"{0}\",\n".format(counter.get('name')))
+    c(".symbol_name = \"{0}\",\n".format(counter.get('symbol_name')))
+    c(".desc = \"{0}\",\n".format(counter.get('description')))
+    c(".type = INTEL_PERF_LOGICAL_COUNTER_TYPE_{0},\n".format(semantic_type_uc))
+    c(".storage = INTEL_PERF_LOGICAL_COUNTER_STORAGE_{0},\n".format(data_type_uc))
+    c(".unit = INTEL_PERF_LOGICAL_COUNTER_UNIT_{0},\n".format(output_units(counter.get('units'))))
+    c(".read_{0} = {1},\n".format(data_type, set.read_funcs["$" + counter.get('symbol_name')]))
+    c(".max_{0} = {1},\n".format(data_type, set.max_funcs["$" + counter.get('symbol_name')]))
+    c(".group = \"{0}\",\n".format(counter.get('mdapi_group')))
     availability = counter.get('availability')
     if availability:
-        set.gen.output_availability(set, availability, counter.get('name'))
-        c.indent(4)
-
-    c("counter = &metric_set->counters[metric_set->n_counters++];\n")
-    c("counter->metric_set = metric_set;\n")
-    c("counter->name = \"{0}\";\n".format(counter.get('name')))
-    c("counter->symbol_name = \"{0}\";\n".format(counter.get('symbol_name')));
-    c("counter->desc = \"{0}\";\n".format(counter.get('description')))
-    c("counter->type = INTEL_PERF_LOGICAL_COUNTER_TYPE_{0};\n".format(semantic_type_uc))
-    c("counter->storage = INTEL_PERF_LOGICAL_COUNTER_STORAGE_{0};\n".format(data_type_uc))
-    c("counter->unit = INTEL_PERF_LOGICAL_COUNTER_UNIT_{0};\n".format(output_units(counter.get('units'))))
-    c("counter->read_{0} = {1};\n".format(data_type, set.read_funcs["$" + counter.get('symbol_name')]))
-    c("counter->max_{0} = {1};\n".format(data_type, set.max_funcs["$" + counter.get('symbol_name')]))
-    c("intel_perf_add_logical_counter(perf, counter, \"{0}\");\n".format(counter.get('mdapi_group')))
-
-    if availability:
-        c.outdent(4)
-        c("}\n")
+        c(".availability = {0},\n".format(availability_func_name(set, counter)))
+    c.outdent(4)
+    c("},")
 
 
 def generate_metric_sets(args, gen):
@@ -97,6 +109,13 @@ def generate_metric_sets(args, gen):
     # Print out all set registration functions for each set in each
     # generation.
     for set in gen.sets:
+        counters = sorted(set.counters, key=lambda k: k.get('symbol_name'))
+
+        c("\n")
+
+        for counter in counters:
+          output_availability_funcs(set, counter)
+
         c("\nstatic void\n")
         c(gen.chipset + "_add_" + set.underscore_name + "_metric_set(struct intel_perf *perf)")
         c("{\n")
@@ -104,8 +123,6 @@ def generate_metric_sets(args, gen):
 
         c("struct intel_perf_metric_set *metric_set;\n")
         c("struct intel_perf_logical_counter *counter;\n\n")
-
-        counters = sorted(set.counters, key=lambda k: k.get('symbol_name'))
 
         c("metric_set = calloc(1, sizeof(*metric_set));\n")
         c("metric_set->name = \"" + set.name + "\";\n")
@@ -171,9 +188,31 @@ def generate_metric_sets(args, gen):
         c("intel_perf_add_metric_set(perf, metric_set);");
         c("\n")
 
+        c("{")
+        c.indent(4)
+        c("static const struct intel_perf_logical_counter _counters[] = {")
+        c.indent(4)
+
         for counter in counters:
             output_counter_report(set, counter)
+        c.outdent(4)
+        c("};")
+        c("int i;")
 
+        c("for (i = 0; i < sizeof(_counters) / sizeof(_counters[0]); i++) {")
+        c.indent(4)
+        c("if (_counters[i].availability && !_counters[i].availability(perf))")
+        c.indent(4)
+        c("continue;")
+        c.outdent(4)
+        c("counter = &metric_set->counters[metric_set->n_counters++];")
+        c("*counter = _counters[i];")
+        c("counter->metric_set = metric_set;")
+        c("intel_perf_add_logical_counter(perf, counter, counter->group);")
+        c.outdent(4)
+        c("}")
+        c.outdent(4)
+        c("}")
         c("\nassert(metric_set->n_counters <= {0});\n".format(len(counters)));
 
         c.outdent(4)
@@ -245,6 +284,8 @@ def main():
     h(textwrap.dedent("""\
         #ifndef %s
         #define %s
+
+        #include <string.h>
 
         #include "i915/perf.h"
 
