@@ -256,13 +256,13 @@ struct intel_perf_metric_set {
 	int c_offset;
 	int perfcnt_offset;
 
-	struct intel_perf_register_prog *b_counter_regs;
+	const struct intel_perf_register_prog *b_counter_regs;
 	uint32_t n_b_counter_regs;
 
-	struct intel_perf_register_prog *mux_regs;
+	const struct intel_perf_register_prog *mux_regs;
 	uint32_t n_mux_regs;
 
-	struct intel_perf_register_prog *flex_regs;
+	const struct intel_perf_register_prog *flex_regs;
 	uint32_t n_flex_regs;
 
 	struct igt_list_head link;

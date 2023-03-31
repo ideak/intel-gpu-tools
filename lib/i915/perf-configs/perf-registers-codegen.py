@@ -44,20 +44,6 @@ def generate_register_configs(set):
     c("{")
     c.indent(4)
 
-    # allocate memory
-    total_n_registers = {}
-    register_configs = set.findall('register_config')
-    for register_config in register_configs:
-        t = register_types[register_config.get('type')]
-        if t not in total_n_registers:
-            total_n_registers[t] = len(register_config.findall('register'))
-        else:
-            total_n_registers[t] += len(register_config.findall('register'))
-
-    for reg in total_n_registers:
-        c("metric_set->{0} = calloc({1}, sizeof(struct intel_perf_register_prog));".format(reg, total_n_registers[reg]))
-    c("\n")
-
     # fill in register/values
     register_configs = set.findall('register_config')
     for register_config in register_configs:
@@ -77,7 +63,7 @@ def generate_register_configs(set):
               (register.get('address'), register.get('value')))
         c.outdent(4)
         c("};")
-        c("memcpy(metric_set->%s, _%s, sizeof(_%s));" % (t, t, t))
+        c("metric_set->%s = _%s;" % (t, t))
         c("metric_set->n_%s = sizeof(_%s) / sizeof(_%s[0]);" % (t, t, t))
         c.outdent(4)
         c("}")
@@ -154,9 +140,6 @@ def main():
     h("#endif /* %s */" % header_define)
 
     c(copyright)
-    c("\n")
-    c("#include <stdlib.h>")
-    c("#include <string.h>")
     c("\n")
     c("#include \"%s\"" % header_file)
     c("#include \"i915/perf.h\"")
