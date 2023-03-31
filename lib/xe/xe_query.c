@@ -426,6 +426,18 @@ struct drm_xe_engine_class_instance *xe_hw_engine(int fd, int idx)
 	return &xe_dev->hw_engines[idx];
 }
 
+struct drm_xe_query_mem_region *xe_mem_region(int fd, uint64_t region)
+{
+	struct xe_device *xe_dev;
+	int region_idx = ffs(region) - 1;
+
+	xe_dev = find_in_cache(fd);
+	igt_assert(xe_dev);
+	igt_assert(xe_dev->mem_usage->num_regions > region_idx);
+
+	return &xe_dev->mem_usage->regions[region_idx];
+}
+
 /**
  * xe_number_hw_engine:
  * @fd: xe device fd
