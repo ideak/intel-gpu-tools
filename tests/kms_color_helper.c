@@ -54,7 +54,7 @@ uint64_t get_max_bpc(igt_output_t *output)
 
 void paint_gradient_rectangles(data_t *data,
 			       drmModeModeInfo *mode,
-			       color_t *colors,
+			       const color_t *colors,
 			       struct igt_fb *fb)
 {
 	cairo_t *cr = igt_get_cairo_ctx(data->drm_fd, fb);
@@ -90,7 +90,7 @@ void paint_gradient_rectangles(data_t *data,
 
 void paint_rectangles(data_t *data,
 		      drmModeModeInfo *mode,
-		      color_t *colors,
+		      const color_t *colors,
 		      struct igt_fb *fb)
 {
 	cairo_t *cr = igt_get_cairo_ctx(data->drm_fd, fb);

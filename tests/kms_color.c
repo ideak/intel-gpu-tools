@@ -321,7 +321,7 @@ static bool test_pipe_legacy_gamma(data_t *data,
 static bool test_pipe_legacy_gamma_reset(data_t *data,
 					 igt_plane_t *primary)
 {
-	const double ctm_identity[] = {
+	static const double ctm_identity[] = {
 		1.0, 0.0, 0.0,
 		0.0, 1.0, 0.0,
 		0.0, 0.0, 1.0,
@@ -454,11 +454,11 @@ end:
  */
 static bool test_pipe_ctm(data_t *data,
 			  igt_plane_t *primary,
-			  color_t *before,
-			  color_t *after,
-			  double *ctm_matrix)
+			  const color_t *before,
+			  const color_t *after,
+			  const double *ctm_matrix)
 {
-	const double ctm_identity[] = {
+	static const double ctm_identity[] = {
 		1.0, 0.0, 0.0,
 		0.0, 1.0, 0.0,
 		0.0, 0.0, 1.0,
@@ -566,17 +566,17 @@ static void test_pipe_limited_range_ctm(data_t *data,
 					igt_plane_t *primary)
 {
 	double limited_result = 235.0 / 255.0;
-	color_t red_green_blue_limited[] = {
+	static const color_t red_green_blue_limited[] = {
 		{ limited_result, 0.0, 0.0 },
 		{ 0.0, limited_result, 0.0 },
 		{ 0.0, 0.0, limited_result },
 	};
-	color_t red_green_blue_full[] = {
+	static const color_t red_green_blue_full[] = {
 		{ 0.5, 0.0, 0.0 },
 		{ 0.0, 0.5, 0.0 },
 		{ 0.0, 0.0, 0.5 },
 	};
-	double ctm[] = {
+	static const double ctm[] = {
 		1.0, 0.0, 0.0,
 		0.0, 1.0, 0.0,
 		0.0, 0.0, 1.0,
@@ -737,12 +737,12 @@ out:
 
 static void
 run_ctm_tests_for_pipe(data_t *data, enum pipe p,
-		       color_t *expected_colors,
-		       double *ctm,
+		       const color_t *expected_colors,
+		       const double *ctm,
 		       int iter)
 {
 	double delta;
-	color_t red_green_blue[] = {
+	static const color_t red_green_blue[] = {
 		{ 1.0, 0.0, 0.0 },
 		{ 0.0, 1.0, 0.0 },
 		{ 0.0, 0.0, 1.0 },
@@ -777,12 +777,15 @@ run_ctm_tests_for_pipe(data_t *data, enum pipe p,
 		 * for odd number of items in the LUTs.
 		 */
 		for (i = 0; i < iter; i++) {
-			expected_colors[0].r =
-				expected_colors[1].g =
-				expected_colors[2].b =
-				ctm[0] + delta * (i - (iter / 2));
+			float c = ctm[0] + delta * (i - (iter / 2));
+			color_t expected_colors_local[] = {
+				{ .r = c, },
+				{ .g = c, },
+				{ .b = c, },
+			};
+
 			if (test_pipe_ctm(data, data->primary, red_green_blue,
-					  expected_colors, ctm)) {
+					  expected_colors_local, ctm)) {
 				success = true;
 				break;
 			}
@@ -798,17 +801,17 @@ static void
 run_deep_color_tests_for_pipe(data_t *data, enum pipe p)
 {
 	igt_output_t *output;
-	color_t blue_green_blue[] = {
+	static const color_t blue_green_blue[] = {
 		{ 0.0, 0.0, 1.0 },
 		{ 0.0, 1.0, 0.0 },
 		{ 0.0, 0.0, 1.0 },
 	};
-	color_t red_green_blue[] = {
+	static const color_t red_green_blue[] = {
 		{ 1.0, 0.0, 0.0 },
 		{ 0.0, 1.0, 0.0 },
-		{ 0.0, 0.0, 1.0 }
+		{ 0.0, 0.0, 1.0 },
 	};
-	double ctm[] = {
+	static const double ctm[] = {
 		0.0, 0.0, 0.0,
 		0.0, 1.0, 0.0,
 		1.0, 0.0, 1.0,
@@ -923,7 +926,7 @@ static void
 run_tests_for_pipe(data_t *data)
 {
 	enum pipe pipe;
-	struct {
+	static const struct {
 		const char *name;
 		bool (*test_t)(data_t*, igt_plane_t*);
 		const char *desc;
@@ -945,7 +948,7 @@ run_tests_for_pipe(data_t *data)
 		  .desc = "Verify that setting the legacy gamma LUT resets the gamma LUT set through GAMMA_LUT property",
 		},
 	};
-	struct {
+	static const struct {
 		const char *name;
 		int iter;
 		color_t colors[3];
