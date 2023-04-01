@@ -735,10 +735,18 @@ out:
 	test_cleanup(data);
 }
 
+static void transform_color(color_t *color, const double *ctm, double offset)
+{
+	color_t tmp = *color;
+
+	color->r = ctm[0] * tmp.r + ctm[1] * tmp.g + ctm[2] * tmp.b + offset;
+	color->g = ctm[3] * tmp.r + ctm[4] * tmp.g + ctm[5] * tmp.b + offset;
+	color->b = ctm[6] * tmp.r + ctm[7] * tmp.g + ctm[8] * tmp.b + offset;
+}
+
 static void
 run_ctm_tests_for_pipe(data_t *data, enum pipe p,
 		       const color_t *fb_colors,
-		       const color_t *expected_colors,
 		       const double *ctm,
 		       int iter)
 {
@@ -758,13 +766,12 @@ run_ctm_tests_for_pipe(data_t *data, enum pipe p,
 	if (!pipe_output_combo_valid(data, p))
 		goto out;
 
+	if (!iter)
+		iter = 1;
+
 	igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(p), data->output->name) {
 		bool success = false;
 		int i;
-
-		if (!iter)
-			success = test_pipe_ctm(data, data->primary, fb_colors,
-						expected_colors, ctm);
 
 		/*
 		 * We tests a few values around the expected result because
@@ -773,15 +780,18 @@ run_ctm_tests_for_pipe(data_t *data, enum pipe p,
 		 * for odd number of items in the LUTs.
 		 */
 		for (i = 0; i < iter; i++) {
-			float c = ctm[0] + delta * (i - (iter / 2));
-			color_t expected_colors_local[] = {
-				{ .r = c, },
-				{ .g = c, },
-				{ .b = c, },
+			color_t expected_colors[3] = {
+				fb_colors[0],
+				fb_colors[1],
+				fb_colors[2],
 			};
 
+			transform_color(&expected_colors[0], ctm, delta * (i - (iter / 2)));
+			transform_color(&expected_colors[1], ctm, delta * (i - (iter / 2)));
+			transform_color(&expected_colors[2], ctm, delta * (i - (iter / 2)));
+
 			if (test_pipe_ctm(data, data->primary, fb_colors,
-					  expected_colors_local, ctm)) {
+					  expected_colors, ctm)) {
 				success = true;
 				break;
 			}
@@ -953,17 +963,11 @@ run_tests_for_pipe(data_t *data)
 		const char *name;
 		int iter;
 		const color_t *fb_colors;
-		color_t colors[3];
 		double ctm[9];
 		const char *desc;
 	} ctm_tests[] = {
 		{ .name = "ctm-red-to-blue",
 		  .fb_colors = colors_rgb,
-		  .colors = {
-			  { 0.0, 0.0, 1.0 },
-			  { 0.0, 1.0, 0.0 },
-			  { 0.0, 0.0, 1.0 },
-		  },
 		  .ctm = {
 			  0.0, 0.0, 0.0,
 			  0.0, 1.0, 0.0,
@@ -973,11 +977,6 @@ run_tests_for_pipe(data_t *data)
 		},
 		{ .name = "ctm-green-to-red",
 		  .fb_colors = colors_rgb,
-		  .colors = {
-			  { 1.0, 0.0, 0.0 },
-			  { 1.0, 0.0, 0.0 },
-			  { 0.0, 0.0, 1.0 },
-		  },
 		  .ctm = {
 			  1.0, 1.0, 0.0,
 			  0.0, 0.0, 0.0,
@@ -987,11 +986,6 @@ run_tests_for_pipe(data_t *data)
 		},
 		{ .name = "ctm-blue-to-red",
 		  .fb_colors = colors_rgb,
-		  .colors = {
-			  { 1.0, 0.0, 0.0 },
-			  { 0.0, 1.0, 0.0 },
-			  { 1.0, 0.0, 0.0 },
-		  },
 		  .ctm = {
 			  1.0, 0.0, 1.0,
 			  0.0, 1.0, 0.0,
@@ -1001,11 +995,6 @@ run_tests_for_pipe(data_t *data)
 		},
 		{ .name = "ctm-max",
 		  .fb_colors = colors_rgb,
-		  .colors = {
-			  { 1.0, 0.0, 0.0 },
-			  { 0.0, 1.0, 0.0 },
-			  { 0.0, 0.0, 1.0 },
-		  },
 		  .ctm = { 100.0, 0.0, 0.0,
 			  0.0, 100.0, 0.0,
 			  0.0, 0.0, 100.0,
@@ -1014,11 +1003,6 @@ run_tests_for_pipe(data_t *data)
 		},
 		{ .name = "ctm-negative",
 		  .fb_colors = colors_rgb,
-		  .colors = {
-			  { 0.0, 0.0, 0.0 },
-			  { 0.0, 0.0, 0.0 },
-			  { 0.0, 0.0, 0.0 },
-		  },
 		  .ctm = {
 			  -1.0,  0.0,  0.0,
 			   0.0, -1.0,  0.0,
@@ -1075,7 +1059,6 @@ run_tests_for_pipe(data_t *data)
 			for_each_pipe(&data->display, pipe) {
 				run_ctm_tests_for_pipe(data, pipe,
 						       ctm_tests[i].fb_colors,
-						       ctm_tests[i].colors,
 						       ctm_tests[i].ctm,
 						       ctm_tests[i].iter);
 			}
