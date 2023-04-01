@@ -511,6 +511,14 @@ static bool test_pipe_ctm(data_t *data,
 		set_gamma(data, primary->pipe, gamma_linear);
 	}
 
+	igt_debug("color before[0] %f,%f,%f\n", before[0].r, before[0].g, before[0].b);
+	igt_debug("color before[1] %f,%f,%f\n", before[1].r, before[1].g, before[1].b);
+	igt_debug("color before[2] %f,%f,%f\n", before[2].r, before[2].g, before[2].b);
+
+	igt_debug("color after[0] %f,%f,%f\n", after[0].r, after[0].g, after[0].b);
+	igt_debug("color after[1] %f,%f,%f\n", after[1].r, after[1].g, after[1].b);
+	igt_debug("color after[2] %f,%f,%f\n", after[2].r, after[2].g, after[2].b);
+
 	disable_ctm(primary->pipe);
 	igt_display_commit(&data->display);
 
