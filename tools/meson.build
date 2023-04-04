@@ -81,7 +81,7 @@ executable('intel_reg', sources : intel_reg_src,
 	     '-DIGT_DATADIR="@0@"'.format(join_paths(prefix, datadir)),
 	   ])
 
-install_data('intel_gpu_abrt', install_dir : bindir)
+install_data(['intel_gpu_abrt', 'intel-gfx-fw-info'], install_dir : bindir)
 
 install_subdir('registers', install_dir : datadir)
 

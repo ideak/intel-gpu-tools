@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+# pylint: disable=C0301
+# SPDX-License-Identifier: (GPL-2.0 OR MIT)
+#
+# Copyright (C) 2023 Intel Corporation
+
+import argparse
+import logging
+import sys
+import typing
+
+# struct definition below should match the one from i915
+# (drivers/gpu/drm/i915/gt/uc/intel_uc_fw_abi.h) and xe
+# (drivers/gpu/drm/xe/xe_uc_fw_abi.h).
+#
+# For compatibility reasons with dissect.cstruct python module, the following
+# things are changed from the original kernel definition:
+#
+#       1) #define in the middle of the struct removed: comment them out
+#       2) No anonymous union - not compatible with the
+#          dumpstruct(): give it a name
+
+CDEF = """
+typedef uint32 u32;
+
+struct uc_css_header {
+	u32 module_type;
+	/*
+	 * header_size includes all non-uCode bits, including css_header, rsa
+	 * key, modulus key and exponent data.
+	 */
+	u32 header_size_dw;
+	u32 header_version;
+	u32 module_id;
+	u32 module_vendor;
+	u32 date;
+// #define CSS_DATE_DAY				(0xFF << 0)
+// #define CSS_DATE_MONTH			(0xFF << 8)
+// #define CSS_DATE_YEAR			(0xFFFF << 16)
+	u32 size_dw; /* uCode plus header_size_dw */
+	u32 key_size_dw;
+	u32 modulus_size_dw;
+	u32 exponent_size_dw;
+	u32 time;
+// #define CSS_TIME_HOUR			(0xFF << 0)
+// #define CSS_DATE_MIN				(0xFF << 8)
+// #define CSS_DATE_SEC				(0xFFFF << 16)
+	char username[8];
+	char buildnumber[12];
+	u32 sw_version;
+// #define CSS_SW_VERSION_UC_MAJOR		(0xFF << 16)
+// #define CSS_SW_VERSION_UC_MINOR		(0xFF << 8)
+// #define CSS_SW_VERSION_UC_PATCH		(0xFF << 0)
+	u32 vf_version;
+	u32 reserved0[12];
+	union {
+		u32 private_data_size; /* only applies to GuC */
+		u32 reserved1;
+	} rsvd;
+	u32 header_info;
+};
+"""
+
+logging.basicConfig(format="%(levelname)s: %(message)s")
+
+try:
+    from dissect import cstruct
+except:
+    logging.critical(
+        "Could not import dissect.cstruct module. See https://github.com/fox-it/dissect.cstruct for installation options"
+    )
+    raise SystemExit(1)
+
+
+def ffs(x: int) -> int:
+    """Returns the index, counting from 0, of the
+    least significant set bit in `x`.
+    """
+    return (x & -x).bit_length() - 1
+
+
+def FIELD_GET(mask: int, value: int) -> int:
+    return (value & mask) >> ffs(mask)
+
+
+def decode(fw) -> str:
+    data = []
+
+    CSS_SW_VERSION_UC_MAJOR = 0xFF << 16
+    CSS_SW_VERSION_UC_MINOR = 0xFF << 8
+    CSS_SW_VERSION_UC_PATCH = 0xFF
+    major = FIELD_GET(CSS_SW_VERSION_UC_MAJOR, fw.sw_version)
+    minor = FIELD_GET(CSS_SW_VERSION_UC_MINOR, fw.sw_version)
+    patch = FIELD_GET(CSS_SW_VERSION_UC_PATCH, fw.sw_version)
+    data += [f"version: {major}.{minor}.{patch}"]
+
+    CSS_DATE_DAY = 0xFF
+    CSS_DATE_MONTH = 0xFF << 8
+    CSS_DATE_YEAR = 0xFFFF << 16
+    day = FIELD_GET(CSS_DATE_DAY, fw.date)
+    month = FIELD_GET(CSS_DATE_MONTH, fw.date)
+    year = FIELD_GET(CSS_DATE_YEAR, fw.date)
+    data += [f"date: {year:02x}-{month:02x}-{day:02x}"]
+
+    return data
+
+
+def parse_args(argv: typing.List[str]) -> argparse.Namespace:
+    description = "Dump GuC/HuC firmware header"
+    parser = argparse.ArgumentParser(prog="intel-gfx-fw-info", description=description)
+
+    parser.add_argument("filename", help="GuC/HuC firmware file")
+
+    return parser.parse_args(argv)
+
+
+def main(argv: typing.List[str]) -> int:
+    args = parse_args(argv)
+
+    cparser = cstruct.cstruct()
+    cparser.load(CDEF)
+
+    try:
+        with open(args.filename, mode="rb") as f:
+            fw = cparser.uc_css_header(f)
+    except FileNotFoundError as e:
+        logging.fatal(e)
+        return 1
+
+    print(*decode(fw), sep="\n")
+    print("raw dump:", end="")
+    cstruct.dumpstruct(fw, color=sys.stdout.isatty())
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
