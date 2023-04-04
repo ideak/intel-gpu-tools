@@ -33,15 +33,6 @@
 #define OFFSET_INDIRECT_DATA_START	0xFFFDF000
 #define OFFSET_KERNEL			0xFFFEF000
 
-#undef MEDIA_VFE_STATE
-#define MEDIA_VFE_STATE			0x70000007
-#undef STATE_BASE_ADDRESS
-#define STATE_BASE_ADDRESS		0x61010014
-#undef MEDIA_INTERFACE_DESCRIPTOR_LOAD
-#define MEDIA_INTERFACE_DESCRIPTOR_LOAD	0x70020002
-#undef GPGPU_WALKER
-#define GPGPU_WALKER			0x7105000d
-
 struct bo_dict_entry {
 	uint64_t addr;
 	uint32_t size;
@@ -301,7 +292,7 @@ static void tgllp_compute_exec_compute(uint32_t *addr_bo_buffer_batch,
 	addr_bo_buffer_batch[b++] = 0x00000000;
 	addr_bo_buffer_batch[b++] = 0x00000000;
 	addr_bo_buffer_batch[b++] = 0x00000000;
-	addr_bo_buffer_batch[b++] = MEDIA_VFE_STATE;
+	addr_bo_buffer_batch[b++] = MEDIA_VFE_STATE | (9 - 2);
 	addr_bo_buffer_batch[b++] = 0x00000000;
 	addr_bo_buffer_batch[b++] = 0x00000000;
 	addr_bo_buffer_batch[b++] = 0x00A70100;
@@ -316,7 +307,7 @@ static void tgllp_compute_exec_compute(uint32_t *addr_bo_buffer_batch,
 	addr_bo_buffer_batch[b++] = 0x00000000;
 	addr_bo_buffer_batch[b++] = 0x00000000;
 	addr_bo_buffer_batch[b++] = 0x00000000;
-	addr_bo_buffer_batch[b++] = STATE_BASE_ADDRESS;
+	addr_bo_buffer_batch[b++] = STATE_BASE_ADDRESS | (16 - 2);
 	addr_bo_buffer_batch[b++] = 0x00000001;
 	addr_bo_buffer_batch[b++] = 0x00000000;
 	addr_bo_buffer_batch[b++] = 0x00040000;
@@ -352,11 +343,11 @@ static void tgllp_compute_exec_compute(uint32_t *addr_bo_buffer_batch,
 	addr_bo_buffer_batch[b++] = 0x00000000;
 	addr_bo_buffer_batch[b++] = MEDIA_STATE_FLUSH;
 	addr_bo_buffer_batch[b++] = 0x00000000;
-	addr_bo_buffer_batch[b++] = MEDIA_INTERFACE_DESCRIPTOR_LOAD;
+	addr_bo_buffer_batch[b++] = MEDIA_INTERFACE_DESCRIPTOR_LOAD | (4 - 2);
 	addr_bo_buffer_batch[b++] = 0x00000000;
 	addr_bo_buffer_batch[b++] = 0x00000020;
 	addr_bo_buffer_batch[b++] = 0x00000000;
-	addr_bo_buffer_batch[b++] = GPGPU_WALKER;
+	addr_bo_buffer_batch[b++] = GPGPU_WALKER | 13;
 	addr_bo_buffer_batch[b++] = 0x00000000;
 	addr_bo_buffer_batch[b++] = 0x00000c80;
 	addr_bo_buffer_batch[b++] = offset_indirect_data_start;
