@@ -45,6 +45,7 @@
 #define PWR_DOMAIN_INFO "i915_power_domain_info"
 #define RPM_STATUS "i915_runtime_pm_status"
 #define KMS_HELPER "/sys/module/drm_kms_helper/parameters/"
+#define PACKAGE_CSTATE_PATH  "pmc_core/package_cstate_show"
 #define KMS_POLL_DISABLE 0
 #define DC9_RESETS_DC_COUNTERS(devid) (!(IS_DG1(devid) || IS_DG2(devid)))
 
@@ -60,6 +61,7 @@ typedef struct {
 	int drm_fd;
 	int msr_fd;
 	int debugfs_fd;
+	int debugfs_root_fd;
 	uint32_t devid;
 	char *debugfs_dump;
 	igt_display_t display;
@@ -519,6 +521,36 @@ static int has_panels_without_dc_support(igt_display_t *display)
 	return external_panel;
 }
 
+static unsigned int read_pkgc_counter(int debugfs_root_fd)
+{
+	char buf[4096];
+	char *str;
+	int len;
+
+	len = igt_sysfs_read(debugfs_root_fd, PACKAGE_CSTATE_PATH, buf, sizeof(buf) - 1);
+	igt_skip_on_f(len < 0, "PKGC state file not found\n");
+	buf[len] = '\0';
+	str = strstr(buf, "Package C10");
+	igt_skip_on_f(!str, "PKGC10 is not supported.\n");
+
+	return get_dc_counter(str);
+}
+
+static void test_pkgc_state_dpms(data_t *data)
+{
+	unsigned int timeout_sec = 6;
+	unsigned int prev_value = 0, cur_value = 0;
+
+	prev_value = read_pkgc_counter(data->debugfs_root_fd);
+	setup_dc_dpms(data);
+	dpms_off(data);
+	igt_wait((cur_value = read_pkgc_counter(data->debugfs_root_fd)) > prev_value,
+		  timeout_sec * 1000, 100);
+	igt_assert_f(cur_value > prev_value, "PKGC10 is not achieved.\n");
+	dpms_on(data);
+	cleanup_dc_dpms(data);
+}
+
 static void kms_poll_state_restore(int sig)
 {
 	int sysfs_fd;
@@ -538,6 +570,8 @@ igt_main
 		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
 		data.debugfs_fd = igt_debugfs_dir(data.drm_fd);
 		igt_require(data.debugfs_fd != -1);
+		data.debugfs_root_fd = open(igt_debugfs_mount(), O_RDONLY);
+		igt_require(data.debugfs_root_fd != -1);
 		kmstest_set_vt_graphics_mode();
 		data.devid = intel_get_drm_devid(data.drm_fd);
 		igt_pm_enable_sata_link_power_management();
@@ -600,7 +634,11 @@ igt_main
 	igt_subtest("dc6-dpms") {
 		igt_require_f(igt_pm_pc8_plus_residencies_enabled(data.msr_fd),
 			      "PC8+ residencies not supported\n");
-		test_dc_state_dpms(&data, CHECK_DC6);
+		if (intel_display_ver(data.devid) >= 14)
+			test_pkgc_state_dpms(&data);
+		else
+			test_dc_state_dpms(&data, CHECK_DC6);
+
 	}
 
 	igt_describe("This test validates display engine entry to DC9 state");
@@ -614,6 +652,7 @@ igt_main
 	igt_fixture {
 		free(data.debugfs_dump);
 		close(data.debugfs_fd);
+		close(data.debugfs_root_fd);
 		close(data.msr_fd);
 		display_fini(&data);
 		close(data.drm_fd);
