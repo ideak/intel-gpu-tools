@@ -48,6 +48,7 @@
 #include "i915/gem_create.h"
 #include "igt.h"
 #include "igt_types.h"
+#include "i915/i915_blt.h"
 
 IGT_TEST_DESCRIPTION("Test doing many blits with a working set larger than the"
 		     " aperture size.");
@@ -67,6 +68,7 @@ static void copy(int fd, uint64_t ahnd, uint32_t dst, uint32_t src,
 	struct drm_i915_gem_relocation_entry reloc[2];
 	struct drm_i915_gem_exec_object2 obj[3];
 	struct drm_i915_gem_execbuffer2 exec;
+	static uint32_t devid;
 	int i = 0;
 
 	memset(obj, 0, sizeof(obj));
@@ -83,29 +85,48 @@ static void copy(int fd, uint64_t ahnd, uint32_t dst, uint32_t src,
 	obj[2].offset = CANONICAL(obj[2].offset);
 	obj[2].flags = EXEC_OBJECT_SUPPORTS_48B_ADDRESS;
 
-	batch[i++] = XY_SRC_COPY_BLT_CMD |
-		  XY_SRC_COPY_BLT_WRITE_ALPHA |
-		  XY_SRC_COPY_BLT_WRITE_RGB;
-	if (intel_gen(intel_get_drm_devid(fd)) >= 8)
-		batch[i - 1] |= 8;
-	else
-		batch[i - 1] |= 6;
+	devid = intel_get_drm_devid(fd);
 
-	batch[i++] = (3 << 24) | /* 32 bits */
-		  (0xcc << 16) | /* copy ROP */
-		  WIDTH*4;
-	batch[i++] = 0; /* dst x1,y1 */
-	batch[i++] = (HEIGHT << 16) | WIDTH; /* dst x2,y2 */
-	batch[i++] = obj[0].offset;
-	if (intel_gen(intel_get_drm_devid(fd)) >= 8)
-		batch[i++] = obj[0].offset >> 32;
-	batch[i++] = 0; /* src x1,y1 */
-	batch[i++] = WIDTH*4;
-	batch[i++] = obj[1].offset;
-	if (intel_gen(intel_get_drm_devid(fd)) >= 8)
-		batch[i++] = obj[1].offset >> 32;
-	batch[i++] = MI_BATCH_BUFFER_END;
-	batch[i++] = MI_NOOP;
+	if (blt_has_xy_src_copy(fd)) {
+		batch[i++] = XY_SRC_COPY_BLT_CMD |
+			     XY_SRC_COPY_BLT_WRITE_ALPHA |
+			     XY_SRC_COPY_BLT_WRITE_RGB;
+		if (intel_gen(intel_get_drm_devid(fd)) >= 8)
+			batch[i - 1] |= 8;
+		else
+			batch[i - 1] |= 6;
+
+		batch[i++] = (3 << 24) | /* 32 bits */
+			  (0xcc << 16) | /* copy ROP */
+			  WIDTH * 4;
+		batch[i++] = 0; /* dst x1,y1 */
+		batch[i++] = (HEIGHT << 16) | WIDTH; /* dst x2,y2 */
+		batch[i++] = obj[0].offset;
+		if (intel_gen(devid) >= 8)
+			batch[i++] = obj[0].offset >> 32;
+		batch[i++] = 0; /* src x1,y1 */
+		batch[i++] = WIDTH * 4;
+		batch[i++] = obj[1].offset;
+		if (intel_gen(devid) >= 8)
+			batch[i++] = obj[1].offset >> 32;
+		batch[i++] = MI_BATCH_BUFFER_END;
+		batch[i++] = MI_NOOP;
+	} else if (blt_has_fast_copy(fd)) {
+		batch[i++] = XY_FAST_COPY_BLT;
+		batch[i++] = XY_FAST_COPY_COLOR_DEPTH_32 | WIDTH * 4;
+		batch[i++] = 0; /* dst x1,y1 */
+		batch[i++] = (HEIGHT << 16) | WIDTH; /* dst x2,y2 */
+		batch[i++] = obj[0].offset; /* dst address lower bits */
+		batch[i++] = obj[0].offset >> 32; /* dst address upper bits */
+		batch[i++] = 0; /* src x1,y1 */
+		batch[i++] = WIDTH * 4; /* src pitch */
+		batch[i++] = obj[1].offset; /* src address lower bits */
+		batch[i++] = obj[1].offset >> 32; /* src address upper bits */
+		batch[i++] = MI_BATCH_BUFFER_END;
+		batch[i++] = MI_NOOP;
+	} else {
+		igt_assert_f(0, "No supported blit command found\n");
+	}
 
 	gem_write(fd, obj[2].handle, 0, batch, i * sizeof(batch[0]));
 
