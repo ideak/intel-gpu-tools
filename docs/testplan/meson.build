@@ -10,10 +10,14 @@ xe_test_config = join_paths(source_root, 'tests', 'xe', 'xe_test_config.json')
 
 check_testlist = []
 if build_tests
-	# Check if documentation matches the actual tests
-	check_testlist = [ '--check-testlist', '--igt-build-path', build_root ]
+	doc_dependencies = test_executables
+	if jsonc.found()
+		# Check if documentation matches the actual tests
+		check_testlist = [ '--check-testlist', '--igt-build-path', build_root ]
+		doc_dependencies += runner
+	endif
 else
-	test_executables = []
+	doc_dependencies = []
 endif
 
 test_dict = { 'xe_tests':
@@ -24,7 +28,7 @@ foreach testplan, fields: test_dict
 	rst = custom_target(testplan + '.rst',
 			    build_by_default : true,
 			    command : [ igt_doc_script, '--config', '@INPUT@', '--rest', '@OUTPUT@' ] + fields['extra_args'],
-			    depends : test_executables,
+			    depends : doc_dependencies,
 			    input : fields['input'],
 			    output : testplan + '.rst'
 			   )
