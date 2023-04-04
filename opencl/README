@@ -1,0 +1,30 @@
+This directory contains some OpenCL compute files, and a script to be used
+to produce a header file containing the binaries for the CL against
+multiple platforms.
+
+For instance, to generate compute square Kernel binaries for TGL and ADL
+variants, use this:
+
+    opencl/gen_opencl_kernel xe_compute_square opencl/compute_square_kernel.cl \
+	   xe_compute_square_kernels.c build/opencl tgllp adl-s adl-p adl-n
+
+    cp build/opencl/xe_compute_square_kernels.c lib/xe/
+
+The opencl/gen_opencl_kernel requires the Intel compute runtime[1].
+
+[1] https://github.com/intel/compute-runtime
+
+This is usually shipped with different names on different distributions.
+The above command generate Kernels for both TGL and ADL platforms.
+Modern packages for Ubuntu are provided at github, under releases
+tag.
+
+Please notice that the GPU platforms supported by Intel ICD tools depend
+on its version. In order to know what's supported, you can run:
+
+	$ ocloc compile --help 2>&1|grep -A1 'Target device.'
+	  -device <device_type>         Target device.
+                  <device_type> can be: bdw, skl, kbl, cfl, apl, bxt, glk, whl, aml, cml, icllp, lkf, ehl, jsl, tgllp, rkl, adl-s, adl-p, adl-n, dg1, acm-g10, ats-m150, dg2-g10, acm-g11, ats-m75, dg2-g11, acm-g12, dg2-g12, pvc-sdv, pvc, gen11, gen12lp, gen8, gen9, xe, xe-hp, xe-hpc, xe-hpg, version  or hexadecimal value with 0x prefix
+
+The above results are for Intel ICD version 22.43.24558, which supports
+both TGL and ADL platforms, plus other newer GPU models.

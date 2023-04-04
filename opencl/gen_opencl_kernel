@@ -1,0 +1,103 @@
+#!/bin/bash
+
+trap 'catch $LINENO' ERR
+
+catch() {
+    echo "error in line $1"
+    exit 1
+}
+
+
+# Parse arguments
+if [ $# -lt 5 ]; then
+        echo -e 'Usage:\n\t$0: <Kernel name> <kernel.cl> <header name> <dest_dir> <GPU models>' >&2
+        echo -e "Example:\n\t$0 kernel_foo kernel.cl kernels.c ../build/opencl tgllp rkl\n" >&2
+        exit 1
+fi
+
+if [ "$(xxd --help 2>&1|grep '\-n')" == "" ]; then
+	# Old versions have its own criteria to generate names.
+	# In this specific case, names will be like:
+	# "build_opencl_${GPU_DEVICE}_${kernel_name}_bin"
+	# Not fancy but it works.
+	USE_NAME_PARM=
+else
+	# Remove bloatware from the names, calling Kernels as:
+	# "${GPU_DEVICE}_${kernel_name}"
+	USE_NAME_PARM=1
+fi
+
+
+kernel_name=$1
+shift
+
+kernel_cl=$1
+shift
+
+output_fname=$1
+shift
+
+dest_dir=$1
+shift
+
+mkdir -p $dest_dir
+
+args=( "$@" )
+
+echo $args
+
+out_files=""
+for i in "${args[@]}"; do
+	name="$dest_dir/${i}_${kernel_name}"
+	out="$name.h"
+        echo "Generating $out"
+	ocloc compile -q -file ${kernel_cl} -device ${i} -output ${name}_bin -output_no_suffix
+	if  [ "$USE_NAME_PARM" != "" ]; then
+		xxd -n "${i}_${kernel_name}" -i ${name}_bin >$out
+	else
+		xxd -i ${name}_bin >$out
+	fi
+	sed "s,  ,\t,;s,.*unsigned int.*,,;s,\-,_,g;s,unsigned,static const unsigned," -i $out
+	sed "1 i// Match ID: $(ocloc ids $i|grep -v "Matched ids:")" -i $out
+	out_files+=" $out"
+done
+
+output_fname="$dest_dir/$output_fname"
+echo "Generating $output_fname"
+
+cat << PREFIX >$output_fname
+/* SPDX-License-Identifier: MIT */
+/*
+ * This file is auto-generated from $kernel_cl:
+ *
+PREFIX
+
+cat $kernel_cl |sed s,"^"," * ," >>$output_fname
+
+cat << INCLUDES >>$output_fname
+ */
+
+#include "intel_chipset.h"
+#include "lib/xe/xe_compute.h"
+
+INCLUDES
+
+cat $out_files >>$output_fname
+
+echo "const struct xe_compute_kernels ${kernel_name}_kernels[] = {" >>$output_fname
+
+for i in "${args[@]}"; do
+        out="$dest_dir/${i}_${kernel_name}.h"
+        echo -e "\t{" >>$output_fname; \
+	grep "Match ID:" $out|sed -E "s/.*\s([0-9]+)\.([0-9]+).*/\t\t.ip_ver = IP_VER(\1, \2),/" >>$output_fname;
+	grep unsigned $out|sed -E "s/.*\s+([_a-zA-Z0-9]+)\[\].*/\t\t.size = sizeof(\1),/" >>$output_fname;
+	grep unsigned $out|sed -E "s/.*\s+([_a-zA-Z0-9]+)\[\].*/\t\t.kernel = \1,/" >>$output_fname;
+	echo -e "\t}," >>$output_fname;
+done
+
+cat << SUFFIX >>$output_fname
+	{}
+};
+SUFFIX
+
+echo "Done."
