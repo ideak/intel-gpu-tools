@@ -32,8 +32,8 @@ parser.add_argument("--show-subtests", action="store_true",
                     help="Shows the name of the documented subtests in alphabetical order.")
 parser.add_argument("--sort-field",
                     help="modify --show-subtests to sort output based on SORT_FIELD value")
-parser.add_argument("--filter-field",
-                    help="modify --show-subtests to filter output based a regex given by FILTER_FIELD=~'regex'")
+parser.add_argument("--filter-field", nargs='*',
+                    help="filter subtests based on regular expressions given by FILTER_FIELD=~'regex'")
 parser.add_argument("--check-testlist", action="store_true",
                     help="Compare documentation against IGT built tests.")
 parser.add_argument("--include-plan", action="store_true",
@@ -51,10 +51,14 @@ parse_args = parser.parse_args()
 tests = TestList(parse_args.config, parse_args.include_plan, parse_args.files,
                  parse_args.igt_build_path)
 
+if parse_args.filter_field:
+    for filter_expr in parse_args.filter_field:
+        tests.add_filter(filter_expr)
+
 RUN = 0
 if parse_args.show_subtests:
     RUN = 1
-    tests.show_subtests(parse_args.sort_field, parse_args.filter_field)
+    tests.show_subtests(parse_args.sort_field)
 
 if parse_args.check_testlist:
     RUN = 1
@@ -64,7 +68,7 @@ if parse_args.gen_testlist:
     RUN = 1
     if not parse_args.sort_field:
         sys.exit("Need a field to split the testlists")
-    tests.gen_testlist(parse_args.gen_testlist, parse_args.sort_field, parse_args.filter_field)
+    tests.gen_testlist(parse_args.gen_testlist, parse_args.sort_field)
 
 if parse_args.to_json:
     RUN = 1

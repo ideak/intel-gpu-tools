@@ -257,6 +257,7 @@ class TestList:
         self.level_count = 0
         self.field_list = {}
         self.title = None
+        self.filters = {}
 
         driver_name = re.sub(r'(.*/)?([^\/]+)/.*', r'\2', config_fname).capitalize()
 
@@ -383,6 +384,23 @@ class TestList:
                 self.level_count += 1
 
             self.__add_field(key, sublevel, hierarchy_level, field[key])
+
+    def __filter_subtest(self, test, subtest, field_not_found_value):
+
+        """ Apply filter criteria to subtests """
+
+        for filter_field, regex in self.filters.items():
+            if filter_field in subtest:
+                if not re.match(regex, subtest[filter_field]):
+                    return True
+            elif filter_field in test:
+                if not re.match(regex, test[filter_field]):
+                    return True
+            else:
+                return field_not_found_value
+
+        # None of the filtering rules were applied
+        return False
 
     def expand_subtest(self, fname, test_name, test, allow_inherit):
 
@@ -532,6 +550,9 @@ class TestList:
 
             subtest_array = self.expand_subtest(fname, name, test, subtest_only)
             for subtest in subtest_array:
+                if self.__filter_subtest(test, subtest, True):
+                    continue
+
                 summary = subtest["Summary"]
 
                 dic[summary] = {}
@@ -570,6 +591,19 @@ class TestList:
             name = re.sub(r'\.[ch]', '', name)
             name = "igt@" + name
 
+            tmp_subtest = self.expand_subtest(fname, name, test, False)
+
+            # Get subtests first, to avoid displaying tests with
+            # all filtered subtests
+            subtest_array = []
+            for subtest in tmp_subtest:
+                if self.__filter_subtest(self.doc[test], subtest, True):
+                    continue
+                subtest_array.append(subtest)
+
+            if not subtest_array:
+                continue
+
             print(len(name) * '=')
             print(name)
             print(len(name) * '=')
@@ -583,9 +617,8 @@ class TestList:
 
                 print(f":{field}: {self.doc[test][field]}")
 
-            subtest_array = self.expand_subtest(fname, name, test, False)
-
             for subtest in subtest_array:
+
                 print()
                 print(subtest["Summary"])
                 print(len(subtest["Summary"]) * '=')
@@ -709,10 +742,27 @@ class TestList:
             json.dump(test_dict, write_file, indent = 4)
 
     #
+    # Add filters
+    #
+    def add_filter(self, filter_field_expr):
+
+        """ Add a filter criteria for output data """
+
+        match = re.match(r"(.*)=~\s*(.*)", filter_field_expr)
+        if not match:
+            sys.exit(f"Filter field {filter_field_expr} is not at <field> =~ <regex> syntax")
+        field = match.group(1).strip().lower()
+        if field not in self.field_list:
+            sys.exit(f"Field '{field}' is not defined")
+        filter_field = self.field_list[field]
+        regex = re.compile("{0}".format(match.group(2).strip()), re.I) # pylint: disable=C0209
+        self.filters[filter_field] = regex
+
+    #
     # Subtest list methods
     #
 
-    def get_subtests(self, sort_field = None, filter_field_expr = None):
+    def get_subtests(self, sort_field = None):
 
         """Return an array with all subtests"""
 
@@ -724,17 +774,6 @@ class TestList:
                 sys.exit(f"Field '{sort_field}' is not defined")
             sort_field = self.field_list[sort_field.lower()]
 
-        if filter_field_expr:
-            match = re.match(r"(.*)=~\s*(.*)", filter_field_expr)
-            if not match:
-                sys.exit(f"Filter field {filter_field_expr} is not at <field> =~ <regex> syntax")
-
-            field = match.group(1).strip().lower()
-            if field not in self.field_list:
-                sys.exit(f"Field '{field}' is not defined")
-            filter_field = self.field_list[field]
-            regex = re.compile("{0}".format(match.group(2).strip()), re.I) # pylint: disable=C0209
-
         for test in sorted(self.doc.keys()):
             fname = self.doc[test]["File"]
 
@@ -745,11 +784,8 @@ class TestList:
             subtest_array = self.expand_subtest(fname, test_name, test, True)
 
             for subtest in subtest_array:
-                if filter_field_expr:
-                    if filter_field not in subtest:
-                        continue
-                    if not re.match(regex, subtest[filter_field]):
-                        continue
+                if self.__filter_subtest(test, subtest, True):
+                    continue
 
                 if sort_field:
                     if sort_field in subtest:
@@ -806,6 +842,9 @@ class TestList:
 
         if not self.igt_build_path:
             sys.exit("Need the IGT build path")
+
+        if self.filters:
+            print("NOTE: test checks are affected by filters")
 
         doc_subtests = sorted(self.get_subtests()[""])
 
@@ -1067,12 +1106,12 @@ class TestList:
                 sys.exit(f"{fname}:{file_ln + 1}: Error: unrecognized line. Need to add field at %s?\n\t==> %s" %
                          (self.config_fname, file_line))
 
-    def show_subtests(self, sort_field, filter_field):
+    def show_subtests(self, sort_field):
 
         """Show subtests, allowing sort and filter a field """
 
         if sort_field:
-            test_subtests = self.get_subtests(sort_field, filter_field)
+            test_subtests = self.get_subtests(sort_field)
             for val_key in sorted(test_subtests.keys()):
                 if not test_subtests[val_key]:
                     continue
@@ -1083,17 +1122,17 @@ class TestList:
                     for sub in test_subtests[val_key]:
                         print (f"  {sub}")
         else:
-            for sub in self.get_subtests(sort_field, filter_field)[""]:
+            for sub in self.get_subtests(sort_field)[""]:
                 print (sub)
 
-    def gen_testlist(self, directory, sort_field, filter_field):
+    def gen_testlist(self, directory, sort_field):
 
         """Generate testlists from the test documentation"""
 
         test_prefix = os.path.commonprefix(self.get_subtests()[""])
         test_prefix = re.sub(r'^igt@', '', test_prefix)
 
-        test_subtests = self.get_subtests(sort_field, filter_field)
+        test_subtests = self.get_subtests(sort_field)
 
         for test in test_subtests.keys():  # pylint: disable=C0201,C0206
             if not test_subtests[test]:
