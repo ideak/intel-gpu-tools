@@ -66,6 +66,7 @@ igt_main
 	int i915;
 
 	igt_fixture {
+		igt_skip_on_simulation();
 		i915 = drm_open_driver_master(DRIVER_INTEL);
 	}
 
