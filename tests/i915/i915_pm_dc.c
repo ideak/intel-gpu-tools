@@ -345,6 +345,20 @@ static void test_dc3co_vpb_simulation(data_t *data)
 	cleanup_dc3co_fbs(data);
 }
 
+static void psr_dpms(data_t *data, int mode)
+{
+	igt_output_t *output;
+
+	for_each_connected_output(&data->display, output) {
+		drmModeConnectorPtr connector = output->config.connector;
+
+		if (connector->connector_type == DRM_MODE_CONNECTOR_eDP)
+			continue;
+
+		kmstest_set_connector_dpms(data->drm_fd, connector, mode);
+	}
+}
+
 static void test_dc_state_psr(data_t *data, int dc_flag)
 {
 	uint32_t dc_counter_before_psr;
@@ -551,6 +565,23 @@ static void test_pkgc_state_dpms(data_t *data)
 	cleanup_dc_dpms(data);
 }
 
+static void test_pkgc_state_psr(data_t *data)
+{
+	unsigned int timeout_sec = 6;
+	unsigned int prev_value = 0, cur_value = 0;
+
+	prev_value = read_pkgc_counter(data->debugfs_root_fd);
+	setup_output(data);
+	setup_primary(data);
+	igt_assert(psr_wait_entry(data->debugfs_fd, data->op_psr_mode));
+	psr_dpms(data, DRM_MODE_DPMS_OFF);
+	igt_wait((cur_value = read_pkgc_counter(data->debugfs_root_fd)) > prev_value,
+		  timeout_sec * 1000, 100);
+	igt_assert_f(cur_value > prev_value, "PKGC10 is not achieved.\n");
+	psr_dpms(data, DRM_MODE_DPMS_ON);
+	cleanup_dc_psr(data);
+}
+
 static void kms_poll_state_restore(int sig)
 {
 	int sysfs_fd;
@@ -611,7 +642,10 @@ igt_main
 		psr_enable(data.drm_fd, data.debugfs_fd, data.op_psr_mode);
 		igt_require_f(igt_pm_pc8_plus_residencies_enabled(data.msr_fd),
 			      "PC8+ residencies not supported\n");
-		test_dc_state_psr(&data, CHECK_DC6);
+		if (intel_display_ver(data.devid) >= 14)
+			test_pkgc_state_psr(&data);
+		else
+			test_dc_state_psr(&data, CHECK_DC6);
 	}
 
 	igt_describe("This test validates display engine entry to DC5 state "
