@@ -2409,11 +2409,16 @@ uint32_t intel_bb_copy_data(struct intel_bb *ibb,
  */
 void intel_bb_blit_start(struct intel_bb *ibb, uint32_t flags)
 {
-	intel_bb_out(ibb, XY_SRC_COPY_BLT_CMD |
-		     XY_SRC_COPY_BLT_WRITE_ALPHA |
-		     XY_SRC_COPY_BLT_WRITE_RGB |
-		     flags |
-		     (6 + 2 * (ibb->gen >= 8)));
+	if (blt_has_xy_src_copy(ibb->i915))
+		intel_bb_out(ibb, XY_SRC_COPY_BLT_CMD |
+			     XY_SRC_COPY_BLT_WRITE_ALPHA |
+			     XY_SRC_COPY_BLT_WRITE_RGB |
+			     flags |
+			     (6 + 2 * (ibb->gen >= 8)));
+	else if (blt_has_fast_copy(ibb->i915))
+		intel_bb_out(ibb, XY_FAST_COPY_BLT | flags);
+	else
+		igt_assert_f(0, "No supported blit command found\n");
 }
 
 /*
@@ -2451,12 +2456,20 @@ void intel_bb_emit_blt_copy(struct intel_bb *ibb,
 
 	if (gen >= 4 && src->tiling != I915_TILING_NONE) {
 		src_pitch /= 4;
-		cmd_bits |= XY_SRC_COPY_BLT_SRC_TILED;
+		if (blt_has_xy_src_copy(ibb->i915))
+			cmd_bits |= XY_SRC_COPY_BLT_SRC_TILED;
+		else if (blt_has_fast_copy(ibb->i915))
+			cmd_bits |= fast_copy_dword0(src->tiling, dst->tiling);
+		else
+			igt_assert_f(0, "No supported blit command found\n");
 	}
 
 	if (gen >= 4 && dst->tiling != I915_TILING_NONE) {
 		dst_pitch /= 4;
-		cmd_bits |= XY_SRC_COPY_BLT_DST_TILED;
+		if (blt_has_xy_src_copy(ibb->i915))
+			cmd_bits |= XY_SRC_COPY_BLT_DST_TILED;
+		else
+			cmd_bits |= fast_copy_dword0(src->tiling, dst->tiling);
 	}
 
 	CHECK_RANGE(src_x1); CHECK_RANGE(src_y1);
@@ -2467,19 +2480,23 @@ void intel_bb_emit_blt_copy(struct intel_bb *ibb,
 	CHECK_RANGE(src_pitch); CHECK_RANGE(dst_pitch);
 
 	br13_bits = 0;
-	switch (bpp) {
-	case 8:
-		break;
-	case 16:		/* supporting only RGB565, not ARGB1555 */
-		br13_bits |= 1 << 24;
-		break;
-	case 32:
-		br13_bits |= 3 << 24;
-		cmd_bits |= (XY_SRC_COPY_BLT_WRITE_ALPHA |
-			     XY_SRC_COPY_BLT_WRITE_RGB);
-		break;
-	default:
-		igt_fail(IGT_EXIT_FAILURE);
+	if (blt_has_xy_src_copy(ibb->i915)) {
+		switch (bpp) {
+		case 8:
+			break;
+		case 16:		/* supporting only RGB565, not ARGB1555 */
+			br13_bits |= 1 << 24;
+			break;
+		case 32:
+			br13_bits |= 3 << 24;
+			cmd_bits |= (XY_SRC_COPY_BLT_WRITE_ALPHA |
+				     XY_SRC_COPY_BLT_WRITE_RGB);
+			break;
+		default:
+			igt_fail(IGT_EXIT_FAILURE);
+		}
+	} else {
+		br13_bits = fast_copy_dword1(ibb->i915, src->tiling, dst->tiling, bpp);
 	}
 
 	if ((src->tiling | dst->tiling) >= I915_TILING_Y) {
