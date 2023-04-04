@@ -99,6 +99,7 @@ lib_sources = [
 	'igt_msm.c',
 	'igt_dsc.c',
 	'xe/xe_compute.c',
+	'xe/xe_compute_square_kernels.c',
 	'xe/xe_ioctl.c',
 	'xe/xe_query.c',
 	'xe/xe_spin.c'

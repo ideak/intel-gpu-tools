@@ -9,21 +9,24 @@
 #ifndef XE_COMPUTE_H
 #define XE_COMPUTE_H
 
-#include <stdint.h>
+/*
+ * OpenCL Kernels are generated using:
+ *
+ * GPU=tgllp &&                                                         \
+ *      ocloc -file opencl/compute_square_kernel.cl -device $GPU &&     \
+ *      xxd -i compute_square_kernel_Gen12LPlp.bin
+ *
+ * For each GPU model desired. A list of supported models can be obtained with: ocloc compile --help
+ */
 
-void tgllp_create_indirect_data(uint32_t *addr_bo_buffer_batch,
-				uint64_t addr_input, uint64_t addr_output);
-void tgllp_create_surface_state(uint32_t *addr_bo_buffer_batch,
-				uint64_t addr_input, uint64_t addr_output);
-void tgllp_create_dynamic_state(uint32_t *addr_bo_buffer_batch,
-				uint64_t offset_kernel);
-void tgllp_create_batch_compute(uint32_t *addr_bo_buffer_batch,
-				uint64_t addr_surface_state_base,
-				uint64_t addr_dynamic_state_base,
-				uint64_t addr_indirect_object_base,
-				uint64_t offset_indirect_data_start);
+struct xe_compute_kernels {
+	int ip_ver;
+	unsigned int size;
+	const unsigned char *kernel;
+};
 
-extern unsigned char tgllp_kernel_square_bin[];
-extern unsigned int tgllp_kernel_square_length;
+extern const struct xe_compute_kernels xe_compute_square_kernels[];
+
+bool run_xe_compute_kernel(int fd);
 
 #endif	/* XE_COMPUTE_H */
