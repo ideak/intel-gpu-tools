@@ -83,6 +83,11 @@ typedef struct {
 	cursorarea oldcursorarea[MAXCURSORBUFFER];
 } data_t;
 
+static bool extended;
+static enum pipe active_pipes[IGT_MAX_PIPES];
+static uint32_t last_pipe;
+
+
 #define TEST_DPMS (1<<0)
 #define TEST_SUSPEND (1<<1)
 
@@ -716,6 +721,17 @@ static bool valid_pipe_output_combo(data_t *data)
 	return ret;
 }
 
+static bool execution_constraint(enum pipe pipe)
+{
+	if (!extended &&
+	    pipe != active_pipes[0] &&
+	    pipe != active_pipes[last_pipe])
+		return true;
+
+	return false;
+}
+
+
 static void run_size_tests(data_t *data, int w, int h)
 {
 	enum pipe pipe;
@@ -766,6 +782,9 @@ static void run_size_tests(data_t *data, int w, int h)
 			}
 
 			for_each_pipe_with_single_output(&data->display, pipe, data->output) {
+				if (execution_constraint(pipe))
+					continue;
+
 				data->pipe = pipe;
 
 				if (!valid_pipe_output_combo(data))
@@ -802,6 +821,9 @@ static void run_tests_on_pipe(data_t *data)
 		     "correctly.");
 	igt_subtest_with_dynamic("cursor-size-change") {
 		for_each_pipe_with_single_output(&data->display, pipe, data->output) {
+			if (execution_constraint(pipe))
+				continue;
+
 			data->pipe = pipe;
 
 			if (!valid_pipe_output_combo(data))
@@ -819,6 +841,9 @@ static void run_tests_on_pipe(data_t *data)
 		     "plane, i.e., alpha channel equal to 1.0.");
 	igt_subtest_with_dynamic("cursor-alpha-opaque") {
 		for_each_pipe_with_single_output(&data->display, pipe, data->output) {
+			if (execution_constraint(pipe))
+				continue;
+
 			data->pipe = pipe;
 
 			if (!valid_pipe_output_combo(data))
@@ -836,6 +861,9 @@ static void run_tests_on_pipe(data_t *data)
 		     "plane, i.e., alpha channel equal to 0.0.");
 	igt_subtest_with_dynamic("cursor-alpha-transparent") {
 		for_each_pipe_with_single_output(&data->display, pipe, data->output) {
+			if (execution_constraint(pipe))
+				continue;
+
 			data->pipe = pipe;
 
 			if (!valid_pipe_output_combo(data))
@@ -856,6 +884,9 @@ static void run_tests_on_pipe(data_t *data)
 	igt_describe("Check random placement of a cursor with DPMS.");
 	igt_subtest_with_dynamic("cursor-dpms") {
 		for_each_pipe_with_single_output(&data->display, pipe, data->output) {
+			if (execution_constraint(pipe))
+				continue;
+
 			data->pipe = pipe;
 			data->flags = TEST_DPMS;
 
@@ -874,6 +905,9 @@ static void run_tests_on_pipe(data_t *data)
 	igt_describe("Check random placement of a cursor with suspend.");
 	igt_subtest_with_dynamic("cursor-suspend") {
 		for_each_pipe_with_single_output(&data->display, pipe, data->output) {
+			if (execution_constraint(pipe))
+				continue;
+
 			data->pipe = pipe;
 			data->flags = TEST_SUSPEND;
 
@@ -915,16 +949,40 @@ static void run_tests_on_pipe(data_t *data)
 
 static data_t data;
 
-igt_main
+static int opt_handler(int opt, int opt_index, void *_data)
+{
+	switch (opt) {
+	case 'e':
+		extended = true;
+		break;
+	default:
+		return IGT_OPT_HANDLER_ERROR;
+	}
+
+	return IGT_OPT_HANDLER_SUCCESS;
+}
+
+const char *help_str =
+	"  -e \tExtended tests.\n";
+
+igt_main_args("e", NULL, help_str, opt_handler, NULL)
 {
 	uint64_t cursor_width = 64, cursor_height = 64;
 	int ret;
 
 	igt_fixture {
+		enum pipe pipe;
+
+		last_pipe = 0;
+
 		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
 
 		igt_display_require(&data.display, data.drm_fd);
 		igt_display_require_output(&data.display);
+		/* Get active pipes. */
+		for_each_pipe(&data.display, pipe)
+			active_pipes[last_pipe++] = pipe;
+		last_pipe--;
 
 		ret = drmGetCap(data.drm_fd, DRM_CAP_CURSOR_WIDTH, &cursor_width);
 		igt_assert(ret == 0 || errno == EINVAL);
