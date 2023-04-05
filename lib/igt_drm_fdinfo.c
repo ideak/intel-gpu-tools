@@ -60,6 +60,7 @@ static int parse_engine(char *line, struct drm_client_fdinfo *info,
 		"copy",
 		"video",
 		"video-enhance",
+		"compute",
 	};
 	ssize_t name_len;
 	char *name, *p;
