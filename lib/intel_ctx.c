@@ -62,6 +62,28 @@ intel_ctx_cfg_t intel_ctx_cfg_all_physical(int fd)
 }
 
 /**
+ * intel_ctx_cfg_for_gt:
+ * @fd: open i915 drm file descriptor
+ * @gt: gt id
+ *
+ * Returns an intel_ctx_cfg_t containing all physical engines belonging to @gt
+ */
+intel_ctx_cfg_t intel_ctx_cfg_for_gt(int fd, int gt)
+{
+	struct i915_engine_class_instance *ci;
+	intel_ctx_cfg_t cfg = {};
+	unsigned int count;
+
+	ci = gem_list_engines(fd, 1u << gt, ~0u, &count);
+	igt_assert(ci);
+	memcpy(&cfg.engines, ci, count * sizeof(*ci));
+	cfg.num_engines = count;
+	free(ci);
+
+	return cfg;
+}
+
+/**
  * intel_ctx_cfg_for_engine:
  * @class: engine class
  * @inst: engine instance
@@ -292,6 +314,26 @@ const intel_ctx_t *intel_ctx_create_all_physical(int fd)
 		return intel_ctx_0(fd);
 
 	cfg = intel_ctx_cfg_all_physical(fd);
+	return intel_ctx_create(fd, &cfg);
+}
+
+/**
+ * intel_ctx_create_for_gt:
+ * @fd: open i915 drm file descriptor
+ * @gt: gt id
+ *
+ * Creates an intel_ctx_t containing all physical engines belonging to @gt
+ */
+const intel_ctx_t *intel_ctx_create_for_gt(int fd, int gt)
+{
+	intel_ctx_cfg_t cfg;
+
+	igt_require(gem_has_contexts(fd) || !gt);
+
+	if (!gem_has_contexts(fd))
+		return intel_ctx_0(fd);
+
+	cfg = intel_ctx_cfg_for_gt(fd, gt);
 	return intel_ctx_create(fd, &cfg);
 }
 

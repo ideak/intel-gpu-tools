@@ -54,6 +54,7 @@ typedef struct intel_ctx_cfg {
 
 intel_ctx_cfg_t intel_ctx_cfg_for_engine(unsigned int class, unsigned int inst);
 intel_ctx_cfg_t intel_ctx_cfg_all_physical(int fd);
+intel_ctx_cfg_t intel_ctx_cfg_for_gt(int fd, int gt);
 int intel_ctx_cfg_engine_class(const intel_ctx_cfg_t *cfg, unsigned int engine);
 
 /**
@@ -75,6 +76,7 @@ const intel_ctx_t *intel_ctx_0(int fd);
 const intel_ctx_t *intel_ctx_create_for_engine(int fd, unsigned int class,
 					       unsigned int inst);
 const intel_ctx_t *intel_ctx_create_all_physical(int fd);
+const intel_ctx_t *intel_ctx_create_for_gt(int fd, int gt);
 void intel_ctx_destroy(int fd, const intel_ctx_t *ctx);
 
 unsigned int intel_ctx_engine_class(const intel_ctx_t *ctx, unsigned int engine);
