@@ -197,6 +197,9 @@ single(int gem_fd, const intel_ctx_t *ctx,
 	int spin_fd;
 	uint64_t ahnd;
 
+	if (flags & TEST_BUSY)
+		igt_require(!gem_using_guc_submission(gem_fd));
+
 	if (flags & TEST_ISOLATION) {
 		spin_fd = gem_reopen_driver(gem_fd);
 		ctx = intel_ctx_create_all_physical(spin_fd);
@@ -287,6 +290,8 @@ busy_check_all(int gem_fd, const intel_ctx_t *ctx,
 	igt_spin_t *spin;
 	unsigned int i;
 
+	igt_require(!gem_using_guc_submission(gem_fd));
+
 	memset(tval, 0, sizeof(tval));
 
 	spin = spin_sync(gem_fd, ahnd, ctx, e);
@@ -346,6 +351,8 @@ most_busy_check_all(int gem_fd, const intel_ctx_t *ctx,
 	uint64_t val[16];
 	unsigned int i;
 
+	igt_require(!gem_using_guc_submission(gem_fd));
+
 	memset(busy_class, 0, sizeof(busy_class));
 	memset(tval, 0, sizeof(tval));
 
@@ -403,6 +410,8 @@ all_busy_check_all(int gem_fd, const intel_ctx_t *ctx,
 	unsigned long slept;
 	uint64_t val[16];
 	unsigned int i;
+
+	igt_require(!gem_using_guc_submission(gem_fd));
 
 	memset(busy_class, 0, sizeof(busy_class));
 	memset(tval, 0, sizeof(tval));
@@ -525,6 +534,9 @@ virtual(int i915, const intel_ctx_cfg_t *base_cfg, unsigned int flags)
 {
 	intel_ctx_cfg_t cfg = {};
 
+	if (flags & TEST_BUSY)
+		igt_require(!gem_using_guc_submission(i915));
+
 	cfg.vm = gem_vm_create(i915);
 
 	for (int class = 0; class < 32; class++) {
@@ -623,6 +635,8 @@ virtual_all(int i915, const intel_ctx_cfg_t *base_cfg, unsigned int flags)
 {
 	const unsigned int num_engines = base_cfg->num_engines;
 	intel_ctx_cfg_t cfg = {};
+
+	igt_require(!gem_using_guc_submission(i915));
 
 	cfg.vm = gem_vm_create(i915);
 
