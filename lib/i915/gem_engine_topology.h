@@ -61,6 +61,12 @@ intel_get_current_physical_engine(struct intel_engine_data *ed);
 
 void intel_next_engine(struct intel_engine_data *ed);
 
+struct i915_engine_class_instance *
+gem_list_engines(int i915,
+		 uint32_t gt_mask,
+		 uint32_t class_mask,
+		 unsigned int *count);
+
 bool gem_engine_is_equal(const struct intel_execution_engine2 *e1,
 			 const struct intel_execution_engine2 *e2);
 
