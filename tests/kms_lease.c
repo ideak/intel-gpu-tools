@@ -77,7 +77,7 @@ static int prepare_crtc(lease_t *lease, data_t *data)
 	drmModeModeInfo *mode;
 	igt_display_t *display = &lease->display;
 	igt_output_t *output = connector_id_to_output(display, data->connector_id);
-	enum pipe pipe = data->pipe;
+	enum pipe pipe = display->pipes[data->pipe].pipe;
 	igt_plane_t *primary;
 	int ret;
 
