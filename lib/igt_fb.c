@@ -49,6 +49,8 @@
 #include "intel_batchbuffer.h"
 #include "intel_chipset.h"
 #include "intel_bufops.h"
+#include "xe/xe_ioctl.h"
+#include "xe/xe_query.h"
 
 /**
  * SECTION:igt_fb
@@ -434,7 +436,7 @@ void igt_get_fb_tile_size(int fd, uint64_t modifier, int fb_bpp,
 
 	switch (modifier) {
 	case DRM_FORMAT_MOD_LINEAR :
-		if (is_i915_device(fd))
+		if (is_intel_device(fd))
 			*width_ret = 64;
 		else
 			*width_ret = 1;
@@ -924,6 +926,9 @@ static uint64_t calc_fb_size(struct igt_fb *fb)
 		size += calc_plane_size(fb, plane);
 	}
 
+	if (is_xe_device(fb->fd))
+		size = ALIGN(size, xe_get_default_alignment(fb->fd));
+
 	return size;
 }
 
@@ -1143,8 +1148,8 @@ static int create_bo_for_fb(struct igt_fb *fb, bool prefer_sysmem)
 	 * them, so we need to make sure to use a device BO then.
 	 */
 	if (fb->modifier || fb->size || fb->strides[0] ||
-	    (is_i915_device(fd) && igt_format_is_yuv(fb->drm_format)) ||
-	    (is_i915_device(fd) && igt_format_is_fp16(fb->drm_format)) ||
+	    (is_intel_device(fd) && igt_format_is_yuv(fb->drm_format)) ||
+	    (is_intel_device(fd) && igt_format_is_fp16(fb->drm_format)) ||
 	    (is_amdgpu_device(fd) && igt_format_is_yuv(fb->drm_format)) ||
 	    is_nouveau_device(fd))
 		device_bo = true;
@@ -1168,6 +1173,9 @@ static int create_bo_for_fb(struct igt_fb *fb, bool prefer_sysmem)
 					       fb->strides[0]);
 			/* If we can't use fences, we won't use ggtt detiling later. */
 			igt_assert(err == 0 || err == -EOPNOTSUPP);
+		} else if (is_xe_device(fd)) {
+			fb->gem_handle = xe_bo_create_flags(fd, 0, fb->size,
+							vram_if_possible(fd, 0));
 		} else if (is_vc4_device(fd)) {
 			fb->gem_handle = igt_vc4_create_bo(fd, fb->size);
 
