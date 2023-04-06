@@ -380,7 +380,7 @@ uint64_t vram_memory(int fd, int gt)
 	igt_assert(xe_dev);
 	igt_assert(gt >= 0 && gt < xe_dev->number_gt);
 
-	return native_region_for_gt(xe_dev->gts, gt);
+	return xe_has_vram(fd) ? native_region_for_gt(xe_dev->gts, gt) : 0;
 }
 
 /**
@@ -393,11 +393,7 @@ uint64_t vram_memory(int fd, int gt)
  */
 uint64_t vram_if_possible(int fd, int gt)
 {
-	uint64_t regions = all_memory_regions(fd);
-	uint64_t system_memory = regions & 0x1;
-	uint64_t vram = regions & (~0x1);
-
-	return vram ? vram : system_memory;
+	return vram_memory(fd, gt) ?: system_memory(fd);
 }
 
 /**
