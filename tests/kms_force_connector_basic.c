@@ -36,6 +36,7 @@ static void reset_connectors(void)
 	drmModeRes *res;
 	drmModeConnector *connector = NULL;
 	int drm_fd;
+	char *param;
 
 	drm_fd = drm_open_driver_master(DRIVER_ANY);
 	res = drmModeGetResources(drm_fd);
@@ -53,7 +54,11 @@ static void reset_connectors(void)
 		drmModeFreeConnector(connector);
 	}
 
-	igt_set_module_param_int(drm_fd, "load_detect_test", 0);
+	param = __igt_params_get(drm_fd, "load_detect_test");
+	if (param) {
+		igt_set_module_param_int(drm_fd, "load_detect_test", 0);
+		free(param);
+	}
 
 	close(drm_fd);
 }
