@@ -334,16 +334,26 @@ uint64_t xe_bo_mmap_offset(int fd, uint32_t bo)
 	return mmo.offset;
 }
 
-void *xe_bo_map(int fd, uint32_t bo, size_t size)
+static void *__xe_bo_map(int fd, uint16_t bo, size_t size, int prot)
 {
 	uint64_t mmo;
 	void *map;
 
 	mmo = xe_bo_mmap_offset(fd, bo);
-	map = mmap(NULL, size, PROT_WRITE, MAP_SHARED, fd, mmo);
+	map = mmap(NULL, size, prot, MAP_SHARED, fd, mmo);
 	igt_assert(map != MAP_FAILED);
 
 	return map;
+}
+
+void *xe_bo_map(int fd, uint32_t bo, size_t size)
+{
+	return __xe_bo_map(fd, bo, size, PROT_WRITE);
+}
+
+void *xe_bo_mmap_ext(int fd, uint32_t bo, size_t size, int prot)
+{
+	return __xe_bo_map(fd, bo, size, prot);
 }
 
 static int __xe_exec(int fd, struct drm_xe_exec *exec)
