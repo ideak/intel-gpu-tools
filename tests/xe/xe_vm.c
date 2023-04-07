@@ -1331,7 +1331,7 @@ test_munmap_style_unbind(int fd, struct drm_xe_engine_class_instance *eci,
 		map = mmap(from_user_pointer(addr), bo_size, PROT_READ |
 			    PROT_WRITE, MAP_SHARED | MAP_FIXED |
 			    MAP_ANONYMOUS, -1, 0);
-		igt_assert(data != MAP_FAILED);
+		igt_assert(map != MAP_FAILED);
 	} else {
 		bo = xe_bo_create(fd, eci->gt_id, vm, bo_size);
 		map = xe_bo_map(fd, bo, bo_size);
