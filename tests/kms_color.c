@@ -736,8 +736,7 @@ run_gamma_degamma_tests_for_pipe(data_t *data, enum pipe p,
 	if (!pipe_output_combo_valid(data, p))
 		goto out;
 
-	igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(p), data->output->name)
-		igt_assert(test_t(data, data->primary));
+	igt_assert(test_t(data, data->primary));
 
 out:
 	test_cleanup(data);
@@ -758,7 +757,9 @@ run_ctm_tests_for_pipe(data_t *data, enum pipe p,
 		       const double *ctm,
 		       int iter)
 {
+	bool success = false;
 	double delta;
+	int i;
 
 	test_setup(data, p);
 
@@ -777,35 +778,30 @@ run_ctm_tests_for_pipe(data_t *data, enum pipe p,
 	if (!iter)
 		iter = 1;
 
-	igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(p), data->output->name) {
-		bool success = false;
-		int i;
+	/*
+	 * We tests a few values around the expected result because
+	 * it depends on the hardware we're dealing with, we can either
+	 * get clamped or rounded values and we also need to account
+	 * for odd number of items in the LUTs.
+	 */
+	for (i = 0; i < iter; i++) {
+		color_t expected_colors[3] = {
+			fb_colors[0],
+			fb_colors[1],
+			fb_colors[2],
+		};
 
-		/*
-		 * We tests a few values around the expected result because
-		 * it depends on the hardware we're dealing with, we can either
-		 * get clamped or rounded values and we also need to account
-		 * for odd number of items in the LUTs.
-		 */
-		for (i = 0; i < iter; i++) {
-			color_t expected_colors[3] = {
-				fb_colors[0],
-				fb_colors[1],
-				fb_colors[2],
-			};
+		transform_color(&expected_colors[0], ctm, delta * (i - (iter / 2)));
+		transform_color(&expected_colors[1], ctm, delta * (i - (iter / 2)));
+		transform_color(&expected_colors[2], ctm, delta * (i - (iter / 2)));
 
-			transform_color(&expected_colors[0], ctm, delta * (i - (iter / 2)));
-			transform_color(&expected_colors[1], ctm, delta * (i - (iter / 2)));
-			transform_color(&expected_colors[2], ctm, delta * (i - (iter / 2)));
-
-			if (test_pipe_ctm(data, data->primary, fb_colors,
-					  expected_colors, ctm)) {
-				success = true;
-				break;
-			}
+		if (test_pipe_ctm(data, data->primary, fb_colors,
+				  expected_colors, ctm)) {
+			success = true;
+			break;
 		}
-		igt_assert(success);
 	}
+	igt_assert(success);
 
 out:
 	test_cleanup(data);
@@ -927,10 +923,10 @@ run_invalid_tests_for_pipe(data_t *data)
 		igt_describe_f("%s", tests[i].desc);
 		igt_subtest_with_dynamic_f("%s", tests[i].name) {
 			for_each_pipe(&data->display, pipe) {
-				prep_pipe(data, pipe);
-
-				igt_dynamic_f("pipe-%s", kmstest_pipe_name(pipe))
+				igt_dynamic_f("pipe-%s", kmstest_pipe_name(pipe)) {
+					prep_pipe(data, pipe);
 					tests[i].test_t(data, pipe);
+				}
 			}
 		}
 	}
@@ -1070,8 +1066,10 @@ run_tests_for_pipe(data_t *data)
 		igt_describe_f("%s", gamma_degamma_tests[i].desc);
 		igt_subtest_with_dynamic_f("%s", gamma_degamma_tests[i].name) {
 			for_each_pipe(&data->display, pipe) {
-				run_gamma_degamma_tests_for_pipe(data, pipe,
-								 gamma_degamma_tests[i].test_t);
+				igt_dynamic_f("pipe-%s", kmstest_pipe_name(pipe)) {
+					run_gamma_degamma_tests_for_pipe(data, pipe,
+									 gamma_degamma_tests[i].test_t);
+				}
 			}
 		}
 	}
@@ -1080,10 +1078,12 @@ run_tests_for_pipe(data_t *data)
 		igt_describe_f("%s", ctm_tests[i].desc);
 		igt_subtest_with_dynamic_f("%s", ctm_tests[i].name) {
 			for_each_pipe(&data->display, pipe) {
-				run_ctm_tests_for_pipe(data, pipe,
-						       ctm_tests[i].fb_colors,
-						       ctm_tests[i].ctm,
-						       ctm_tests[i].iter);
+				igt_dynamic_f("pipe-%s", kmstest_pipe_name(pipe)) {
+					run_ctm_tests_for_pipe(data, pipe,
+							       ctm_tests[i].fb_colors,
+							       ctm_tests[i].ctm,
+							       ctm_tests[i].iter);
+				}
 			}
 		}
 	}
