@@ -13,6 +13,7 @@ igt@kms_atomic_transition@plane-all-modeset-transition
 igt@kms_atomic_transition@plane-all-transition
 igt@kms_atomic_transition@plane-all-transition-nonblocking
 igt@kms_atomic_transition@plane-primary-toggle-with-vblank-wait
+igt@kms_atomic_transition@plane-toggle-modeset-transition
 igt@kms_atomic_transition@plane-use-after-nonblocking-unbind
 igt@kms_bw@linear-tiling-1-displays-1920x1080p
 igt@kms_bw@linear-tiling-1-displays-2560x1440p
@@ -179,6 +180,7 @@ igt@kms_plane@plane-position-hole-dpms
 igt@kms_plane_cursor@overlay
 igt@kms_plane_cursor@primary
 igt@kms_plane_cursor@viewport
+igt@kms_plane_lowres@tiling-none
 igt@kms_plane_multiple@tiling-none
 igt@kms_plane_scaling@planes-downscale-factor-0-25
 igt@kms_plane_scaling@planes-downscale-factor-0-5
@@ -222,6 +224,9 @@ igt@kms_sequence@get-forked-busy
 igt@kms_sequence@get-idle
 igt@kms_sequence@queue-busy
 igt@kms_sequence@queue-idle
+igt@kms_universal_plane@disable-primary-vs-flip-pipe-a
+igt@kms_universal_plane@universal-plane-pageflip-windowed-pipe-a
+igt@kms_universal_plane@universal-plane-pipe-a-functional
 igt@kms_vblank@crtc-id
 igt@kms_vblank@invalid
 igt@kms_vblank@pipe-a-accuracy-idle
@@ -231,6 +236,7 @@ igt@kms_vblank@pipe-a-query-forked-busy
 igt@kms_vblank@pipe-a-query-idle
 igt@kms_vblank@pipe-a-ts-continuation-dpms-suspend
 igt@kms_vblank@pipe-a-ts-continuation-idle
+igt@kms_vblank@pipe-a-ts-continuation-modeset
 igt@kms_vblank@pipe-a-ts-continuation-suspend
 igt@kms_vblank@pipe-a-wait-busy
 igt@kms_vblank@pipe-a-wait-forked
