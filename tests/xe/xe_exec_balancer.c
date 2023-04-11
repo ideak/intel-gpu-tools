@@ -44,7 +44,7 @@ static void test_all_active(int fd, int gt, int class)
 	struct drm_xe_exec exec = {
 		.num_batch_buffer = 1,
 		.num_syncs = 2,
-		.syncs = to_user_pointer(&sync),
+		.syncs = to_user_pointer(sync),
 	};
 	uint32_t engines[MAX_INSTANCE];
 	uint32_t syncobjs[MAX_INSTANCE];
@@ -186,7 +186,7 @@ test_exec(int fd, int gt, int class, int n_engines, int n_execs,
 	};
 	struct drm_xe_exec exec = {
 		.num_syncs = 2,
-		.syncs = to_user_pointer(&sync),
+		.syncs = to_user_pointer(sync),
 	};
 	uint32_t engines[MAX_N_ENGINES];
 	uint32_t syncobjs[MAX_N_ENGINES];
@@ -407,7 +407,7 @@ test_cm(int fd, int gt, int class, int n_engines, int n_execs,
 	struct drm_xe_exec exec = {
 		.num_batch_buffer = 1,
 		.num_syncs = 1,
-		.syncs = to_user_pointer(&sync),
+		.syncs = to_user_pointer(sync),
 	};
 	uint32_t engines[MAX_N_ENGINES];
 	size_t bo_size;

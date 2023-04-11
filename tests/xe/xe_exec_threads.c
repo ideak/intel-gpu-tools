@@ -53,7 +53,7 @@ test_balancer(int fd, int gt, uint32_t vm, uint64_t addr, uint64_t userptr,
 	struct drm_xe_sync sync_all[MAX_N_ENGINES];
 	struct drm_xe_exec exec = {
 		.num_syncs = 2,
-		.syncs = to_user_pointer(&sync),
+		.syncs = to_user_pointer(sync),
 	};
 	uint32_t engines[MAX_N_ENGINES];
 	uint32_t syncobjs[MAX_N_ENGINES];
@@ -262,7 +262,7 @@ test_compute_mode(int fd, uint32_t vm, uint64_t addr, uint64_t userptr,
 	struct drm_xe_exec exec = {
 		.num_batch_buffer = 1,
 		.num_syncs = 1,
-		.syncs = to_user_pointer(&sync),
+		.syncs = to_user_pointer(sync),
 	};
 	uint32_t engines[MAX_N_ENGINES];
 	size_t bo_size;
@@ -471,7 +471,7 @@ test_legacy_mode(int fd, uint32_t vm, uint64_t addr, uint64_t userptr,
 	struct drm_xe_exec exec = {
 		.num_batch_buffer = 1,
 		.num_syncs = 2,
-		.syncs = to_user_pointer(&sync),
+		.syncs = to_user_pointer(sync),
 	};
 	uint32_t engines[MAX_N_ENGINES];
 	uint32_t bind_engines[MAX_N_ENGINES];

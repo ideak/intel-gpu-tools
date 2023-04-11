@@ -529,7 +529,7 @@ shared_pte_page(int fd, struct drm_xe_engine_class_instance *eci, int n_bo,
 	struct drm_xe_exec exec = {
 		.num_batch_buffer = 1,
 		.num_syncs = 2,
-		.syncs = to_user_pointer(&sync),
+		.syncs = to_user_pointer(sync),
 	};
 	uint32_t engines[MAX_N_ENGINES];
 	uint32_t syncobjs[MAX_N_ENGINES];
@@ -701,7 +701,7 @@ test_bind_engines_independent(int fd, struct drm_xe_engine_class_instance *eci)
 	struct drm_xe_exec exec = {
 		.num_batch_buffer = 1,
 		.num_syncs = 2,
-		.syncs = to_user_pointer(&sync),
+		.syncs = to_user_pointer(sync),
 	};
 #define N_ENGINES	2
 	uint32_t engines[N_ENGINES];
@@ -857,7 +857,7 @@ test_bind_array(int fd, struct drm_xe_engine_class_instance *eci, int n_execs,
 	};
 	struct drm_xe_exec exec = {
 		.num_batch_buffer = 1,
-		.syncs = to_user_pointer(&sync),
+		.syncs = to_user_pointer(sync),
 	};
 	uint32_t engine, bind_engine = 0;
 #define BIND_ARRAY_MAX_N_EXEC	16
@@ -1029,7 +1029,7 @@ test_large_binds(int fd, struct drm_xe_engine_class_instance *eci,
 	struct drm_xe_exec exec = {
 		.num_batch_buffer = 1,
 		.num_syncs = 2,
-		.syncs = to_user_pointer(&sync),
+		.syncs = to_user_pointer(sync),
 	};
 	uint64_t addr = 0x1ull << 30, base_addr = 0x1ull << 30;
 	uint32_t vm;
@@ -1184,7 +1184,7 @@ static void *hammer_thread(void *tdata)
 	struct drm_xe_exec exec = {
 		.num_batch_buffer = 1,
 		.num_syncs = 1,
-		.syncs = to_user_pointer(&sync),
+		.syncs = to_user_pointer(sync),
 	};
 	struct {
 		uint32_t batch[16];
@@ -1303,7 +1303,7 @@ test_munmap_style_unbind(int fd, struct drm_xe_engine_class_instance *eci,
 	struct drm_xe_exec exec = {
 		.num_batch_buffer = 1,
 		.num_syncs = 2,
-		.syncs = to_user_pointer(&sync),
+		.syncs = to_user_pointer(sync),
 	};
 	uint64_t addr = 0x1a0000, base_addr = 0x1a0000;
 	uint32_t vm;

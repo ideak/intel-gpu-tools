@@ -152,7 +152,7 @@ test_export_dma_buf(struct drm_xe_engine_class_instance *hwe0,
 		};
 		struct drm_xe_exec exec = {
 			.num_batch_buffer = 1,
-			.syncs = to_user_pointer(&sync),
+			.syncs = to_user_pointer(sync),
 		};
 		uint32_t syncobj;
 		int b = 0;

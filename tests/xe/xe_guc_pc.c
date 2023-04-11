@@ -42,7 +42,7 @@ static void exec_basic(int fd, struct drm_xe_engine_class_instance *eci,
 	struct drm_xe_exec exec = {
 		.num_batch_buffer = 1,
 		.num_syncs = 2,
-		.syncs = to_user_pointer(&sync),
+		.syncs = to_user_pointer(sync),
 	};
 	uint32_t engines[MAX_N_ENGINES];
 	uint32_t bind_engines[MAX_N_ENGINES];
