@@ -820,10 +820,18 @@ class TestList:
         run_missing = []
         doc_uneeded = []
 
+        test_regex = r""
+        for doc_test in doc_subtests:
+            if test_regex != r"":
+                test_regex += r"|"
+            test_regex += r'^' + doc_test + r'$'
+
+        test_regex = re.compile(test_regex)
+
         for doc_test in doc_subtests:
             found = False
             for run_test in run_subtests:
-                if re.match(r'^' + doc_test + r'$', run_test):
+                if re.match(test_regex, run_test):
                     found = True
                     break
             if not found:
@@ -831,10 +839,8 @@ class TestList:
 
         for run_test in run_subtests:
             found = False
-            for doc_test in doc_subtests:
-                if re.match(r'^' + doc_test + r'$', run_test):
-                    found = True
-                    break
+            if re.match(test_regex, run_test):
+                found = True
             if not found:
                 run_missing.append(run_test)
 
