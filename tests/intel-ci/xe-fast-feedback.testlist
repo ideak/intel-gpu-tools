@@ -113,8 +113,8 @@ igt@xe_mmio@mmio-timestamp
 igt@xe_mmio@mmio-invalid
 igt@xe_prime_self_import@basic-with_one_bo
 igt@xe_prime_self_import@basic-with_fd_dup
-igt@xe_prime_self_import@export-vs-gem_close-race
-igt@xe_prime_self_import@reimport-vs-gem_close-race
+#igt@xe_prime_self_import@export-vs-gem_close-race
+#igt@xe_prime_self_import@reimport-vs-gem_close-race
 #igt@xe_prime_self_import@basic-llseek-size
 igt@xe_query@query-engines
 igt@xe_query@query-mem-usage

@@ -288,7 +288,7 @@ static void *thread_fn_reimport_vs_close(void *p)
 /**
  * SUBTEST: reimport-vs-gem_close-race
  * Description: Reimport versus gem_close race
- * Run type: BAT
+ * Run type: FULL
  */
 
  static void test_reimport_close_race(void)
@@ -386,7 +386,7 @@ static void *thread_fn_export_vs_close(void *p)
 /**
  * SUBTEST: export-vs-gem_close-race
  * Description: Export versus gem_close race test
- * Run type: BAT
+ * Run type: FULL
  */
 
 static void test_export_close_race(void)
