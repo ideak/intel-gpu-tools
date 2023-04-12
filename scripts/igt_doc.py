@@ -11,6 +11,7 @@
 """Maintain test plan and test implementation documentation on IGT."""
 
 import argparse
+import sys
 
 from test_list import TestList
 

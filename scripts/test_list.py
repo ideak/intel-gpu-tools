@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# pylint: disable=C0301,R0902,R0914,R0912,R0915,R1702,C0302
+# pylint: disable=C0301,R0902,R0914,R0912,R0913,R0915,R1702,C0302
 # SPDX-License-Identifier: (GPL-2.0 OR MIT)
 
 ## Copyright (C) 2023    Intel Corporation                 ##
@@ -394,7 +394,7 @@ class TestList:
         for subtest in self.doc[test]["subtest"].keys():
             summary = test_name
             if self.doc[test]["subtest"][subtest]["Summary"] != '':
-                 summary += '@' + self.doc[test]["subtest"][subtest]["Summary"]
+                summary += '@' + self.doc[test]["subtest"][subtest]["Summary"]
             if not summary:
                 continue
 
