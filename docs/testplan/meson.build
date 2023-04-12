@@ -11,11 +11,8 @@ xe_test_config = join_paths(source_root, 'tests', 'xe', 'xe_test_config.json')
 check_testlist = []
 if build_tests
 	doc_dependencies = test_executables
-	if jsonc.found()
-		# Check if documentation matches the actual tests
-		check_testlist = [ '--check-testlist', '--igt-build-path', build_root ]
-		doc_dependencies += runner
-	endif
+	# Check if documentation matches the actual tests
+	check_testlist = [ '--check-testlist', '--igt-build-path', build_root ]
 else
 	doc_dependencies = []
 endif

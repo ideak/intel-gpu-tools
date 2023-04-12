@@ -16,7 +16,6 @@ import sys
 from test_list import TestList
 
 IGT_BUILD_PATH = 'build'
-IGT_RUNNER = 'runner/igt_runner'
 
 parser = argparse.ArgumentParser(description = "Print formatted kernel documentation to stdout.",
                                  formatter_class = argparse.ArgumentDefaultsHelpFormatter,
@@ -36,24 +35,21 @@ parser.add_argument("--sort-field",
 parser.add_argument("--filter-field",
                     help="modify --show-subtests to filter output based a regex given by FILTER_FIELD=~'regex'")
 parser.add_argument("--check-testlist", action="store_true",
-                    help="Compare documentation against IGT runner testlist.")
+                    help="Compare documentation against IGT built tests.")
 parser.add_argument("--include-plan", action="store_true",
                     help="Include test plans, if any.")
 parser.add_argument("--igt-build-path",
-                    help="Path where the IGT runner is sitting. Used by --check-testlist.",
+                    help="Path to the IGT build directory. Used by --check-testlist.",
                     default=IGT_BUILD_PATH)
 parser.add_argument("--gen-testlist",
                     help="Generate documentation at the GEN_TESTLIST directory, using SORT_FIELD to split the tests. Requires --sort-field.")
-parser.add_argument("--igt-runner",
-                    help="Path where the IGT runner is sitting. Used by --check-testlist.",
-                    default=IGT_RUNNER)
 parser.add_argument('--files', nargs='+',
                     help="File name(s) to be processed")
 
 parse_args = parser.parse_args()
 
 tests = TestList(parse_args.config, parse_args.include_plan, parse_args.files,
-                 parse_args.igt_build_path, parse_args.igt_runner)
+                 parse_args.igt_build_path)
 
 RUN = 0
 if parse_args.show_subtests:

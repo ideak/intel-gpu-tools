@@ -245,7 +245,7 @@ class TestList:
     """
 
     def __init__(self, config_fname, include_plan = False, file_list = False,
-                 igt_build_path = None, igt_runner = None):
+                 igt_build_path = None):
         self.doc = {}
         self.test_number = 0
         self.config = None
@@ -254,7 +254,6 @@ class TestList:
         self.props = {}
         self.config_fname = config_fname
         self.igt_build_path = igt_build_path
-        self.igt_runner = igt_runner
         self.level_count = 0
         self.field_list = {}
         self.title = None
@@ -766,6 +765,38 @@ class TestList:
 
         return subtests
 
+    def __get_testlist(self, name):
+        match = re.match(r"(.*/)?(.*)\.c$", name)
+        if not match:
+            return []
+
+        basename = "igt@" + match.group(2)
+
+        fname = os.path.join(self.igt_build_path, "tests", match.group(2))
+        if not os.path.isfile(fname):
+            print(f"Error: file {fname} doesn't exist.")
+            sys.exit(1)
+        try:
+            result = subprocess.run([ fname, "--list-subtests" ],
+                                    check = True,
+                                    stdout = subprocess.PIPE,
+                                    universal_newlines=True)
+            subtests = result.stdout.splitlines()
+
+            return [basename  + "@" + i for i in subtests]
+        except subprocess.CalledProcessError:
+            # Handle it as a test using igt_simple_main
+            return [basename]
+
+    def get_testlist(self):
+
+        """ Return a list of tests as reported by --list-subtests """
+        tests = []
+        for name in self.filenames:
+            tests += self.__get_testlist(name)
+
+        return sorted(tests)
+
     #
     # Validation methods
     #
@@ -773,28 +804,16 @@ class TestList:
 
         """Compare documented subtests with the IGT test list"""
 
-        if not self.igt_build_path or not self.igt_runner:
-            sys.exit("Need the IGT build path and igt_runner executable file name")
+        if not self.igt_build_path:
+            sys.exit("Need the IGT build path")
 
         doc_subtests = sorted(self.get_subtests()[""])
 
         for i in range(0, len(doc_subtests)): # pylint: disable=C0200
             doc_subtests[i] = re.sub(r'\<[^\>]+\>', r'\\d+', doc_subtests[i])
 
-        test_prefix = os.path.commonprefix(doc_subtests)
-
         # Get a list of tests from
-        try:
-            result = subprocess.run([ f"{self.igt_build_path}/{self.igt_runner}",
-                                    "-L", "-t",  test_prefix,
-                                    f"{self.igt_build_path}/tests"], check = True,
-                                    stdout=subprocess.PIPE, universal_newlines=True)
-        except subprocess.CalledProcessError as sub_err:
-            print(sub_err.stderr)
-            print("Error:", sub_err)
-            sys.exit(1)
-
-        run_subtests = sorted(result.stdout.splitlines())
+        run_subtests = self.get_testlist()
 
         # Compare arrays
 
