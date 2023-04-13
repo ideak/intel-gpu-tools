@@ -26,6 +26,7 @@ option('testplan',
 
 option('sphinx',
        type : 'feature',
+       value : 'disabled',
        description : 'Build testplan documentation using Sphinx')
 
 option('docs',
