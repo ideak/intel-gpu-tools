@@ -2,7 +2,8 @@
 vmwgfx_progs = [
 	'vmw_tri',
 	'vmw_execution_buffer',
-	'vmw_surface_copy'
+	'vmw_surface_copy',
+	'vmw_mob_stress'
 ]
 vmwgfx_deps = test_deps
 
