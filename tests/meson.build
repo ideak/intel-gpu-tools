@@ -510,6 +510,8 @@ subdir('v3d')
 
 subdir('vc4')
 
+subdir('vmwgfx')
+
 gen_testlist = find_program('generate_testlist.sh')
 test_list_target = custom_target('testlist',
 	      output : 'test-list.txt',
