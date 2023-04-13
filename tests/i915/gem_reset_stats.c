@@ -906,6 +906,7 @@ igt_main
 	igt_fixture {
 		bool has_reset_stats;
 		bool using_full_reset;
+		char *tmp;
 
 		device = drm_open_driver(DRIVER_INTEL);
 		devid = intel_get_drm_devid(device);
@@ -922,6 +923,12 @@ igt_main
 			      "No reset stats ioctl support. Too old kernel?\n");
 		igt_require_f(using_full_reset,
 			      "Full GPU reset is not enabled. Is enable_hangcheck set?\n");
+
+		/* Don't allow request watchdog to interfere */
+		tmp = __igt_params_get(device, "request_timeout_ms");
+		if (tmp && atoi(tmp))
+			igt_params_save_and_set(device, "request_timeout_ms", "%u", 0);
+		free(tmp);
 	}
 
 	igt_subtest("params")
