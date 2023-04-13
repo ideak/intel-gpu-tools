@@ -265,6 +265,7 @@ libexecdir = join_paths(get_option('libexecdir'), 'igt-gpu-tools')
 amdgpudir = join_paths(libexecdir, 'amdgpu')
 v3ddir = join_paths(libexecdir, 'v3d')
 vc4dir = join_paths(libexecdir, 'vc4')
+vmwgfxdir = join_paths(libexecdir, 'vmwgfx')
 mandir = get_option('mandir')
 pkgconfigdir = join_paths(libdir, 'pkgconfig')
 python3 = find_program('python3', required : true)
@@ -313,12 +314,18 @@ if get_option('use_rpath')
 	endforeach
 	vc4_rpathdir = join_paths(vc4_rpathdir, libdir)
 
+	vmwgfx_rpathdir = '$ORIGIN'
+	foreach p : vmwgfxdir.split('/')
+		vmwgfx_rpathdir = join_paths(vmwgfx_rpathdir, '..')
+	endforeach
+	vmwgfx_rpathdir = join_paths(vmwgfx_rpathdir, libdir)
 else
 	bindir_rpathdir = ''
 	libexecdir_rpathdir = ''
 	amdgpudir_rpathdir = ''
 	v3d_rpathdir = ''
 	vc4_rpathdir = ''
+	vmwgfx_rpathdir = ''
 endif
 
 subdir('lib')

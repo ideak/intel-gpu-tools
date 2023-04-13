@@ -90,6 +90,7 @@ lib_sources = [
 	'igt_panfrost.c',
 	'igt_v3d.c',
 	'igt_vc4.c',
+	'igt_vmwgfx.c',
 	'igt_psr.c',
 	'igt_amd.c',
 	'igt_edid.c',

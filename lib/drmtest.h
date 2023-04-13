@@ -52,6 +52,7 @@
 #define DRIVER_PANFROST	(1 << 5)
 #define DRIVER_MSM	(1 << 6)
 #define DRIVER_XE	(1 << 7)
+#define DRIVER_VMWGFX   (1 << 8)
 
 /*
  * Exclude DRVER_VGEM from DRIVER_ANY since if you run on a system
