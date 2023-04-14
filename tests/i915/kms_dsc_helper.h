@@ -21,8 +21,6 @@
 #include <fcntl.h>
 #include <termios.h>
 
-#define HDISPLAY_5K	5120
-
 void force_dsc_enable(int drmfd, igt_output_t *output);
 void force_dsc_enable_bpc(int drmfd, igt_output_t *output, int input_bpc);
 void save_force_dsc_en(int drmfd, igt_output_t *output);

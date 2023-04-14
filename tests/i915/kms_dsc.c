@@ -47,7 +47,6 @@ typedef struct {
 	unsigned int plane_format;
 	igt_output_t *output;
 	int input_bpc;
-	int n_pipes;
 	int disp_ver;
 	enum pipe pipe;
 } data_t;
@@ -72,19 +71,24 @@ static drmModeModeInfo *get_highres_mode(igt_output_t *output)
 	return highest_mode;
 }
 
-static bool check_big_joiner_pipe_constraint(data_t *data)
+static bool pipe_output_combo_valid(data_t *data)
 {
 	igt_output_t *output = data->output;
-	drmModeModeInfo *mode = get_highres_mode(output);
+	drmModeModeInfo *mode;
+	bool ret = true;
 
-	if (mode->hdisplay >= HDISPLAY_5K &&
-	    data->pipe == (data->n_pipes - 1)) {
-		igt_debug("Pipe-%s not supported due to bigjoiner limitation\n",
-			   kmstest_pipe_name(data->pipe));
-		return false;
-	}
+	igt_display_reset(&data->display);
+	mode = get_highres_mode(output);
 
-	return true;
+	igt_output_set_pipe(output, data->pipe);
+	igt_output_override_mode(output, mode);
+
+	if (!i915_pipe_output_combo_valid(&data->display))
+		ret = false;
+
+	igt_output_set_pipe(output, PIPE_NONE);
+
+	return ret;
 }
 
 static void test_cleanup(data_t *data)
@@ -190,7 +194,7 @@ static void test_dsc(data_t *data, enum dsc_test_type test_type, int bpc,
 		if (!check_gen11_bpc_constraint(data->drm_fd, data->output, data->input_bpc))
 			continue;
 
-		if (!check_big_joiner_pipe_constraint(data))
+		if (!pipe_output_combo_valid(data))
 			continue;
 
 		if (test_type == TEST_DSC_BPC)
@@ -206,7 +210,6 @@ static void test_dsc(data_t *data, enum dsc_test_type test_type, int bpc,
 igt_main
 {
 	data_t data = {};
-	int i;
 
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
@@ -217,9 +220,6 @@ igt_main
 		igt_display_require(&data.display, data.drm_fd);
 		igt_display_require_output(&data.display);
 		igt_require(data.disp_ver >= 11);
-		data.n_pipes = 0;
-		for_each_pipe(&data.display, i)
-			data.n_pipes++;
 	}
 
 	igt_describe("Tests basic display stream compression functionality if supported "
