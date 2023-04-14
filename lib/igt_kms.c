@@ -5814,6 +5814,66 @@ bool igt_max_bpc_constraint(igt_display_t *display, enum pipe pipe,
 }
 
 /*
+ * igt_get_max_dotclock:
+ * @fd: A drm file descriptor
+ *
+ * Get the Max pixel clock frequency from intel specific debugfs
+ * "i915_frequency_info".
+ *
+ * Returns: Max supported pixel clock frequency.
+ */
+int igt_get_max_dotclock(int fd)
+{
+	char buf[4096];
+	char *s;
+	int dir, res, max_dotclock = 0;
+
+	if (!is_i915_device(fd))
+		return max_dotclock;
+
+	dir = igt_debugfs_dir(fd);
+	igt_require(dir);
+
+	/*
+	 * Display specific clock frequency info is moved to i915_cdclk_info,
+	 * On older kernels if this debugfs is not found, fallback to read from
+	 * i915_frequency_info.
+	 */
+	res = igt_debugfs_simple_read(dir, "i915_cdclk_info",
+				      buf, sizeof(buf));
+	if (res <= 0)
+		res = igt_debugfs_simple_read(dir, "i915_frequency_info",
+					      buf, sizeof(buf));
+	close(dir);
+
+	igt_require(res > 0);
+
+	igt_assert(s = strstr(buf, "Max pixel clock frequency:"));
+	igt_assert_eq(sscanf(s, "Max pixel clock frequency: %d kHz", &max_dotclock), 1);
+
+	/* 100 Mhz to 5 GHz seem like reasonable values to expect */
+	igt_assert_lt(max_dotclock, 5000000);
+	igt_assert_lt(100000, max_dotclock);
+
+	return max_dotclock;
+}
+
+/* igt_bigjoiner_possible:
+ * @mode: libdrm mode
+ * @max_dotclock: Max pixel clock frequency
+ *
+ * Bigjoiner will come into the picture, when the requested
+ * mode resolution > 5K or mode clock > max_dotclock.
+ *
+ * Returns: True if mode requires Bigjoiner, else False.
+ */
+bool igt_bigjoiner_possible(drmModeModeInfo *mode, int max_dotclock)
+{
+	return (mode->hdisplay > MAX_HDISPLAY_PER_PIPE ||
+		mode->clock > max_dotclock);
+}
+
+/*
  * igt_check_bigjoiner_support:
  * @display: a pointer to an #igt_display_t structure
  *
@@ -5835,6 +5895,7 @@ bool igt_check_bigjoiner_support(igt_display_t *display)
 		enum pipe idx;
 		drmModeModeInfo *mode;
 	} pipes[IGT_MAX_PIPES];
+	int max_dotclock;
 
 	/* Get total enabled pipes. */
 	for_each_pipe(display, p)
@@ -5858,22 +5919,24 @@ bool igt_check_bigjoiner_support(igt_display_t *display)
 		return true;
 	}
 
+	max_dotclock = igt_get_max_dotclock(display->drm_fd);
+
 	/*
-	 * if mode.hdisplay > 5120, then ignore
+	 * if mode resolution > 5K (or) mode.clock > max dot-clock, then ignore
 	 *  - if the consecutive pipe is not available
 	 *  - last crtc in single/multi-connector config
 	 *  - consecutive crtcs in multi-connector config
 	 *
 	 * in multi-connector config ignore if
-	 *  - previous crtc mode.hdisplay > 5120 and
+	 *  - previous crtc (mode resolution > 5K or mode.clock > max dot-clock) and
 	 *  - current & previous crtcs are consecutive
 	 */
 	for (i = 0; i < pipes_in_use; i++) {
-		if (((pipes[i].mode->hdisplay > MAX_HDISPLAY_PER_PIPE) &&
+		if ((igt_bigjoiner_possible(pipes[i].mode, max_dotclock) &&
 		     ((pipes[i].idx >= (total_pipes - 1)) ||
 		      (!display->pipes[pipes[i].idx + 1].enabled) ||
 		      ((i < (pipes_in_use - 1)) && (abs(pipes[i + 1].idx - pipes[i].idx) <= 1)))) ||
-		    ((i > 0) && (pipes[i - 1].mode->hdisplay > MAX_HDISPLAY_PER_PIPE) &&
+		    ((i > 0) && igt_bigjoiner_possible(pipes[i - 1].mode, max_dotclock) &&
 		     ((!display->pipes[pipes[i - 1].idx + 1].enabled) ||
 		      (abs(pipes[i].idx - pipes[i - 1].idx) <= 1)))) {
 			igt_debug("Pipe/Output combo is not possible with selected mode(s).\n");
