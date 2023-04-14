@@ -61,8 +61,16 @@ static int get_current_cdclk_freq(int debugfs_fd)
 	char *start_loc;
 	int res;
 
-	res = igt_debugfs_simple_read(debugfs_fd, "i915_frequency_info",
+	/*
+	 * Display specific clock frequency info is moved to i915_cdclk_info,
+	 * On older kernels if this debugfs is not found, fallback to read from
+	 * i915_frequency_info.
+	 */
+	res = igt_debugfs_simple_read(debugfs_fd, "i915_cdclk_info",
 				      buf, sizeof(buf));
+	if (res <= 0)
+		res = igt_debugfs_simple_read(debugfs_fd, "i915_frequency_info",
+					      buf, sizeof(buf));
 	igt_require(res > 0);
 
 	igt_assert(start_loc = strstr(buf, "Current CD clock frequency: "));
