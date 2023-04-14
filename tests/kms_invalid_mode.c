@@ -213,42 +213,6 @@ test_output(data_t *data)
 	igt_remove_fb(data->drm_fd, &fb);
 }
 
-static int i915_max_dotclock(data_t *data)
-{
-	char buf[4096];
-	char *s;
-	int dir, res, max_dotclock = 0;
-
-	if (!is_i915_device(data->drm_fd))
-		return 0;
-
-	dir = igt_debugfs_dir(data->drm_fd);
-	igt_require(dir);
-
-	/*
-	 * Display specific clock frequency info is moved to i915_cdclk_info,
-	 * On older kernels if this debugfs is not found, fallback to read from
-	 * i915_frequency_info.
-	 */
-	res = igt_debugfs_simple_read(dir, "i915_cdclk_info",
-				      buf, sizeof(buf));
-	if (res <= 0)
-		res = igt_debugfs_simple_read(dir, "i915_frequency_info",
-					      buf, sizeof(buf));
-	close(dir);
-
-	igt_require(res > 0);
-
-	igt_assert(s = strstr(buf, "Max pixel clock frequency:"));
-	igt_assert_eq(sscanf(s, "Max pixel clock frequency: %d kHz", &max_dotclock), 1);
-
-	/* 100 Mhz to 5 GHz seem like reasonable values to expect */
-	igt_assert_lt(max_dotclock, 5000000);
-	igt_assert_lt(100000, max_dotclock);
-
-	return max_dotclock;
-}
-
 static const struct {
 	const char *name;
 	bool (*adjust_mode)(data_t *data, drmModeModeInfoPtr mode);
@@ -308,7 +272,7 @@ igt_main
 		data.res = drmModeGetResources(data.drm_fd);
 		igt_assert(data.res);
 
-		data.max_dotclock = i915_max_dotclock(&data);
+		data.max_dotclock = igt_get_max_dotclock(data.drm_fd);
 		igt_info("Max dotclock: %d kHz\n", data.max_dotclock);
 	}
 
