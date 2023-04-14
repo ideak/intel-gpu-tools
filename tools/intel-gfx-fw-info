@@ -59,6 +59,25 @@ struct uc_css_header {
 	} rsvd;
 	u32 header_info;
 };
+
+#define HUC_GSC_VERSION_HI_DW		44
+#define   HUC_GSC_MAJOR_VER_HI_MASK	(0xFF << 0)
+#define   HUC_GSC_MINOR_VER_HI_MASK	(0xFF << 16)
+#define HUC_GSC_VERSION_LO_DW		45
+#define   HUC_GSC_PATCH_VER_LO_MASK	(0xFF << 0)
+
+// Add a fake definition for the GSC's header so this script can still
+// check the version
+
+struct uc_huc_gsc_header {
+	u32 rsvd[HUC_GSC_VERSION_HI_DW];
+	u32 ver_hi;
+	u32 ver_lo;
+};
+
+struct magic {
+	char data[4];
+};
 """
 
 logging.basicConfig(format="%(levelname)s: %(message)s")
@@ -83,26 +102,47 @@ def FIELD_GET(mask: int, value: int) -> int:
     return (value & mask) >> ffs(mask)
 
 
-def decode(fw) -> str:
-    data = []
+class Fw:
+    def __init__(self, fw):
+        self.fw = fw
 
-    CSS_SW_VERSION_UC_MAJOR = 0xFF << 16
-    CSS_SW_VERSION_UC_MINOR = 0xFF << 8
-    CSS_SW_VERSION_UC_PATCH = 0xFF
-    major = FIELD_GET(CSS_SW_VERSION_UC_MAJOR, fw.sw_version)
-    minor = FIELD_GET(CSS_SW_VERSION_UC_MINOR, fw.sw_version)
-    patch = FIELD_GET(CSS_SW_VERSION_UC_PATCH, fw.sw_version)
-    data += [f"version: {major}.{minor}.{patch}"]
 
-    CSS_DATE_DAY = 0xFF
-    CSS_DATE_MONTH = 0xFF << 8
-    CSS_DATE_YEAR = 0xFFFF << 16
-    day = FIELD_GET(CSS_DATE_DAY, fw.date)
-    month = FIELD_GET(CSS_DATE_MONTH, fw.date)
-    year = FIELD_GET(CSS_DATE_YEAR, fw.date)
-    data += [f"date: {year:02x}-{month:02x}-{day:02x}"]
+class FwCss(Fw):
+    def decode(self):
+        data = []
 
-    return data
+        CSS_SW_VERSION_UC_MAJOR = 0xFF << 16
+        CSS_SW_VERSION_UC_MINOR = 0xFF << 8
+        CSS_SW_VERSION_UC_PATCH = 0xFF
+        major = FIELD_GET(CSS_SW_VERSION_UC_MAJOR, self.fw.sw_version)
+        minor = FIELD_GET(CSS_SW_VERSION_UC_MINOR, self.fw.sw_version)
+        patch = FIELD_GET(CSS_SW_VERSION_UC_PATCH, self.fw.sw_version)
+        data += [f"version: {major}.{minor}.{patch}"]
+
+        CSS_DATE_DAY = 0xFF
+        CSS_DATE_MONTH = 0xFF << 8
+        CSS_DATE_YEAR = 0xFFFF << 16
+        day = FIELD_GET(CSS_DATE_DAY, self.fw.date)
+        month = FIELD_GET(CSS_DATE_MONTH, self.fw.date)
+        year = FIELD_GET(CSS_DATE_YEAR, self.fw.date)
+        data += [f"date: {year:02x}-{month:02x}-{day:02x}"]
+
+        return data
+
+
+class FwGsc(Fw):
+    def decode(self):
+        data = []
+
+        HUC_GSC_MINOR_VER_HI_MASK = 0xFF << 16
+        HUC_GSC_MAJOR_VER_HI_MASK = 0xFF
+        HUC_GSC_PATCH_VER_LO_MASK = 0xFF
+        major = FIELD_GET(HUC_GSC_MAJOR_VER_HI_MASK, self.fw.ver_hi)
+        minor = FIELD_GET(HUC_GSC_MINOR_VER_HI_MASK, self.fw.ver_hi)
+        patch = FIELD_GET(HUC_GSC_PATCH_VER_LO_MASK, self.fw.ver_lo)
+        data += [f"version: {major}.{minor}.{patch}"]
+
+        return data
 
 
 def parse_args(argv: typing.List[str]) -> argparse.Namespace:
@@ -122,14 +162,19 @@ def main(argv: typing.List[str]) -> int:
 
     try:
         with open(args.filename, mode="rb") as f:
-            fw = cparser.uc_css_header(f)
+            magic = cparser.magic(f)
+            f.seek(0, 0)
+            if magic.data == b"$CPD":
+                fw = FwGsc(cparser.uc_huc_gsc_header(f))
+            else:
+                fw = FwCss(cparser.uc_css_header(f))
     except FileNotFoundError as e:
         logging.fatal(e)
         return 1
 
-    print(*decode(fw), sep="\n")
+    print(*fw.decode(), sep="\n")
     print("raw dump:", end="")
-    cstruct.dumpstruct(fw, color=sys.stdout.isatty())
+    cstruct.dumpstruct(fw.fw, color=sys.stdout.isatty())
 
     return 0
 
