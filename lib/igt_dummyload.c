@@ -528,6 +528,7 @@ void igt_spin_set_timeout(igt_spin_t *spin, int64_t ns)
 	struct itimerspec its;
 	pthread_attr_t attr;
 	int timerfd;
+	int err;
 
 	if (!spin)
 		return;
@@ -547,8 +548,13 @@ void igt_spin_set_timeout(igt_spin_t *spin, int64_t ns)
 	pthread_attr_setschedpolicy(&attr, SCHED_FIFO);
 	pthread_attr_setschedparam(&attr, &param);
 
-	igt_assert(pthread_create(&spin->timer_thread, &attr,
-				  timer_thread, spin) == 0);
+	err = pthread_create(&spin->timer_thread, &attr, timer_thread, spin);
+	if (err) {
+		igt_debug("Cannot create thread with SCHED_FIFO (%s), trying without scheduling policy...\n",
+			  strerror(err));
+		igt_assert_eq(pthread_create(&spin->timer_thread, NULL,
+					     timer_thread, spin), 0);
+	}
 	pthread_attr_destroy(&attr);
 
 	memset(&its, 0, sizeof(its));
