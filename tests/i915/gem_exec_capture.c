@@ -131,6 +131,7 @@ ascii85_decode(char *in, uint32_t **out, bool inflate, char **end)
 static int check_error_state(int dir, struct offset *obj_offsets, int obj_count,
 			     uint64_t obj_size, bool incremental)
 {
+	int error_dump_limit = 4096;
 	char *error, *str;
 	int blobs = 0;
 
@@ -139,7 +140,7 @@ static int check_error_state(int dir, struct offset *obj_offsets, int obj_count,
 	igt_sysfs_set(dir, "error", "Begone!");
 	igt_assert(error);
 	igt_assert(errno != ENOMEM);
-	igt_debug("%s\n", error);
+	igt_debug("%.*s\n", error_dump_limit, error);
 
 	/* render ring --- user = 0x00000000 ffffd000 */
 	for (str = error; (str = strstr(str, "--- user = ")); ) {
