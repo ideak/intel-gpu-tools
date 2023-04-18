@@ -377,7 +377,7 @@ sanity_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 	igt_plane_t *primary;
 	drmModeModeInfo *mode;
 	int i;
-	int expect;
+	int expect = 0;
 
 	igt_require_pipe(&data->display, pipe);
 
@@ -400,9 +400,9 @@ sanity_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 	 * doesn't cover CRTC (should fail on pre-gen9 and succeed on
 	 * gen9+).
 	 */
-	igt_require_intel(data->drm_fd);
 	igt_plane_set_fb(primary, &test.undersized_fb);
-	expect = (data->display_ver < 9) ? -EINVAL : 0;
+	if (is_intel_device(data->drm_fd))
+		expect = (data->display_ver < 9) ? -EINVAL : 0;
 	igt_assert(igt_display_try_commit2(&data->display, COMMIT_UNIVERSAL) == expect);
 
 	/* Same as above, but different plane positioning. */
@@ -412,7 +412,8 @@ sanity_test_pipe(data_t *data, enum pipe pipe, igt_output_t *output)
 	igt_plane_set_position(primary, 0, 0);
 
 	/* Try to use universal plane API to scale down (should fail on pre-gen9) */
-	expect = (data->display_ver < 9) ? -ERANGE : 0;
+	if (is_intel_device(data->drm_fd))
+		expect = (data->display_ver < 9) ? -ERANGE : 0;
 	igt_assert(drmModeSetPlane(data->drm_fd, primary->drm_plane->plane_id,
 				   output->config.crtc->crtc_id,
 				   test.oversized_fb.fb_id, 0,
