@@ -29,6 +29,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include "xe/xe_ioctl.h"
 
 enum operations {
 	PAGE_FLIP,
@@ -181,7 +182,8 @@ static void fill_blt(data_t *data, const struct igt_fb *fb, unsigned char color)
 	intel_bb_destroy(ibb);
 	intel_buf_destroy(dst);
 
-	gem_bo_busy(data->drm_fd, fb->gem_handle);
+	if (is_i915_device(data->drm_fd))
+		gem_bo_busy(data->drm_fd, fb->gem_handle);
 }
 
 static void fill_render(data_t *data, const struct igt_fb *fb,
@@ -204,7 +206,16 @@ static void fill_render(data_t *data, const struct igt_fb *fb,
 
 	src = intel_buf_create(data->bops, width, height, fb->plane_bpp[0],
 			       0, tiling, 0);
-	gem_write(data->drm_fd, src->handle, 0, buf, 4);
+
+	if (is_i915_device(data->drm_fd)) {
+		gem_write(data->drm_fd, src->handle, 0, buf, 4);
+	} else {
+		void *map = xe_bo_mmap_ext(data->drm_fd, src->handle, 4,
+					   PROT_READ | PROT_WRITE);
+
+		memcpy(map, buf, 4);
+		gem_munmap(map, 4);
+	}
 
 	rendercopy(ibb,
 		   src, 0, 0, 0xff, 0xff,
@@ -214,7 +225,8 @@ static void fill_render(data_t *data, const struct igt_fb *fb,
 	intel_buf_destroy(src);
 	intel_buf_destroy(dst);
 
-	gem_bo_busy(data->drm_fd, fb->gem_handle);
+	if (is_i915_device(data->drm_fd))
+		gem_bo_busy(data->drm_fd, fb->gem_handle);
 }
 
 static bool sink_support(data_t *data, enum psr_mode mode)
@@ -256,6 +268,11 @@ static bool drrs_disabled(data_t *data)
 {
 	char buf[512];
 
+	/*
+	 * FIXME: As of now, XE's debugfs is using i915 namespace, once Kernel
+	 * changes got landed, please update this logic to use XE specific
+	 * debugfs.
+	 */
 	igt_debugfs_simple_read(data->debugfs_fd, "i915_drrs_status",
 			 buf, sizeof(buf));
 
@@ -510,7 +527,7 @@ igt_main_args("", long_options, help_str, opt_handler, &data)
 	};
 
 	igt_fixture {
-		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
+		data.drm_fd = drm_open_driver_master(DRIVER_INTEL | DRIVER_XE);
 		data.debugfs_fd = igt_debugfs_dir(data.drm_fd);
 		kmstest_set_vt_graphics_mode();
 		data.devid = intel_get_drm_devid(data.drm_fd);
@@ -547,6 +564,9 @@ igt_main_args("", long_options, help_str, opt_handler, &data)
 			igt_subtest_f("%sprimary_%s",
 				      append_subtest_name[data.op_psr_mode],
 				      op_str(op)) {
+				igt_skip_on(is_xe_device(data.drm_fd) &&
+					    (op == MMAP_CPU || op == MMAP_GTT));
+
 				data.op = op;
 				data.test_plane_id = DRM_PLANE_TYPE_PRIMARY;
 				test_setup(&data);
@@ -561,6 +581,9 @@ igt_main_args("", long_options, help_str, opt_handler, &data)
 			igt_subtest_f("%ssprite_%s",
 				      append_subtest_name[data.op_psr_mode],
 				      op_str(op)) {
+				igt_skip_on(is_xe_device(data.drm_fd) &&
+					    (op == MMAP_CPU || op == MMAP_GTT));
+
 				data.op = op;
 				data.test_plane_id = DRM_PLANE_TYPE_OVERLAY;
 				test_setup(&data);
@@ -573,6 +596,9 @@ igt_main_args("", long_options, help_str, opt_handler, &data)
 			igt_subtest_f("%scursor_%s",
 				      append_subtest_name[data.op_psr_mode],
 				      op_str(op)) {
+				igt_skip_on(is_xe_device(data.drm_fd) &&
+					    (op == MMAP_CPU || op == MMAP_GTT));
+
 				data.op = op;
 				data.test_plane_id = DRM_PLANE_TYPE_CURSOR;
 				test_setup(&data);
