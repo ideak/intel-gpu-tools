@@ -308,7 +308,7 @@ enum flip_test {
 static bool cursor_slowpath(igt_display_t *display, enum flip_test mode)
 {
 	/* Intel display 9 and newer will handle cursor movement as fastsets */
-	if (is_i915_device(display->drm_fd) &&
+	if (is_intel_device(display->drm_fd) &&
 	    intel_display_ver(intel_get_drm_devid(display->drm_fd)) >= 9)
 	    return true;
 
@@ -1465,7 +1465,6 @@ static void flip_vs_cursor_busy_crc(igt_display_t *display, bool atomic)
 	igt_output_t *output;
 	igt_plane_t *cursor;
 
-	igt_require_intel(display->drm_fd);
 	ahnd = get_reloc_ahnd(display->drm_fd, 0);
 
 	if (atomic)
@@ -1708,6 +1707,7 @@ igt_main
 	igt_describe("this test perform a busy bo update followed by a cursor update");
 	igt_subtest_group {
 		igt_fixture {
+			igt_require_i915(display.drm_fd);
 			igt_require_pipe_crc(display.drm_fd);
 			igt_display_require_output(&display);
 		}
