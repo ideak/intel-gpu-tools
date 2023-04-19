@@ -388,7 +388,7 @@ static void setup_test_plane(data_t *data, int test_plane)
 	igt_create_color_fb(data->drm_fd,
 			    data->mode->hdisplay, data->mode->vdisplay,
 			    DRM_FORMAT_XRGB8888,
-			    I915_FORMAT_MOD_X_TILED,
+			    DRM_FORMAT_MOD_LINEAR,
 			    0.0, 1.0, 0.0,
 			    &data->fb_green);
 
@@ -416,7 +416,7 @@ static void setup_test_plane(data_t *data, int test_plane)
 		igt_create_color_fb(data->drm_fd,
 				    white_h, white_v,
 				    DRM_FORMAT_XRGB8888,
-				    I915_FORMAT_MOD_X_TILED,
+				    DRM_FORMAT_MOD_LINEAR,
 				    1.0, 1.0, 1.0,
 				    &data->fb_white);
 		break;
