@@ -5706,7 +5706,7 @@ unsigned int igt_get_pipe_current_bpc(int drmfd, enum pipe pipe)
 	fd = igt_debugfs_pipe_dir(drmfd, pipe, O_RDONLY);
 	igt_assert(fd >= 0);
 
-	if (is_i915_device(drmfd))
+	if (is_intel_device(drmfd))
 		strcpy(debugfs_name, "i915_current_bpc");
 	else if (is_amdgpu_device(drmfd))
 		strcpy(debugfs_name, "amdgpu_current_bpc");
@@ -5828,7 +5828,7 @@ int igt_get_max_dotclock(int fd)
 	char *s;
 	int dir, res, max_dotclock = 0;
 
-	if (!is_i915_device(fd))
+	if (!is_intel_device(fd))
 		return max_dotclock;
 
 	dir = igt_debugfs_dir(fd);

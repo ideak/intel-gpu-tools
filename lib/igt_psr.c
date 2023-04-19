@@ -277,7 +277,7 @@ bool i915_psr2_selective_fetch_check(int drm_fd)
 	int debugfs_fd;
 	bool ret;
 
-	if (!is_i915_device(drm_fd))
+	if (!is_intel_device(drm_fd))
 		return false;
 
 	debugfs_fd = igt_debugfs_dir(drm_fd);
@@ -303,7 +303,7 @@ bool i915_psr2_sel_fetch_to_psr1(int drm_fd)
 	int debugfs_fd;
 	bool ret = false;
 
-	if (!is_i915_device(drm_fd))
+	if (!is_intel_device(drm_fd))
 		return ret;
 
 	debugfs_fd = igt_debugfs_dir(drm_fd);
