@@ -152,6 +152,26 @@ test_huc_copy(int fd)
 	xe_vm_destroy(fd, vm);
 }
 
+static bool
+is_huc_running(int fd)
+{
+	char buf[4096];
+	char *s;
+	int gt;
+
+	xe_for_each_gt(fd, gt) {
+		char name[256];
+
+		sprintf(name, "gt%d/uc/huc_info", gt);
+		igt_debugfs_read(fd, name, buf);
+		s = strstr(buf, "RUNNING");
+
+		if (s)
+			return true;
+	}
+	return false;
+}
+
 igt_main
 {
 	int xe;
@@ -162,7 +182,11 @@ igt_main
 	}
 
 	igt_subtest("huc_copy") {
-		igt_skip_on(!IS_TIGERLAKE(intel_get_drm_devid(xe)));
+		/*
+		 * TODO: eventually need to differentiate huc failed to load vs
+		 * platform doesnt have huc
+		 */
+		igt_skip_on(!is_huc_running(xe));
 		test_huc_copy(xe);
 	}
 
