@@ -372,8 +372,11 @@ end:
 	}
 
 	igt_describe("Test to detect forced load.");
-	igt_subtest("force-load-detect")
+	igt_subtest("force-load-detect") {
+		igt_require_i915(drm_fd);
+
 		force_load_detect(drm_fd, connector, res);
+	}
 
 	for (i = 0; i < ARRAY_SIZE(tests); i++) {
 		igt_describe_f("%s", tests[i].desc);
