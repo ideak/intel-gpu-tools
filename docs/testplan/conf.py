@@ -68,5 +68,5 @@ htmlhelp_basename = 'IGT'
 
 # rst2pdf
 pdf_documents = [
-    ('index', u'xe_tests', u'IGT Xe Tests', u'IGT authors'),
+    ('index', u'tests', u'IGT Xe Tests', u'IGT authors'),
 ]

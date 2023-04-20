@@ -1,0 +1,88 @@
+{
+    "description": "JSON file to be used to parse i915 documentation",
+    "files": [ "*.c", "../core_auth.c", "../core_getclient.c",
+               "../core_getstats.c", "../core_getversion.c",
+               "../core_hotunplug.c", "../core_setmaster.c",
+               "../core_setmaster_vs_auth.c", "../debugfs_test.c",
+               "../device_reset.c", "../dmabuf.c",
+               "../drm_import_export.c", "../drm_mm.c",
+               "../dumb_buffer.c", "../prime_busy.c", "../prime_mmap.c",
+               "../prime_mmap_coherency.c", "../prime_self_import.c",
+               "../prime_vgem.c", "../sw_sync.c", "../syncobj_basic.c",
+               "../syncobj_timeline.c", "../syncobj_wait.c",
+               "../vgem_basic.c", "../vgem_slow.c" ],
+    "exclude_files": [ "kms_*", "gem_concurrent_all.c" ],
+    "fields": {
+	"Mega feature": {
+                "_properties_": {
+                    "description": "Contains the mega feature for end to end use case, e. g. the 'sellable' feature."
+                },
+                "Category": {
+                "_properties_": {
+                    "description": "Contains the major group for the tested functionality"
+                },
+
+                "Sub-category": {
+                    "_properties_": {
+                        "description": "Contains the minor group of the functionality"
+                    },
+                    "Functionality": {
+                        "_properties_": {
+                            "description": "Describes the functionality to be tested"
+                        },
+                        "Feature": {
+                            "_properties_": {
+                                "description": "Describes the lowest level feature bucket"
+                            },
+                            "Run type": {
+                                "_properties_": {
+                                    "description": "Defines what category of testlist it belongs"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "Test category": {
+            "_properties_": {
+                "description": "Defines the test category. Usually used at subtest level."
+            }
+        },
+        "Test requirement": {
+            "_properties_": {
+                "description": "Defines Kernel parameters required for the test to run"
+            }
+        },
+        "Issue": {
+            "_properties_": {
+                "description": "If the test is used to solve an issue, point to the URL containing the issue."
+            }
+        },
+        "GPU excluded platform": {
+            "_properties_": {
+                "description": "Provides a list of GPUs not capable of running the subtest (or the test as a whole)."
+            }
+        },
+        "GPU requirement": {
+            "_properties_": {
+                "description": "Describes any GPU-specific requrirement, like requiring multi-tiles."
+            }
+        },
+        "Depends on" : {
+            "_properties_": {
+                "description": "List other subtests that are required to not be skipped before calling this one."
+            }
+        },
+        "TODO": {
+            "_properties_": {
+                "description": "Point to known missing features at the test or subtest."
+            }
+        },
+        "Description" : {
+            "_properties_": {
+                "description": "Provides a description for the test/subtest."
+            }
+        }
+    }
+}

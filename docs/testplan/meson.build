@@ -8,6 +8,7 @@ stylesheet = join_paths(meson.current_source_dir(), 'testplan.css')
 
 xe_test_config = join_paths(source_root, 'tests', 'xe', 'xe_test_config.json')
 kms_test_config = join_paths(source_root, 'tests', 'kms_test_config.json')
+i915_test_config = join_paths(source_root, 'tests', 'i915', 'i915_test_config.json')
 
 check_testlist = []
 if build_tests
@@ -29,11 +30,13 @@ xe_test_dict = {
 
 if build_xe
 	test_dict = {
+		'i915_tests': { 'input': i915_test_config, 'extra_args': [] },
 		'kms_tests': { 'input': kms_test_config, 'extra_args': [] },
 		'xe_tests': { 'input': xe_test_config, 'extra_args': check_testlist }
 	    }
 else
 	test_dict = {
+	      'i915_tests': { 'input': i915_test_config, 'extra_args': [] },
 	      'kms_tests': { 'input': kms_test_config, 'extra_args': [] }
 	    }
 endif
@@ -80,14 +83,14 @@ if sphinx.found()
 	if rst2pdf.found()
 		sphinx_out_pdf = meson.current_build_dir() + '/pdf'
 
-		custom_target('xe_tests.pdf',
+		custom_target('tests.pdf',
 			      build_by_default : true,
 			      command : [ 'sphinx-build', '-c', meson.current_source_dir(),
 					  '-b', 'pdf',
 					  '-D', 'version=' + meson.project_version(),
 					  meson.current_build_dir(), sphinx_out_pdf],
 			      input : index_rst,
-			      output : 'xe_tests.pdf'
+			      output : 'tests.pdf'
 			     )
 	endif
 endif
