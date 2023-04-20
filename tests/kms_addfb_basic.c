@@ -549,7 +549,7 @@ static void addfb25_tests(int fd)
 	igt_subtest("addfb25-bad-modifier") {
 		igt_require_fb_modifiers(fd);
 
-		f.modifier[0] = ~0;
+		f.modifier[0] = DRM_FORMAT_MOD_INVALID;
 		do_ioctl_err(fd, DRM_IOCTL_MODE_ADDFB2, &f, EINVAL);
 	}
 
@@ -729,7 +729,7 @@ static void prop_tests(int fd)
 
 	igt_describe("Test that get-properties ioctl call fails correctly for invalid object type");
 	igt_subtest("invalid-get-prop-any") {
-		get_props.obj_type = 0; /* DRM_MODE_OBJECT_ANY */
+		get_props.obj_type = DRM_MODE_OBJECT_ANY;
 
 		do_ioctl_err(fd, DRM_IOCTL_MODE_OBJ_GETPROPERTIES, &get_props, EINVAL);
 	}
@@ -747,7 +747,7 @@ static void prop_tests(int fd)
 
 	igt_describe("Test that set-properties ioctl call fails correctly for invalid object type");
 	igt_subtest("invalid-set-prop-any") {
-		set_prop.obj_type = 0; /* DRM_MODE_OBJECT_ANY */
+		set_prop.obj_type = DRM_MODE_OBJECT_ANY;
 
 		do_ioctl_err(fd, DRM_IOCTL_MODE_OBJ_SETPROPERTY, &set_prop, EINVAL);
 	}
