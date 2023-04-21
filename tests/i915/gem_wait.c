@@ -31,6 +31,55 @@
 #include "i915/gem_create.h"
 #include "igt.h"
 #include "igt_vgem.h"
+/**
+ * TEST: gem wait
+ * Description: Tests the GEM_WAIT ioctl
+ * Feature: synchronization
+ *
+ * SUBTEST: await
+ * Description: Verify GEM_WAIT functionality in await mode.
+ * Run type: FULL
+ *
+ * SUBTEST: busy
+ * Description: Verify GEM_WAIT functionality in busy mode.
+ * Run type: FULL
+ *
+ * SUBTEST: hang-busy
+ * Description: Verify GEM_WAIT functionality in busy mode, when hang is allowed.
+ * Run type: FULL
+ *
+ * SUBTEST: hang-busy-write
+ * Description: Verify GEM_WAIT functionality in busy-write mode, when hang is allowed.
+ * Run type: FULL
+ *
+ * SUBTEST: hang-wait
+ * Description: Verify GEM_WAIT functionality in wait mode, when hang is allowed.
+ * Run type: FULL
+ *
+ * SUBTEST: hang-wait-write
+ * Description: Verify GEM_WAIT functionality in wait-write mode, when hang is allowed.
+ * Run type: FULL
+ *
+ * SUBTEST: invalid-buf
+ * Description: Verify that GEM_WAIT called with invalid buffer object will fail.
+ * Run type: FULL
+ *
+ * SUBTEST: invalid-flags
+ * Description: Verify that GEM_WAIT called with invalid flag will fail.
+ * Run type: FULL
+ *
+ * SUBTEST: wait
+ * Description: Verify GEM_WAIT functionality in wait mode.
+ * Run type: FULL
+ *
+ * SUBTEST: write-busy
+ * Description: Verify GEM_WAIT functionality in write-busy mode.
+ * Run type: FULL
+ *
+ * SUBTEST: write-wait
+ * Description: Verify GEM_WAIT functionality in write-wait mode.
+ * Run type: FULL
+ */
 
 IGT_TEST_DESCRIPTION("Tests the GEM_WAIT ioctl");
 

@@ -27,6 +27,69 @@
 #include "i915/gem_create.h"
 
 #include <limits.h>
+/**
+ * TEST: i915 query
+ * Description: Testing the i915 query uAPI.
+ * Run type: FULL
+ *
+ * SUBTEST: engine-info
+ * Description: Positive tests for DRM_I915_QUERY_ENGINE_INFO
+ * Feature: gem_core
+ *
+ * SUBTEST: engine-info-invalid
+ * Description: Negative tests for DRM_I915_QUERY_ENGINE_INFO
+ * Feature: gem_core
+ *
+ * SUBTEST: hwconfig_table
+ * Description: Test DRM_I915_QUERY_HWCONFIG_BLOB query
+ * Feature: gem_core
+ *
+ * SUBTEST: query-garbage
+ * Description: Test response to an invalid query call
+ * Feature: gem_core
+ *
+ * SUBTEST: query-regions-garbage-items
+ * Description: Dodgy returned data tests for DRM_I915_QUERY_MEMORY_REGIONS
+ * Feature: gem_core
+ *
+ * SUBTEST: query-regions-sanity-check
+ * Description: Basic tests for DRM_I915_QUERY_MEMORY_REGIONS
+ * Feature: gem_core
+ *
+ * SUBTEST: query-regions-unallocated
+ * Description: Sanity check the region unallocated tracking
+ * Feature: gem_core
+ *
+ * SUBTEST: query-topology-coherent-slice-mask
+ * Description: Compare new DRM_I915_QUERY_TOPOLOGY_INFO query with legacy (sub)slice getparams
+ * Feature: gem_core
+ *
+ * SUBTEST: query-topology-garbage-items
+ * Description: Test response to invalid DRM_I915_QUERY_TOPOLOGY_INFO query
+ * Feature: gem_core
+ *
+ * SUBTEST: query-topology-kernel-writes
+ * Description: Guardband test for DRM_I915_QUERY_TOPOLOGY_INFO query
+ * Feature: gem_core
+ *
+ * SUBTEST: query-topology-known-pci-ids
+ * Description:
+ *   Verify DRM_I915_QUERY_TOPOLOGY_INFO query against hardcoded known values for certain
+ *   platforms
+ * Feature: gem_core
+ *
+ * SUBTEST: query-topology-matches-eu-total
+ * Description: More compare new DRM_I915_QUERY_TOPOLOGY_INFO query with legacy (sub)slice getparams
+ * Feature: gem_core
+ *
+ * SUBTEST: query-topology-unsupported
+ * Description: Verify DRM_I915_QUERY_TOPOLOGY_INFO query fails when it is not supported
+ * Feature: gem_core, no-query-topology
+ *
+ * SUBTEST: test-query-geometry-subslices
+ * Description: Test DRM_I915_QUERY_GEOMETRY_SUBSLICES query
+ * Feature: gem_core
+ */
 
 IGT_TEST_DESCRIPTION("Testing the i915 query uAPI.");
 

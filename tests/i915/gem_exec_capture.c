@@ -31,6 +31,36 @@
 #include "igt_device.h"
 #include "igt_rand.h"
 #include "igt_sysfs.h"
+/**
+ * TEST: gem exec capture
+ * Description: Check that we capture the user specified objects on a hang
+ * Feature: cmd_submission
+ * Run type: FULL
+ *
+ * SUBTEST: capture
+ *
+ * SUBTEST: capture-invisible
+ * Description:
+ *   Check that the kernel doesn't crash if the pages can't be copied from the CPU during error
+ *   capture.
+ *
+ * SUBTEST: capture-recoverable
+ * Description: Verify that the kernel rejects EXEC_OBJECT_CAPTURE with recoverable contexts.
+ *
+ * SUBTEST: many-256M-incremental
+ *
+ * SUBTEST: many-2M-incremental
+ *
+ * SUBTEST: many-2M-zero
+ *
+ * SUBTEST: many-4K-incremental
+ *
+ * SUBTEST: many-4K-zero
+ *
+ * SUBTEST: pi
+ *
+ * SUBTEST: userptr
+ */
 
 #define MAX_RESET_TIME	600
 

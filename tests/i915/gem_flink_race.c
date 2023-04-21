@@ -35,6 +35,16 @@
 #include "i915/gem_create.h"
 #include "igt.h"
 #include "igt_stats.h"
+/**
+ * TEST: gem flink race
+ * Description: Check for flink/open vs. gem close races.
+ * Feature: xorg_dri2
+ * Run type: FULL
+ *
+ * SUBTEST: flink_close
+ *
+ * SUBTEST: flink_name
+ */
 
 IGT_TEST_DESCRIPTION("Check for flink/open vs. gem close races.");
 

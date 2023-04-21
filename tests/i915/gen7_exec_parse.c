@@ -34,6 +34,37 @@
 #include "i915/gem.h"
 #include "i915/gem_create.h"
 #include "sw_sync.h"
+/**
+ * TEST: gen7 exec parse
+ * Feature: cmd_submission, command_parser
+ * Run type: FULL
+ *
+ * SUBTEST: basic-allocation
+ *
+ * SUBTEST: basic-allowed
+ *
+ * SUBTEST: basic-offset
+ *
+ * SUBTEST: basic-rejected
+ *
+ * SUBTEST: batch-without-end
+ *
+ * SUBTEST: bitmasks
+ *
+ * SUBTEST: chained-batch
+ *
+ * SUBTEST: cmd-crossing-page
+ *
+ * SUBTEST: load-register-reg
+ *
+ * SUBTEST: oacontrol-tracking
+ *
+ * SUBTEST: test-lri-OACONTROL
+ *
+ * SUBTEST: test-lri-OASTATUS2
+ *
+ * SUBTEST: test-lri-SO_WRITE_OFFSET_0
+ */
 
 #define DERRMR 0x44050
 #define OASTATUS2 0x2368

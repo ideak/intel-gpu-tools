@@ -39,6 +39,27 @@
 #include "i915/gem_create.h"
 #include "igt.h"
 #include "igt_debugfs.h"
+/**
+ * TEST: gem ppgtt
+ * Run type: FULL
+ *
+ * SUBTEST: blt-vs-render-ctx0
+ * Feature: mapping
+ *
+ * SUBTEST: blt-vs-render-ctxN
+ * Feature: mapping
+ *
+ * SUBTEST: flink-and-close-vma-leak
+ * Feature: mapping, xorg_dri2
+ *
+ * SUBTEST: shrink-vs-evict-any
+ * Description: Regression test to verify GTT eviction can't randomly fail due to object lock contention
+ * Feature: mapping
+ *
+ * SUBTEST: shrink-vs-evict-pinned
+ * Description: Regression test to verify GTT eviction can't randomly fail due to object lock contention
+ * Feature: mapping
+ */
 
 #define WIDTH 512
 #define STRIDE (WIDTH*4)

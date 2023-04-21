@@ -26,6 +26,24 @@
 #include "i915/gem.h"
 #include "i915/gem_create.h"
 #include "igt.h"
+/**
+ * TEST: prime busy
+ * Description: Basic check of polling for prime fences.
+ * Feature: prime
+ * Run type: FULL
+ *
+ * SUBTEST: after
+ *
+ * SUBTEST: after-wait
+ *
+ * SUBTEST: before
+ *
+ * SUBTEST: before-wait
+ *
+ * SUBTEST: hang
+ *
+ * SUBTEST: hang-wait
+ */
 
 IGT_TEST_DESCRIPTION("Basic check of polling for prime fences.");
 

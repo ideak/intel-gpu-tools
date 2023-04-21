@@ -49,6 +49,144 @@
 #include "igt_pm.h"
 #include "intel_ctx.h"
 #include "sw_sync.h"
+/**
+ * TEST: perf pmu
+ * Description: Test the i915 pmu perf interface
+ * Run type: FULL
+ *
+ * SUBTEST: all-busy-check-all
+ * Feature: pmu
+ *
+ * SUBTEST: all-busy-idle-check-all
+ * Feature: pmu
+ *
+ * SUBTEST: busy
+ * Feature: pmu
+ *
+ * SUBTEST: busy-accuracy-2
+ * Feature: pmu
+ *
+ * SUBTEST: busy-accuracy-50
+ * Feature: pmu
+ *
+ * SUBTEST: busy-accuracy-98
+ * Feature: pmu
+ *
+ * SUBTEST: busy-check-all
+ * Feature: pmu
+ *
+ * SUBTEST: busy-double-start
+ * Feature: pmu
+ *
+ * SUBTEST: busy-hang
+ * Feature: pmu
+ *
+ * SUBTEST: busy-idle
+ * Feature: pmu
+ *
+ * SUBTEST: busy-idle-check-all
+ * Feature: pmu
+ *
+ * SUBTEST: busy-idle-no-semaphores
+ * Feature: pmu
+ *
+ * SUBTEST: busy-no-semaphores
+ * Feature: pmu
+ *
+ * SUBTEST: busy-start
+ * Feature: pmu
+ *
+ * SUBTEST: cpu-hotplug
+ * Feature: pmu
+ *
+ * SUBTEST: enable-race
+ * Feature: pmu
+ *
+ * SUBTEST: event-wait
+ * Feature: obsolete, pmu
+ *
+ * SUBTEST: faulting-read
+ * Feature: pmu
+ *
+ * SUBTEST: frequency
+ * Feature: pmu
+ *
+ * SUBTEST: frequency-idle
+ * Feature: pmu
+ *
+ * SUBTEST: gt-awake
+ * Feature: pmu
+ *
+ * SUBTEST: idle
+ * Feature: pmu
+ *
+ * SUBTEST: idle-no-semaphores
+ * Feature: pmu
+ *
+ * SUBTEST: init-busy
+ * Feature: pmu
+ *
+ * SUBTEST: init-sema
+ * Feature: pmu
+ *
+ * SUBTEST: init-wait
+ * Feature: pmu
+ *
+ * SUBTEST: interrupts
+ * Feature: pmu
+ *
+ * SUBTEST: interrupts-sync
+ * Feature: pmu
+ *
+ * SUBTEST: invalid-init
+ * Feature: pmu
+ *
+ * SUBTEST: invalid-open
+ * Feature: pmu
+ *
+ * SUBTEST: module-unload
+ * Feature: pmu
+ *
+ * SUBTEST: most-busy-check-all
+ * Feature: pmu
+ *
+ * SUBTEST: most-busy-idle-check-all
+ * Feature: pmu
+ *
+ * SUBTEST: multi-client
+ * Feature: pmu
+ *
+ * SUBTEST: pmu-read
+ * Description: Verify i915 pmu dir exists and read all events
+ * Feature: pmu
+ *
+ * SUBTEST: rc6
+ * Feature: pmu
+ *
+ * SUBTEST: rc6-runtime-pm
+ * Feature: pmu
+ *
+ * SUBTEST: rc6-runtime-pm-long
+ * Feature: pmu
+ *
+ * SUBTEST: rc6-suspend
+ * Feature: pmu
+ *
+ * SUBTEST: render-node-busy
+ * Feature: pmu
+ *
+ * SUBTEST: render-node-busy-idle
+ * Feature: pmu
+ *
+ * SUBTEST: semaphore-busy
+ * Feature: pmu
+ *
+ * SUBTEST: semaphore-wait
+ * Feature: pmu
+ *
+ * SUBTEST: semaphore-wait-idle
+ * Feature: pmu
+ */
 
 IGT_TEST_DESCRIPTION("Test the i915 pmu perf interface");
 

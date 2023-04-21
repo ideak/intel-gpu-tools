@@ -40,6 +40,47 @@
 #include "igt_sysfs.h"
 #include "igt_debugfs.h"
 #include "sw_sync.h"
+/**
+ * TEST: i915 hangman
+ * Description: Tests for hang detection and recovery
+ * Feature: reset
+ *
+ * SUBTEST: detector
+ * Description: Check that hang detector works
+ * Run type: FULL
+ *
+ * SUBTEST: engine-engine-error
+ * Description: Per engine hang recovery (invalid CS, engine reset)
+ * Run type: FULL
+ *
+ * SUBTEST: engine-engine-hang
+ * Description: Per engine hang recovery (spin, engine reset)
+ * Run type: FULL
+ *
+ * SUBTEST: engine-error-state-capture
+ * Description: Per engine error capture (engine reset)
+ * Run type: FULL
+ *
+ * SUBTEST: error-state-basic
+ * Description: Basic error capture
+ * Run type: BAT
+ *
+ * SUBTEST: gt-engine-error
+ * Description: Per engine hang recovery (invalid CS, GT reset)
+ * Run type: FULL
+ *
+ * SUBTEST: gt-engine-hang
+ * Description: Per engine hang recovery (spin, GT reset)
+ * Run type: FULL
+ *
+ * SUBTEST: gt-error-state-capture
+ * Description: Per engine error capture (GT reset)
+ * Run type: FULL
+ *
+ * SUBTEST: hangcheck-unterminated
+ * Description: Check that executing unintialised memory causes a hang
+ * Run type: FULL
+ */
 
 #ifndef I915_PARAM_CMD_PARSER_VERSION
 #define I915_PARAM_CMD_PARSER_VERSION       28

@@ -41,6 +41,69 @@
 #include "i915/gem_vm.h"
 #include "i915/i915_crc.h"
 #include "i915/i915_blt.h"
+/**
+ * TEST: api intel bb
+ * Description: intel_bb API check.
+ * Feature: igt_core
+ * Run type: FULL
+ *
+ * SUBTEST: add-remove-objects
+ *
+ * SUBTEST: bb-with-allocator
+ *
+ * SUBTEST: blit-noreloc-keep-cache
+ *
+ * SUBTEST: blit-noreloc-purge-cache
+ *
+ * SUBTEST: blit-reloc-keep-cache
+ *
+ * SUBTEST: blit-reloc-purge-cache
+ *
+ * SUBTEST: crc32
+ * Description: Compare cpu and gpu crc32 sums on input object
+ *
+ * SUBTEST: delta-check
+ *
+ * SUBTEST: destroy-bb
+ *
+ * SUBTEST: full-batch
+ *
+ * SUBTEST: intel-bb-blit-none
+ *
+ * SUBTEST: intel-bb-blit-x
+ *
+ * SUBTEST: intel-bb-blit-y
+ *
+ * SUBTEST: lot-of-buffers
+ *
+ * SUBTEST: misplaced-blitter
+ * Description: Execute intel_bb with set of engines provided by userspace
+ *
+ * SUBTEST: object-noreloc-keep-cache-simple
+ *
+ * SUBTEST: object-noreloc-purge-cache-simple
+ *
+ * SUBTEST: object-reloc-keep-cache
+ *
+ * SUBTEST: object-reloc-purge-cache
+ *
+ * SUBTEST: offset-control
+ *
+ * SUBTEST: purge-bb
+ *
+ * SUBTEST: render
+ *
+ * SUBTEST: render-ccs
+ *
+ * SUBTEST: reset-bb
+ * Description: Ensure reset is possible on fresh bb
+ *
+ * SUBTEST: reset-flags
+ *
+ * SUBTEST: simple-bb
+ *
+ * SUBTEST: simple-bb-ctx
+ */
 
 #define PAGE_SIZE 4096
 

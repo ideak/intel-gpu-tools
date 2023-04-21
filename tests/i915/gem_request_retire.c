@@ -49,6 +49,14 @@
 #include "i915/gem.h"
 #include "igt.h"
 #include "igt_types.h"
+/**
+ * TEST: gem request retire
+ * Description: Collection of tests targeting request retirement code paths.
+ * Feature: cmd_submission
+ * Run type: FULL
+ *
+ * SUBTEST: retire-vma-not-inactive
+ */
 
 IGT_TEST_DESCRIPTION("Collection of tests targeting request retirement code"
 		     " paths.");

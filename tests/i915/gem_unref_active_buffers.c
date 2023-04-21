@@ -41,6 +41,14 @@
 #include "igt.h"
 #include "i915/gem.h"
 #include "i915/gem_create.h"
+/**
+ * TEST: gem unref active buffers
+ * Description: Test unreferencing of active buffers.
+ * Feature: cmd_submission
+ * Run type: FULL
+ *
+ * SUBTEST:
+ */
 
 IGT_TEST_DESCRIPTION("Test unreferencing of active buffers.");
 

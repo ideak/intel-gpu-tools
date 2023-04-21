@@ -45,6 +45,14 @@
 #include "drm.h"
 #include "i915/gem.h"
 #include "igt.h"
+/**
+ * TEST: gem media fill
+ * Description: Basic test for the media_fill() function, a very simple workload for the Media pipeline.
+ * Feature: media
+ * Run type: FULL
+ *
+ * SUBTEST: media-fill
+ */
 
 IGT_TEST_DESCRIPTION("Basic test for the media_fill() function, a very simple"
 		     " workload for the Media pipeline.");

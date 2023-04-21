@@ -10,6 +10,18 @@
 #include "lib/intel_chipset.h"
 #include "i915/i915_blt.h"
 #include "i915/intel_mocs.h"
+/**
+ * TEST: gem exercise blt
+ * Description: Exercise blitter commands
+ * Feature: blitter
+ * Run type: FULL
+ *
+ * SUBTEST: fast-copy
+ * Description: Check fast-copy blit
+ *
+ * SUBTEST: fast-copy-emit
+ * Description: Check multiple fast-copy in one batch
+ */
 
 IGT_TEST_DESCRIPTION("Exercise blitter commands");
 

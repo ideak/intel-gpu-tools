@@ -45,6 +45,13 @@
 
 #include "drm.h"
 #include "i915/gem_create.h"
+/**
+ * TEST: gem tiled wc
+ * Feature: caching, gtt
+ * Run type: FULL
+ *
+ * SUBTEST:
+ */
 
 #define WIDTH 512
 #define HEIGHT 512

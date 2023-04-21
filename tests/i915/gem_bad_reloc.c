@@ -41,6 +41,25 @@
 #include "i915/gem.h"
 #include "i915/gem_create.h"
 #include "igt.h"
+/**
+ * TEST: gem bad reloc
+ * Description:
+ *   Simulates SNA behaviour using negative self-relocations for STATE_BASE_ADDRESS command
+ *   packets.
+ * Feature: cmd_submission
+ * Run type: FULL
+ *
+ * SUBTEST: negative-reloc
+ * Description:
+ *   SNA behaviour is compressing batch buffer which leads to negative relocation deltas.
+ *   Negative self-relocation happening with real offset 0.
+ *
+ * SUBTEST: negative-reloc-bltcopy
+ * Description: Exercising blitter operation with negative reloc.
+ *
+ * SUBTEST: negative-reloc-lut
+ * Description: Similar to previous test with flags for lut_based_execbuffer.
+ */
 
 IGT_TEST_DESCRIPTION("Simulates SNA behaviour using negative self-relocations"
 		     " for STATE_BASE_ADDRESS command packets.");

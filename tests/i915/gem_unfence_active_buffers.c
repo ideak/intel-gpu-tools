@@ -52,6 +52,14 @@
 #include "i915/gem.h"
 #include "i915/gem_create.h"
 #include "igt.h"
+/**
+ * TEST: gem unfence active buffers
+ * Description: Check for use-after-free in the fence stealing code.
+ * Feature: synchronization
+ * Run type: FULL
+ *
+ * SUBTEST:
+ */
 
 IGT_TEST_DESCRIPTION("Check for use-after-free in the fence stealing code.");
 

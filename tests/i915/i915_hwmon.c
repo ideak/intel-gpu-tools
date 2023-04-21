@@ -8,6 +8,18 @@
 #include "igt.h"
 #include "igt_hwmon.h"
 #include "igt_sysfs.h"
+/**
+ * TEST: i915 hwmon
+ * Description: Tests for i915 hwmon
+ * Feature: hwmon
+ * Run type: FULL
+ *
+ * SUBTEST: hwmon-read
+ * Description: Verify we can read all hwmon attributes
+ *
+ * SUBTEST: hwmon-write
+ * Description: Verify writable hwmon attributes
+ */
 
 IGT_TEST_DESCRIPTION("Tests for i915 hwmon");
 

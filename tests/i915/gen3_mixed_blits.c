@@ -48,6 +48,13 @@
 #include "i915/gem_create.h"
 #include "i915_reg.h"
 #include "igt.h"
+/**
+ * TEST: gen3 mixed blits
+ * Feature: obsolete
+ * Run type: FULL
+ *
+ * SUBTEST:
+ */
 
 #define WIDTH (512)
 #define HEIGHT (512)

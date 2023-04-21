@@ -41,6 +41,22 @@
 #include "drm.h"
 #include "i915_drm.h"
 #include "i915/gem_create.h"
+/**
+ * TEST: gem fence upload
+ * Run type: FULL
+ *
+ * SUBTEST: performance
+ *
+ * SUBTEST: thread-contention
+ *
+ * SUBTEST: thread-performance-both
+ *
+ * SUBTEST: thread-performance-read
+ *
+ * SUBTEST: thread-performance-write
+ *
+ * SUBTEST: wc-contention
+ */
 
 #define OBJECT_SIZE (1024*1024) /* restricted to 1MiB alignment on i915 fences */
 

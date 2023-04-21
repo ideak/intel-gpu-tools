@@ -35,6 +35,75 @@
 #include "igt.h"
 #include "igt_rand.h"
 #include "sw_sync.h"
+/**
+ * TEST: gem ctx create
+ * Description: Test the context create ioctls
+ * Feature: context
+ *
+ * SUBTEST: active
+ * Description:
+ *   For each engine calculate the average performance of context creation execution and
+ *   exercise context reclaim
+ * Run type: FULL
+ *
+ * SUBTEST: active-all
+ * Description: Calculate the average performance of context creation and it's execution using all engines
+ * Run type: FULL
+ *
+ * SUBTEST: basic
+ * Description: Test random context creation
+ * Run type: BAT
+ *
+ * SUBTEST: basic-files
+ * Description: Exercise implicit per-fd context creation
+ * Run type: BAT
+ *
+ * SUBTEST: ext-param
+ * Description: Verify valid and invalid context extensions
+ * Run type: FULL
+ *
+ * SUBTEST: files
+ * Description: Exercise implicit per-fd context creation on 1 CPU for long duration
+ * Run type: FULL
+ *
+ * SUBTEST: forked-active
+ * Description:
+ *   For each engine calculate the average performance of context creation and execution on
+ *   multiple parallel processes
+ * Run type: FULL
+ *
+ * SUBTEST: forked-active-all
+ * Description:
+ *   Calculate the average performance of context creation and it's execution using all engines
+ *   on multiple parallel processes
+ * Run type: FULL
+ *
+ * SUBTEST: forked-files
+ * Description: Exercise implicit per-fd context creation on all CPUs for long duration
+ * Run type: FULL
+ *
+ * SUBTEST: hog
+ * Description:
+ *   For each engine calculate the average performance of context creation and execution while
+ *   all other engines are hogging the resources
+ * Run type: FULL
+ *
+ * SUBTEST: iris-pipeline
+ * Description: Set, validate and execute particular context params
+ * Run type: FULL
+ *
+ * SUBTEST: maximum-mem
+ * Description:
+ *   Create contexts upto available RAM size, calculate the average performance of their
+ *   execution on multiple parallel processes
+ * Run type: FULL
+ *
+ * SUBTEST: maximum-swap
+ * Description:
+ *   Create contexts upto available RAM+SWAP size, calculate the average performance of their
+ *   execution on multiple parallel processes
+ * Run type: FULL
+ */
 
 IGT_TEST_DESCRIPTION("Test the context create ioctls");
 

@@ -26,6 +26,29 @@
 #include "igt.h"
 #include "igt_dummyload.h"
 #include "igt_types.h"
+/**
+ * TEST: gem ctx isolation
+ * Feature: context
+ * Run type: FULL
+ *
+ * SUBTEST: clean
+ *
+ * SUBTEST: dirty-create
+ *
+ * SUBTEST: dirty-switch
+ *
+ * SUBTEST: nonpriv
+ *
+ * SUBTEST: nonpriv-switch
+ *
+ * SUBTEST: preservation
+ *
+ * SUBTEST: preservation-S3
+ *
+ * SUBTEST: preservation-S4
+ *
+ * SUBTEST: preservation-reset
+ */
 
 /* MAX_REG must be greater than the maximum register address. */
 #define MAX_REG 0x400000

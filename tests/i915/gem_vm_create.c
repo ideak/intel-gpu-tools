@@ -27,6 +27,25 @@
 #include "igt.h"
 #include "igt_rand.h"
 #include "igt_dummyload.h"
+/**
+ * TEST: gem vm create
+ * Run type: FULL
+ *
+ * SUBTEST: create-ext
+ * Feature: mapping
+ *
+ * SUBTEST: execbuf
+ * Feature: cmd_submission, mapping
+ *
+ * SUBTEST: invalid-create
+ * Feature: mapping
+ *
+ * SUBTEST: invalid-destroy
+ * Feature: mapping
+ *
+ * SUBTEST: isolation
+ * Feature: context, mapping
+ */
 
 static int vm_create_ioctl(int i915, struct drm_i915_gem_vm_control *ctl)
 {

@@ -58,6 +58,16 @@
 
 #include "drm.h"
 #include "i915/gem_create.h"
+/**
+ * TEST: gem tiled swapping
+ * Description: Exercise swizzle code for swapping.
+ * Feature: gtt, mapping
+ * Run type: FULL
+ *
+ * SUBTEST: non-threaded
+ *
+ * SUBTEST: threaded
+ */
 
 IGT_TEST_DESCRIPTION("Exercise swizzle code for swapping.");
 

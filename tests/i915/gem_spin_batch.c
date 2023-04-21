@@ -25,6 +25,46 @@
 #include "i915/gem.h"
 #include "i915/gem_ring.h"
 #include "igt.h"
+/**
+ * TEST: gem spin batch
+ * Run type: FULL
+ *
+ * SUBTEST: engines
+ * Feature: context, igt_core
+ *
+ * SUBTEST: legacy
+ * Feature: context, igt_core
+ *
+ * SUBTEST: legacy-resubmit
+ * Feature: context, igt_core
+ *
+ * SUBTEST: legacy-resubmit-new
+ * Feature: context, igt_core, multictx
+ *
+ * SUBTEST: resubmit
+ * Feature: context, igt_core
+ *
+ * SUBTEST: resubmit-all
+ * Feature: context, igt_core, multictx
+ *
+ * SUBTEST: resubmit-new
+ * Feature: context, igt_core, multictx
+ *
+ * SUBTEST: resubmit-new-all
+ * Feature: context, igt_core, multictx
+ *
+ * SUBTEST: spin-all
+ * Feature: igt_core, multictx
+ *
+ * SUBTEST: spin-all-new
+ * Feature: igt_core, multictx
+ *
+ * SUBTEST: spin-each
+ * Feature: igt_core, multictx
+ *
+ * SUBTEST: user-each
+ * Feature: igt_core, multictx
+ */
 
 #define MAX_ERROR 5 /* % */
 

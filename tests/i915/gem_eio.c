@@ -52,6 +52,99 @@
 #include "igt_stats.h"
 #include "igt_sysfs.h"
 #include "sw_sync.h"
+/**
+ * TEST: gem eio
+ * Description: Test that specific ioctls report a wedged GPU (EIO).
+ * Run type: FULL
+ *
+ * SUBTEST: banned
+ * Feature: reset
+ *
+ * SUBTEST: context-create
+ * Feature: reset
+ *
+ * SUBTEST: create
+ * Description: Validate i915_gem_create_ioctl, while gpu is wedged for fb scanout.
+ * Feature: reset
+ *
+ * SUBTEST: create-ext
+ * Description:
+ *   Validate i915_gem_create_ext_ioctl and checks if returns clear backing store while gpu is
+ *   wedged for fb scanout.
+ * Feature: reset
+ *
+ * SUBTEST: execbuf
+ * Feature: reset
+ *
+ * SUBTEST: hibernate
+ * Feature: hibernate, reset
+ *
+ * SUBTEST: in-flight-10ms
+ * Feature: reset
+ *
+ * SUBTEST: in-flight-1us
+ * Feature: reset
+ *
+ * SUBTEST: in-flight-contexts-10ms
+ * Feature: reset
+ *
+ * SUBTEST: in-flight-contexts-1us
+ * Feature: reset
+ *
+ * SUBTEST: in-flight-contexts-immediate
+ * Feature: reset
+ *
+ * SUBTEST: in-flight-external
+ * Feature: reset
+ *
+ * SUBTEST: in-flight-immediate
+ * Feature: reset
+ *
+ * SUBTEST: in-flight-internal-10ms
+ * Feature: reset
+ *
+ * SUBTEST: in-flight-internal-1us
+ * Feature: reset
+ *
+ * SUBTEST: in-flight-internal-immediate
+ * Feature: reset
+ *
+ * SUBTEST: in-flight-suspend
+ * Feature: reset
+ *
+ * SUBTEST: kms
+ * Feature: kms_gem_interop, reset
+ *
+ * SUBTEST: reset-stress
+ * Feature: reset
+ *
+ * SUBTEST: suspend
+ * Feature: reset, suspend
+ *
+ * SUBTEST: throttle
+ * Feature: reset
+ *
+ * SUBTEST: unwedge-stress
+ * Feature: reset
+ *
+ * SUBTEST: wait-10ms
+ * Feature: reset
+ *
+ * SUBTEST: wait-1us
+ * Feature: reset
+ *
+ * SUBTEST: wait-immediate
+ * Feature: reset
+ *
+ * SUBTEST: wait-wedge-10ms
+ * Feature: reset
+ *
+ * SUBTEST: wait-wedge-1us
+ * Feature: reset
+ *
+ * SUBTEST: wait-wedge-immediate
+ * Feature: reset
+ */
 
 IGT_TEST_DESCRIPTION("Test that specific ioctls report a wedged GPU (EIO).");
 

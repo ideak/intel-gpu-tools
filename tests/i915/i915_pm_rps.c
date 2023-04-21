@@ -42,6 +42,40 @@
 #include "igt_dummyload.h"
 #include "igt_perf.h"
 #include "igt_sysfs.h"
+/**
+ * TEST: i915 pm rps
+ * Description: Render P-States tests - verify GPU frequency changes
+ *
+ * SUBTEST: basic-api
+ * Feature: pm_rps
+ * Run type: BAT
+ *
+ * SUBTEST: engine-order
+ * Description: Check if context reuse does not affect waitboosting
+ * Feature: pm_rps
+ * Run type: FULL
+ *
+ * SUBTEST: fence-order
+ * Description: Check if the order of fences does not affect waitboosting
+ * Feature: pm_rps, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: min-max-config-idle
+ * Feature: pm_rps
+ * Run type: FULL
+ *
+ * SUBTEST: min-max-config-loaded
+ * Feature: pm_rps
+ * Run type: FULL
+ *
+ * SUBTEST: reset
+ * Feature: pm_rps
+ * Run type: FULL
+ *
+ * SUBTEST: waitboost
+ * Feature: pm_rps
+ * Run type: FULL
+ */
 
 IGT_TEST_DESCRIPTION("Render P-States tests - verify GPU frequency changes");
 

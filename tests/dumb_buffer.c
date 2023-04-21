@@ -49,6 +49,24 @@
 #include "drmtest.h"
 #include "igt_aux.h"
 #include "ioctl_wrappers.h"
+/**
+ * TEST: dumb buffer
+ * Description: This is a test for the generic dumb buffer interface.
+ * Feature: prime
+ * Run type: FULL
+ *
+ * SUBTEST: create-clear
+ *
+ * SUBTEST: create-valid-dumb
+ *
+ * SUBTEST: invalid-bpp
+ *
+ * SUBTEST: map-invalid-size
+ *
+ * SUBTEST: map-uaf
+ *
+ * SUBTEST: map-valid
+ */
 
 IGT_TEST_DESCRIPTION("This is a test for the generic dumb buffer interface.");
 

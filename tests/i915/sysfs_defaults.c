@@ -33,6 +33,13 @@
 #include "i915/gem.h"
 #include "i915/gem_engine_topology.h"
 #include "igt_sysfs.h"
+/**
+ * TEST: sysfs defaults
+ * Feature: gem_core
+ * Run type: FULL
+ *
+ * SUBTEST: readonly
+ */
 
 static bool may_write(int dir, const char *file)
 {

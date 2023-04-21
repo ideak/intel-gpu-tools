@@ -23,6 +23,22 @@
 
 #include "igt.h"
 #include "igt_kmod.h"
+/**
+ * TEST: i915 selftest
+ * Description: Basic unit tests for i915.ko
+ *
+ * SUBTEST: live
+ * Feature: gem_core
+ * Run type: BAT
+ *
+ * SUBTEST: mock
+ * Feature: gem_core
+ * Run type: FULL
+ *
+ * SUBTEST: perf
+ * Feature: oa
+ * Run type: FULL
+ */
 
 IGT_TEST_DESCRIPTION("Basic unit tests for i915.ko");
 

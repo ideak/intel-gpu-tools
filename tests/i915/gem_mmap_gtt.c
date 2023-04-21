@@ -46,6 +46,494 @@
 #include "igt_sysfs.h"
 #include "igt_x86.h"
 #include "sw_sync.h"
+/**
+ * TEST: gem mmap gtt
+ * Description: Ensure that all operations around MMAP_GTT ioctl works.
+ *
+ * SUBTEST: bad-object
+ * Description: Verify mapping to invalid gem objects fails.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: basic
+ * Description: Basic checks of GEM_MMAP_GTT ioctl.
+ * Feature: gtt
+ * Run type: BAT
+ *
+ * SUBTEST: basic-copy
+ * Description: Test copy between two GTT mmappings.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: basic-read
+ * Description: Test to read content from GTT mmapped object.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: basic-read-write
+ * Description: Check basic read->write order of a GTT mmapped bo.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: basic-read-write-distinct
+ * Description: Check distinct read->write order of a GTT mmapped bo.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: basic-short
+ * Description: Test mmaping less than the full object.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: basic-small-bo
+ * Description: Check mmap access to a small buffer object by CPU directly and through GTT in sequence.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: basic-small-bo-tiledX
+ * Description:
+ *   Check mmap access to a small X-tiled buffer object by CPU directly and through GTT in
+ *   sequence.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: basic-small-bo-tiledY
+ * Description:
+ *   Check mmap access to a small Y-tiled buffer object by CPU directly and through GTT in
+ *   sequence.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: basic-small-copy
+ * Description: Check page by page copying between two GTT mmapped normal-small bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: basic-small-copy-XY
+ * Description: Check page by page copying between two GTT mmapped tiled-small bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: basic-small-copy-odd
+ * Description: Check page by page copying between two GTT mmapped odd tiled-small bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: basic-wc
+ * Description:
+ *   Check the performance of WC writes with WC reads of GTT and WC writes of GTT with WB writes of.
+ *   CPU.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: basic-write
+ * Description: Test to write content to GTT mmapped object.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: basic-write-cpu-read-gtt
+ * Description: Check coherency between GTT and CPU mmappings with LLC.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: basic-write-gtt
+ * Description: Test creates a prefault object into GTT and writes into it from another GTT mmapped.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: basic-write-read
+ * Description: Check basic write->read order of a GTT mmapped bo.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: basic-write-read-distinct
+ * Description: Check distinct write->read order of a GTT mmapped bo.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: big-bo
+ * Description: Check mmap access to a big buffer object by CPU directly and through GTT in sequence.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: big-bo-tiledX
+ * Description: Check mmap access to a big X-tiled buffer object by CPU directly and through GTT in sequence.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: big-bo-tiledY
+ * Description: Check mmap access to a big Y-tiled buffer object by CPU directly and through GTT in sequence.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: big-copy
+ * Description: Check page by page copying between two GTT mmapped normal-big bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: big-copy-XY
+ * Description: Check page by page copying between two GTT mmapped tiled-big bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: big-copy-odd
+ * Description: Check page by page copying between two GTT mmapped odd tiled-big bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: clflush
+ * Description: Check the userspace clflushing of the GTT mmap.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: close-race
+ * Description:
+ *   Test to check that a few threads opening and closing handles cause explosion in other threads
+ *   in the process of mmaping that handle.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: coherency
+ * Description: Check whether a write through the GTT is immediately visible to the CPU.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: cpuset-basic-small-copy
+ * Description:
+ *   Add forked contention with lighter variant (single cpu) and check page by page copying
+ *   between two GTT mmapped normal-small bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: cpuset-basic-small-copy-XY
+ * Description:
+ *   Add forked contention with lighter variant (single cpu) and check page by page copying
+ *   between two GTT mmapped tiled-small bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: cpuset-basic-small-copy-odd
+ * Description:
+ *   Add forked contention with lighter variant (single cpu) and check page by page copying
+ *   between two GTT mmapped odd tiled-small bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: cpuset-big-copy
+ * Description:
+ *   Add forked contention with lighter variant (single cpu) and check page by page copying
+ *   between two GTT mmapped normal-big bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: cpuset-big-copy-XY
+ * Description:
+ *   Add forked contention with lighter variant (single cpu) and check page by page copying
+ *   between two GTT mmapped tiled-big bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: cpuset-big-copy-odd
+ * Description:
+ *   Add forked contention with lighter variant (single cpu) and check page by page copying
+ *   between two GTT mmapped odd tiled-big bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: cpuset-huge-copy
+ * Description:
+ *   Add forked contention with lighter variant (single cpu) and check page by page copying
+ *   between two GTT mmapped normal-huge bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: cpuset-huge-copy-XY
+ * Description:
+ *   Add forked contention with lighter variant (single cpu) and check page by page copying
+ *   between two GTT mmapped tiled-huge bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: cpuset-huge-copy-odd
+ * Description:
+ *   Add forked contention with lighter variant (single cpu) and check page by page copying
+ *   between two GTT mmapped odd tiled-huge bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: cpuset-medium-copy
+ * Description:
+ *   Add forked contention with lighter variant (single cpu) and check page by page copying
+ *   between two GTT mmapped normal-medium bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: cpuset-medium-copy-XY
+ * Description:
+ *   Add forked contention with lighter variant (single cpu) and check page by page copying
+ *   between two GTT mmapped tiled-medium bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: cpuset-medium-copy-odd
+ * Description:
+ *   Add forked contention with lighter variant (single cpu) and check page by page copying
+ *   between two GTT mmapped odd tiled-medium bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: cpuset-swap-copy
+ * Description:
+ *   Add forked contention with lighter variant (single cpu) and check page by page copying
+ *   between two GTT mmapped normal-huge bo's larger than physical memory and resulting in
+ *   thrashing of swap space.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: cpuset-swap-copy-XY
+ * Description:
+ *   Add forked contention with lighter variant (single cpu) and check page by page copying
+ *   between two GTT mmapped tiled-huge bo's larger than physical memory and resulting in
+ *   thrashing of swap space.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: cpuset-swap-copy-odd
+ * Description:
+ *   Add forked contention with lighter variant (single cpu) and check page by page copying
+ *   between two GTT mmapped odd tiled-huge bo's larger than physical memory and resulting in
+ *   thrashing of swap space.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: fault-concurrent
+ * Description: Excercise concurrent pagefaulting of a GTT mmaped bo.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: fault-concurrent-X
+ * Description: Excercise concurrent pagefaulting of a X-tiled GTT mmaped bo.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: fault-concurrent-Y
+ * Description: Excercise concurrent pagefaulting of a Y-tiled GTT mmaped bo.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: flink-race
+ * Description:
+ *   Test to check that a few threads opening and closing flink handles cause explosion in other
+ *   threads in the process of mmaping that handle.
+ * Feature: gtt, xorg_dri2
+ * Run type: FULL
+ *
+ * SUBTEST: forked-basic-small-copy
+ * Description:
+ *   Add forked contention and check page by page copying between two GTT mmapped normal-small
+ *   bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: forked-basic-small-copy-XY
+ * Description:
+ *   Add forked contention and check page by page copying between two GTT mmapped tiled-small
+ *   bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: forked-basic-small-copy-odd
+ * Description:
+ *   Add forked contention and check page by page copying between two GTT mmapped odd tiled-small
+ *   bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: forked-big-copy
+ * Description:
+ *   Add forked contention and check page by page copying between two GTT mmapped normal-big
+ *   bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: forked-big-copy-XY
+ * Description: Add forked contention and check page by page copying between two GTT mmapped tiled-big bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: forked-big-copy-odd
+ * Description:
+ *   Add forked contention and check page by page copying between two GTT mmapped odd tiled-big
+ *   bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: forked-huge-copy
+ * Description:
+ *   Add forked contention and check page by page copying between two GTT mmapped normal-huge
+ *   bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: forked-huge-copy-XY
+ * Description:
+ *   Add forked contention and check page by page copying between two GTT mmapped tiled-huge
+ *   bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: forked-huge-copy-odd
+ * Description:
+ *   Add forked contention and check page by page copying between two GTT mmapped odd tiled-huge
+ *   bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: forked-medium-copy
+ * Description:
+ *   Add forked contention and check page by page copying between two GTT mmapped normal-medium
+ *   bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: forked-medium-copy-XY
+ * Description:
+ *   Add forked contention and check page by page copying between two GTT mmapped tiled-medium
+ *   bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: forked-medium-copy-odd
+ * Description:
+ *   Add forked contention and check page by page copying between two GTT mmapped odd
+ *   tiled-medium bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: forked-swap-copy
+ * Description:
+ *   Add forked contention and check page by page copying between two GTT mmapped normal-huge
+ *   bo's larger than physical memory and resulting in thrashing of swap space.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: forked-swap-copy-XY
+ * Description:
+ *   Add forked contention and check page by page copying between two GTT mmapped tiled-huge bo's
+ *   larger than physical memory and resulting in thrashing of swap space.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: forked-swap-copy-odd
+ * Description:
+ *   Add forked contention and check page by page copying between two GTT mmapped odd tiled-huge
+ *   bo's larger than physical memory and resulting in thrashing of swap space.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: hang
+ * Description: Check read/writes across a GPU reset.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: hang-busy
+ * Description: Exercise the GTT mmap revocation for a reset on a busy object.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: hang-user
+ * Description: Mix a busy hang with GTT and userptr.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: huge-bo
+ * Description: Check mmap access to a huge buffer object by CPU directly and through GTT in sequence.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: huge-bo-tiledX
+ * Description: Check mmap access to a huge X-tiled buffer object by CPU directly and through GTT in sequence.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: huge-bo-tiledY
+ * Description: Check mmap access to a huge Y-tiled buffer object by CPU directly and through GTT in sequence.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: huge-copy
+ * Description: Check page by page copying between two GTT mmapped normal-huge bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: huge-copy-XY
+ * Description: Check page by page copying between two GTT mmapped tiled-huge bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: huge-copy-odd
+ * Description: Check page by page copying between two GTT mmapped odd tiled-huge bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: isolation
+ * Description:
+ *   Test mmap_offset lifetime, closing the object on another file should not affect the local
+ *   mmap_offset.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: medium-copy
+ * Description: Check page by page copying between two GTT mmapped normal-medium bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: medium-copy-XY
+ * Description: Check page by page copying between two GTT mmapped tiled-medium bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: medium-copy-odd
+ * Description: Check page by page copying between two GTT mmapped odd tiled-medium bo's.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: pf-nonblock
+ * Description: Check that the initial pagefault is non-blocking.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: ptrace
+ * Description: Inspect a GTT mmap using ptrace().
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: swap-copy
+ * Description:
+ *   Check page by page copying between two GTT mmapped normal-huge bo's larger than physical
+ *   memory and resulting in thrashing of swap space.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: swap-copy-XY
+ * Description:
+ *   Check page by page copying between two GTT mmapped tiled-huge bo's larger than physical
+ *   memory and resulting in thrashing of swap space.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: swap-copy-odd
+ * Description:
+ *   Check page by page copying between two GTT mmapped odd tiled-huge bo's larger than physical
+ *   memory and resulting in thrashing of swap space.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST: zero-extend
+ * Description: Test MMAP_GTT extension validity.
+ * Feature: gtt
+ * Run type: FULL
+ */
 
 #ifndef PAGE_SIZE
 #define PAGE_SIZE 4096

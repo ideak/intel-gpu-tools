@@ -7,6 +7,15 @@
 #include "igt_kmod.h"
 #include "i915/gem_create.h"
 #include "i915/gem.h"
+/**
+ * TEST: gem lmem evict
+ * Description: Force tiny lmem size for easily testing eviction scenarios.
+ * Feature: local_memory
+ * Run type: FULL
+ *
+ * SUBTEST: dontneed-evict-race
+ * Description: Regression test to verify that madvise will sync against busy dma-resv object for lmem
+ */
 
 IGT_TEST_DESCRIPTION("Force tiny lmem size for easily testing eviction scenarios.");
 

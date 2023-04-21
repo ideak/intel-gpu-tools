@@ -30,6 +30,14 @@
 #include <sys/poll.h>
 #include <sys/stat.h>
 #include <dirent.h>
+/**
+ * TEST: vgem slow
+ * Description: Extended sanity check of Virtual GEM module (vGEM).
+ * Feature: vgem
+ * Run type: FULL
+ *
+ * SUBTEST: nohang
+ */
 
 IGT_TEST_DESCRIPTION("Extended sanity check of Virtual GEM module (vGEM).");
 

@@ -37,6 +37,14 @@
 #include "drm.h"
 #include "i915/gem.h"
 #include "igt.h"
+/**
+ * TEST: gem pwrite snooped
+ * Description: pwrite to a snooped bo then make it uncached and check that the GPU sees the data.
+ * Feature: gtt, mapping
+ * Run type: FULL
+ *
+ * SUBTEST:
+ */
 
 IGT_TEST_DESCRIPTION(
    "pwrite to a snooped bo then make it uncached and check that the GPU sees the data.");

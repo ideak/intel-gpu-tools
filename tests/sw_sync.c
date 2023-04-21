@@ -38,6 +38,48 @@
 
 #include "sw_sync.h"
 
+/**
+ * TEST: sw sync
+ * Description: Test SW Sync Framework
+ * Feature: synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: alloc_fence
+ *
+ * SUBTEST: alloc_fence_invalid_timeline
+ *
+ * SUBTEST: alloc_merge_fence
+ *
+ * SUBTEST: alloc_timeline
+ *
+ * SUBTEST: sync_busy
+ *
+ * SUBTEST: sync_busy_fork
+ *
+ * SUBTEST: sync_busy_fork_unixsocket
+ *
+ * SUBTEST: sync_expired_merge
+ *
+ * SUBTEST: sync_merge
+ *
+ * SUBTEST: sync_merge_invalid
+ *
+ * SUBTEST: sync_merge_same
+ *
+ * SUBTEST: sync_multi_consumer
+ *
+ * SUBTEST: sync_multi_consumer_producer
+ *
+ * SUBTEST: sync_multi_producer_single_consumer
+ *
+ * SUBTEST: sync_multi_timeline_wait
+ *
+ * SUBTEST: sync_random_merge
+ *
+ * SUBTEST: timeline_closed
+ *
+ * SUBTEST: timeline_closed_signaled
+ */
 
 IGT_TEST_DESCRIPTION("Test SW Sync Framework");
 

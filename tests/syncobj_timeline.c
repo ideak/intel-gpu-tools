@@ -30,6 +30,400 @@
 #include <pthread.h>
 #include <signal.h>
 #include "drm.h"
+/**
+ * TEST: syncobj timeline
+ * Description: Tests for the drm timeline sync object API
+ * Feature: synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: 32bits-limit
+ * Description:
+ *   Verifies that signaling around the int32_t limit. For compatibility reason, the handling
+ *   of seqnos in the dma-fences can consider a seqnoA is prior seqnoB even though seqnoA > seqnoB.
+ *
+ * SUBTEST: device-signal-unordered
+ * Description:
+ *   Verifies that a device signaling fences out of order on the timeline still increments the
+ *   timeline monotonically and that waits work properly.
+ *
+ * SUBTEST: device-submit-unordered
+ * Description: Verifies that submitting out of order doesn't break the timeline.
+ *
+ * SUBTEST: etime-multi-wait-all-for-submit-available-unsubmitted
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: etime-multi-wait-all-for-submit-available-unsubmitted-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: etime-multi-wait-all-for-submit-available-unsubmitted-submitted
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: etime-multi-wait-all-for-submit-submitted
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: etime-multi-wait-all-for-submit-submitted-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: etime-multi-wait-all-for-submit-unsubmitted
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: etime-multi-wait-all-for-submit-unsubmitted-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: etime-multi-wait-all-for-submit-unsubmitted-submitted
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: etime-multi-wait-all-for-submit-unsubmitted-submitted-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: etime-multi-wait-all-submitted
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: etime-multi-wait-all-submitted-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: etime-multi-wait-for-submit-available-unsubmitted
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: etime-multi-wait-for-submit-submitted
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: etime-multi-wait-for-submit-unsubmitted
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: etime-multi-wait-for-submit-unsubmitted-submitted
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: etime-multi-wait-submitted
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: etime-single-wait-all-for-submit-available-unsubmitted
+ * Description: Verifies wait behavior on a single timeline syncobj
+ *
+ * SUBTEST: etime-single-wait-all-for-submit-submitted
+ * Description: Verifies wait behavior on a single timeline syncobj
+ *
+ * SUBTEST: etime-single-wait-all-for-submit-unsubmitted
+ * Description: Verifies wait behavior on a single timeline syncobj
+ *
+ * SUBTEST: etime-single-wait-all-submitted
+ * Description: Verifies wait behavior on a single timeline syncobj
+ *
+ * SUBTEST: etime-single-wait-for-submit-available-unsubmitted
+ * Description: Verifies wait behavior on a single timeline syncobj
+ *
+ * SUBTEST: etime-single-wait-for-submit-submitted
+ * Description: Verifies wait behavior on a single timeline syncobj
+ *
+ * SUBTEST: etime-single-wait-for-submit-unsubmitted
+ * Description: Verifies wait behavior on a single timeline syncobj
+ *
+ * SUBTEST: etime-single-wait-submitted
+ * Description: Verifies wait behavior on a single timeline syncobj
+ *
+ * SUBTEST: host-signal-ordered
+ * Description:
+ *   Verifies that the host signaling fences out of order on the timeline still increments the
+ *   timeline monotonically and that waits work properly.
+ *
+ * SUBTEST: host-signal-points
+ * Description:
+ *   Verifies that as we signal points from the host, the syncobj timeline value increments and
+ *   that waits for submits/signals works properly.
+ *
+ * SUBTEST: invalid-multi-wait-all-available-unsubmitted
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: invalid-multi-wait-all-available-unsubmitted-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: invalid-multi-wait-all-available-unsubmitted-submitted
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: invalid-multi-wait-all-available-unsubmitted-submitted-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: invalid-multi-wait-all-unsubmitted
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: invalid-multi-wait-all-unsubmitted-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: invalid-multi-wait-all-unsubmitted-submitted
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: invalid-multi-wait-all-unsubmitted-submitted-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: invalid-multi-wait-available-unsubmitted
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: invalid-multi-wait-available-unsubmitted-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: invalid-multi-wait-available-unsubmitted-submitted
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: invalid-multi-wait-available-unsubmitted-submitted-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: invalid-multi-wait-unsubmitted
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: invalid-multi-wait-unsubmitted-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: invalid-multi-wait-unsubmitted-submitted
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: invalid-multi-wait-unsubmitted-submitted-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: invalid-query-bad-pad
+ * Description:
+ *   Verify that querying a timeline syncobj with an invalid
+ *   drm_syncobj_timeline_array::flags field is rejected
+ *
+ * SUBTEST: invalid-query-illegal-handle
+ * Description: Verifies that querying an invalid syncobj handle is rejected
+ *
+ * SUBTEST: invalid-query-one-illegal-handle
+ * Description: Verifies that querying a list of invalid syncobj handle including an invalid one is rejected
+ *
+ * SUBTEST: invalid-query-zero-handles
+ * Description: Verifies that querying an empty list of syncobj handles is rejected
+ *
+ * SUBTEST: invalid-signal-bad-pad
+ * Description: Verifies that an invalid value in drm_syncobj_timeline_array.flags is rejected
+ *
+ * SUBTEST: invalid-signal-illegal-handle
+ * Description: Verify that signaling an invalid syncobj handle is rejected
+ *
+ * SUBTEST: invalid-signal-illegal-point
+ *
+ * SUBTEST: invalid-signal-one-illegal-handle
+ * Description:
+ *   Verify that an invalid syncobj handle in drm_syncobj_timeline_array is rejected for
+ *   signaling
+ *
+ * SUBTEST: invalid-signal-zero-handles
+ * Description: Verify that signaling an empty list of syncobj handles is rejected
+ *
+ * SUBTEST: invalid-single-wait-all-available-unsubmitted
+ * Description: Verifies wait behavior on a single timeline syncobj
+ *
+ * SUBTEST: invalid-single-wait-all-unsubmitted
+ * Description: Verifies wait behavior on a single timeline syncobj
+ *
+ * SUBTEST: invalid-single-wait-available-unsubmitted
+ * Description: Verifies wait behavior on a single timeline syncobj
+ *
+ * SUBTEST: invalid-single-wait-unsubmitted
+ * Description: Verifies wait behavior on a single timeline syncobj
+ *
+ * SUBTEST: invalid-transfer-bad-pad
+ * Description: Verifies that invalid drm_syncobj_transfer::pad field value is rejected
+ *
+ * SUBTEST: invalid-transfer-illegal-handle
+ * Description: Verifies that an invalid syncobj handle is rejected in drm_syncobj_transfer
+ *
+ * SUBTEST: invalid-transfer-non-existent-point
+ * Description:
+ *   Verifies that transfering a point from a syncobj timeline is to another point in the same
+ *   timeline works
+ *
+ * SUBTEST: invalid-wait-bad-flags
+ * Description: Verifies that an invalid value in drm_syncobj_timeline_wait::flags is rejected
+ *
+ * SUBTEST: invalid-wait-illegal-handle
+ * Description: Verifies that waiting on an invalid syncobj handle is rejected
+ *
+ * SUBTEST: invalid-wait-zero-handles
+ * Description: Verifies that waiting on an empty list of invalid syncobj handles is rejected
+ *
+ * SUBTEST: multi-wait-all-available-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: multi-wait-all-available-submitted
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: multi-wait-all-available-submitted-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: multi-wait-all-for-submit-available-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: multi-wait-all-for-submit-available-submitted
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: multi-wait-all-for-submit-available-submitted-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: multi-wait-all-for-submit-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: multi-wait-all-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: multi-wait-available-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: multi-wait-available-submitted
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: multi-wait-available-submitted-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: multi-wait-for-submit-available-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: multi-wait-for-submit-available-submitted
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: multi-wait-for-submit-available-submitted-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: multi-wait-for-submit-available-unsubmitted-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: multi-wait-for-submit-available-unsubmitted-submitted
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: multi-wait-for-submit-available-unsubmitted-submitted-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: multi-wait-for-submit-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: multi-wait-for-submit-submitted-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: multi-wait-for-submit-unsubmitted-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: multi-wait-for-submit-unsubmitted-submitted-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: multi-wait-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: multi-wait-submitted-signaled
+ * Description: Verifies waiting on a list of timeline syncobjs
+ *
+ * SUBTEST: reset-during-wait-for-submit
+ * Description: Verifies behavior of a reset operation on timeline syncobj while wait operation is ongoing
+ *
+ * SUBTEST: reset-multiple-signaled
+ * Description: Verifies behavior of a reset operation on a list of signaled timeline syncobjs
+ *
+ * SUBTEST: reset-signaled
+ * Description: Verifies behavior of a reset operation on a signaled timeline syncobj
+ *
+ * SUBTEST: reset-unsignaled
+ * Description: Verifies behavior of a reset operation on an unsignaled timeline syncobj
+ *
+ * SUBTEST: signal
+ * Description: Verifies basic signaling of a timeline syncobj
+ *
+ * SUBTEST: signal-array
+ * Description: Verifies the signaling of a list of timeline syncobj
+ *
+ * SUBTEST: signal-point-0
+ * Description:
+ *   Verifies that signaling point 0 of a timline syncobj works with both timeline & legacy wait
+ *   operations
+ *
+ * SUBTEST: single-wait-all-available-signaled
+ * Description: Verifies wait behavior on a single timeline syncobj
+ *
+ * SUBTEST: single-wait-all-available-submitted
+ * Description: Verifies wait behavior on a single timeline syncobj
+ *
+ * SUBTEST: single-wait-all-for-submit-available-signaled
+ * Description: Verifies wait behavior on a single timeline syncobj
+ *
+ * SUBTEST: single-wait-all-for-submit-available-submitted
+ * Description: Verifies wait behavior on a single timeline syncobj
+ *
+ * SUBTEST: single-wait-all-for-submit-signaled
+ * Description: Verifies wait behavior on a single timeline syncobj
+ *
+ * SUBTEST: single-wait-all-signaled
+ * Description: Verifies wait behavior on a single timeline syncobj
+ *
+ * SUBTEST: single-wait-available-signaled
+ * Description: Verifies wait behavior on a single timeline syncobj
+ *
+ * SUBTEST: single-wait-available-submitted
+ * Description: Verifies wait behavior on a single timeline syncobj
+ *
+ * SUBTEST: single-wait-for-submit-available-signaled
+ * Description: Verifies wait behavior on a single timeline syncobj
+ *
+ * SUBTEST: single-wait-for-submit-available-submitted
+ * Description: Verifies wait behavior on a single timeline syncobj
+ *
+ * SUBTEST: single-wait-for-submit-signaled
+ * Description: Verifies wait behavior on a single timeline syncobj
+ *
+ * SUBTEST: single-wait-signaled
+ * Description: Verifies wait behavior on a single timeline syncobj
+ *
+ * SUBTEST: transfer-timeline-point
+ * Description:
+ *   Verifies that transfering a point from a syncobj timeline is to another point in the same
+ *   timeline works for signal/wait operations
+ *
+ * SUBTEST: wait-all-complex
+ * Description:
+ *   Verifies timeline syncobj at different signal/operations stages & between different
+ *   threads.
+ *
+ * SUBTEST: wait-all-delayed-signal
+ * Description: Verifies wait behavior on a timeline syncobj with a delayed signal from a different thread
+ *
+ * SUBTEST: wait-all-for-submit-complex
+ * Description:
+ *   Verifies timeline syncobj at different signal/operations stages & between different
+ *   threads.
+ *
+ * SUBTEST: wait-all-for-submit-delayed-submit
+ * Description: Verifies wait behavior on a timeline syncobj with a delayed signal from a different thread
+ *
+ * SUBTEST: wait-all-for-submit-snapshot
+ * Description: Verifies waiting on a list of timeline syncobjs with different thread for wait/signal
+ *
+ * SUBTEST: wait-all-interrupted
+ * Description: Verifies timeline syncobj waits interaction with signals.
+ *
+ * SUBTEST: wait-all-snapshot
+ * Description: Verifies waiting on a list of timeline syncobjs with different thread for wait/signal
+ *
+ * SUBTEST: wait-any-complex
+ * Description:
+ *   Verifies timeline syncobj at different signal/operations stages & between different
+ *   threads.
+ *
+ * SUBTEST: wait-any-interrupted
+ * Description: Verifies timeline syncobj waits interaction with signals.
+ *
+ * SUBTEST: wait-any-snapshot
+ * Description: Verifies waiting on a list of timeline syncobjs with different thread for wait/signal
+ *
+ * SUBTEST: wait-delayed-signal
+ * Description: Verifies wait behavior on a timeline syncobj with a delayed signal from a different thread
+ *
+ * SUBTEST: wait-for-submit-complex
+ * Description:
+ *   Verifies timeline syncobj at different signal/operations stages & between different
+ *   threads.
+ *
+ * SUBTEST: wait-for-submit-delayed-submit
+ * Description: Verifies wait behavior on a timeline syncobj with a delayed signal from a different thread
+ *
+ * SUBTEST: wait-for-submit-snapshot
+ * Description: Verifies waiting on a list of timeline syncobjs with different thread for wait/signal
+ */
 
 IGT_TEST_DESCRIPTION("Tests for the drm timeline sync object API");
 

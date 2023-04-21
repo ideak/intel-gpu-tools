@@ -33,6 +33,24 @@
 #include "i915/gem.h"
 #include "i915/gem_create.h"
 #include "igt.h"
+/**
+ * TEST: gem fenced exec thrash
+ * Description: Test execbuf fence accounting.
+ * Feature: gtt, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: 2-spare-fences
+ *
+ * SUBTEST: no-spare-fences
+ *
+ * SUBTEST: no-spare-fences-busy
+ *
+ * SUBTEST: no-spare-fences-busy-interruptible
+ *
+ * SUBTEST: no-spare-fences-interruptible
+ *
+ * SUBTEST: too-many-fences
+ */
 
 IGT_TEST_DESCRIPTION("Test execbuf fence accounting.");
 

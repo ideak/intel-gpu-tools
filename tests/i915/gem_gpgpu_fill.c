@@ -48,6 +48,13 @@
 #include "igt_collection.h"
 #include "intel_bufops.h"
 #include "i915/intel_memory_region.h"
+/**
+ * TEST: gem gpgpu fill
+ * Feature: compute
+ * Run type: FULL
+ *
+ * SUBTEST: basic
+ */
 
 #define WIDTH 64
 #define HEIGHT 64

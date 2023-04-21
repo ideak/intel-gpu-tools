@@ -44,6 +44,20 @@
 #include "igt_perf.h"
 #include "igt_sysfs.h"
 #include "ioctl_wrappers.h"
+/**
+ * TEST: gem ctx sseu
+ * Description: Test context render powergating programming.
+ * Feature: pm_sseu
+ * Run type: FULL
+ *
+ * SUBTEST: engines
+ *
+ * SUBTEST: invalid-args
+ *
+ * SUBTEST: invalid-sseu
+ *
+ * SUBTEST: mmap-args
+ */
 
 IGT_TEST_DESCRIPTION("Test context render powergating programming.");
 

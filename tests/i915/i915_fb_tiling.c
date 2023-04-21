@@ -23,6 +23,14 @@
  */
 
 #include "igt.h"
+/**
+ * TEST: i915 fb tiling
+ * Description: Object tiling must be fixed after framebuffer creation.
+ * Feature: mapping
+ * Run type: FULL
+ *
+ * SUBTEST:
+ */
 
 IGT_TEST_DESCRIPTION("Object tiling must be fixed after framebuffer creation.");
 

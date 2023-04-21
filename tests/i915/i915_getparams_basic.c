@@ -30,6 +30,18 @@
 #include <errno.h>
 #include <xf86drm.h>
 #include <i915_drm.h>
+/**
+ * TEST: i915 getparams basic
+ * Description: Tests the export of parameters via DRM_IOCTL_I915_GETPARAM
+ * Feature: gem_core
+ * Run type: BAT
+ *
+ * SUBTEST: basic-eu-total
+ * Description: Examine the export of EU_TOTAL parameter
+ *
+ * SUBTEST: basic-subslice-total
+ * Description: Examine the export of SUBSLICE_TOTAL parameter
+ */
 
 IGT_TEST_DESCRIPTION("Tests the export of parameters via DRM_IOCTL_I915_GETPARAM\n");
 

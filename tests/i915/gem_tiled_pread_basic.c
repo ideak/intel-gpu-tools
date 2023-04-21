@@ -48,6 +48,14 @@
 
 #include "drm.h"
 #include "i915/gem_create.h"
+/**
+ * TEST: gem tiled pread basic
+ * Description: Test pread behavior on tiled objects with respect to the reported swizzling value.
+ * Feature: gtt, mapping
+ * Run type: BAT
+ *
+ * SUBTEST:
+ */
 
 IGT_TEST_DESCRIPTION("Test pread behavior on tiled objects with respect to the"
 		     " reported swizzling value.");

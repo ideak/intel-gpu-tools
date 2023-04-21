@@ -43,6 +43,18 @@
 #include "drm.h"
 #include "i915/gem.h"
 #include "igt.h"
+/**
+ * TEST: gem pipe control store loop
+ * Description: Test (TLB-)Coherency of pipe_control QW writes.
+ * Feature: cmd_submission
+ * Run type: FULL
+ *
+ * SUBTEST: fresh-buffer
+ * Description: Checks tlb consistency of the pipe_control with fresh buffer.
+ *
+ * SUBTEST: reused-buffer
+ * Description: Checks tlb consistency of the pipe_control with reused buffer.
+ */
 
 IGT_TEST_DESCRIPTION("Test (TLB-)Coherency of pipe_control QW writes.");
 

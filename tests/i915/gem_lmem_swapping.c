@@ -24,6 +24,95 @@
 #include "drm.h"
 #include "i915/i915_blt.h"
 #include "i915/intel_mocs.h"
+/**
+ * TEST: gem lmem swapping
+ * Description: Exercise local memory swapping.
+ * Feature: local_memory
+ *
+ * SUBTEST: basic
+ * Description: Exercise local memory swapping to system memory
+ * Run type: BAT
+ *
+ * SUBTEST: heavy-multi
+ * Description: Exercise local memory swapping to system memory
+ * Run type: FULL
+ *
+ * SUBTEST: heavy-random
+ * Description: Exercise local memory swapping to system memory
+ * Run type: FULL
+ *
+ * SUBTEST: heavy-verify-multi
+ * Description: Exercise local memory swapping to system memory
+ * Run type: FULL
+ *
+ * SUBTEST: heavy-verify-multi-ccs
+ * Description: Exercise local memory swapping to system memory
+ * Run type: FULL
+ *
+ * SUBTEST: heavy-verify-random
+ * Description: Exercise local memory swapping to system memory
+ * Run type: FULL
+ *
+ * SUBTEST: heavy-verify-random-ccs
+ * Description: Exercise local memory swapping to system memory
+ * Run type: FULL
+ *
+ * SUBTEST: massive
+ * Description: Exercise local memory swapping to system memory
+ * Run type: FULL
+ *
+ * SUBTEST: massive-random
+ * Description: Exercise local memory swapping to system memory
+ * Run type: FULL
+ *
+ * SUBTEST: parallel-multi
+ * Description: Exercise local memory swapping to system memory
+ * Run type: FULL
+ *
+ * SUBTEST: parallel-random
+ * Description: Exercise local memory swapping to system memory
+ * Run type: FULL
+ *
+ * SUBTEST: parallel-random-engines
+ * Description: Exercise local memory swapping to system memory
+ * Run type: BAT
+ *
+ * SUBTEST: parallel-random-verify
+ * Description: Exercise local memory swapping to system memory
+ * Run type: FULL
+ *
+ * SUBTEST: parallel-random-verify-ccs
+ * Description: Exercise local memory swapping to system memory
+ * Run type: FULL
+ *
+ * SUBTEST: random
+ * Description: Exercise local memory swapping to system memory
+ * Run type: FULL
+ *
+ * SUBTEST: random-engines
+ * Description: Exercise local memory swapping to system memory
+ * Run type: BAT
+ *
+ * SUBTEST: smem-oom
+ * Description: Exercise local memory swapping during exhausting system memory
+ * Run type: FULL
+ *
+ * SUBTEST: verify
+ * Description: Exercise local memory swapping to system memory
+ * Run type: FULL
+ *
+ * SUBTEST: verify-ccs
+ * Description: Exercise local memory swapping to system memory
+ * Run type: FULL
+ *
+ * SUBTEST: verify-random
+ * Description: Exercise local memory swapping to system memory
+ * Run type: BAT
+ *
+ * SUBTEST: verify-random-ccs
+ * Description: Exercise local memory swapping to system memory
+ * Run type: FULL
+ */
 
 IGT_TEST_DESCRIPTION("Exercise local memory swapping.");
 

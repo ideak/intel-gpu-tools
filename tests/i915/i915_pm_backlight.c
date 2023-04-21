@@ -36,6 +36,31 @@
 #include <time.h>
 #include "igt_device.h"
 #include "igt_device_scan.h"
+/**
+ * TEST: i915 pm backlight
+ * Description: Basic backlight sysfs test
+ * Feature: backlight
+ *
+ * SUBTEST: bad-brightness
+ * Description: test the bad brightness.
+ * Run type: FULL
+ *
+ * SUBTEST: basic-brightness
+ * Description: test the basic brightness.
+ * Run type: BAT
+ *
+ * SUBTEST: fade
+ * Description: test basic fade.
+ * Run type: FULL
+ *
+ * SUBTEST: fade-with-dpms
+ * Description: test the fade with DPMS.
+ * Run type: FULL
+ *
+ * SUBTEST: fade-with-suspend
+ * Description: test the fade with suspend.
+ * Run type: FULL
+ */
 
 struct context {
 	int max;

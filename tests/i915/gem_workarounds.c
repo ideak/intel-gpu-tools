@@ -32,6 +32,46 @@
 #include "igt.h"
 #include "igt_device.h"
 #include "igt_types.h"
+/**
+ * TEST: gem workarounds
+ * Run type: FULL
+ *
+ * SUBTEST: basic-read
+ * Feature: workarounds
+ *
+ * SUBTEST: basic-read-context
+ * Feature: workarounds
+ *
+ * SUBTEST: basic-read-fd
+ * Feature: workarounds
+ *
+ * SUBTEST: hibernate-resume
+ * Feature: hibernate, workarounds
+ *
+ * SUBTEST: hibernate-resume-context
+ * Feature: hibernate, workarounds
+ *
+ * SUBTEST: hibernate-resume-fd
+ * Feature: hibernate, workarounds
+ *
+ * SUBTEST: reset
+ * Feature: workarounds
+ *
+ * SUBTEST: reset-context
+ * Feature: workarounds
+ *
+ * SUBTEST: reset-fd
+ * Feature: workarounds
+ *
+ * SUBTEST: suspend-resume
+ * Feature: suspend, workarounds
+ *
+ * SUBTEST: suspend-resume-context
+ * Feature: suspend, workarounds
+ *
+ * SUBTEST: suspend-resume-fd
+ * Feature: suspend, workarounds
+ */
 
 #define PAGE_SIZE 4096
 #define PAGE_ALIGN(x) ALIGN(x, PAGE_SIZE)

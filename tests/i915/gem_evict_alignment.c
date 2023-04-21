@@ -47,6 +47,23 @@
 #include "i915/gem.h"
 #include "i915/gem_create.h"
 #include "igt.h"
+/**
+ * TEST: gem evict alignment
+ * Description: Run a couple of big batches to force the unbind on misalignment code.
+ * Run type: FULL
+ *
+ * SUBTEST: major-hang
+ *
+ * SUBTEST: major-interruptible
+ *
+ * SUBTEST: major-normal
+ *
+ * SUBTEST: minor-hang
+ *
+ * SUBTEST: minor-interruptible
+ *
+ * SUBTEST: minor-normal
+ */
 
 IGT_TEST_DESCRIPTION("Run a couple of big batches to force the unbind on"
 		     " misalignment code.");

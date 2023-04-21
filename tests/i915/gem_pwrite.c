@@ -46,6 +46,73 @@
 #include "igt.h"
 #include "igt_rand.h"
 #include "igt_vgem.h"
+/**
+ * TEST: gem pwrite
+ * Feature: mapping
+ * Run type: FULL
+ *
+ * SUBTEST: basic-exhaustion
+ *
+ * SUBTEST: basic-random
+ *
+ * SUBTEST: basic-self
+ *
+ * SUBTEST: bench
+ *
+ * SUBTEST: big-cpu-backwards
+ *
+ * SUBTEST: big-cpu-fbr
+ *
+ * SUBTEST: big-cpu-forwards
+ *
+ * SUBTEST: big-cpu-random
+ *
+ * SUBTEST: big-gtt-backwards
+ *
+ * SUBTEST: big-gtt-fbr
+ *
+ * SUBTEST: big-gtt-forwards
+ *
+ * SUBTEST: big-gtt-random
+ *
+ * SUBTEST: display
+ *
+ * SUBTEST: huge-cpu-backwards
+ *
+ * SUBTEST: huge-cpu-fbr
+ *
+ * SUBTEST: huge-cpu-forwards
+ *
+ * SUBTEST: huge-cpu-random
+ *
+ * SUBTEST: huge-gtt-backwards
+ *
+ * SUBTEST: huge-gtt-fbr
+ *
+ * SUBTEST: huge-gtt-forwards
+ *
+ * SUBTEST: huge-gtt-random
+ *
+ * SUBTEST: small-cpu-backwards
+ *
+ * SUBTEST: small-cpu-fbr
+ *
+ * SUBTEST: small-cpu-forwards
+ *
+ * SUBTEST: small-cpu-random
+ *
+ * SUBTEST: small-gtt-backwards
+ *
+ * SUBTEST: small-gtt-fbr
+ *
+ * SUBTEST: small-gtt-forwards
+ *
+ * SUBTEST: small-gtt-random
+ *
+ * SUBTEST: snoop
+ *
+ * SUBTEST: uncached
+ */
 
 #define MiB(x) ((x) * 1024 * 1024)
 

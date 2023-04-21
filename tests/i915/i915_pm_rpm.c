@@ -40,6 +40,191 @@
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+/**
+ * TEST: i915 pm rpm
+ *
+ * SUBTEST: basic-pci-d3-state
+ * Feature: pm_rpm
+ * Run type: BAT
+ *
+ * SUBTEST: basic-rte
+ * Feature: pm_rpm
+ * Run type: BAT
+ *
+ * SUBTEST: cursor
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: cursor-dpms
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: debugfs-forcewake-user
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: debugfs-read
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: dpms-lpsp
+ * Feature: dpms, pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: dpms-mode-unset-lpsp
+ * Feature: dpms, pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: dpms-mode-unset-non-lpsp
+ * Feature: dpms, non-lpsp, pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: dpms-non-lpsp
+ * Feature: dpms, non-lpsp, pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: drm-resources-equal
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: fences
+ * Feature: gtt, pm_rpm, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: fences-dpms
+ * Feature: gtt, pm_rpm, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: gem-evict-pwrite
+ * Feature: gtt, pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: gem-execbuf
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: gem-execbuf-stress
+ * Description: Validate execbuf submission while exercising rpm suspend/resume cycles.
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: gem-execbuf-stress-pc8
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: gem-idle
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: gem-mmap-type
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: gem-pread
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: i2c
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: legacy-planes
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: legacy-planes-dpms
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: modeset-lpsp
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: modeset-lpsp-stress
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: modeset-lpsp-stress-no-wait
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: modeset-non-lpsp
+ * Feature: non-lpsp, pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: modeset-non-lpsp-stress
+ * Feature: non-lpsp, pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: modeset-non-lpsp-stress-no-wait
+ * Feature: non-lpsp, pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: modeset-pc8-residency-stress
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: modeset-stress-extra-wait
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: module-reload
+ * Feature: pm_rpm
+ * Run type: BAT
+ *
+ * SUBTEST: pc8-residency
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: pm-caching
+ * Feature: gtt, pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: pm-tiling
+ * Feature: gtt, pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: reg-read-ioctl
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: sysfs-read
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: system-hibernate
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: system-hibernate-devices
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: system-suspend
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: system-suspend-devices
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: system-suspend-execbuf
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: system-suspend-modeset
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: universal-planes
+ * Feature: pm_rpm
+ * Run type: FULL
+ *
+ * SUBTEST: universal-planes-dpms
+ * Feature: pm_rpm
+ * Run type: FULL
+ */
+
 #if defined(__linux__)
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>

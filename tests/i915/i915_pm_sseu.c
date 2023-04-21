@@ -35,6 +35,14 @@
 #include "i915/gem.h"
 #include "igt.h"
 #include "intel_bufops.h"
+/**
+ * TEST: i915 pm sseu
+ * Description: Tests slice/subslice/EU power gating functionality.
+ * Feature: pm_sseu
+ * Run type: FULL
+ *
+ * SUBTEST: full-enable
+ */
 
 IGT_TEST_DESCRIPTION("Tests slice/subslice/EU power gating functionality.\n");
 

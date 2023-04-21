@@ -36,6 +36,87 @@
 #include "igt_dummyload.h"
 #include "igt_gt.h"
 #include "igt_sysfs.h"
+/**
+ * TEST: gem exec suspend
+ * Description: Exercise simple execbufs runs across various suspend/resume cycles.
+ * Feature: cmd_submission, suspend
+ *
+ * SUBTEST: basic
+ * Description: Check basic functionality without any suspend/resume cycle.
+ * Run type: FULL
+ *
+ * SUBTEST: basic-S0
+ * Description: Check with suspend-to-idle target state.
+ * Run type: FULL
+ *
+ * SUBTEST: basic-S3
+ * Description: Check full cycle of suspend-to-mem.
+ * Run type: FULL
+ *
+ * SUBTEST: basic-S3-devices
+ * Description: Check with suspend-to-mem with devices only.
+ * Run type: FULL
+ *
+ * SUBTEST: basic-S4
+ * Description: Check full cycle of suspend-to-disk.
+ * Run type: FULL
+ *
+ * SUBTEST: basic-S4-devices
+ * Description: Check with suspend-to-disk with devices only.
+ * Run type: FULL
+ *
+ * SUBTEST: cached
+ * Description: Check without suspend/resume cycle state with cached object.
+ * Run type: FULL
+ *
+ * SUBTEST: cached-S3
+ * Description: Check suspend-to-mem state with cached object.
+ * Run type: FULL
+ *
+ * SUBTEST: cached-S4
+ * Description: Check suspend-to-disk state with cached object.
+ * Run type: FULL
+ *
+ * SUBTEST: fixed
+ * Description: Check without suspend/resume cycle state with fixed object.
+ * Run type: FULL
+ *
+ * SUBTEST: fixed-S3
+ * Description: Check suspend-to-mem state with fixed object.
+ * Run type: FULL
+ *
+ * SUBTEST: fixed-S4
+ * Description: Check suspend-to-disk state with fixed object.
+ * Run type: FULL
+ *
+ * SUBTEST: hang-S3
+ * Description: Check full cycle of suspend-to-mem with a pending GPU hang.
+ * Run type: FULL
+ *
+ * SUBTEST: hang-S4
+ * Description: Check full cycle of suspend-to-disk with a pending GPU hang.
+ * Run type: FULL
+ *
+ * SUBTEST: power-S0
+ * Description: Check power consumption during idle state.
+ * Run type: FULL
+ *
+ * SUBTEST: power-S3
+ * Description: Check power consumption during suspend-to-mem state.
+ * Run type: FULL
+ *
+ * SUBTEST: uncached
+ * Description: Check without suspend/resume cycle state with uncached object.
+ * Run type: FULL
+ *
+ * SUBTEST: uncached-S3
+ * Description: Check suspend-to-mem state with uncached object.
+ * Run type: FULL
+ *
+ * SUBTEST: uncached-S4
+ * Description: Check suspend-to-disk state with uncached object.
+ * Run type: FULL
+ */
 
 IGT_TEST_DESCRIPTION("Exercise simple execbufs runs across various suspend/resume cycles.");
 

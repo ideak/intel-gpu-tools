@@ -39,6 +39,45 @@
 #include "igt_kmod.h"
 #include "igt_sysfs.h"
 #include "sw_sync.h"
+/**
+ * TEST: core hotunplug
+ * Description: Examine behavior of a driver on device hot unplug
+ * Feature: SMI, core
+ *
+ * SUBTEST: hotrebind
+ * Description:
+ *   Check if the driver can be cleanly rebound to a device with a still open hot unbound driver
+ *   instance
+ * Run type: FULL
+ *
+ * SUBTEST: hotrebind-lateclose
+ * Description: Check if a hot unbound driver instance still open after hot rebind can be cleanly released
+ * Run type: FULL
+ *
+ * SUBTEST: hotreplug
+ * Description: Check if a hot unplugged and still open device can be cleanly restored
+ * Run type: FULL
+ *
+ * SUBTEST: hotreplug-lateclose
+ * Description: Check if an instance of a still open while hot replugged device can be cleanly released
+ * Run type: FULL
+ *
+ * SUBTEST: hotunbind-rebind
+ * Description: Check if the driver can be cleanly unbound from an open device, then released and rebound
+ * Run type: FULL
+ *
+ * SUBTEST: hotunplug-rescan
+ * Description: Check if an open device can be cleanly unplugged, then released and restored
+ * Run type: FULL
+ *
+ * SUBTEST: unbind-rebind
+ * Description: Check if the driver can be cleanly unbound from a device believed to be closed, then rebound
+ * Run type: BAT
+ *
+ * SUBTEST: unplug-rescan
+ * Description: Check if a device believed to be closed can be cleanly unplugged, then restored
+ * Run type: FULL
+ */
 
 IGT_TEST_DESCRIPTION("Examine behavior of a driver on device hot unplug");
 

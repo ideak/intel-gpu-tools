@@ -25,6 +25,15 @@
 #include "i915/gem_create.h"
 #include "igt.h"
 #include "igt_types.h"
+/**
+ * TEST: gem close
+ * Feature: mapping
+ * Run type: FULL
+ *
+ * SUBTEST: basic
+ *
+ * SUBTEST: many-handles-one-vma
+ */
 
 static int batch_create(int fd)
 {

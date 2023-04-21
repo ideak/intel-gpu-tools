@@ -35,6 +35,14 @@
 #include "drm.h"
 #include "i915/gem.h"
 #include "igt.h"
+/**
+ * TEST: gem media vme
+ * Description: A very simple workload for the VME media block.
+ * Feature: media
+ * Run type: FULL
+ *
+ * SUBTEST:
+ */
 
 IGT_TEST_DESCRIPTION("A very simple workload for the VME media block.");
 

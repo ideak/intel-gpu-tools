@@ -43,6 +43,23 @@
 #include "igt.h"
 #include "igt_types.h"
 #include "sw_sync.h"
+/**
+ * TEST: gem ctx engines
+ * Feature: context
+ * Run type: FULL
+ *
+ * SUBTEST: execute-allforone
+ *
+ * SUBTEST: execute-one
+ *
+ * SUBTEST: execute-oneforall
+ *
+ * SUBTEST: independent
+ *
+ * SUBTEST: invalid-engines
+ *
+ * SUBTEST: none
+ */
 
 #define engine_class(e, n) ((e)->engines[(n)].engine_class)
 #define engine_instance(e, n) ((e)->engines[(n)].engine_instance)

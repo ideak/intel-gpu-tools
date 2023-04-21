@@ -26,6 +26,29 @@
 #include "igt.h"
 #include "igt_device_scan.h"
 #include "igt_rand.h"
+/**
+ * TEST: gem exec gttfill
+ * Description: Fill the GTT with batches.
+ *
+ * SUBTEST: all-engines
+ * Description: Stress test check behaviour/correctness of handling batches to fill gtt
+ * Feature: cmd_submission, gtt
+ * Run type: FULL
+ *
+ * SUBTEST: basic
+ * Description: Checks if it can handle enough batches to fill gtt
+ * Feature: cmd_submission, gtt
+ * Run type: BAT
+ *
+ * SUBTEST: engines
+ * Description: Checks the correctness of handling enough batches to fill gtt for each engine
+ * Feature: cmd_submission, gtt
+ * Run type: FULL
+ *
+ * SUBTEST: multigpu-basic
+ * Feature: cmd_submission, gtt, multigpu
+ * Run type: FULL
+ */
 
 IGT_TEST_DESCRIPTION("Fill the GTT with batches.");
 

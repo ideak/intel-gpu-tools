@@ -23,6 +23,36 @@
 #include "igt.h"
 #include <dirent.h>
 #include <sys/utsname.h>
+/**
+ * TEST: i915 module load
+ * Description: Tests the i915 module loading.
+ *
+ * SUBTEST: load
+ * Description: Check if i915 and friends are not yet loaded, then load them.
+ * Feature: core
+ * Run type: BAT
+ *
+ * SUBTEST: reload
+ * Description: Verify the basic functionality of i915 driver after it's reloaded.
+ * Feature: core, sriov-core
+ * Run type: BAT
+ *
+ * SUBTEST: reload-no-display
+ * Description: Verify that i915 driver can be successfully loaded with disabled display.
+ * Feature: core, sriov-core
+ * Run type: FULL
+ *
+ * SUBTEST: reload-with-fault-injection
+ * Description: Verify that i915 driver can be successfully reloaded at least once with fault injection.
+ * Feature: core, sriov-core
+ * Run type: FULL
+ *
+ * SUBTEST: resize-bar
+ * Description: Check whether lmem bar size can be resized to only supported sizes.
+ * Feature: core
+ * Run type: FULL
+ */
+
 #ifdef __linux__
 #include <linux/limits.h>
 #endif

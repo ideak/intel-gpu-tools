@@ -40,6 +40,22 @@
 #include "igt_power.h"
 #include "igt_sysfs.h"
 #include "sw_sync.h"
+/**
+ * TEST: i915 pm rc6 residency
+ * Run type: FULL
+ *
+ * SUBTEST: media-rc6-accuracy
+ * Feature: pm_rc6
+ *
+ * SUBTEST: rc6-accuracy
+ * Feature: GuCRC, pm_rc6
+ *
+ * SUBTEST: rc6-fence
+ * Feature: GuCRC, pm_rc6
+ *
+ * SUBTEST: rc6-idle
+ * Feature: GuCRC, pm_rc6
+ */
 
 #define SLEEP_DURATION 3 /* in seconds */
 

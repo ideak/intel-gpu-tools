@@ -7,6 +7,15 @@
 #include "i915/gem.h"
 #include "igt_power.h"
 #include "igt_sysfs.h"
+/**
+ * TEST: i915 power
+ * Description: i915 power measurement tests
+ * Feature: hwmon
+ * Run type: FULL
+ *
+ * SUBTEST: sanity
+ * Description: Sanity check gpu power measurement
+ */
 
 IGT_TEST_DESCRIPTION("i915 power measurement tests");
 

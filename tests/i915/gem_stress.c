@@ -61,6 +61,13 @@
 #include <sys/time.h>
 
 #include <drm.h>
+/**
+ * TEST: gem stress
+ * Description: General gem coherency test.
+ * Run type: FULL
+ *
+ * SUBTEST:
+ */
 
 IGT_TEST_DESCRIPTION("General gem coherency test.");
 

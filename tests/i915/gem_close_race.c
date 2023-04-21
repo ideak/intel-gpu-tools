@@ -48,6 +48,51 @@
 #include "igt.h"
 #include "igt_aux.h"
 #include "igt_device_scan.h"
+/**
+ * TEST: gem close race
+ * Description: Test try to race gem_close against workload submission.
+ *
+ * SUBTEST: basic-process
+ * Description: Basic workload submission.
+ * Feature: synchronization
+ * Run type: BAT
+ *
+ * SUBTEST: basic-threads
+ * Description:
+ *   Share buffer handle across different drm fd's and trying to race gem_close against
+ *   continuous workload with minimum timeout.
+ * Feature: synchronization
+ * Run type: BAT
+ *
+ * SUBTEST: contexts
+ * Description:
+ *   Share buffer handle across different drm fd's and trying to race gem_close against
+ *   continuous workload in other contexts.
+ * Feature: synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: gem-close-race
+ * Description:
+ *   Share buffer handle across different drm fd's and trying to race of gem_close against
+ *   continuous workload.
+ * Feature: synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: multigpu-basic-process
+ * Description: Basic workload submission on multi-GPU machine.
+ * Feature: multigpu, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: multigpu-basic-threads
+ * Description: Run basic-threads race on multi-GPU machine.
+ * Feature: multigpu, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: process-exit
+ * Description: Test try to race gem_close against submission of continuous workload.
+ * Feature: synchronization
+ * Run type: FULL
+ */
 
 #define OBJECT_SIZE (256 * 1024)
 

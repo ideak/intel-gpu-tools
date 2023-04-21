@@ -31,6 +31,15 @@
 #include "igt_rand.h"
 #include "igt_sysfs.h"
 #include "igt_vgem.h"
+/**
+ * TEST: gem exec await
+ * Feature: cmd_submission
+ * Run type: FULL
+ *
+ * SUBTEST: wide-all
+ *
+ * SUBTEST: wide-contexts
+ */
 
 static double elapsed(const struct timespec *start, const struct timespec *end)
 {

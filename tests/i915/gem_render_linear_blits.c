@@ -49,6 +49,22 @@
 
 #include "i915/gem.h"
 #include "igt.h"
+/**
+ * TEST: gem render linear blits
+ * Feature: mapping
+ *
+ * SUBTEST: aperture-shrink
+ * Run type: FULL
+ *
+ * SUBTEST: aperture-thrash
+ * Run type: FULL
+ *
+ * SUBTEST: basic
+ * Run type: BAT
+ *
+ * SUBTEST: swap-thrash
+ * Run type: FULL
+ */
 
 #define WIDTH 512
 #define STRIDE (WIDTH*4)

@@ -42,6 +42,12 @@
 
 #include "drm.h"
 #include "i915/gem_create.h"
+/**
+ * TEST: gem gtt speed
+ * Run type: FULL
+ *
+ * SUBTEST:
+ */
 
 #define OBJECT_SIZE 16384
 

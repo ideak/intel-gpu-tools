@@ -48,6 +48,33 @@
 
 #include "i915/gem.h"
 #include "igt.h"
+/**
+ * TEST: gem render tiled blits
+ * Description:
+ *   Tests performs cyclic forward, backward and random blits on tiled buffer objects using render
+ *   engine with various working set sizes and compares outputs with expected ones.
+ * Feature: mapping
+ *
+ * SUBTEST: aperture-shrink
+ * Description:
+ *   Check with working set size larger than aperture size and a helper process to shrink buffer
+ *   object caches.
+ * Run type: FULL
+ *
+ * SUBTEST: aperture-thrash
+ * Description: Check with working set size larger than aperture size.
+ * Run type: FULL
+ *
+ * SUBTEST: basic
+ * Description: Check basic functionality.
+ * Run type: BAT
+ *
+ * SUBTEST: swap-thrash
+ * Description:
+ *   Check with working set size larger than system memory size resulting in usage and thrashing
+ *   of swap space.
+ * Run type: FULL
+ */
 
 IGT_TEST_DESCRIPTION("Tests performs cyclic forward, backward and random blits on tiled buffer "
 		      "objects using render engine with various working set sizes and compares "

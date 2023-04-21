@@ -47,6 +47,35 @@
 
 #include "i915/gem.h"
 #include "igt.h"
+/**
+ * TEST: gem pread after blit
+ * Description: Test pread behavior when getting values out of just-drawn-to buffers.
+ * Run type: FULL
+ *
+ * SUBTEST: default-hang
+ *
+ * SUBTEST: default-interruptible
+ *
+ * SUBTEST: default-normal
+ *
+ * SUBTEST: display-hang
+ *
+ * SUBTEST: display-interruptible
+ *
+ * SUBTEST: display-normal
+ *
+ * SUBTEST: snooped-hang
+ *
+ * SUBTEST: snooped-interruptible
+ *
+ * SUBTEST: snooped-normal
+ *
+ * SUBTEST: uncached-hang
+ *
+ * SUBTEST: uncached-interruptible
+ *
+ * SUBTEST: uncached-normal
+ */
 
 IGT_TEST_DESCRIPTION("Test pread behavior when getting values out of"
 		     " just-drawn-to buffers.");

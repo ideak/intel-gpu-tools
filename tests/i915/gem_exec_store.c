@@ -34,6 +34,27 @@
 #include "igt.h"
 #include "igt_device.h"
 #include "igt_gt.h"
+/**
+ * TEST: gem exec store
+ * Description: Exercise store dword functionality using execbuf-ioctl
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic
+ * Description: Verify that all capable engines can store dwords to a common buffer object
+ * Run type: BAT
+ *
+ * SUBTEST: cachelines
+ * Description: Verify that each capable engine can store a dword to different cachelines of a buffer object
+ * Run type: FULL
+ *
+ * SUBTEST: dword
+ * Description: Verify that each capable engine can store a dword to a buffer object
+ * Run type: FULL
+ *
+ * SUBTEST: pages
+ * Description: Verify that each capable engine can store a dword to various page-sized buffer objects
+ * Run type: FULL
+ */
 
 IGT_TEST_DESCRIPTION("Exercise store dword functionality using execbuf-ioctl");
 

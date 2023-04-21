@@ -39,6 +39,14 @@
 
 #include "drm.h"
 #include "i915/gem_create.h"
+/**
+ * TEST: gem tiling max stride
+ * Description: Check that max fence stride works.
+ * Feature: gtt, mapping
+ * Run type: FULL
+ *
+ * SUBTEST:
+ */
 
 IGT_TEST_DESCRIPTION("Check that max fence stride works.");
 

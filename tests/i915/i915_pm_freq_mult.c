@@ -10,6 +10,16 @@
 #include "i915/gem.h"
 #include "igt.h"
 #include "igt_sysfs.h"
+/**
+ * TEST: i915 pm freq mult
+ * Description:
+ *   Tests for sysfs controls (or multipliers) for IP blocks which run at frequencies different
+ *   from the main GT frequency.
+ * Run type: FULL
+ *
+ * SUBTEST: media-freq
+ * Description: Tests for media frequency factor sysfs
+ */
 
 IGT_TEST_DESCRIPTION(
 	"Tests for sysfs controls (or multipliers) for IP blocks which run at "

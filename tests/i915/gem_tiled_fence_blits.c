@@ -45,6 +45,21 @@
 #include "i915/gem_create.h"
 #include "igt.h"
 #include "igt_x86.h"
+/**
+ * TEST: gem tiled fence blits
+ * Description:
+ *   Tests fence management problems related to tiled blits by performing many blits on tiled
+ *   buffer objects with fences enabled and with working set larger than the aperture size.
+ * Feature: gtt, mapping
+ *
+ * SUBTEST: basic
+ * Description: Check basic functionality.
+ * Run type: BAT
+ *
+ * SUBTEST: normal
+ * Description: Check with parallel execution.
+ * Run type: FULL
+ */
 
 IGT_TEST_DESCRIPTION("Tests fence management problems related to tiled blits by performing "
 		     "many blits on tiled buffer objects with fences enabled and with working "

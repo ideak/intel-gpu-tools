@@ -38,6 +38,123 @@
 #include "igt_sysfs.h"
 #include "igt_types.h"
 #include "sw_sync.h"
+/**
+ * TEST: gem exec balancer
+ * Description: Exercise in-kernel load-balancing
+ * Run type: FULL
+ *
+ * SUBTEST: bonded-chain
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: bonded-dual
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: bonded-false-hang
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: bonded-pair
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: bonded-semaphore
+ * Feature: cmd_submission, media_scalability, multictx
+ *
+ * SUBTEST: bonded-sync
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: bonded-true-hang
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: busy
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: fairslice
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: full
+ * Feature: cmd_submission, media_scalability, multictx
+ *
+ * SUBTEST: full-late
+ * Feature: cmd_submission, media_scalability, multictx
+ *
+ * SUBTEST: full-late-pulse
+ * Feature: cmd_submission, media_scalability, multictx
+ *
+ * SUBTEST: full-pulse
+ * Feature: cmd_submission, media_scalability, multictx
+ *
+ * SUBTEST: hang
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: hog
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: indices
+ * Feature: cmd_submission, media_scalability, multictx
+ *
+ * SUBTEST: individual
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: invalid-balancer
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: invalid-bonds
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: nohangcheck
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: noheartbeat
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: nop
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: parallel
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: parallel-balancer
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: parallel-bb-first
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: parallel-contexts
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: parallel-dmabuf-import-out-fence
+ * Description: Regression test to check that dmabuf imported sync file can handle fence array
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: parallel-keep-in-fence
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: parallel-keep-submit-fence
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: parallel-ordering
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: parallel-out-fence
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: persistence
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: semaphore
+ * Feature: cmd_submission, media_scalability, multictx
+ *
+ * SUBTEST: sequential
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: sliced
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: smoke
+ * Feature: cmd_submission, media_scalability
+ *
+ * SUBTEST: waits
+ * Feature: cmd_submission, media_scalability
+ */
 
 IGT_TEST_DESCRIPTION("Exercise in-kernel load-balancing");
 

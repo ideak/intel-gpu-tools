@@ -28,6 +28,14 @@
 #include "drmtest.h"
 #include "i915_drm.h"
 #include "intel_chipset.h"
+/**
+ * TEST: i915 pciid
+ * Description: Check that igt/i915 know about this PCI-ID
+ * Feature: core
+ * Run type: BAT
+ *
+ * SUBTEST:
+ */
 
 IGT_TEST_DESCRIPTION("Check that igt/i915 know about this PCI-ID");
 

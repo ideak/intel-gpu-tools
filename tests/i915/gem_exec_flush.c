@@ -28,6 +28,1502 @@
 #include "i915/gem_ring.h"
 #include "igt.h"
 #include "igt_x86.h"
+/**
+ * TEST: gem exec flush
+ * Description: Basic check of flushing after batches
+ * Run type: FULL
+ *
+ * SUBTEST: basic-batch-kernel-default-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: basic-batch-kernel-default-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-batch-kernel-default-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-uc-pro-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-uc-prw-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-uc-ro-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-uc-rw-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-uc-set-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-wb-pro-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-wb-prw-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-wb-ro-before-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-wb-ro-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-wb-rw-before-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-wb-rw-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-wb-set-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-cpu-blt-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-cpu-blt-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-cpu-blt-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-cpu-bsd-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-cpu-bsd-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-cpu-bsd-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-cpu-bsd1-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-cpu-bsd1-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-cpu-bsd1-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-cpu-bsd2-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-cpu-bsd2-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-cpu-bsd2-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-cpu-default-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-cpu-default-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-cpu-default-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-cpu-render-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-cpu-render-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-cpu-render-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-cpu-vebox-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-cpu-vebox-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-cpu-vebox-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-gtt-blt-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-gtt-blt-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-gtt-blt-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-gtt-bsd-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-gtt-bsd-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-gtt-bsd-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-gtt-bsd1-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-gtt-bsd1-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-gtt-bsd1-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-gtt-bsd2-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-gtt-bsd2-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-gtt-bsd2-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-gtt-default-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-gtt-default-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-gtt-default-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-gtt-render-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-gtt-render-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-gtt-render-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-gtt-vebox-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-gtt-vebox-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-gtt-vebox-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-kernel-blt-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-kernel-blt-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-kernel-blt-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-kernel-bsd-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-kernel-bsd-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-kernel-bsd-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-kernel-bsd1-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-kernel-bsd1-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-kernel-bsd1-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-kernel-bsd2-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-kernel-bsd2-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-kernel-bsd2-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-kernel-render-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-kernel-render-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-kernel-render-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-kernel-vebox-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-kernel-vebox-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-kernel-vebox-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-user-blt-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-user-blt-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-user-blt-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-user-bsd-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-user-bsd-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-user-bsd-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-user-bsd1-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-user-bsd1-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-user-bsd1-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-user-bsd2-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-user-bsd2-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-user-bsd2-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-user-default-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-user-default-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-user-default-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-user-render-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-user-render-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-user-render-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-user-vebox-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-user-vebox-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-user-vebox-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-wc-blt-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-wc-blt-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-wc-blt-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-wc-bsd-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-wc-bsd-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-wc-bsd-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-wc-bsd1-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-wc-bsd1-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-wc-bsd1-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-wc-bsd2-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-wc-bsd2-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-wc-bsd2-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-wc-default-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-wc-default-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-wc-default-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-wc-render-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-wc-render-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-wc-render-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-wc-vebox-cmd
+ * Feature: cmd_submission, command_parser
+ *
+ * SUBTEST: batch-wc-vebox-uc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-wc-vebox-wb
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-pro-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-pro-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-pro-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-pro-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-pro-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-pro-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-pro-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-pro-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-pro-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-pro-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-pro-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-pro-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-pro-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-pro-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-prw-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-prw-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-prw-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-prw-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-prw-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-prw-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-prw-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-prw-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-prw-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-prw-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-prw-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-prw-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-prw-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-prw-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-before-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-before-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-before-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-before-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-before-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-before-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-before-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-before-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-before-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-before-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-before-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-before-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-before-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-before-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-ro-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-before-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-before-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-before-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-before-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-before-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-before-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-before-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-before-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-before-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-before-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-before-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-before-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-before-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-before-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-rw-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-set-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-set-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-set-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-set-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-set-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-set-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-set-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-set-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-set-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-set-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-set-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-set-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-set-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: stream-set-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-pro-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-pro-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-pro-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-pro-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-pro-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-pro-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-pro-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-pro-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-pro-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-pro-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-pro-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-pro-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-pro-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-prw-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-prw-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-prw-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-prw-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-prw-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-prw-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-prw-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-prw-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-prw-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-prw-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-prw-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-prw-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-prw-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-before-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-before-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-before-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-before-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-before-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-before-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-before-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-before-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-before-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-before-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-before-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-before-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-before-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-before-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-ro-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-before-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-before-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-before-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-before-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-before-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-before-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-before-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-before-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-before-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-before-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-before-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-before-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-before-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-before-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-rw-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-set-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-set-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-set-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-set-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-set-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-set-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-set-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-set-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-set-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-set-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-set-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-set-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: uc-set-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-pro-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-pro-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-pro-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-pro-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-pro-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-pro-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-pro-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-pro-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-pro-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-pro-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-pro-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-pro-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-pro-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-prw-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-prw-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-prw-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-prw-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-prw-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-prw-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-prw-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-prw-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-prw-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-prw-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-prw-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-prw-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-prw-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-ro-before-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-ro-before-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-ro-before-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-ro-before-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-ro-before-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-ro-before-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-ro-before-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-ro-before-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-ro-before-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-ro-before-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-ro-before-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-ro-before-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-ro-before-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-ro-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-ro-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-ro-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-ro-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-ro-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-ro-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-ro-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-ro-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-ro-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-ro-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-ro-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-ro-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-ro-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-rw-before-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-rw-before-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-rw-before-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-rw-before-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-rw-before-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-rw-before-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-rw-before-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-rw-before-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-rw-before-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-rw-before-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-rw-before-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-rw-before-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-rw-before-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-rw-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-rw-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-rw-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-rw-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-rw-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-rw-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-rw-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-rw-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-rw-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-rw-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-rw-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-rw-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-rw-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-set-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-set-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-set-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-set-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-set-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-set-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-set-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-set-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-set-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-set-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-set-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-set-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wb-set-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-pro-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-pro-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-pro-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-pro-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-pro-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-pro-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-pro-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-pro-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-pro-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-pro-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-pro-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-pro-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-pro-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-pro-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-prw-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-prw-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-prw-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-prw-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-prw-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-prw-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-prw-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-prw-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-prw-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-prw-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-prw-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-prw-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-prw-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-prw-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-before-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-before-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-before-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-before-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-before-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-before-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-before-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-before-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-before-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-before-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-before-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-before-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-before-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-before-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-ro-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-before-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-before-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-before-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-before-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-before-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-before-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-before-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-before-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-before-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-before-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-before-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-before-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-before-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-before-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-rw-vebox-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-set-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-set-blt-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-set-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-set-bsd-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-set-bsd1
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-set-bsd1-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-set-bsd2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-set-bsd2-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-set-default
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-set-default-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-set-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-set-render-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-set-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-set-vebox-interruptible
+ * Feature: cmd_submission
+ */
 
 IGT_TEST_DESCRIPTION("Basic check of flushing after batches");
 

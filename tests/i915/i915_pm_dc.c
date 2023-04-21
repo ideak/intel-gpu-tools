@@ -36,6 +36,47 @@
 #include "limits.h"
 #include "time.h"
 #include "igt_pm.h"
+/**
+ * TEST: i915 pm dc
+ * Description: Tests to validate display power DC states.
+ * Run type: FULL
+ *
+ * SUBTEST: dc3co-vpb-simulation
+ * Description:
+ *   In this test we make sure that system enters DC3CO when PSR2 is active and system is in SLEEP
+ *   state
+ * Feature: dc3co, pm_dc
+ *
+ * SUBTEST: dc5-dpms
+ * Description:
+ *   This test validates display engine entry to DC5 state while all connectors's DPMS property
+ *   set to OFF
+ * Feature: pm_dc
+ *
+ * SUBTEST: dc5-dpms-negative
+ * Description:
+ *   This test validates negative scenario of DC5 display engine entry to DC5 state while all
+ *   connectors's DPMS property set to ON
+ * Feature: pm_dc
+ *
+ * SUBTEST: dc5-psr
+ * Description: This test validates display engine entry to DC5 state while PSR is active
+ * Feature: pm_dc
+ *
+ * SUBTEST: dc6-dpms
+ * Description:
+ *   This test validates display engine entry to DC6 state while all connectors's DPMS property
+ *   set to OFF
+ * Feature: pm_dc
+ *
+ * SUBTEST: dc6-psr
+ * Description: This test validates display engine entry to DC6 state while PSR is active
+ * Feature: pm_dc
+ *
+ * SUBTEST: dc9-dpms
+ * Description: This test validates display engine entry to DC9 state
+ * Feature: pm_dc
+ */
 
 /* DC State Flags */
 #define CHECK_DC5	(1 << 0)

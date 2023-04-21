@@ -43,6 +43,25 @@
 #include "i915/gem_create.h"
 #include "igt.h"
 #include "igt_x86.h"
+/**
+ * TEST: gem fence thrash
+ * Feature: gtt, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: bo-copy
+ *
+ * SUBTEST: bo-write-verify-none
+ *
+ * SUBTEST: bo-write-verify-threaded-none
+ *
+ * SUBTEST: bo-write-verify-threaded-x
+ *
+ * SUBTEST: bo-write-verify-threaded-y
+ *
+ * SUBTEST: bo-write-verify-x
+ *
+ * SUBTEST: bo-write-verify-y
+ */
 
 #define PAGE_SIZE 4096
 #define CACHELINE 64

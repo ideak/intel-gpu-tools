@@ -48,6 +48,23 @@
 
 #include "i915/gem.h"
 #include "igt.h"
+/**
+ * TEST: gem render copy redux
+ * Description: Advanced test for the render_copy() function.
+ * Run type: FULL
+ *
+ * SUBTEST: flink
+ * Feature: mapping, xorg_dri2
+ *
+ * SUBTEST: flink-interruptible
+ * Feature: mapping, xorg_dri2
+ *
+ * SUBTEST: interruptible
+ * Feature: mapping
+ *
+ * SUBTEST: normal
+ * Feature: mapping
+ */
 
 IGT_TEST_DESCRIPTION("Advanced test for the render_copy() function.");
 

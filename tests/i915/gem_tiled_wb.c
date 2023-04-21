@@ -45,6 +45,16 @@
 
 #include "drm.h"
 #include "i915/gem_create.h"
+/**
+ * TEST: gem tiled wb
+ * Description:
+ *   This is a test of write-combining mmap's behavior on tiled objects with respect to the reported
+ *   swizzling value.
+ * Feature: caching, gtt
+ * Run type: FULL
+ *
+ * SUBTEST:
+ */
 
 IGT_TEST_DESCRIPTION("This is a test of write-combining mmap's behavior on"
 		     " tiled objects with respect to the reported swizzling"

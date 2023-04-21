@@ -49,6 +49,23 @@
 #include "igt.h"
 #include "igt_types.h"
 #include "i915/i915_blt.h"
+/**
+ * TEST: gem linear blits
+ * Description: Test doing many blits with a working set larger than the aperture size.
+ * Feature: blitter
+ *
+ * SUBTEST: basic
+ * Description: Basic blitter functionality check with 2 buffers
+ * Run type: BAT
+ *
+ * SUBTEST: interruptible
+ * Description: Test with interrupts in between the parent process
+ * Run type: FULL
+ *
+ * SUBTEST: normal
+ * Description: The intent is to push beyond the working GTT size to force the driver to rebind the buffers
+ * Run type: FULL
+ */
 
 IGT_TEST_DESCRIPTION("Test doing many blits with a working set larger than the"
 		     " aperture size.");

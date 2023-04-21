@@ -41,6 +41,30 @@
 #include "igt.h"
 #include "igt_types.h"
 #include "lib/igt_device_scan.h"
+/**
+ * TEST: gem basic
+ * Description: Tests basic gem_create and gem_close IOCTLs
+ *
+ * SUBTEST: bad-close
+ * Description: Verify that gem_close fails with bad params.
+ * Feature: gem_core
+ * Run type: BAT
+ *
+ * SUBTEST: create-close
+ * Description: Verify basic functionality of gem_create and gem_close.
+ * Feature: gem_core
+ * Run type: BAT
+ *
+ * SUBTEST: create-fd-close
+ * Description: Verify that closing drm driver is possible with opened gem object.
+ * Feature: gem_core
+ * Run type: BAT
+ *
+ * SUBTEST: multigpu-create-close
+ * Description: Verify basic functionality of gem_create and gem_close on multi-GPU.
+ * Feature: gem_core, multigpu
+ * Run type: FULL
+ */
 
 IGT_TEST_DESCRIPTION("Tests basic gem_create and gem_close IOCTLs");
 

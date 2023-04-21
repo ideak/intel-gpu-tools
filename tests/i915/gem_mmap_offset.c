@@ -37,6 +37,42 @@
 #include "i915/intel_memory_region.h"
 #include "igt.h"
 #include "igt_x86.h"
+/**
+ * TEST: gem mmap offset
+ * Description: Basic MMAP_OFFSET IOCTL tests for mem regions
+ * Feature: mapping
+ * Run type: FULL
+ *
+ * SUBTEST: bad-extensions
+ *
+ * SUBTEST: bad-flags
+ *
+ * SUBTEST: bad-object
+ * Description: Verify mapping to invalid gem objects won't be created
+ *
+ * SUBTEST: basic-uaf
+ * Description: Check buffer object mapping persists after gem_close
+ *
+ * SUBTEST: blt-coherency
+ *
+ * SUBTEST: clear
+ *
+ * SUBTEST: close-race
+ * Description: Check race between close and mmap offset between threads
+ *
+ * SUBTEST: isolation
+ *
+ * SUBTEST: oob-read
+ * Description: Check for out-of-bound access in vm_access
+ *
+ * SUBTEST: open-flood
+ *
+ * SUBTEST: perf
+ *
+ * SUBTEST: pf-nonblock
+ *
+ * SUBTEST: ptrace
+ */
 
 IGT_TEST_DESCRIPTION("Basic MMAP_OFFSET IOCTL tests for mem regions\n");
 

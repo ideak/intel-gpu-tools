@@ -39,6 +39,13 @@
 
 #include "drm.h"
 #include "i915/gem_create.h"
+/**
+ * TEST: gem lut handle
+ * Description: Exercises the basic execbuffer using the handle LUT interface.
+ * Run type: FULL
+ *
+ * SUBTEST:
+ */
 
 IGT_TEST_DESCRIPTION("Exercises the basic execbuffer using the handle LUT"
 		     " interface.");

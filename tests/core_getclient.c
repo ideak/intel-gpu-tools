@@ -31,6 +31,14 @@
 #include <stdlib.h>
 #include <errno.h>
 
+/**
+ * TEST: core getclient
+ * Description: Tests the DRM_IOCTL_GET_CLIENT ioctl.
+ * Feature: core
+ * Run type: FULL
+ *
+ * SUBTEST:
+ */
 
 IGT_TEST_DESCRIPTION("Tests the DRM_IOCTL_GET_CLIENT ioctl.");
 

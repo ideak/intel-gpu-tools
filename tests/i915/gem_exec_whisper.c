@@ -37,6 +37,195 @@
 #include "igt_rand.h"
 #include "igt_sysfs.h"
 #include "intel_ctx.h"
+/**
+ * TEST: gem exec whisper
+ * Feature: cmd_submission
+ * Run type: FULL
+ *
+ * SUBTEST: basic-contexts
+ *
+ * SUBTEST: basic-contexts-all
+ *
+ * SUBTEST: basic-contexts-forked
+ *
+ * SUBTEST: basic-contexts-forked-all
+ *
+ * SUBTEST: basic-contexts-priority
+ *
+ * SUBTEST: basic-contexts-priority-all
+ *
+ * SUBTEST: basic-fds
+ *
+ * SUBTEST: basic-fds-all
+ *
+ * SUBTEST: basic-fds-forked
+ *
+ * SUBTEST: basic-fds-forked-all
+ *
+ * SUBTEST: basic-fds-priority
+ *
+ * SUBTEST: basic-fds-priority-all
+ *
+ * SUBTEST: basic-forked
+ *
+ * SUBTEST: basic-forked-all
+ *
+ * SUBTEST: basic-normal
+ *
+ * SUBTEST: basic-normal-all
+ *
+ * SUBTEST: basic-queues
+ *
+ * SUBTEST: basic-queues-all
+ *
+ * SUBTEST: basic-queues-forked
+ *
+ * SUBTEST: basic-queues-forked-all
+ *
+ * SUBTEST: basic-queues-priority
+ *
+ * SUBTEST: basic-queues-priority-all
+ *
+ * SUBTEST: basic-sync
+ *
+ * SUBTEST: basic-sync-all
+ *
+ * SUBTEST: chain
+ *
+ * SUBTEST: chain-all
+ *
+ * SUBTEST: chain-forked
+ *
+ * SUBTEST: chain-forked-all
+ *
+ * SUBTEST: chain-interruptible
+ *
+ * SUBTEST: chain-interruptible-all
+ *
+ * SUBTEST: chain-sync
+ *
+ * SUBTEST: chain-sync-all
+ *
+ * SUBTEST: contexts-chain
+ *
+ * SUBTEST: contexts-chain-all
+ *
+ * SUBTEST: contexts-engine
+ *
+ * SUBTEST: contexts-forked-engine
+ *
+ * SUBTEST: contexts-interruptible
+ *
+ * SUBTEST: contexts-interruptible-all
+ *
+ * SUBTEST: contexts-interruptible-engine
+ *
+ * SUBTEST: contexts-priority-engine
+ *
+ * SUBTEST: contexts-sync
+ *
+ * SUBTEST: contexts-sync-all
+ *
+ * SUBTEST: contexts-sync-engine
+ *
+ * SUBTEST: fds-chain
+ *
+ * SUBTEST: fds-chain-all
+ *
+ * SUBTEST: fds-engine
+ *
+ * SUBTEST: fds-forked-engine
+ *
+ * SUBTEST: fds-interruptible
+ *
+ * SUBTEST: fds-interruptible-all
+ *
+ * SUBTEST: fds-interruptible-engine
+ *
+ * SUBTEST: fds-priority-engine
+ *
+ * SUBTEST: fds-sync
+ *
+ * SUBTEST: fds-sync-all
+ *
+ * SUBTEST: fds-sync-engine
+ *
+ * SUBTEST: forked-engine
+ *
+ * SUBTEST: hang-chain
+ *
+ * SUBTEST: hang-chain-forked
+ *
+ * SUBTEST: hang-chain-sync
+ *
+ * SUBTEST: hang-contexts
+ *
+ * SUBTEST: hang-contexts-chain
+ *
+ * SUBTEST: hang-contexts-forked
+ *
+ * SUBTEST: hang-contexts-priority
+ *
+ * SUBTEST: hang-contexts-sync
+ *
+ * SUBTEST: hang-fds
+ *
+ * SUBTEST: hang-fds-chain
+ *
+ * SUBTEST: hang-fds-forked
+ *
+ * SUBTEST: hang-fds-priority
+ *
+ * SUBTEST: hang-fds-sync
+ *
+ * SUBTEST: hang-forked
+ *
+ * SUBTEST: hang-normal
+ *
+ * SUBTEST: hang-queues
+ *
+ * SUBTEST: hang-queues-chain
+ *
+ * SUBTEST: hang-queues-forked
+ *
+ * SUBTEST: hang-queues-priority
+ *
+ * SUBTEST: hang-queues-sync
+ *
+ * SUBTEST: hang-sync
+ *
+ * SUBTEST: interruptible
+ *
+ * SUBTEST: interruptible-all
+ *
+ * SUBTEST: interruptible-engine
+ *
+ * SUBTEST: normal-engine
+ *
+ * SUBTEST: queues-chain
+ *
+ * SUBTEST: queues-chain-all
+ *
+ * SUBTEST: queues-engine
+ *
+ * SUBTEST: queues-forked-engine
+ *
+ * SUBTEST: queues-interruptible
+ *
+ * SUBTEST: queues-interruptible-all
+ *
+ * SUBTEST: queues-interruptible-engine
+ *
+ * SUBTEST: queues-priority-engine
+ *
+ * SUBTEST: queues-sync
+ *
+ * SUBTEST: queues-sync-all
+ *
+ * SUBTEST: queues-sync-engine
+ *
+ * SUBTEST: sync-engine
+ */
 
 #define ENGINE_MASK  (I915_EXEC_RING_MASK | I915_EXEC_BSD_MASK)
 

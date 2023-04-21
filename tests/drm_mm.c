@@ -23,6 +23,14 @@
 
 #include "igt.h"
 #include "igt_kmod.h"
+/**
+ * TEST: drm mm
+ * Description: Basic sanity check of DRM's range manager (struct drm_mm)
+ * Feature: mapping
+ * Run type: FULL
+ *
+ * SUBTEST: all-tests
+ */
 
 IGT_TEST_DESCRIPTION("Basic sanity check of DRM's range manager (struct drm_mm)");
 

@@ -30,6 +30,150 @@
 #include <pthread.h>
 #include <signal.h>
 #include "drm.h"
+/**
+ * TEST: syncobj wait
+ * Description: Tests for the drm sync object wait API
+ * Feature: synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: invalid-multi-wait-all-unsubmitted
+ *
+ * SUBTEST: invalid-multi-wait-all-unsubmitted-signaled
+ *
+ * SUBTEST: invalid-multi-wait-all-unsubmitted-submitted
+ *
+ * SUBTEST: invalid-multi-wait-all-unsubmitted-submitted-signaled
+ *
+ * SUBTEST: invalid-multi-wait-unsubmitted
+ *
+ * SUBTEST: invalid-multi-wait-unsubmitted-signaled
+ *
+ * SUBTEST: invalid-multi-wait-unsubmitted-submitted
+ *
+ * SUBTEST: invalid-multi-wait-unsubmitted-submitted-signaled
+ *
+ * SUBTEST: invalid-reset-bad-pad
+ *
+ * SUBTEST: invalid-reset-illegal-handle
+ *
+ * SUBTEST: invalid-reset-one-illegal-handle
+ *
+ * SUBTEST: invalid-reset-zero-handles
+ *
+ * SUBTEST: invalid-signal-bad-pad
+ *
+ * SUBTEST: invalid-signal-illegal-handle
+ *
+ * SUBTEST: invalid-signal-one-illegal-handle
+ *
+ * SUBTEST: invalid-signal-zero-handles
+ *
+ * SUBTEST: invalid-single-wait-all-unsubmitted
+ *
+ * SUBTEST: invalid-single-wait-unsubmitted
+ *
+ * SUBTEST: invalid-wait-bad-flags
+ *
+ * SUBTEST: invalid-wait-illegal-handle
+ *
+ * SUBTEST: invalid-wait-zero-handles
+ *
+ * SUBTEST: multi-wait-all-for-submit-signaled
+ *
+ * SUBTEST: multi-wait-all-for-submit-submitted
+ *
+ * SUBTEST: multi-wait-all-for-submit-submitted-signaled
+ *
+ * SUBTEST: multi-wait-all-for-submit-unsubmitted
+ *
+ * SUBTEST: multi-wait-all-for-submit-unsubmitted-signaled
+ *
+ * SUBTEST: multi-wait-all-for-submit-unsubmitted-submitted
+ *
+ * SUBTEST: multi-wait-all-signaled
+ *
+ * SUBTEST: multi-wait-all-submitted
+ *
+ * SUBTEST: multi-wait-all-submitted-signaled
+ *
+ * SUBTEST: multi-wait-for-submit-signaled
+ *
+ * SUBTEST: multi-wait-for-submit-submitted
+ *
+ * SUBTEST: multi-wait-for-submit-submitted-signaled
+ *
+ * SUBTEST: multi-wait-for-submit-unsubmitted
+ *
+ * SUBTEST: multi-wait-for-submit-unsubmitted-signaled
+ *
+ * SUBTEST: multi-wait-for-submit-unsubmitted-submitted
+ *
+ * SUBTEST: multi-wait-for-submit-unsubmitted-submitted-signaled
+ *
+ * SUBTEST: multi-wait-signaled
+ *
+ * SUBTEST: multi-wait-submitted
+ *
+ * SUBTEST: multi-wait-submitted-signaled
+ *
+ * SUBTEST: reset-during-wait-for-submit
+ *
+ * SUBTEST: reset-multiple-signaled
+ *
+ * SUBTEST: reset-signaled
+ *
+ * SUBTEST: reset-unsignaled
+ *
+ * SUBTEST: signal
+ *
+ * SUBTEST: single-wait-all-for-submit-signaled
+ *
+ * SUBTEST: single-wait-all-for-submit-submitted
+ *
+ * SUBTEST: single-wait-all-for-submit-unsubmitted
+ *
+ * SUBTEST: single-wait-all-signaled
+ *
+ * SUBTEST: single-wait-all-submitted
+ *
+ * SUBTEST: single-wait-for-submit-signaled
+ *
+ * SUBTEST: single-wait-for-submit-submitted
+ *
+ * SUBTEST: single-wait-for-submit-unsubmitted
+ *
+ * SUBTEST: single-wait-signaled
+ *
+ * SUBTEST: single-wait-submitted
+ *
+ * SUBTEST: wait-all-complex
+ *
+ * SUBTEST: wait-all-delayed-signal
+ *
+ * SUBTEST: wait-all-for-submit-complex
+ *
+ * SUBTEST: wait-all-for-submit-delayed-submit
+ *
+ * SUBTEST: wait-all-for-submit-snapshot
+ *
+ * SUBTEST: wait-all-interrupted
+ *
+ * SUBTEST: wait-all-snapshot
+ *
+ * SUBTEST: wait-any-complex
+ *
+ * SUBTEST: wait-any-interrupted
+ *
+ * SUBTEST: wait-any-snapshot
+ *
+ * SUBTEST: wait-delayed-signal
+ *
+ * SUBTEST: wait-for-submit-complex
+ *
+ * SUBTEST: wait-for-submit-delayed-submit
+ *
+ * SUBTEST: wait-for-submit-snapshot
+ */
 
 IGT_TEST_DESCRIPTION("Tests for the drm sync object wait API");
 

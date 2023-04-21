@@ -35,6 +35,246 @@
 #include "igt_vgem.h"
 #include "intel_ctx.h"
 #include "sw_sync.h"
+/**
+ * TEST: gem exec fence
+ * Description: Check that execbuf waits for explicit fences
+ *
+ * SUBTEST: await-hang
+ * Description: Check for explicit fence with async wait on each engine with a pending gpu hang.
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: basic-await
+ * Description: Basic check for explicit fence with async wait on each engine.
+ * Feature: cmd_submission, multitile, synchronization
+ * Run type: BAT
+ *
+ * SUBTEST: basic-busy
+ * Description: Basic check for explicit fence on each busy engine.
+ * Feature: cmd_submission, multitile, synchronization
+ * Run type: BAT
+ *
+ * SUBTEST: basic-busy-all
+ * Description: Basic check for composite fence on all busy engines.
+ * Feature: cmd_submission, multitile, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: basic-wait
+ * Description: Basic check for explicit fence with additinal wait time on each busy engine.
+ * Feature: cmd_submission, multitile, synchronization
+ * Run type: BAT
+ *
+ * SUBTEST: basic-wait-all
+ * Description: Basic check for composite fence with additional wait on all busy engines.
+ * Feature: cmd_submission, multitile, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: busy-hang
+ * Description: Check for explicit fence on each busy engine with a pending gpu hang.
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: busy-hang-all
+ * Description: Check for composite fence on all busy engines with a pending gpu hang.
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: concurrent
+ * Description: Check blocking bonded fences on each engine.
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: expired-history
+ * Description: Verifies long history of fences are expired.
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: invalid-fence-array
+ * Description: Verifies invalid fence-array pointers are rejected.
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: invalid-timeline-fence-array
+ * Description:
+ *   Verifies invalid execbuf parameters in drm_i915_gem_execbuffer_ext_timeline_fences
+ *   are rejected
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: keep-in-fence
+ * Description: Check in-fence is not overwritten with out-fence on each engine.
+ * Feature: cmd_submission, multitile, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: long-history
+ * Description: Verifies accumulation of long history of fences.
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: nb-await
+ * Description: Check for explicit fence with non-blocking wait on each engine.
+ * Feature: cmd_submission, multitile, synchronization
+ * Run type: BAT
+ *
+ * SUBTEST: nb-await-hang
+ * Description: Check for explicit fence with non-blocking async wait on each engine with a pending gpu hang.
+ * Feature: cmd_submission, multitile, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: parallel
+ * Description: Check for EXEC_FENCE_SUBMIT in parallel execution scenarios on each engine.
+ * Feature: cmd_submission, multitile, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: submit
+ * Description: Check timeslicing on submit-fence.
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: submit-chain
+ * Description: Check launching a chain of spinners across all engines using submit-fence.
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: submit3
+ * Description: Check timeslicing on submit-fence by submitting coupled batches.
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: submit67
+ * Description:
+ *   Check timeslicing on submit-fence by submitting more coupled batches than can possibly fit
+ *   into the ELSP.
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: syncobj-backward-timeline-chain-engines
+ * Description:
+ *   Engine chaining tests to verify ordering of timeline syncobjs with backward timeline
+ *   points.
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: syncobj-channel
+ * Description: Verifies two clients racing for syncobj using channel.
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: syncobj-export
+ * Description: Verify exporting of fence-array syncobj signaled by i915.
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: syncobj-import
+ * Description: Verifies creating of a syncobj from explicit fence.
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: syncobj-invalid-flags
+ * Description: Verifies that invalid fence flags in fence-array are rejected.
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: syncobj-invalid-wait
+ * Description: Verifies that submitting an execbuf with a wait on a syncobj that doesn't exists is rejected.
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: syncobj-repeat
+ * Description: Verifies that waiting & signaling a same fence-array syncobj within the same execbuf works.
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: syncobj-signal
+ * Description: Verifies proper signaling of a fence-array syncobj through execbuf.
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: syncobj-stationary-timeline-chain-engines
+ * Description:
+ *   Engine chaining tests to verify ordering of timeline syncobj with stationary timeline
+ *   points.
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: syncobj-timeline-chain-engines
+ * Description: Engine chaining tests to verify ordering of timeline syncobjs through execbuf.
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: syncobj-timeline-export
+ * Description: Verify exporting of timeline syncobj signaled by i915
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: syncobj-timeline-invalid-flags
+ * Description:
+ *   Verifies that invalid fence flags in drm_i915_gem_execbuffer_ext_timeline_fences are
+ *   rejected
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: syncobj-timeline-invalid-wait
+ * Description:
+ *   Verifies that submitting an execbuf with a wait on a timeline syncobj point that does not
+ *   exists is rejected
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: syncobj-timeline-multiple-ext-nodes
+ * Description: Verify that passing multiple execbuffer_ext nodes works
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: syncobj-timeline-repeat
+ * Description:
+ *   Verifies that waiting & signaling a same timeline syncobj point within the same execbuf
+ *   fworks
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: syncobj-timeline-signal
+ * Description: Verifies proper signaling of a timeline syncobj through execbuf
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: syncobj-timeline-unused-fence
+ * Description:
+ *   Verifies that a timeline syncobj passed into
+ *   drm_i915_gem_execbuffer_ext_timeline_fences but with no signal/wait flag is left
+ *   untouched
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: syncobj-timeline-wait
+ * Description: Verifies that waiting on a timeline syncobj point between engines works
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: syncobj-unused-fence
+ * Description: Verifies that a syncobj passed into execbuf but with no signal/wait flag is left untouched.
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: syncobj-wait
+ * Description: Verifies that waiting on a timeline syncobj point between engines works.
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: wait-hang
+ * Description:
+ *   Check for explicit fence with additional wait time on each busy engine with a pending gpu
+ *   hang.
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: wait-hang-all
+ * Description:
+ *   Check for composite fence with additional wait on all busy engines and with a pending gpu
+ *   hang.
+ * Feature: cmd_submission, synchronization
+ * Run type: FULL
+ */
 
 IGT_TEST_DESCRIPTION("Check that execbuf waits for explicit fences");
 

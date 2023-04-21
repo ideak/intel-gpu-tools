@@ -31,6 +31,20 @@
 
 #include "i915/gem.h"
 #include "igt.h"
+/**
+ * TEST: prime mmap coherency
+ * Description:
+ *   Test dma-buf mmap on !llc platforms mostly and provoke coherency bugs so we know for sure where
+ *   we need the sync ioctls.
+ * Feature: prime
+ * Run type: FULL
+ *
+ * SUBTEST: ioctl-errors
+ *
+ * SUBTEST: read
+ *
+ * SUBTEST: write
+ */
 
 IGT_TEST_DESCRIPTION("Test dma-buf mmap on !llc platforms mostly and provoke"
 		" coherency bugs so we know for sure where we need the sync ioctls.");

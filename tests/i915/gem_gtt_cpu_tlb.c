@@ -43,6 +43,14 @@
 
 #include "drm.h"
 #include "i915/gem_create.h"
+/**
+ * TEST: gem gtt cpu tlb
+ * Description: Check whether gtt tlbs for cpu access are correctly invalidated.
+ * Feature: gtt, mapping
+ * Run type: FULL
+ *
+ * SUBTEST:
+ */
 
 IGT_TEST_DESCRIPTION("Check whether gtt tlbs for cpu access are correctly"
 		     " invalidated.");

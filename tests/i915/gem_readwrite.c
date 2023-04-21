@@ -38,6 +38,21 @@
 
 #include "drm.h"
 #include "i915/gem_create.h"
+/**
+ * TEST: gem readwrite
+ * Feature: mapping
+ * Run type: FULL
+ *
+ * SUBTEST: beyond-EOB
+ *
+ * SUBTEST: new-obj
+ *
+ * SUBTEST: read-bad-handle
+ *
+ * SUBTEST: read-write
+ *
+ * SUBTEST: write-bad-handle
+ */
 
 #define OBJECT_SIZE 16384
 

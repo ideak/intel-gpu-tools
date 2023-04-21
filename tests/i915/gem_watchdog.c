@@ -35,6 +35,17 @@
 #include "igt.h"
 #include "igt_params.h"
 #include "sw_sync.h"
+/**
+ * TEST: gem watchdog
+ * Feature: gem_core
+ * Run type: FULL
+ *
+ * SUBTEST: default-physical
+ *
+ * SUBTEST: default-virtual
+ *
+ * SUBTEST: far-fence
+ */
 
 #define EWATCHDOG EINTR
 

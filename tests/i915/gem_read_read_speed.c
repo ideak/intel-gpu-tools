@@ -42,6 +42,67 @@
 #include "i915/gem.h"
 #include "igt.h"
 #include "igt_sysfs.h"
+/**
+ * TEST: gem read read speed
+ * Description: Test speed of concurrent reads between engines.
+ * Run type: FULL
+ *
+ * SUBTEST: read-read-1024x1024
+ *
+ * SUBTEST: read-read-128x128
+ *
+ * SUBTEST: read-read-2048x2048
+ *
+ * SUBTEST: read-read-256x256
+ *
+ * SUBTEST: read-read-4096x4096
+ *
+ * SUBTEST: read-read-512x512
+ *
+ * SUBTEST: read-read-8192x8192
+ *
+ * SUBTEST: read-write-1024x1024
+ *
+ * SUBTEST: read-write-128x128
+ *
+ * SUBTEST: read-write-2048x2048
+ *
+ * SUBTEST: read-write-256x256
+ *
+ * SUBTEST: read-write-4096x4096
+ *
+ * SUBTEST: read-write-512x512
+ *
+ * SUBTEST: read-write-8192x8192
+ *
+ * SUBTEST: write-read-1024x1024
+ *
+ * SUBTEST: write-read-128x128
+ *
+ * SUBTEST: write-read-2048x2048
+ *
+ * SUBTEST: write-read-256x256
+ *
+ * SUBTEST: write-read-4096x4096
+ *
+ * SUBTEST: write-read-512x512
+ *
+ * SUBTEST: write-read-8192x8192
+ *
+ * SUBTEST: write-write-1024x1024
+ *
+ * SUBTEST: write-write-128x128
+ *
+ * SUBTEST: write-write-2048x2048
+ *
+ * SUBTEST: write-write-256x256
+ *
+ * SUBTEST: write-write-4096x4096
+ *
+ * SUBTEST: write-write-512x512
+ *
+ * SUBTEST: write-write-8192x8192
+ */
 
 IGT_TEST_DESCRIPTION("Test speed of concurrent reads between engines.");
 

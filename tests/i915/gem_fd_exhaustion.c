@@ -34,6 +34,12 @@
 #include <limits.h>
 
 #include "i915/gem_create.h"
+/**
+ * TEST: gem fd exhaustion
+ * Run type: FULL
+ *
+ * SUBTEST:
+ */
 
 igt_simple_main
 {

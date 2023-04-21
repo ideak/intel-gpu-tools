@@ -48,6 +48,61 @@
 #include "igt_sysfs.h"
 #include "intel_ctx.h"
 
+/**
+ * TEST: gem exec nop
+ * Run type: FULL
+ *
+ * SUBTEST: basic-parallel
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-sequential
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-series
+ * Feature: cmd_submission
+ *
+ * SUBTEST: context-sequential
+ * Feature: cmd_submission
+ *
+ * SUBTEST: forked-sequential
+ * Feature: cmd_submission
+ *
+ * SUBTEST: headless
+ * Feature: cmd_submission
+ *
+ * SUBTEST: independent
+ * Feature: cmd_submission
+ *
+ * SUBTEST: multiple
+ * Feature: cmd_submission
+ *
+ * SUBTEST: parallel
+ * Feature: cmd_submission
+ *
+ * SUBTEST: poll
+ * Feature: cmd_submission
+ *
+ * SUBTEST: poll-sequential
+ * Feature: cmd_submission
+ *
+ * SUBTEST: preempt
+ * Feature: cmd_submission, multitile
+ *
+ * SUBTEST: sequential
+ * Feature: cmd_submission
+ *
+ * SUBTEST: series
+ * Feature: cmd_submission
+ *
+ * SUBTEST: signal
+ * Feature: cmd_submission, multitile
+ *
+ * SUBTEST: signal-all
+ * Feature: cmd_submission, multitile
+ *
+ * SUBTEST: single
+ * Feature: cmd_submission
+ */
 
 #define ENGINE_FLAGS  (I915_EXEC_RING_MASK | I915_EXEC_BSD_MASK)
 

@@ -62,6 +62,56 @@
 #include "i915/gem_mman.h"
 #include "i915/intel_memory_region.h"
 #include "i915_drm.h"
+/**
+ * TEST: gem create
+ * Description:
+ *   Ensure that basic gem_create and gem_create_ext works and that invalid input combinations
+ *   are rejected.
+ * Feature: mapping
+ * Run type: FULL
+ *
+ * SUBTEST: busy-create
+ * Description: Create buffer objects while GPU is busy.
+ *
+ * SUBTEST: create-clear
+ * Description: Verify that all new objects are clear.
+ *
+ * SUBTEST: create-ext-cpu-access-big
+ * Description:
+ *   Verify the extreme cases with very large objects and.
+ *   I915_GEM_CREATE_EXT_FLAG_NEEDS_CPU_ACCESS
+ *
+ * SUBTEST: create-ext-cpu-access-sanity-check
+ * Description:
+ *   Verify the basic functionally and expected ABI contract around.
+ *   I915_GEM_CREATE_EXT_FLAG_NEEDS_CPU_ACCESS
+ *
+ * SUBTEST: create-ext-placement-all
+ * Description: Create objects in every memory region using create_ext.
+ *
+ * SUBTEST: create-ext-placement-each
+ * Description: Create one object with memory pieces in each memory region using create_ext.
+ *
+ * SUBTEST: create-ext-placement-sanity-check
+ * Description: Exercise create_ext placements extension.
+ *
+ * SUBTEST: create-invalid-size
+ * Description: Try to create a gem object of invalid size 0 and check if ioctl returns error.
+ *
+ * SUBTEST: create-massive
+ * Description: Exercise creation of buffer object with impossible size and check for the expected error.
+ *
+ * SUBTEST: create-size-update
+ * Description: Try to create a gem object with size 15 and check actual created size.
+ *
+ * SUBTEST: create-valid-nonaligned
+ * Description:
+ *   Try to create an object with non-aligned size, check we got one with size aligned up to page
+ *   size and test we can write into the padded extra memory.
+ *
+ * SUBTEST: hog-create
+ * Description: Create buffer objects while GPU is busy.
+ */
 
 IGT_TEST_DESCRIPTION("Ensure that basic gem_create and gem_create_ext works"
 		     " and that invalid input combinations are rejected.");

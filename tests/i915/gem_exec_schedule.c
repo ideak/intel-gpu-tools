@@ -44,6 +44,188 @@
 #include "igt_vgem.h"
 #include "intel_ctx.h"
 #include "sw_sync.h"
+/**
+ * TEST: gem exec schedule
+ * Description: Check that we can control the order of execution
+ * Run type: FULL
+ *
+ * SUBTEST: deep
+ * Feature: cmd_submission
+ *
+ * SUBTEST: fairslice
+ * Feature: cmd_submission
+ *
+ * SUBTEST: fairslice-all
+ * Feature: cmd_submission
+ *
+ * SUBTEST: fifo
+ * Feature: cmd_submission
+ *
+ * SUBTEST: implicit-boths
+ * Feature: cmd_submission
+ *
+ * SUBTEST: implicit-read-write
+ * Feature: cmd_submission
+ *
+ * SUBTEST: implicit-write-read
+ * Feature: cmd_submission
+ *
+ * SUBTEST: in-order
+ * Feature: cmd_submission
+ *
+ * SUBTEST: independent
+ * Feature: cmd_submission
+ *
+ * SUBTEST: lateslice
+ * Feature: cmd_submission
+ *
+ * SUBTEST: manyslice
+ * Feature: cmd_submission
+ *
+ * SUBTEST: noreorder
+ * Feature: cmd_submission
+ *
+ * SUBTEST: noreorder-corked
+ * Feature: cmd_submission
+ *
+ * SUBTEST: noreorder-priority
+ * Feature: cmd_submission
+ *
+ * SUBTEST: out-order
+ * Feature: cmd_submission
+ *
+ * SUBTEST: pi-common
+ * Feature: cmd_submission
+ *
+ * SUBTEST: pi-distinct-iova
+ * Feature: cmd_submission
+ *
+ * SUBTEST: pi-ringfull
+ * Feature: cmd_submission
+ *
+ * SUBTEST: pi-shared-iova
+ * Feature: cmd_submission
+ *
+ * SUBTEST: pi-userfault
+ * Feature: cmd_submission
+ *
+ * SUBTEST: preempt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: preempt-contexts
+ * Feature: cmd_submission, multictx
+ *
+ * SUBTEST: preempt-engines
+ * Feature: cmd_submission, multictx
+ *
+ * SUBTEST: preempt-hang
+ * Feature: cmd_submission, multictx
+ *
+ * SUBTEST: preempt-other
+ * Feature: cmd_submission, multictx
+ *
+ * SUBTEST: preempt-other-chain
+ * Feature: cmd_submission, multictx
+ *
+ * SUBTEST: preempt-queue
+ * Feature: cmd_submission, multictx
+ *
+ * SUBTEST: preempt-queue-chain
+ * Feature: cmd_submission, multictx
+ *
+ * SUBTEST: preempt-queue-contexts
+ * Feature: cmd_submission, multictx
+ *
+ * SUBTEST: preempt-queue-contexts-chain
+ * Feature: cmd_submission, multictx
+ *
+ * SUBTEST: preempt-self
+ * Feature: cmd_submission, multictx
+ *
+ * SUBTEST: preempt-user
+ * Feature: cmd_submission, multictx
+ *
+ * SUBTEST: preemptive-hang
+ * Feature: cmd_submission
+ *
+ * SUBTEST: promotion
+ * Feature: cmd_submission
+ *
+ * SUBTEST: reorder-wide
+ * Feature: cmd_submission
+ *
+ * SUBTEST: semaphore-codependency
+ * Feature: cmd_submission
+ *
+ * SUBTEST: semaphore-noskip
+ * Feature: cmd_submission
+ *
+ * SUBTEST: semaphore-power
+ * Feature: cmd_submission
+ *
+ * SUBTEST: semaphore-resolve
+ * Feature: cmd_submission
+ *
+ * SUBTEST: semaphore-user
+ * Feature: cmd_submission
+ *
+ * SUBTEST: smoketest
+ * Feature: cmd_submission
+ *
+ * SUBTEST: smoketest-all
+ * Feature: cmd_submission
+ *
+ * SUBTEST: submit-early-slice
+ * Feature: cmd_submission
+ *
+ * SUBTEST: submit-golden-slice
+ * Feature: cmd_submission
+ *
+ * SUBTEST: submit-late-slice
+ * Feature: cmd_submission
+ *
+ * SUBTEST: thriceslice
+ * Feature: cmd_submission
+ *
+ * SUBTEST: timeslicing
+ * Feature: cmd_submission
+ *
+ * SUBTEST: u-fairslice
+ * Feature: cmd_submission
+ *
+ * SUBTEST: u-fairslice-all
+ * Feature: cmd_submission
+ *
+ * SUBTEST: u-independent
+ * Feature: cmd_submission
+ *
+ * SUBTEST: u-lateslice
+ * Feature: cmd_submission
+ *
+ * SUBTEST: u-semaphore-codependency
+ * Feature: cmd_submission
+ *
+ * SUBTEST: u-semaphore-noskip
+ * Feature: cmd_submission
+ *
+ * SUBTEST: u-semaphore-resolve
+ * Feature: cmd_submission
+ *
+ * SUBTEST: u-semaphore-user
+ * Feature: cmd_submission
+ *
+ * SUBTEST: u-submit-early-slice
+ * Feature: cmd_submission
+ *
+ * SUBTEST: u-submit-golden-slice
+ * Feature: cmd_submission
+ *
+ * SUBTEST: u-submit-late-slice
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wide
+ * Feature: cmd_submission
+ */
 
 #define LO 0
 #define HI 1

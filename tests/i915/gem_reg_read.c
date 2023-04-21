@@ -32,6 +32,17 @@
 #include <sys/utsname.h>
 #include <time.h>
 
+/**
+ * TEST: gem reg read
+ * Feature: gem_core
+ * Run type: FULL
+ *
+ * SUBTEST: bad-register
+ *
+ * SUBTEST: timestamp-monotonic
+ *
+ * SUBTEST: timestamp-moving
+ */
 
 static bool is_x86_64;
 static bool has_proper_timestamp;

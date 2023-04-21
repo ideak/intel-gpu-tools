@@ -32,6 +32,14 @@
 
 #include <drm.h>
 
+/**
+ * TEST: core getstats
+ * Description: Tests the DRM_IOCTL_GET_STATS ioctl.
+ * Feature: core
+ * Run type: FULL
+ *
+ * SUBTEST:
+ */
 
 /**
  * Checks DRM_IOCTL_GET_STATS.

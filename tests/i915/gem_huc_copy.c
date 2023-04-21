@@ -35,6 +35,17 @@
 #include "drm.h"
 #include "i915/gem.h"
 #include "i915/gem_create.h"
+/**
+ * TEST: gem huc copy
+ * Description: A very simple workload for the HuC.
+ * Feature: huc
+ * Run type: BAT
+ *
+ * SUBTEST: huc-copy
+ * Description:
+ *   Make sure that Huc firmware worksby copying a char array using Hucand verifying the copied
+ *   result
+ */
 
 IGT_TEST_DESCRIPTION("A very simple workload for the HuC.");
 

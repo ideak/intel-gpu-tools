@@ -58,6 +58,14 @@
 
 #include "drm.h"
 #include "i915/gem_create.h"
+/**
+ * TEST: gem tiled pread pwrite
+ * Description: Test swizzling by testing pwrite does the inverse of pread.
+ * Feature: gtt, mapping
+ * Run type: FULL
+ *
+ * SUBTEST:
+ */
 
 IGT_TEST_DESCRIPTION("Test swizzling by testing pwrite does the inverse of"
 		     " pread.");

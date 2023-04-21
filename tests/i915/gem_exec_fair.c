@@ -26,6 +26,98 @@
 #include "igt_vgem.h"
 #include "ioctl_wrappers.h"
 #include "sw_sync.h"
+/**
+ * TEST: gem exec fair
+ * Description: Check that GPU time and execution order is fairly distributed across clients
+ * Feature: cmd_submission
+ * Run type: FULL
+ *
+ * SUBTEST: basic-deadline
+ *
+ * SUBTEST: basic-flow
+ *
+ * SUBTEST: basic-none
+ *
+ * SUBTEST: basic-none-rrul
+ *
+ * SUBTEST: basic-none-share
+ *
+ * SUBTEST: basic-none-solo
+ *
+ * SUBTEST: basic-none-vip
+ *
+ * SUBTEST: basic-pace
+ *
+ * SUBTEST: basic-pace-share
+ *
+ * SUBTEST: basic-pace-solo
+ *
+ * SUBTEST: basic-sync
+ *
+ * SUBTEST: basic-throttle
+ *
+ * SUBTEST: deadline-prio
+ *
+ * SUBTEST: fair-flow
+ *
+ * SUBTEST: fair-flow-ping
+ *
+ * SUBTEST: fair-flow-share
+ *
+ * SUBTEST: fair-flow-solo
+ *
+ * SUBTEST: fair-half
+ *
+ * SUBTEST: fair-half-solo
+ *
+ * SUBTEST: fair-next
+ *
+ * SUBTEST: fair-next-ping
+ *
+ * SUBTEST: fair-next-share
+ *
+ * SUBTEST: fair-next-solo
+ *
+ * SUBTEST: fair-none
+ *
+ * SUBTEST: fair-none-ping
+ *
+ * SUBTEST: fair-none-rrul
+ *
+ * SUBTEST: fair-none-share
+ *
+ * SUBTEST: fair-none-solo
+ *
+ * SUBTEST: fair-none-vip
+ *
+ * SUBTEST: fair-pace
+ *
+ * SUBTEST: fair-pace-ping
+ *
+ * SUBTEST: fair-pace-share
+ *
+ * SUBTEST: fair-pace-solo
+ *
+ * SUBTEST: fair-spare
+ *
+ * SUBTEST: fair-spare-solo
+ *
+ * SUBTEST: fair-sync
+ *
+ * SUBTEST: fair-sync-solo
+ *
+ * SUBTEST: fair-sync-vip
+ *
+ * SUBTEST: fair-throttle
+ *
+ * SUBTEST: fair-throttle-rrul
+ *
+ * SUBTEST: fair-throttle-share
+ *
+ * SUBTEST: fair-throttle-solo
+ *
+ * SUBTEST: fair-throttle-vip
+ */
 
 IGT_TEST_DESCRIPTION("Check that GPU time and execution order is fairly distributed across clients");
 

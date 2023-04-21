@@ -24,6 +24,16 @@
 #include "i915/gem.h"
 #include "i915/gem_create.h"
 #include "igt.h"
+/**
+ * TEST: gem exec async
+ * Description: Check that we can issue concurrent writes across the engines.
+ * Feature: cmd_submission
+ * Run type: FULL
+ *
+ * SUBTEST: concurrent-writes
+ *
+ * SUBTEST: forked-writes
+ */
 
 IGT_TEST_DESCRIPTION("Check that we can issue concurrent writes across the engines.");
 

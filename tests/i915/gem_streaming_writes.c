@@ -40,6 +40,35 @@
 #include "i915/gem.h"
 #include "i915/gem_create.h"
 #include "igt.h"
+/**
+ * TEST: gem streaming writes
+ * Description: Test of streaming writes into active GPU sources
+ * Run type: FULL
+ *
+ * SUBTEST: batch-cpu
+ *
+ * SUBTEST: batch-gtt
+ *
+ * SUBTEST: batch-reverse-cpu
+ *
+ * SUBTEST: batch-reverse-gtt
+ *
+ * SUBTEST: batch-reverse-wc
+ *
+ * SUBTEST: batch-wc
+ *
+ * SUBTEST: cpu
+ *
+ * SUBTEST: cpu-sync
+ *
+ * SUBTEST: gtt
+ *
+ * SUBTEST: gtt-sync
+ *
+ * SUBTEST: wc
+ *
+ * SUBTEST: wc-sync
+ */
 
 #define OBJECT_SIZE 1024*1024
 #define CHUNK_SIZE 32

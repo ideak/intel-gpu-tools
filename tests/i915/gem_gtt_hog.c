@@ -42,6 +42,12 @@
 #include "i915/gem.h"
 #include "i915/gem_create.h"
 #include "igt.h"
+/**
+ * TEST: gem gtt hog
+ * Run type: FULL
+ *
+ * SUBTEST:
+ */
 
 static const uint32_t canary = 0xdeadbeef;
 

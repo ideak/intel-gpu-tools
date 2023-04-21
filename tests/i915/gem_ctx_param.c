@@ -30,6 +30,94 @@
 #include "igt.h"
 #include "i915/gem_create.h"
 #include "i915/gem_vm.h"
+/**
+ * TEST: gem ctx param
+ * Description: Basic test for context set/get param input validation.
+ * Run type: FULL
+ *
+ * SUBTEST: basic
+ * Description: Basic test for context get/set param ioctls using valid context
+ * Feature: context
+ *
+ * SUBTEST: basic-default
+ * Description: Basic test for context get/set param ioctls using default context
+ * Feature: context
+ *
+ * SUBTEST: get-priority-new-ctx
+ * Description:
+ *   Test performed with context param set to priority.
+ *   Verify that priority is default for newly created context
+ * Feature: context
+ *
+ * SUBTEST: invalid-ctx-get
+ * Description: Verify that context get param ioctl using invalid context returns relevant error
+ * Feature: context
+ *
+ * SUBTEST: invalid-ctx-set
+ * Description: Verify that context set param ioctl using invalid context returns relevant error
+ * Feature: context
+ *
+ * SUBTEST: invalid-get-engines
+ * Feature: context
+ *
+ * SUBTEST: invalid-get-no-zeromap
+ * Feature: context
+ *
+ * SUBTEST: invalid-get-ringsize
+ * Feature: context
+ *
+ * SUBTEST: invalid-param-get
+ * Description: Checks that fetching context parameters using an unused param value is erroneous
+ * Feature: context
+ *
+ * SUBTEST: invalid-param-set
+ * Description: Checks that setting context parameters using an unused param value is erroneous
+ * Feature: context
+ *
+ * SUBTEST: invalid-set-no-zeromap
+ * Feature: context
+ *
+ * SUBTEST: invalid-set-ringsize
+ * Feature: context
+ *
+ * SUBTEST: invalid-size-get
+ * Description: Verify that context get param ioctl returns valid size for valid context
+ * Feature: context
+ *
+ * SUBTEST: invalid-size-set
+ * Description: Verify that context set param ioctl using invalid size returns relevant error
+ * Feature: context
+ *
+ * SUBTEST: non-root-set
+ * Description: Verify that context set param ioctl returns relevant error in non root mode
+ * Feature: context
+ *
+ * SUBTEST: root-set
+ * Description: Verify that context set param ioctl works fine in root mode
+ * Feature: context
+ *
+ * SUBTEST: set-priority-invalid-size
+ * Description:
+ *   Test performed with context param set to priority.
+ *   Verify that relevant error is returned on setting invalid ctx size with default priority
+ * Feature: context
+ *
+ * SUBTEST: set-priority-not-supported
+ * Description:
+ *   Verify that context set param ioctl returns relevant error if driver doesn't supports
+ *   assigning custom priorities from userspace
+ * Feature: context, no-set-priority
+ *
+ * SUBTEST: set-priority-range
+ * Description:
+ *   Test performed with context param set to priority.
+ *   Change priority range to test value overflow
+ * Feature: context
+ *
+ * SUBTEST: vm
+ * Description: Tests that multiple contexts can share the same VMA
+ * Feature: context
+ */
 
 IGT_TEST_DESCRIPTION("Basic test for context set/get param input validation.");
 

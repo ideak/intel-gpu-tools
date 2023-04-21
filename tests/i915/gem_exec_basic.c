@@ -25,6 +25,17 @@
 #include "igt_collection.h"
 
 #include "i915/gem_create.h"
+/**
+ * TEST: gem exec basic
+ * Description: Basic sanity check of execbuf-ioctl rings.
+ * Feature: cmd_submission
+ * Run type: BAT
+ *
+ * SUBTEST: basic
+ * Description:
+ *   Check basic functionality of GEM_EXECBUFFER2 ioctl on every ring and iterating over memory
+ *   regions.
+ */
 
 IGT_TEST_DESCRIPTION("Basic sanity check of execbuf-ioctl rings.");
 

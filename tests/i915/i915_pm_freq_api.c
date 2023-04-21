@@ -8,6 +8,17 @@
 #include "i915/gem.h"
 #include "igt_sysfs.h"
 #include "igt.h"
+/**
+ * TEST: i915 pm freq api
+ * Description: Test SLPC freq API
+ * Run type: FULL
+ *
+ * SUBTEST: freq-basic-api
+ * Description: Test basic API for controlling min/max GT frequency
+ *
+ * SUBTEST: freq-reset
+ * Description: Test basic freq API works after a reset
+ */
 
 IGT_TEST_DESCRIPTION("Test SLPC freq API");
 /*

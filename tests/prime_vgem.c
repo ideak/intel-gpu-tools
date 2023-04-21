@@ -30,6 +30,105 @@
 #include "igt.h"
 #include "igt_vgem.h"
 #include "intel_batchbuffer.h"	/* igt_blitter_src_copy() */
+/**
+ * TEST: prime vgem
+ * Description: Basic check of polling for prime/vgem fences.
+ *
+ * SUBTEST: basic-blt
+ * Description: Examine blitter access path.
+ * Feature: prime
+ * Run type: FULL
+ *
+ * SUBTEST: basic-fence-blt
+ * Description: Examine blitter access path fencing.
+ * Feature: prime
+ * Run type: FULL
+ *
+ * SUBTEST: basic-fence-flip
+ * Description: Examine vgem bo front/back flip fencing.
+ * Feature: prime
+ * Run type: BAT
+ *
+ * SUBTEST: basic-fence-mmap
+ * Description: Examine GTT access path fencing.
+ * Feature: gtt, prime
+ * Run type: BAT
+ *
+ * SUBTEST: basic-fence-read
+ * Description: Examine read access path fencing.
+ * Feature: gtt, prime
+ * Run type: BAT
+ *
+ * SUBTEST: basic-gtt
+ * Description: Examine access path through GTT.
+ * Feature: gtt, prime
+ * Run type: BAT
+ *
+ * SUBTEST: basic-read
+ * Description: Examine read access path.
+ * Feature: gtt, prime
+ * Run type: BAT
+ *
+ * SUBTEST: basic-userptr
+ * Description: Check that we wrap the vgem mmap with userptr.
+ * Feature: prime
+ * Run type: BAT
+ *
+ * SUBTEST: basic-write
+ * Description: Examine write access path.
+ * Feature: gtt, prime
+ * Run type: BAT
+ *
+ * SUBTEST: busy
+ * Description: Examine busy check of polling for vgem fence.
+ * Feature: prime
+ * Run type: FULL
+ *
+ * SUBTEST: coherency-blt
+ * Description: Examine blitter access path WC coherency.
+ * Feature: prime
+ * Run type: FULL
+ *
+ * SUBTEST: coherency-gtt
+ * Description: Examine concurrent access of vgem bo.
+ * Feature: gtt, prime
+ * Run type: FULL
+ *
+ * SUBTEST: fence-flip-hang
+ * Description: Examine vgem bo front/back flip fencing with a pending gpu hang.
+ * Feature: blacklist, prime, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: fence-read-hang
+ * Description: Examine read access path fencing with a pending gpu hang.
+ * Feature: blacklist, prime, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: fence-wait
+ * Description: Examine basic dma-buf fence interop.
+ * Feature: prime, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: fence-write-hang
+ * Description: Examine write access path fencing with a pending gpu hang.
+ * Feature: blacklist, prime, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: shrink
+ * Description: Examine link establishment between shrinker and vgem bo.
+ * Feature: prime
+ * Run type: FULL
+ *
+ * SUBTEST: sync
+ * Description: Examine sync on vgem fence.
+ * Feature: prime
+ * Run type: FULL
+ *
+ * SUBTEST: wait
+ * Description: Examine wait on vgem fence.
+ * Feature: prime
+ * Run type: FULL
+ */
 
 IGT_TEST_DESCRIPTION("Basic check of polling for prime/vgem fences.");
 

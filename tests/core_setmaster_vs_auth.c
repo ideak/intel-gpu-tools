@@ -40,6 +40,14 @@
 #include <string.h>
 
 #include "igt_device.h"
+/**
+ * TEST: core setmaster vs auth
+ * Description: Check that drop/setMaster correctly transfer master state
+ * Feature: core
+ * Run type: FULL
+ *
+ * SUBTEST:
+ */
 
 IGT_TEST_DESCRIPTION("Check that drop/setMaster correctly transfer master "
 		     "state");

@@ -48,6 +48,36 @@
 
 #include "i915/gem.h"
 #include "i915/gem_create.h"
+/**
+ * TEST: gem exec latency
+ * Run type: FULL
+ *
+ * SUBTEST: context-preempt
+ *
+ * SUBTEST: context-switch
+ *
+ * SUBTEST: dispatch
+ *
+ * SUBTEST: dispatch-queued
+ *
+ * SUBTEST: execution-latency
+ *
+ * SUBTEST: live-dispatch
+ *
+ * SUBTEST: live-dispatch-queued
+ *
+ * SUBTEST: poll
+ *
+ * SUBTEST: preemption
+ *
+ * SUBTEST: rthog-submit
+ *
+ * SUBTEST: synchronisation
+ *
+ * SUBTEST: synchronisation-queued
+ *
+ * SUBTEST: wakeup-latency
+ */
 
 #define ENGINE_FLAGS  (I915_EXEC_RING_MASK | I915_EXEC_BSD_MASK)
 

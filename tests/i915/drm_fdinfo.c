@@ -29,6 +29,50 @@
 #include "i915/gem.h"
 #include "i915/gem_vm.h"
 #include "intel_ctx.h"
+/**
+ * TEST: drm fdinfo
+ * Description: Test the i915 drm fdinfo data
+ * Feature: client_busyness
+ * Run type: FULL
+ *
+ * SUBTEST: all-busy-check-all
+ *
+ * SUBTEST: all-busy-idle-check-all
+ *
+ * SUBTEST: basics
+ *
+ * SUBTEST: busy
+ *
+ * SUBTEST: busy-check-all
+ *
+ * SUBTEST: busy-hang
+ *
+ * SUBTEST: busy-idle
+ *
+ * SUBTEST: busy-idle-check-all
+ *
+ * SUBTEST: idle
+ *
+ * SUBTEST: isolation
+ *
+ * SUBTEST: most-busy-check-all
+ *
+ * SUBTEST: most-busy-idle-check-all
+ *
+ * SUBTEST: virtual-busy
+ *
+ * SUBTEST: virtual-busy-all
+ *
+ * SUBTEST: virtual-busy-hang
+ *
+ * SUBTEST: virtual-busy-hang-all
+ *
+ * SUBTEST: virtual-busy-idle
+ *
+ * SUBTEST: virtual-busy-idle-all
+ *
+ * SUBTEST: virtual-idle
+ */
 
 IGT_TEST_DESCRIPTION("Test the i915 drm fdinfo data");
 

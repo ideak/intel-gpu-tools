@@ -39,6 +39,73 @@
 
 #include "drm.h"
 #include "i915/gem_create.h"
+/**
+ * TEST: gem mmap wc
+ * Run type: FULL
+ *
+ * SUBTEST: bad-object
+ * Feature: caching, mapping
+ *
+ * SUBTEST: bad-offset
+ * Feature: caching, mapping
+ *
+ * SUBTEST: bad-size
+ * Feature: caching, mapping
+ *
+ * SUBTEST: close
+ * Feature: caching, mapping
+ *
+ * SUBTEST: coherency
+ * Feature: caching, mapping
+ *
+ * SUBTEST: copy
+ * Feature: caching, mapping
+ *
+ * SUBTEST: fault-concurrent
+ * Feature: caching, mapping
+ *
+ * SUBTEST: invalid-flags
+ * Feature: caching, mapping
+ *
+ * SUBTEST: pf-nonblock
+ * Feature: caching, mapping
+ *
+ * SUBTEST: read
+ * Feature: caching, mapping
+ *
+ * SUBTEST: read-write
+ * Feature: caching, mapping
+ *
+ * SUBTEST: read-write-distinct
+ * Feature: caching, mapping
+ *
+ * SUBTEST: set-cache-level
+ * Feature: caching, mapping
+ *
+ * SUBTEST: write
+ * Feature: caching, mapping
+ *
+ * SUBTEST: write-cpu-read-wc
+ * Feature: caching, mapping
+ *
+ * SUBTEST: write-cpu-read-wc-unflushed
+ * Feature: caching, mapping
+ *
+ * SUBTEST: write-gtt-read-wc
+ * Feature: caching, gtt, mapping
+ *
+ * SUBTEST: write-prefaulted
+ * Feature: caching, mapping
+ *
+ * SUBTEST: write-read
+ * Feature: caching, mapping
+ *
+ * SUBTEST: write-read-distinct
+ * Feature: caching, mapping
+ *
+ * SUBTEST: write-wc-read-gtt
+ * Feature: caching, gtt, mapping
+ */
 
 static int OBJECT_SIZE = 16*1024*1024;
 

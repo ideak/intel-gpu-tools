@@ -34,6 +34,20 @@
 #include <string.h>
 #include <errno.h>
 
+/**
+ * TEST: gem ctx bad destroy
+ * Description: Negative test cases for destroy contexts.
+ * Feature: context
+ * Run type: FULL
+ *
+ * SUBTEST: double-destroy
+ *
+ * SUBTEST: invalid-ctx
+ *
+ * SUBTEST: invalid-default-ctx
+ *
+ * SUBTEST: invalid-pad
+ */
 
 IGT_TEST_DESCRIPTION("Negative test cases for destroy contexts.");
 

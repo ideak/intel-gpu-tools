@@ -45,6 +45,150 @@
 #include "igt_perf.h"
 #include "igt_sysfs.h"
 #include "drm.h"
+/**
+ * TEST: perf
+ * Description: Test the i915 perf metrics streaming interface
+ * Run type: FULL
+ *
+ * SUBTEST: blocking
+ * Description: Test blocking read with default hrtimer frequency
+ * Feature: oa
+ *
+ * SUBTEST: blocking-parameterized
+ * Description: Test blocking read with different hrtimer frequencies
+ * Feature: oa
+ *
+ * SUBTEST: buffer-fill
+ * Feature: oa
+ *
+ * SUBTEST: create-destroy-userspace-config
+ * Feature: oa
+ *
+ * SUBTEST: disabled-read-error
+ * Feature: oa
+ *
+ * SUBTEST: enable-disable
+ * Feature: oa
+ *
+ * SUBTEST: gen12-group-concurrent-oa-buffer-read
+ * Description: Verify concurrent reads from OA buffers in different groups
+ * Feature: oa
+ *
+ * SUBTEST: gen12-group-exclusive-stream-ctx-handle
+ * Description: Verify exclusivity of perf streams with ctx handle
+ * Feature: oa
+ *
+ * SUBTEST: gen12-group-exclusive-stream-sample-oa
+ * Description: Verify exclusivity of perf streams with sample oa option
+ * Feature: oa
+ *
+ * SUBTEST: gen12-invalid-class-instance
+ * Description: Verify invalid class instance
+ * Feature: oa
+ *
+ * SUBTEST: gen12-mi-rpc
+ * Description: Test MI REPORT PERF COUNT for Gen 12
+ * Feature: oa
+ *
+ * SUBTEST: gen12-oa-tlb-invalidate
+ * Description: Test OA TLB invalidate
+ * Feature: oa
+ *
+ * SUBTEST: gen12-unprivileged-single-ctx-counters
+ * Description: Measure performance for a specific context using OAR in Gen 12
+ * Feature: oa
+ *
+ * SUBTEST: gen8-unprivileged-single-ctx-counters
+ * Feature: oa, obsolete
+ *
+ * SUBTEST: global-sseu-config
+ * Description: Verify specifying SSEU opening parameters
+ * Feature: oa
+ *
+ * SUBTEST: global-sseu-config-invalid
+ * Description: Verify invalid SSEU opening parameters
+ * Feature: oa
+ *
+ * SUBTEST: i915-ref-count
+ * Feature: oa
+ *
+ * SUBTEST: invalid-create-userspace-config
+ * Feature: oa
+ *
+ * SUBTEST: invalid-oa-exponent
+ * Feature: oa
+ *
+ * SUBTEST: invalid-oa-format-id
+ * Feature: oa
+ *
+ * SUBTEST: invalid-oa-metric-set-id
+ * Feature: oa
+ *
+ * SUBTEST: invalid-open-flags
+ * Feature: oa
+ *
+ * SUBTEST: invalid-remove-userspace-config
+ * Feature: oa
+ *
+ * SUBTEST: low-oa-exponent-permissions
+ * Feature: oa
+ *
+ * SUBTEST: mi-rpc
+ * Feature: oa
+ *
+ * SUBTEST: missing-sample-flags
+ * Feature: oa
+ *
+ * SUBTEST: non-sampling-read-error
+ * Feature: oa
+ *
+ * SUBTEST: non-system-wide-paranoid
+ * Feature: oa
+ *
+ * SUBTEST: non-zero-reason
+ * Description: Test that reason field in OA reports is never 0 on Gen8+
+ * Feature: oa
+ *
+ * SUBTEST: oa-exponents
+ * Feature: oa
+ *
+ * SUBTEST: oa-formats
+ * Feature: oa
+ *
+ * SUBTEST: per-context-mode-unprivileged
+ * Feature: oa, obsolete
+ *
+ * SUBTEST: polling
+ * Description: Test polled read with default hrtimer frequency
+ * Feature: oa
+ *
+ * SUBTEST: polling-parameterized
+ * Description: Test polled read with different hrtimer frequencies
+ * Feature: oa
+ *
+ * SUBTEST: polling-small-buf
+ * Description: Test polled read with buffer size smaller than available data
+ * Feature: oa
+ *
+ * SUBTEST: rc6-disable
+ * Feature: oa
+ *
+ * SUBTEST: short-reads
+ * Feature: oa
+ *
+ * SUBTEST: stress-open-close
+ * Description: Stress tests opening & closing the i915-perf stream in a busy loop
+ * Feature: oa
+ *
+ * SUBTEST: sysctl-defaults
+ * Feature: oa
+ *
+ * SUBTEST: unprivileged-single-ctx-counters
+ * Feature: oa, obsolete
+ *
+ * SUBTEST: whitelisted-registers-userspace-config
+ * Feature: oa
+ */
 
 IGT_TEST_DESCRIPTION("Test the i915 perf metrics streaming interface");
 

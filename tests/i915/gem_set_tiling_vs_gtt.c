@@ -38,6 +38,14 @@
 
 #include "drm.h"
 #include "i915/gem_create.h"
+/**
+ * TEST: gem set tiling vs gtt
+ * Description: Check set_tiling vs gtt mmap coherency.
+ * Feature: gtt
+ * Run type: FULL
+ *
+ * SUBTEST:
+ */
 
 IGT_TEST_DESCRIPTION("Check set_tiling vs gtt mmap coherency.");
 

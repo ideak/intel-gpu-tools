@@ -57,6 +57,21 @@
 #include "drm.h"
 #include "i915/gem.h"
 #include "igt.h"
+/**
+ * TEST: gem set tiling vs blt
+ * Description: Check for proper synchronization of tiling changes vs. tiled gpu access.
+ * Feature: blitter, gtt
+ * Run type: FULL
+ *
+ * SUBTEST: tiled-to-tiled
+ * Description: Check for proper synchronization of tiled->tiled transition.
+ *
+ * SUBTEST: tiled-to-untiled
+ * Description: Check for proper synchronization of tiled->untiled transition.
+ *
+ * SUBTEST: untiled-to-tiled
+ * Description: Check for proper synchronization of untiled->tiled transition.
+ */
 
 IGT_TEST_DESCRIPTION("Check for proper synchronization of tiling changes vs."
 		     " tiled gpu access.");

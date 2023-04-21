@@ -29,6 +29,31 @@
 #include <fcntl.h>
 #include <sys/types.h>
 #include <dirent.h>
+/**
+ * TEST: debugfs test
+ * Description: Read entries from debugfs, hwmon and sysfs paths.
+ * Feature: core
+ *
+ * SUBTEST: basic-hwmon
+ * Description: Read all entries from hwmon path
+ * Run type: BAT
+ *
+ * SUBTEST: read_all_entries
+ * Description: Read all entries from debugfs path.
+ * Run type: BAT
+ *
+ * SUBTEST: read_all_entries_display_off
+ * Description: Read all debugfs entries with display on/off.
+ * Run type: FULL
+ *
+ * SUBTEST: read_all_entries_display_on
+ * Description: Read all debugfs entries with display on/off.
+ * Run type: FULL
+ *
+ * SUBTEST: sysfs
+ * Description: Read all entries from sysfs path.
+ * Run type: FULL
+ */
 
 IGT_TEST_DESCRIPTION("Read entries from debugfs, hwmon and sysfs paths.");
 

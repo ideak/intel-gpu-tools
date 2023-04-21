@@ -48,6 +48,67 @@
 #include "igt.h"
 
 #include "eviction_common.c"
+/**
+ * TEST: gem evict everything
+ * Description: Run a couple of big batches to force the eviction code.
+ * Run type: FULL
+ *
+ * SUBTEST: forked-interruptible
+ *
+ * SUBTEST: forked-mempressure-interruptible
+ *
+ * SUBTEST: forked-mempressure-normal
+ *
+ * SUBTEST: forked-multifd-interruptible
+ *
+ * SUBTEST: forked-multifd-mempressure-interruptible
+ *
+ * SUBTEST: forked-multifd-mempressure-normal
+ *
+ * SUBTEST: forked-multifd-normal
+ *
+ * SUBTEST: forked-normal
+ *
+ * SUBTEST: forked-swapping-interruptible
+ *
+ * SUBTEST: forked-swapping-mempressure-interruptible
+ *
+ * SUBTEST: forked-swapping-mempressure-normal
+ *
+ * SUBTEST: forked-swapping-multifd-interruptible
+ *
+ * SUBTEST: forked-swapping-multifd-mempressure-interruptible
+ *
+ * SUBTEST: forked-swapping-multifd-mempressure-normal
+ *
+ * SUBTEST: forked-swapping-multifd-normal
+ *
+ * SUBTEST: forked-swapping-normal
+ *
+ * SUBTEST: major-hang
+ *
+ * SUBTEST: major-interruptible
+ *
+ * SUBTEST: major-normal
+ *
+ * SUBTEST: minor-hang
+ *
+ * SUBTEST: minor-interruptible
+ *
+ * SUBTEST: minor-normal
+ *
+ * SUBTEST: mlocked-hang
+ *
+ * SUBTEST: mlocked-interruptible
+ *
+ * SUBTEST: mlocked-normal
+ *
+ * SUBTEST: swapping-hang
+ *
+ * SUBTEST: swapping-interruptible
+ *
+ * SUBTEST: swapping-normal
+ */
 
 IGT_TEST_DESCRIPTION("Run a couple of big batches to force the eviction"
 		     " code.");

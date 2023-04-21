@@ -44,6 +44,109 @@
 #include "igt.h"
 #include "igt_device.h"
 #include "sw_sync.h"
+/**
+ * TEST: gem exec params
+ * Run type: FULL
+ *
+ * SUBTEST: DR1-dirt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: DR4-dirt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: batch-first
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cliprects-invalid
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cliprects_ptr-dirt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: invalid-batch-start-offset
+ * Feature: cmd_submission
+ *
+ * SUBTEST: invalid-bsd-ring
+ * Feature: cmd_submission
+ *
+ * SUBTEST: invalid-bsd1-flag-on-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: invalid-bsd1-flag-on-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: invalid-bsd1-flag-on-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: invalid-bsd2-flag-on-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: invalid-bsd2-flag-on-render
+ * Feature: cmd_submission
+ *
+ * SUBTEST: invalid-bsd2-flag-on-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: invalid-fence-in
+ * Feature: cmd_submission
+ *
+ * SUBTEST: invalid-fence-in-submit
+ * Feature: cmd_submission
+ *
+ * SUBTEST: invalid-flag
+ * Feature: cmd_submission
+ *
+ * SUBTEST: invalid-ring
+ * Feature: cmd_submission
+ *
+ * SUBTEST: invalid-ring2
+ * Feature: cmd_submission
+ *
+ * SUBTEST: larger-than-life-batch
+ * Feature: cmd_submission
+ *
+ * SUBTEST: mmapped
+ * Feature: cmd_submission
+ *
+ * SUBTEST: no-blt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: no-bsd
+ * Feature: cmd_submission
+ *
+ * SUBTEST: no-vebox
+ * Feature: cmd_submission
+ *
+ * SUBTEST: readonly
+ * Feature: cmd_submission
+ *
+ * SUBTEST: rel-constants-invalid
+ * Feature: cmd_submission
+ *
+ * SUBTEST: rel-constants-invalid-rel-gen5
+ * Feature: cmd_submission
+ *
+ * SUBTEST: rel-constants-invalid-ring
+ * Feature: cmd_submission
+ *
+ * SUBTEST: rs-invalid
+ * Feature: cmd_submission
+ *
+ * SUBTEST: rsvd2-dirt
+ * Feature: cmd_submission
+ *
+ * SUBTEST: secure-non-master
+ * Feature: cmd_submission, obsolete
+ *
+ * SUBTEST: secure-non-root
+ * Feature: cmd_submission, obsolete
+ *
+ * SUBTEST: sol-reset-invalid
+ * Feature: cmd_submission
+ *
+ * SUBTEST: sol-reset-not-gen7
+ * Feature: cmd_submission
+ */
 
 #define ALIGNMENT (1 << 22)
 

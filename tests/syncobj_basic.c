@@ -26,6 +26,36 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include "drm.h"
+/**
+ * TEST: syncobj basic
+ * Description: Basic check for drm sync objects.
+ * Feature: synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: bad-create-flags
+ *
+ * SUBTEST: bad-destroy
+ *
+ * SUBTEST: bad-destroy-pad
+ *
+ * SUBTEST: bad-fd-to-handle
+ *
+ * SUBTEST: bad-flags-fd-to-handle
+ *
+ * SUBTEST: bad-flags-handle-to-fd
+ *
+ * SUBTEST: bad-handle-to-fd
+ *
+ * SUBTEST: bad-pad-fd-to-handle
+ *
+ * SUBTEST: bad-pad-handle-to-fd
+ *
+ * SUBTEST: create-signaled
+ *
+ * SUBTEST: illegal-fd-to-handle
+ *
+ * SUBTEST: test-valid-cycle
+ */
 
 IGT_TEST_DESCRIPTION("Basic check for drm sync objects.");
 

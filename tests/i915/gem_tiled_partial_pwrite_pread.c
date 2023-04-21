@@ -38,6 +38,18 @@
 
 #include "i915/gem.h"
 #include "igt.h"
+/**
+ * TEST: gem tiled partial pwrite pread
+ * Description: Test pwrite/pread consistency when touching partial cachelines.
+ * Feature: gtt, mapping
+ * Run type: FULL
+ *
+ * SUBTEST: reads
+ *
+ * SUBTEST: writes
+ *
+ * SUBTEST: writes-after-reads
+ */
 
 IGT_TEST_DESCRIPTION("Test pwrite/pread consistency when touching partial"
 		     " cachelines.");

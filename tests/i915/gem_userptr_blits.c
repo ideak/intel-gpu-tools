@@ -67,6 +67,286 @@
 
 #include "eviction_common.c"
 #include "i915/i915_blt.h"
+/**
+ * TEST: gem userptr blits
+ * Run type: FULL
+ *
+ * SUBTEST: access-control
+ * Feature: userptr
+ *
+ * SUBTEST: coherency-sync
+ * Feature: userptr
+ *
+ * SUBTEST: coherency-unsync
+ * Feature: userptr
+ *
+ * SUBTEST: create-destroy-sync
+ * Feature: userptr
+ *
+ * SUBTEST: create-destroy-unsync
+ * Feature: userptr
+ *
+ * SUBTEST: dmabuf-sync
+ * Feature: prime, userptr
+ *
+ * SUBTEST: dmabuf-unsync
+ * Feature: prime, userptr
+ *
+ * SUBTEST: forbidden-operations
+ * Feature: userptr
+ *
+ * SUBTEST: forked-access
+ * Feature: userptr
+ *
+ * SUBTEST: forked-sync-interruptible
+ * Feature: userptr
+ *
+ * SUBTEST: forked-sync-mempressure-interruptible
+ * Feature: userptr
+ *
+ * SUBTEST: forked-sync-mempressure-normal
+ * Feature: userptr
+ *
+ * SUBTEST: forked-sync-multifd-interruptible
+ * Feature: userptr
+ *
+ * SUBTEST: forked-sync-multifd-mempressure-interruptible
+ * Feature: userptr
+ *
+ * SUBTEST: forked-sync-multifd-mempressure-normal
+ * Feature: userptr
+ *
+ * SUBTEST: forked-sync-multifd-normal
+ * Feature: userptr
+ *
+ * SUBTEST: forked-sync-normal
+ * Feature: userptr
+ *
+ * SUBTEST: forked-sync-swapping-interruptible
+ * Feature: userptr
+ *
+ * SUBTEST: forked-sync-swapping-mempressure-interruptible
+ * Feature: userptr
+ *
+ * SUBTEST: forked-sync-swapping-mempressure-normal
+ * Feature: userptr
+ *
+ * SUBTEST: forked-sync-swapping-multifd-interruptible
+ * Feature: userptr
+ *
+ * SUBTEST: forked-sync-swapping-multifd-mempressure-interruptible
+ * Feature: userptr
+ *
+ * SUBTEST: forked-sync-swapping-multifd-mempressure-normal
+ * Feature: userptr
+ *
+ * SUBTEST: forked-sync-swapping-multifd-normal
+ * Feature: userptr
+ *
+ * SUBTEST: forked-sync-swapping-normal
+ * Feature: userptr
+ *
+ * SUBTEST: forked-unsync-interruptible
+ * Feature: userptr
+ *
+ * SUBTEST: forked-unsync-mempressure-interruptible
+ * Feature: userptr
+ *
+ * SUBTEST: forked-unsync-mempressure-normal
+ * Feature: userptr
+ *
+ * SUBTEST: forked-unsync-multifd-interruptible
+ * Feature: userptr
+ *
+ * SUBTEST: forked-unsync-multifd-mempressure-interruptible
+ * Feature: userptr
+ *
+ * SUBTEST: forked-unsync-multifd-mempressure-normal
+ * Feature: userptr
+ *
+ * SUBTEST: forked-unsync-multifd-normal
+ * Feature: userptr
+ *
+ * SUBTEST: forked-unsync-normal
+ * Feature: userptr
+ *
+ * SUBTEST: forked-unsync-swapping-interruptible
+ * Feature: userptr
+ *
+ * SUBTEST: forked-unsync-swapping-mempressure-interruptible
+ * Feature: userptr
+ *
+ * SUBTEST: forked-unsync-swapping-mempressure-normal
+ * Feature: userptr
+ *
+ * SUBTEST: forked-unsync-swapping-multifd-interruptible
+ * Feature: userptr
+ *
+ * SUBTEST: forked-unsync-swapping-multifd-mempressure-interruptible
+ * Feature: userptr
+ *
+ * SUBTEST: forked-unsync-swapping-multifd-mempressure-normal
+ * Feature: userptr
+ *
+ * SUBTEST: forked-unsync-swapping-multifd-normal
+ * Feature: userptr
+ *
+ * SUBTEST: forked-unsync-swapping-normal
+ * Feature: userptr
+ *
+ * SUBTEST: huge-split
+ * Feature: userptr
+ *
+ * SUBTEST: input-checking
+ * Feature: userptr
+ *
+ * SUBTEST: invalid-mmap-offset-unsync
+ * Description: Verify unsynchronized userptr on mmap-offset mappings fails
+ * Feature: userptr
+ *
+ * SUBTEST: invalid-null-pointer
+ * Feature: userptr
+ *
+ * SUBTEST: major-normal-sync
+ * Feature: userptr
+ *
+ * SUBTEST: major-sync-interruptible
+ * Feature: userptr
+ *
+ * SUBTEST: major-unsync-interruptible
+ * Feature: userptr
+ *
+ * SUBTEST: major-unsync-normal
+ * Feature: userptr
+ *
+ * SUBTEST: map-fixed-invalidate
+ * Description: Try to anger lockdep with MMU notifier still active after MAP_FIXED remap
+ * Feature: gtt, userptr
+ *
+ * SUBTEST: map-fixed-invalidate-busy
+ * Description: Try to anger lockdep with MMU notifier still active after MAP_FIXED remap
+ * Feature: gtt, userptr
+ *
+ * SUBTEST: map-fixed-invalidate-overlap
+ * Description: Try to anger lockdep with MMU notifier still active after MAP_FIXED remap
+ * Feature: gtt, userptr
+ *
+ * SUBTEST: map-fixed-invalidate-overlap-busy
+ * Description: Try to anger lockdep with MMU notifier still active after MAP_FIXED remap
+ * Feature: gtt, userptr
+ *
+ * SUBTEST: minor-normal-sync
+ * Feature: userptr
+ *
+ * SUBTEST: minor-sync-interruptible
+ * Feature: userptr
+ *
+ * SUBTEST: minor-unsync-interruptible
+ * Feature: userptr
+ *
+ * SUBTEST: minor-unsync-normal
+ * Feature: userptr
+ *
+ * SUBTEST: mlocked-normal-sync
+ * Feature: userptr
+ *
+ * SUBTEST: mlocked-sync-interruptible
+ * Feature: userptr
+ *
+ * SUBTEST: mlocked-unsync-interruptible
+ * Feature: userptr
+ *
+ * SUBTEST: mlocked-unsync-normal
+ * Feature: userptr
+ *
+ * SUBTEST: mmap-offset-banned
+ * Description: Verify mmap_offset to userptr is banned
+ * Feature: userptr
+ *
+ * SUBTEST: nohangcheck
+ * Feature: userptr
+ *
+ * SUBTEST: probe
+ * Feature: userptr
+ *
+ * SUBTEST: process-exit
+ * Feature: userptr
+ *
+ * SUBTEST: process-exit-busy
+ * Feature: userptr
+ *
+ * SUBTEST: readonly-pwrite-unsync
+ * Feature: userptr
+ *
+ * SUBTEST: readonly-unsync
+ * Feature: userptr
+ *
+ * SUBTEST: relocations
+ * Feature: userptr
+ *
+ * SUBTEST: sd-probe
+ * Feature: userptr
+ *
+ * SUBTEST: set-cache-level
+ * Feature: userptr
+ *
+ * SUBTEST: stress-mm
+ * Feature: userptr
+ *
+ * SUBTEST: stress-mm-invalidate-close
+ * Feature: userptr
+ *
+ * SUBTEST: stress-mm-invalidate-close-overlap
+ * Feature: userptr
+ *
+ * SUBTEST: stress-purge
+ * Feature: userptr
+ *
+ * SUBTEST: swapping-normal-sync
+ * Feature: userptr
+ *
+ * SUBTEST: swapping-sync-interruptible
+ * Feature: userptr
+ *
+ * SUBTEST: swapping-unsync-interruptible
+ * Feature: userptr
+ *
+ * SUBTEST: swapping-unsync-normal
+ * Feature: userptr
+ *
+ * SUBTEST: sync-overlap
+ * Feature: userptr
+ *
+ * SUBTEST: sync-unmap
+ * Feature: userptr
+ *
+ * SUBTEST: sync-unmap-after-close
+ * Feature: userptr
+ *
+ * SUBTEST: sync-unmap-cycles
+ * Feature: userptr
+ *
+ * SUBTEST: unsync-overlap
+ * Feature: userptr
+ *
+ * SUBTEST: unsync-unmap
+ * Feature: userptr
+ *
+ * SUBTEST: unsync-unmap-after-close
+ * Feature: userptr
+ *
+ * SUBTEST: unsync-unmap-cycles
+ * Feature: userptr
+ *
+ * SUBTEST: usage-restrictions
+ * Feature: userptr
+ *
+ * SUBTEST: userfault
+ * Feature: userptr
+ *
+ * SUBTEST: vma-merge
+ * Feature: userptr
+ */
 
 #ifndef PAGE_SIZE
 #define PAGE_SIZE 4096

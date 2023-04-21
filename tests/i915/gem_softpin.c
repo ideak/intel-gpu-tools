@@ -31,6 +31,119 @@
 #include "igt.h"
 #include "igt_rand.h"
 #include "intel_allocator.h"
+/**
+ * TEST: gem softpin
+ * Description:
+ *   Tests softpin feature with normal usage, invalid inputs scenarios and couple of eviction
+ *   tests which copy buffers between CPU and GPU.
+ * Feature: mapping
+ *
+ * SUBTEST: 32b-excludes-last-page
+ * Description: Check the last 32b page is excluded.
+ * Run type: FULL
+ *
+ * SUBTEST: allocator-basic
+ * Description: Check that we can place objects at start/end of the GTT using the allocator.
+ * Run type: BAT
+ *
+ * SUBTEST: allocator-basic-reserve
+ * Description: Check that if we can reserve a space for an object starting from a given offset.
+ * Run type: BAT
+ *
+ * SUBTEST: allocator-evict
+ * Description: Exercise eviction with softpinning.
+ * Run type: FULL
+ *
+ * SUBTEST: allocator-fork
+ * Description: Check if multiple processes can use alloctor.
+ * Run type: FULL
+ *
+ * SUBTEST: allocator-nopin
+ * Description: Check that we can combine manual placement with automatic GTT placement.
+ * Run type: FULL
+ *
+ * SUBTEST: allocator-nopin-reserve
+ * Description:
+ *   Check that we can combine manual placement with automatic GTT placement and
+ *   reserves/unreserves space for objects.
+ * Run type: FULL
+ *
+ * SUBTEST: evict-active
+ * Description: Check eviction with active bo.
+ * Run type: FULL
+ *
+ * SUBTEST: evict-active-interruptible
+ * Description: Check eviction with active bo with interrupts.
+ * Run type: FULL
+ *
+ * SUBTEST: evict-hang
+ * Description: Check eviction of softpinned bo with hung batch.
+ * Run type: FULL
+ *
+ * SUBTEST: evict-prime
+ * Description: Check eviction of vma on importing prime fd in reopened drm fds
+ * Run type: FULL
+ *
+ * SUBTEST: evict-prime-sanity-check
+ * Description: Check eviction of vma on importing prime fd in reopened drm fd in single thread
+ * Run type: FULL
+ *
+ * SUBTEST: evict-single-offset
+ * Description: Use same offset for all engines and for different handles.
+ * Run type: FULL
+ *
+ * SUBTEST: evict-snoop
+ * Description: Check eviction against snooping.
+ * Run type: FULL
+ *
+ * SUBTEST: evict-snoop-interruptible
+ * Description: Check eviction against snooping with interrupts.
+ * Run type: FULL
+ *
+ * SUBTEST: full
+ * Description: Check the total occupancy by using pad-to-size to fill the entire GTT.
+ * Run type: FULL
+ *
+ * SUBTEST: invalid
+ * Description: Check that invalid inputs are handled correctly.
+ * Run type: FULL
+ *
+ * SUBTEST: noreloc
+ * Description: Check that noreloc support works.
+ * Run type: FULL
+ *
+ * SUBTEST: noreloc-S3
+ * Description: Check noreloc survives after suspend to RAM/resume cycle.
+ * Run type: FULL
+ *
+ * SUBTEST: noreloc-S4
+ * Description: Check noreloc survives after suspend to disk/resume cycle.
+ * Run type: FULL
+ *
+ * SUBTEST: noreloc-interruptible
+ * Description: Check noreloc support with interruptible.
+ * Run type: FULL
+ *
+ * SUBTEST: overlap
+ * Description: Check all the possible pages aligned overlaps.
+ * Run type: FULL
+ *
+ * SUBTEST: reverse
+ * Description: Check that if the user demands the vma will be swapped.
+ * Run type: FULL
+ *
+ * SUBTEST: safe-alignment
+ * Description: Check start offset and alignment detection.
+ * Run type: BAT
+ *
+ * SUBTEST: softpin
+ * Description: Check softpinning of a gem buffer object.
+ * Run type: FULL
+ *
+ * SUBTEST: zero
+ * Description: Check full placement control under full-ppGTT.
+ * Run type: FULL
+ */
 
 IGT_TEST_DESCRIPTION("Tests softpin feature with normal usage, invalid inputs"
 		     " scenarios and couple of eviction tests which copy buffers"

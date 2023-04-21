@@ -41,6 +41,25 @@
 #include "igt_dummyload.h"
 #include "igt_sysfs.h"
 #include "sw_sync.h"
+/**
+ * TEST: sysfs heartbeat interval
+ * Feature: SMI, cmd_submission
+ * Run type: FULL
+ *
+ * SUBTEST: idempotent
+ *
+ * SUBTEST: invalid
+ *
+ * SUBTEST: long
+ *
+ * SUBTEST: mixed
+ *
+ * SUBTEST: nopreempt
+ *
+ * SUBTEST: off
+ *
+ * SUBTEST: precise
+ */
 
 #define ATTR "heartbeat_interval_ms"
 #define RESET_TIMEOUT 1000 /* milliseconds, long enough for error capture */

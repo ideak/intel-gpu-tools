@@ -47,6 +47,184 @@
 #include "igt.h"
 #include "igt_sysfs.h"
 #include "sw_sync.h"
+/**
+ * TEST: gem reset stats
+ * Run type: FULL
+ *
+ * SUBTEST: ban-blt
+ *
+ * SUBTEST: ban-bsd
+ *
+ * SUBTEST: ban-bsd1
+ *
+ * SUBTEST: ban-bsd2
+ *
+ * SUBTEST: ban-ctx-blt
+ *
+ * SUBTEST: ban-ctx-bsd
+ *
+ * SUBTEST: ban-ctx-bsd1
+ *
+ * SUBTEST: ban-ctx-bsd2
+ *
+ * SUBTEST: ban-ctx-default
+ *
+ * SUBTEST: ban-ctx-render
+ *
+ * SUBTEST: ban-ctx-vebox
+ *
+ * SUBTEST: ban-default
+ *
+ * SUBTEST: ban-render
+ *
+ * SUBTEST: ban-vebox
+ *
+ * SUBTEST: close-pending-blt
+ *
+ * SUBTEST: close-pending-bsd
+ *
+ * SUBTEST: close-pending-bsd1
+ *
+ * SUBTEST: close-pending-bsd2
+ *
+ * SUBTEST: close-pending-ctx-blt
+ *
+ * SUBTEST: close-pending-ctx-bsd
+ *
+ * SUBTEST: close-pending-ctx-bsd1
+ *
+ * SUBTEST: close-pending-ctx-bsd2
+ *
+ * SUBTEST: close-pending-ctx-default
+ *
+ * SUBTEST: close-pending-ctx-render
+ *
+ * SUBTEST: close-pending-ctx-vebox
+ *
+ * SUBTEST: close-pending-default
+ *
+ * SUBTEST: close-pending-fork-blt
+ *
+ * SUBTEST: close-pending-fork-bsd
+ *
+ * SUBTEST: close-pending-fork-bsd1
+ *
+ * SUBTEST: close-pending-fork-bsd2
+ *
+ * SUBTEST: close-pending-fork-default
+ *
+ * SUBTEST: close-pending-fork-render
+ *
+ * SUBTEST: close-pending-fork-reverse-blt
+ *
+ * SUBTEST: close-pending-fork-reverse-bsd
+ *
+ * SUBTEST: close-pending-fork-reverse-bsd1
+ *
+ * SUBTEST: close-pending-fork-reverse-bsd2
+ *
+ * SUBTEST: close-pending-fork-reverse-default
+ *
+ * SUBTEST: close-pending-fork-reverse-render
+ *
+ * SUBTEST: close-pending-fork-reverse-vebox
+ *
+ * SUBTEST: close-pending-fork-vebox
+ *
+ * SUBTEST: close-pending-render
+ *
+ * SUBTEST: close-pending-vebox
+ *
+ * SUBTEST: defer-hangcheck-blt
+ *
+ * SUBTEST: defer-hangcheck-bsd
+ *
+ * SUBTEST: defer-hangcheck-bsd1
+ *
+ * SUBTEST: defer-hangcheck-bsd2
+ *
+ * SUBTEST: defer-hangcheck-default
+ *
+ * SUBTEST: defer-hangcheck-render
+ *
+ * SUBTEST: defer-hangcheck-vebox
+ *
+ * SUBTEST: params
+ *
+ * SUBTEST: params-ctx
+ *
+ * SUBTEST: reset-count-blt
+ *
+ * SUBTEST: reset-count-bsd
+ *
+ * SUBTEST: reset-count-bsd1
+ *
+ * SUBTEST: reset-count-bsd2
+ *
+ * SUBTEST: reset-count-ctx-blt
+ *
+ * SUBTEST: reset-count-ctx-bsd
+ *
+ * SUBTEST: reset-count-ctx-bsd1
+ *
+ * SUBTEST: reset-count-ctx-bsd2
+ *
+ * SUBTEST: reset-count-ctx-default
+ *
+ * SUBTEST: reset-count-ctx-render
+ *
+ * SUBTEST: reset-count-ctx-vebox
+ *
+ * SUBTEST: reset-count-default
+ *
+ * SUBTEST: reset-count-render
+ *
+ * SUBTEST: reset-count-vebox
+ *
+ * SUBTEST: reset-stats-blt
+ *
+ * SUBTEST: reset-stats-bsd
+ *
+ * SUBTEST: reset-stats-bsd1
+ *
+ * SUBTEST: reset-stats-bsd2
+ *
+ * SUBTEST: reset-stats-ctx-blt
+ *
+ * SUBTEST: reset-stats-ctx-bsd
+ *
+ * SUBTEST: reset-stats-ctx-bsd1
+ *
+ * SUBTEST: reset-stats-ctx-bsd2
+ *
+ * SUBTEST: reset-stats-ctx-default
+ *
+ * SUBTEST: reset-stats-ctx-render
+ *
+ * SUBTEST: reset-stats-ctx-vebox
+ *
+ * SUBTEST: reset-stats-default
+ *
+ * SUBTEST: reset-stats-render
+ *
+ * SUBTEST: reset-stats-vebox
+ *
+ * SUBTEST: shared-reset-domain
+ *
+ * SUBTEST: unrelated-ctx-blt
+ *
+ * SUBTEST: unrelated-ctx-bsd
+ *
+ * SUBTEST: unrelated-ctx-bsd1
+ *
+ * SUBTEST: unrelated-ctx-bsd2
+ *
+ * SUBTEST: unrelated-ctx-default
+ *
+ * SUBTEST: unrelated-ctx-render
+ *
+ * SUBTEST: unrelated-ctx-vebox
+ */
 
 #define RS_NO_ERROR      0
 #define RS_BATCH_ACTIVE  (1 << 0)

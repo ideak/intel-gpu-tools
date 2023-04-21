@@ -31,6 +31,599 @@
 #include "igt_dummyload.h"
 #include "igt_kms.h"
 #include "sw_sync.h"
+/**
+ * TEST: gem exec reloc
+ * Description: Basic sanity check of execbuf-ioctl relocations.
+ * Run type: FULL
+ *
+ * SUBTEST: basic-active
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-concurrent0
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-concurrent16
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-cpu
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-cpu-active
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-cpu-gtt
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: basic-cpu-gtt-active
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: basic-cpu-gtt-noreloc
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: basic-cpu-noreloc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-cpu-read
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-cpu-read-active
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-cpu-read-noreloc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-cpu-wc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-cpu-wc-active
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-cpu-wc-noreloc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-gtt
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: basic-gtt-active
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: basic-gtt-cpu
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: basic-gtt-cpu-active
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: basic-gtt-cpu-noreloc
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: basic-gtt-noreloc
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: basic-gtt-read
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: basic-gtt-read-active
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: basic-gtt-read-noreloc
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: basic-gtt-wc
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: basic-gtt-wc-active
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: basic-gtt-wc-noreloc
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: basic-range
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-range-active
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-scanout
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-softpin
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-wc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-wc-active
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-wc-cpu
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-wc-cpu-active
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-wc-cpu-noreloc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-wc-gtt
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: basic-wc-gtt-active
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: basic-wc-gtt-noreloc
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: basic-wc-noreloc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-wc-read
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-wc-read-active
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-wc-read-noreloc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-write-cpu
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-write-cpu-active
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-write-cpu-noreloc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-write-gtt
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: basic-write-gtt-active
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: basic-write-gtt-noreloc
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: basic-write-read
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-write-read-active
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-write-read-noreloc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-write-wc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-write-wc-active
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic-write-wc-noreloc
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-12
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-13
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-14
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-15
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-16
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-17
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-18
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-19
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-20
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-21
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-22
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-23
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-24
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-25
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-26
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-27
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-28
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-29
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-30
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-31
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-32
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-gtt-hang
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: cpu-gtt-interruptible
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: cpu-hang
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-read-hang
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-read-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-wc-hang
+ * Feature: cmd_submission
+ *
+ * SUBTEST: cpu-wc-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: gpu
+ * Feature: cmd_submission
+ *
+ * SUBTEST: gtt-12
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-13
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-14
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-15
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-16
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-17
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-18
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-19
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-20
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-21
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-22
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-23
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-24
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-25
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-26
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-27
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-28
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-29
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-30
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-31
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-32
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-cpu-hang
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-cpu-interruptible
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-hang
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-interruptible
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-read-hang
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-read-interruptible
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-wc-hang
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: gtt-wc-interruptible
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: invalid-domains
+ * Feature: cmd_submission
+ *
+ * SUBTEST: mmap-12
+ * Feature: cmd_submission
+ *
+ * SUBTEST: mmap-13
+ * Feature: cmd_submission
+ *
+ * SUBTEST: mmap-14
+ * Feature: cmd_submission
+ *
+ * SUBTEST: mmap-15
+ * Feature: cmd_submission
+ *
+ * SUBTEST: mmap-16
+ * Feature: cmd_submission
+ *
+ * SUBTEST: mmap-17
+ * Feature: cmd_submission
+ *
+ * SUBTEST: mmap-18
+ * Feature: cmd_submission
+ *
+ * SUBTEST: mmap-19
+ * Feature: cmd_submission
+ *
+ * SUBTEST: mmap-20
+ * Feature: cmd_submission
+ *
+ * SUBTEST: mmap-21
+ * Feature: cmd_submission
+ *
+ * SUBTEST: mmap-22
+ * Feature: cmd_submission
+ *
+ * SUBTEST: mmap-23
+ * Feature: cmd_submission
+ *
+ * SUBTEST: mmap-24
+ * Feature: cmd_submission
+ *
+ * SUBTEST: mmap-25
+ * Feature: cmd_submission
+ *
+ * SUBTEST: mmap-26
+ * Feature: cmd_submission
+ *
+ * SUBTEST: mmap-27
+ * Feature: cmd_submission
+ *
+ * SUBTEST: mmap-28
+ * Feature: cmd_submission
+ *
+ * SUBTEST: mmap-29
+ * Feature: cmd_submission
+ *
+ * SUBTEST: mmap-30
+ * Feature: cmd_submission
+ *
+ * SUBTEST: mmap-31
+ * Feature: cmd_submission
+ *
+ * SUBTEST: mmap-32
+ * Feature: cmd_submission
+ *
+ * SUBTEST: range-hang
+ * Feature: cmd_submission
+ *
+ * SUBTEST: range-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: readonly-12
+ * Feature: cmd_submission
+ *
+ * SUBTEST: readonly-13
+ * Feature: cmd_submission
+ *
+ * SUBTEST: readonly-14
+ * Feature: cmd_submission
+ *
+ * SUBTEST: readonly-15
+ * Feature: cmd_submission
+ *
+ * SUBTEST: readonly-16
+ * Feature: cmd_submission
+ *
+ * SUBTEST: readonly-17
+ * Feature: cmd_submission
+ *
+ * SUBTEST: readonly-18
+ * Feature: cmd_submission
+ *
+ * SUBTEST: readonly-19
+ * Feature: cmd_submission
+ *
+ * SUBTEST: readonly-20
+ * Feature: cmd_submission
+ *
+ * SUBTEST: readonly-21
+ * Feature: cmd_submission
+ *
+ * SUBTEST: readonly-22
+ * Feature: cmd_submission
+ *
+ * SUBTEST: readonly-23
+ * Feature: cmd_submission
+ *
+ * SUBTEST: readonly-24
+ * Feature: cmd_submission
+ *
+ * SUBTEST: readonly-25
+ * Feature: cmd_submission
+ *
+ * SUBTEST: readonly-26
+ * Feature: cmd_submission
+ *
+ * SUBTEST: readonly-27
+ * Feature: cmd_submission
+ *
+ * SUBTEST: readonly-28
+ * Feature: cmd_submission
+ *
+ * SUBTEST: readonly-29
+ * Feature: cmd_submission
+ *
+ * SUBTEST: readonly-30
+ * Feature: cmd_submission
+ *
+ * SUBTEST: readonly-31
+ * Feature: cmd_submission
+ *
+ * SUBTEST: readonly-32
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-12
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-13
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-14
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-15
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-16
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-17
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-18
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-19
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-20
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-21
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-22
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-23
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-24
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-25
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-26
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-27
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-28
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-29
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-30
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-31
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-32
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-cpu-hang
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-cpu-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-gtt-hang
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: wc-gtt-interruptible
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: wc-hang
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-read-hang
+ * Feature: cmd_submission
+ *
+ * SUBTEST: wc-read-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: write-cpu-hang
+ * Feature: cmd_submission
+ *
+ * SUBTEST: write-cpu-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: write-gtt-hang
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: write-gtt-interruptible
+ * Feature: cmd_submission, gtt
+ *
+ * SUBTEST: write-read-hang
+ * Feature: cmd_submission
+ *
+ * SUBTEST: write-read-interruptible
+ * Feature: cmd_submission
+ *
+ * SUBTEST: write-wc-hang
+ * Feature: cmd_submission
+ *
+ * SUBTEST: write-wc-interruptible
+ * Feature: cmd_submission
+ */
 
 IGT_TEST_DESCRIPTION("Basic sanity check of execbuf-ioctl relocations.");
 

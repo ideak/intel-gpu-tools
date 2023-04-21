@@ -34,6 +34,13 @@
 #include "igt_perf.h"
 #include "igt_sysfs.h"
 #include "sw_sync.h"
+/**
+ * TEST: gem ctx freq
+ * Feature: context
+ * Run type: FULL
+ *
+ * SUBTEST: sysfs
+ */
 
 #define SAMPLE_PERIOD (USEC_PER_SEC / 10)
 #define PMU_TOLERANCE 100

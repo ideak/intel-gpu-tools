@@ -45,6 +45,75 @@
 #include "ioctl_wrappers.h" /* gem_wait()! */
 #include "intel_allocator.h"
 #include "sw_sync.h"
+/**
+ * TEST: gem ctx persistence
+ * Feature: context
+ * Run type: FULL
+ *
+ * SUBTEST: engines-cleanup
+ *
+ * SUBTEST: engines-hang
+ *
+ * SUBTEST: engines-hostile
+ *
+ * SUBTEST: engines-hostile-preempt
+ *
+ * SUBTEST: engines-mixed
+ *
+ * SUBTEST: engines-mixed-process
+ *
+ * SUBTEST: engines-persistence
+ *
+ * SUBTEST: engines-queued
+ *
+ * SUBTEST: file
+ *
+ * SUBTEST: hang
+ *
+ * SUBTEST: heartbeat-close
+ *
+ * SUBTEST: heartbeat-hang
+ *
+ * SUBTEST: heartbeat-hostile
+ *
+ * SUBTEST: heartbeat-many
+ *
+ * SUBTEST: heartbeat-stop
+ *
+ * SUBTEST: hostile
+ *
+ * SUBTEST: idempotent
+ *
+ * SUBTEST: legacy-engines-cleanup
+ *
+ * SUBTEST: legacy-engines-hang
+ *
+ * SUBTEST: legacy-engines-hostile
+ *
+ * SUBTEST: legacy-engines-hostile-preempt
+ *
+ * SUBTEST: legacy-engines-mixed
+ *
+ * SUBTEST: legacy-engines-mixed-process
+ *
+ * SUBTEST: legacy-engines-persistence
+ *
+ * SUBTEST: legacy-engines-queued
+ *
+ * SUBTEST: many-contexts
+ *
+ * SUBTEST: process
+ *
+ * SUBTEST: processes
+ *
+ * SUBTEST: saturated-hostile
+ *
+ * SUBTEST: saturated-hostile-nopreempt
+ *
+ * SUBTEST: smoketest
+ *
+ * SUBTEST: userptr
+ */
 
 #define RESET_TIMEOUT_MS 2 * MSEC_PER_SEC; /* default: 640ms */
 static unsigned long reset_timeout_ms = RESET_TIMEOUT_MS;

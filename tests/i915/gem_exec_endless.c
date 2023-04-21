@@ -30,6 +30,13 @@
 #include "igt_sysfs.h"
 #include "igt_types.h"
 #include "sw_sync.h"
+/**
+ * TEST: gem exec endless
+ * Feature: cmd_submission
+ * Run type: FULL
+ *
+ * SUBTEST: dispatch
+ */
 
 #define MAX_ENGINES 64
 

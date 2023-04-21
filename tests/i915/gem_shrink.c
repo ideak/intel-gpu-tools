@@ -33,6 +33,113 @@
 #include "igt_gt.h"
 #include "igt_debugfs.h"
 #include "igt_sysfs.h"
+/**
+ * TEST: gem shrink
+ * Feature: mapping
+ * Run type: FULL
+ *
+ * SUBTEST: execbuf1
+ *
+ * SUBTEST: execbuf1-oom
+ *
+ * SUBTEST: execbuf1-sanitycheck
+ *
+ * SUBTEST: execbuf1-userptr
+ *
+ * SUBTEST: execbuf1-userptr-dirty
+ *
+ * SUBTEST: execbufN
+ *
+ * SUBTEST: execbufN-oom
+ *
+ * SUBTEST: execbufN-sanitycheck
+ *
+ * SUBTEST: execbufN-userptr
+ *
+ * SUBTEST: execbufN-userptr-dirty
+ *
+ * SUBTEST: execbufX
+ *
+ * SUBTEST: execbufX-oom
+ *
+ * SUBTEST: execbufX-sanitycheck
+ *
+ * SUBTEST: execbufX-userptr
+ *
+ * SUBTEST: execbufX-userptr-dirty
+ *
+ * SUBTEST: get-pages
+ *
+ * SUBTEST: get-pages-dirty
+ *
+ * SUBTEST: get-pages-dirty-oom
+ *
+ * SUBTEST: get-pages-dirty-sanitycheck
+ *
+ * SUBTEST: get-pages-dirty-userptr
+ *
+ * SUBTEST: get-pages-dirty-userptr-dirty
+ *
+ * SUBTEST: get-pages-oom
+ *
+ * SUBTEST: get-pages-sanitycheck
+ *
+ * SUBTEST: get-pages-userptr
+ *
+ * SUBTEST: get-pages-userptr-dirty
+ *
+ * SUBTEST: hang
+ *
+ * SUBTEST: hang-oom
+ *
+ * SUBTEST: hang-sanitycheck
+ *
+ * SUBTEST: hang-userptr
+ *
+ * SUBTEST: hang-userptr-dirty
+ *
+ * SUBTEST: mmap-cpu
+ *
+ * SUBTEST: mmap-cpu-oom
+ *
+ * SUBTEST: mmap-cpu-sanitycheck
+ *
+ * SUBTEST: mmap-cpu-userptr
+ *
+ * SUBTEST: mmap-cpu-userptr-dirty
+ *
+ * SUBTEST: mmap-gtt
+ *
+ * SUBTEST: mmap-gtt-oom
+ *
+ * SUBTEST: mmap-gtt-sanitycheck
+ *
+ * SUBTEST: mmap-gtt-userptr
+ *
+ * SUBTEST: mmap-gtt-userptr-dirty
+ *
+ * SUBTEST: pread
+ *
+ * SUBTEST: pread-oom
+ *
+ * SUBTEST: pread-sanitycheck
+ *
+ * SUBTEST: pread-userptr
+ *
+ * SUBTEST: pread-userptr-dirty
+ *
+ * SUBTEST: pwrite
+ *
+ * SUBTEST: pwrite-oom
+ *
+ * SUBTEST: pwrite-sanitycheck
+ *
+ * SUBTEST: pwrite-userptr
+ *
+ * SUBTEST: pwrite-userptr-dirty
+ *
+ * SUBTEST: reclaim
+ */
 
 #ifndef MADV_FREE
 #define MADV_FREE 8

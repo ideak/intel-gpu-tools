@@ -43,6 +43,21 @@
 #include "intel_chipset.h"
 #include "intel_reg.h"
 #include "sw_sync.h"
+/**
+ * TEST: sysfs timeslice duration
+ * Feature: SMI, cmd_submission
+ * Run type: FULL
+ *
+ * SUBTEST: duration
+ *
+ * SUBTEST: idempotent
+ *
+ * SUBTEST: invalid
+ *
+ * SUBTEST: off
+ *
+ * SUBTEST: timeout
+ */
 
 #define ATTR "timeslice_duration_ms"
 #define RESET_TIMEOUT 1000 /* milliseconds, long enough for error capture */

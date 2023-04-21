@@ -44,6 +44,63 @@
 #include "igt_kmod.h"
 #include "igt_device.h"
 #include "igt_device_scan.h"
+/**
+ * TEST: i915 suspend
+ *
+ * SUBTEST: basic-s2idle-without-i915
+ * Description: Validate suspend-to-idle without i915 module
+ * Feature: suspend
+ * Run type: BAT
+ *
+ * SUBTEST: basic-s3-without-i915
+ * Description: Validate S3 without i915 module
+ * Feature: suspend
+ * Run type: BAT
+ *
+ * SUBTEST: debugfs-reader
+ * Feature: suspend
+ * Run type: FULL
+ *
+ * SUBTEST: debugfs-reader-hibernate
+ * Feature: suspend
+ * Run type: FULL
+ *
+ * SUBTEST: fence-restore-tiled2untiled
+ * Feature: gtt, suspend, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: fence-restore-tiled2untiled-hibernate
+ * Feature: gtt, suspend, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: fence-restore-untiled
+ * Feature: gtt, suspend, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: fence-restore-untiled-hibernate
+ * Feature: gtt, suspend, synchronization
+ * Run type: FULL
+ *
+ * SUBTEST: forcewake
+ * Feature: suspend
+ * Run type: FULL
+ *
+ * SUBTEST: forcewake-hibernate
+ * Feature: suspend
+ * Run type: FULL
+ *
+ * SUBTEST: shrink
+ * Feature: suspend
+ * Run type: FULL
+ *
+ * SUBTEST: sysfs-reader
+ * Feature: suspend
+ * Run type: FULL
+ *
+ * SUBTEST: sysfs-reader-hibernate
+ * Feature: suspend
+ * Run type: FULL
+ */
 
 #define OBJECT_SIZE (16*1024*1024)
 

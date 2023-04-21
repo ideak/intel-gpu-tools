@@ -38,6 +38,21 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/stat.h>
+/**
+ * TEST: core setmaster
+ * Description: Check that Drop/SetMaster behaves correctly wrt root/user access
+ * Feature: core
+ * Run type: FULL
+ *
+ * SUBTEST: master-drop-set-root
+ * Description: Ensure that root can Set/DropMaster
+ *
+ * SUBTEST: master-drop-set-shared-fd
+ * Description: Check the Set/DropMaster behaviour on shared fd
+ *
+ * SUBTEST: master-drop-set-user
+ * Description: Ensure first normal user can Set/DropMaster
+ */
 
 IGT_TEST_DESCRIPTION("Check that Drop/SetMaster behaves correctly wrt root/user"
 		     " access");

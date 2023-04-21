@@ -48,6 +48,16 @@
 #include "i915/gem.h"
 #include "i915/gem_create.h"
 #include "igt.h"
+/**
+ * TEST: gem exec big
+ * Description: Run a large nop batch to stress test the error capture code.
+ * Feature: cmd_submission
+ * Run type: FULL
+ *
+ * SUBTEST: exhaustive
+ *
+ * SUBTEST: single
+ */
 
 IGT_TEST_DESCRIPTION("Run a large nop batch to stress test the error capture"
 		     " code.");

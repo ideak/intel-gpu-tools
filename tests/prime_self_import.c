@@ -45,6 +45,43 @@
 
 #include "drm.h"
 #include "i915/gem_create.h"
+/**
+ * TEST: prime self import
+ * Description: Check whether prime import/export works on the same device... but with different fds.
+ * Feature: prime
+ *
+ * SUBTEST: basic-llseek-bad
+ * Description: Check dmabuf llseek support with invalid values.
+ * Run type: BAT
+ *
+ * SUBTEST: basic-llseek-size
+ * Description: Check dmabuf llseek support.
+ * Run type: BAT
+ *
+ * SUBTEST: basic-with_fd_dup
+ * Description: Check prime export with duplicate fd.
+ * Run type: BAT
+ *
+ * SUBTEST: basic-with_one_bo
+ * Description: Check prime import/export with one buffer object.
+ * Run type: BAT
+ *
+ * SUBTEST: basic-with_one_bo_two_files
+ * Description: Check prime/flink with one buffer object.
+ * Run type: BAT
+ *
+ * SUBTEST: basic-with_two_bos
+ * Description: Check prime import/export with two buffer objects.
+ * Run type: BAT
+ *
+ * SUBTEST: export-vs-gem_close-race
+ * Description: Check race of gem close against prime export.
+ * Run type: FULL
+ *
+ * SUBTEST: reimport-vs-gem_close-race
+ * Description: Check race of gem close against reimport.
+ * Run type: FULL
+ */
 
 IGT_TEST_DESCRIPTION("Check whether prime import/export works on the same"
 		     " device... but with different fds.");

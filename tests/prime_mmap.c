@@ -50,6 +50,35 @@
 #include "igt_debugfs.h"
 #include "ioctl_wrappers.h"
 #include "i915/intel_memory_region.h"
+/**
+ * TEST: prime mmap
+ * Feature: prime
+ * Run type: FULL
+ *
+ * SUBTEST: test_aperture_limit
+ *
+ * SUBTEST: test_correct
+ *
+ * SUBTEST: test_correct_cpu_write
+ *
+ * SUBTEST: test_dup
+ *
+ * SUBTEST: test_errors
+ *
+ * SUBTEST: test_forked
+ *
+ * SUBTEST: test_forked_cpu_write
+ *
+ * SUBTEST: test_invalid_sync_flags
+ *
+ * SUBTEST: test_map_unmap
+ *
+ * SUBTEST: test_refcounting
+ *
+ * SUBTEST: test_reprime
+ *
+ * SUBTEST: test_userptr
+ */
 
 #define BO_SIZE (16*1024)
 

@@ -38,6 +38,27 @@
 
 #include "igt.h"
 #include "igt_types.h"
+/**
+ * TEST: gem flink basic
+ * Description: Tests for flink - a way to export a gem object by name
+ * Feature: xorg_dri2
+ * Run type: BAT
+ *
+ * SUBTEST: bad-flink
+ * Description: Verify that GEM_FLINK ioctl with invalid gem object fails.
+ *
+ * SUBTEST: bad-open
+ * Description: Verify that GEM_OPEN ioctl with invalid flink name fails.
+ *
+ * SUBTEST: basic
+ * Description: Check if gem object can be exported to global namespace and then opened.
+ *
+ * SUBTEST: double-flink
+ * Description: Tests that multiple flinks for the same gem object share the same name.
+ *
+ * SUBTEST: flink-lifetime
+ * Description: Tests flink lifetime by referencing from multiple descriptors.
+ */
 
 IGT_TEST_DESCRIPTION("Tests for flink - a way to export a gem object by name");
 

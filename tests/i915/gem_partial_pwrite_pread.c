@@ -38,6 +38,68 @@
 
 #include "i915/gem.h"
 #include "igt.h"
+/**
+ * TEST: gem partial pwrite pread
+ * Description: Test pwrite/pread consistency when touching partial cachelines.
+ * Feature: caching, mapping
+ * Run type: FULL
+ *
+ * SUBTEST: reads
+ * Description:
+ *   Verify if pread is consistent while accessing partial cachelines with default caching
+ *   level
+ *
+ * SUBTEST: reads-display
+ * Description:
+ *   Verify if pread is consistent while accessing partial cachelines with display caching
+ *   level
+ *
+ * SUBTEST: reads-snoop
+ * Description: Verify if pread is consistent while accessing partial cachelines with snoop caching level
+ *
+ * SUBTEST: reads-uncached
+ * Description:
+ *   Verify if pread is consistent while accessing partial cachelines with uncached caching
+ *   level
+ *
+ * SUBTEST: write
+ * Description:
+ *   Verify if pwrite is consistent while accessing partial cachelines with default caching
+ *   level
+ *
+ * SUBTEST: write-display
+ * Description:
+ *   Verify if pwrite is consistent while accessing partial cachelines with display caching
+ *   level
+ *
+ * SUBTEST: write-snoop
+ * Description: Verify if pwrite is consistent while accessing partial cachelines with snoop caching level
+ *
+ * SUBTEST: write-uncached
+ * Description:
+ *   Verify if pwrite is consistent while accessing partial cachelines with uncached caching
+ *   level
+ *
+ * SUBTEST: writes-after-reads
+ * Description:
+ *   Verify if both pread, pwrite are consistent while accessing partial cachelines with
+ *   default caching level
+ *
+ * SUBTEST: writes-after-reads-display
+ * Description:
+ *   Verify if both pread, pwrite are consistent while accessing partial cachelines with
+ *   display caching level
+ *
+ * SUBTEST: writes-after-reads-snoop
+ * Description:
+ *   Verify if both pread, pwrite are consistent while accessing partial cachelines with snoop
+ *   caching level
+ *
+ * SUBTEST: writes-after-reads-uncached
+ * Description:
+ *   Verify if both pread, pwrite are consistent while accessing partial cachelines with
+ *   uncached caching level
+ */
 
 IGT_TEST_DESCRIPTION("Test pwrite/pread consistency when touching partial"
 		     " cachelines.");

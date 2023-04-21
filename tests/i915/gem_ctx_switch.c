@@ -45,6 +45,371 @@
 #include "i915/gem_ring.h"
 #include "i915/gem_vm.h"
 #include "igt.h"
+/**
+ * TEST: gem ctx switch
+ * Feature: context
+ * Run type: FULL
+ *
+ * SUBTEST: all-heavy
+ *
+ * SUBTEST: all-light
+ *
+ * SUBTEST: bcs0
+ *
+ * SUBTEST: bcs0-forked
+ *
+ * SUBTEST: bcs0-forked-heavy
+ *
+ * SUBTEST: bcs0-forked-heavy-interruptible
+ *
+ * SUBTEST: bcs0-forked-heavy-queue
+ *
+ * SUBTEST: bcs0-forked-heavy-queue-interruptible
+ *
+ * SUBTEST: bcs0-forked-interruptible
+ *
+ * SUBTEST: bcs0-forked-queue
+ *
+ * SUBTEST: bcs0-forked-queue-interruptible
+ *
+ * SUBTEST: bcs0-heavy
+ *
+ * SUBTEST: bcs0-heavy-interruptible
+ *
+ * SUBTEST: bcs0-heavy-queue
+ *
+ * SUBTEST: bcs0-heavy-queue-interruptible
+ *
+ * SUBTEST: bcs0-interruptible
+ *
+ * SUBTEST: bcs0-queue
+ *
+ * SUBTEST: bcs0-queue-interruptible
+ *
+ * SUBTEST: legacy-blt
+ *
+ * SUBTEST: legacy-blt-forked
+ *
+ * SUBTEST: legacy-blt-forked-heavy
+ *
+ * SUBTEST: legacy-blt-forked-heavy-interruptible
+ *
+ * SUBTEST: legacy-blt-forked-heavy-queue
+ *
+ * SUBTEST: legacy-blt-forked-heavy-queue-interruptible
+ *
+ * SUBTEST: legacy-blt-forked-interruptible
+ *
+ * SUBTEST: legacy-blt-forked-queue
+ *
+ * SUBTEST: legacy-blt-forked-queue-interruptible
+ *
+ * SUBTEST: legacy-blt-heavy
+ *
+ * SUBTEST: legacy-blt-heavy-interruptible
+ *
+ * SUBTEST: legacy-blt-heavy-queue
+ *
+ * SUBTEST: legacy-blt-heavy-queue-interruptible
+ *
+ * SUBTEST: legacy-blt-interruptible
+ *
+ * SUBTEST: legacy-blt-queue
+ *
+ * SUBTEST: legacy-blt-queue-interruptible
+ *
+ * SUBTEST: legacy-bsd1
+ *
+ * SUBTEST: legacy-bsd1-forked
+ *
+ * SUBTEST: legacy-bsd1-forked-heavy
+ *
+ * SUBTEST: legacy-bsd1-forked-heavy-interruptible
+ *
+ * SUBTEST: legacy-bsd1-forked-heavy-queue
+ *
+ * SUBTEST: legacy-bsd1-forked-heavy-queue-interruptible
+ *
+ * SUBTEST: legacy-bsd1-forked-interruptible
+ *
+ * SUBTEST: legacy-bsd1-forked-queue
+ *
+ * SUBTEST: legacy-bsd1-forked-queue-interruptible
+ *
+ * SUBTEST: legacy-bsd1-heavy
+ *
+ * SUBTEST: legacy-bsd1-heavy-interruptible
+ *
+ * SUBTEST: legacy-bsd1-heavy-queue
+ *
+ * SUBTEST: legacy-bsd1-heavy-queue-interruptible
+ *
+ * SUBTEST: legacy-bsd1-interruptible
+ *
+ * SUBTEST: legacy-bsd1-queue
+ *
+ * SUBTEST: legacy-bsd1-queue-interruptible
+ *
+ * SUBTEST: legacy-bsd2
+ *
+ * SUBTEST: legacy-bsd2-forked
+ *
+ * SUBTEST: legacy-bsd2-forked-heavy
+ *
+ * SUBTEST: legacy-bsd2-forked-heavy-interruptible
+ *
+ * SUBTEST: legacy-bsd2-forked-heavy-queue
+ *
+ * SUBTEST: legacy-bsd2-forked-heavy-queue-interruptible
+ *
+ * SUBTEST: legacy-bsd2-forked-interruptible
+ *
+ * SUBTEST: legacy-bsd2-forked-queue
+ *
+ * SUBTEST: legacy-bsd2-forked-queue-interruptible
+ *
+ * SUBTEST: legacy-bsd2-heavy
+ *
+ * SUBTEST: legacy-bsd2-heavy-interruptible
+ *
+ * SUBTEST: legacy-bsd2-heavy-queue
+ *
+ * SUBTEST: legacy-bsd2-heavy-queue-interruptible
+ *
+ * SUBTEST: legacy-bsd2-interruptible
+ *
+ * SUBTEST: legacy-bsd2-queue
+ *
+ * SUBTEST: legacy-bsd2-queue-interruptible
+ *
+ * SUBTEST: legacy-default
+ *
+ * SUBTEST: legacy-default-forked
+ *
+ * SUBTEST: legacy-default-forked-heavy
+ *
+ * SUBTEST: legacy-default-forked-heavy-interruptible
+ *
+ * SUBTEST: legacy-default-forked-heavy-queue
+ *
+ * SUBTEST: legacy-default-forked-heavy-queue-interruptible
+ *
+ * SUBTEST: legacy-default-forked-interruptible
+ *
+ * SUBTEST: legacy-default-forked-queue
+ *
+ * SUBTEST: legacy-default-forked-queue-interruptible
+ *
+ * SUBTEST: legacy-default-heavy
+ *
+ * SUBTEST: legacy-default-heavy-interruptible
+ *
+ * SUBTEST: legacy-default-heavy-queue
+ *
+ * SUBTEST: legacy-default-heavy-queue-interruptible
+ *
+ * SUBTEST: legacy-default-interruptible
+ *
+ * SUBTEST: legacy-default-queue
+ *
+ * SUBTEST: legacy-default-queue-interruptible
+ *
+ * SUBTEST: legacy-render
+ *
+ * SUBTEST: legacy-render-forked
+ *
+ * SUBTEST: legacy-render-forked-heavy
+ *
+ * SUBTEST: legacy-render-forked-heavy-interruptible
+ *
+ * SUBTEST: legacy-render-forked-heavy-queue
+ *
+ * SUBTEST: legacy-render-forked-heavy-queue-interruptible
+ *
+ * SUBTEST: legacy-render-forked-interruptible
+ *
+ * SUBTEST: legacy-render-forked-queue
+ *
+ * SUBTEST: legacy-render-forked-queue-interruptible
+ *
+ * SUBTEST: legacy-render-heavy
+ *
+ * SUBTEST: legacy-render-heavy-interruptible
+ *
+ * SUBTEST: legacy-render-heavy-queue
+ *
+ * SUBTEST: legacy-render-heavy-queue-interruptible
+ *
+ * SUBTEST: legacy-render-interruptible
+ *
+ * SUBTEST: legacy-render-queue
+ *
+ * SUBTEST: legacy-render-queue-interruptible
+ *
+ * SUBTEST: legacy-vebox
+ *
+ * SUBTEST: legacy-vebox-forked
+ *
+ * SUBTEST: legacy-vebox-forked-heavy
+ *
+ * SUBTEST: legacy-vebox-forked-heavy-interruptible
+ *
+ * SUBTEST: legacy-vebox-forked-heavy-queue
+ *
+ * SUBTEST: legacy-vebox-forked-heavy-queue-interruptible
+ *
+ * SUBTEST: legacy-vebox-forked-interruptible
+ *
+ * SUBTEST: legacy-vebox-forked-queue
+ *
+ * SUBTEST: legacy-vebox-forked-queue-interruptible
+ *
+ * SUBTEST: legacy-vebox-heavy
+ *
+ * SUBTEST: legacy-vebox-heavy-interruptible
+ *
+ * SUBTEST: legacy-vebox-heavy-queue
+ *
+ * SUBTEST: legacy-vebox-heavy-queue-interruptible
+ *
+ * SUBTEST: legacy-vebox-interruptible
+ *
+ * SUBTEST: legacy-vebox-queue
+ *
+ * SUBTEST: legacy-vebox-queue-interruptible
+ *
+ * SUBTEST: queue-heavy
+ *
+ * SUBTEST: queue-light
+ *
+ * SUBTEST: rcs0
+ *
+ * SUBTEST: rcs0-forked
+ *
+ * SUBTEST: rcs0-forked-heavy
+ *
+ * SUBTEST: rcs0-forked-heavy-interruptible
+ *
+ * SUBTEST: rcs0-forked-heavy-queue
+ *
+ * SUBTEST: rcs0-forked-heavy-queue-interruptible
+ *
+ * SUBTEST: rcs0-forked-interruptible
+ *
+ * SUBTEST: rcs0-forked-queue
+ *
+ * SUBTEST: rcs0-forked-queue-interruptible
+ *
+ * SUBTEST: rcs0-heavy
+ *
+ * SUBTEST: rcs0-heavy-interruptible
+ *
+ * SUBTEST: rcs0-heavy-queue
+ *
+ * SUBTEST: rcs0-heavy-queue-interruptible
+ *
+ * SUBTEST: rcs0-interruptible
+ *
+ * SUBTEST: rcs0-queue
+ *
+ * SUBTEST: rcs0-queue-interruptible
+ *
+ * SUBTEST: vcs0
+ *
+ * SUBTEST: vcs0-forked
+ *
+ * SUBTEST: vcs0-forked-heavy
+ *
+ * SUBTEST: vcs0-forked-heavy-interruptible
+ *
+ * SUBTEST: vcs0-forked-heavy-queue
+ *
+ * SUBTEST: vcs0-forked-heavy-queue-interruptible
+ *
+ * SUBTEST: vcs0-forked-interruptible
+ *
+ * SUBTEST: vcs0-forked-queue
+ *
+ * SUBTEST: vcs0-forked-queue-interruptible
+ *
+ * SUBTEST: vcs0-heavy
+ *
+ * SUBTEST: vcs0-heavy-interruptible
+ *
+ * SUBTEST: vcs0-heavy-queue
+ *
+ * SUBTEST: vcs0-heavy-queue-interruptible
+ *
+ * SUBTEST: vcs0-interruptible
+ *
+ * SUBTEST: vcs0-queue
+ *
+ * SUBTEST: vcs0-queue-interruptible
+ *
+ * SUBTEST: vcs1
+ *
+ * SUBTEST: vcs1-forked
+ *
+ * SUBTEST: vcs1-forked-heavy
+ *
+ * SUBTEST: vcs1-forked-heavy-interruptible
+ *
+ * SUBTEST: vcs1-forked-heavy-queue
+ *
+ * SUBTEST: vcs1-forked-heavy-queue-interruptible
+ *
+ * SUBTEST: vcs1-forked-interruptible
+ *
+ * SUBTEST: vcs1-forked-queue
+ *
+ * SUBTEST: vcs1-forked-queue-interruptible
+ *
+ * SUBTEST: vcs1-heavy
+ *
+ * SUBTEST: vcs1-heavy-interruptible
+ *
+ * SUBTEST: vcs1-heavy-queue
+ *
+ * SUBTEST: vcs1-heavy-queue-interruptible
+ *
+ * SUBTEST: vcs1-interruptible
+ *
+ * SUBTEST: vcs1-queue
+ *
+ * SUBTEST: vcs1-queue-interruptible
+ *
+ * SUBTEST: vecs0
+ *
+ * SUBTEST: vecs0-forked
+ *
+ * SUBTEST: vecs0-forked-heavy
+ *
+ * SUBTEST: vecs0-forked-heavy-interruptible
+ *
+ * SUBTEST: vecs0-forked-heavy-queue
+ *
+ * SUBTEST: vecs0-forked-heavy-queue-interruptible
+ *
+ * SUBTEST: vecs0-forked-interruptible
+ *
+ * SUBTEST: vecs0-forked-queue
+ *
+ * SUBTEST: vecs0-forked-queue-interruptible
+ *
+ * SUBTEST: vecs0-heavy
+ *
+ * SUBTEST: vecs0-heavy-interruptible
+ *
+ * SUBTEST: vecs0-heavy-queue
+ *
+ * SUBTEST: vecs0-heavy-queue-interruptible
+ *
+ * SUBTEST: vecs0-interruptible
+ *
+ * SUBTEST: vecs0-queue
+ *
+ * SUBTEST: vecs0-queue-interruptible
+ */
 
 #define INTERRUPTIBLE 0x1
 #define QUEUE 0x2

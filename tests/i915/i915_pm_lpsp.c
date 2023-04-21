@@ -32,6 +32,18 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+/**
+ * TEST: i915 pm lpsp
+ * Description: These tests validates display Low Power Single Pipe configurations
+ * Feature: pm_lpsp
+ * Run type: FULL
+ *
+ * SUBTEST: kms-lpsp
+ * Description: This test validates lpsp on all connected outputs on low power PIPE_A
+ *
+ * SUBTEST: screens-disabled
+ * Description: This test validates lpsp while all crtc are disabled
+ */
 
 #define MAX_SINK_LPSP_INFO_BUF_LEN	4096
 

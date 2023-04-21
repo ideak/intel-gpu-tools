@@ -33,6 +33,31 @@
 #include "i915/gem_create.h"
 #include "igt.h"
 #include "igt_gt.h"
+/**
+ * TEST: gem exec parallel
+ * Description: Exercise filling buffers by many clients working in parallel.
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic
+ * Description: Check basic functionality per engine.
+ * Run type: FULL
+ *
+ * SUBTEST: contexts
+ * Description: Check with many contexts.
+ * Run type: FULL
+ *
+ * SUBTEST: engines
+ * Description: Check with engines working in parallel.
+ * Run type: BAT
+ *
+ * SUBTEST: fds
+ * Description: Check with many fds.
+ * Run type: FULL
+ *
+ * SUBTEST: userptr
+ * Description: Check basic userptr thrashing.
+ * Run type: FULL
+ */
 
 IGT_TEST_DESCRIPTION("Exercise filling buffers by many clients working in parallel.");
 

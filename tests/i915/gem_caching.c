@@ -40,6 +40,18 @@
 #include "i915/gem.h"
 #include "igt.h"
 #include "i915/i915_blt.h"
+/**
+ * TEST: gem caching
+ * Description: Test snoop consistency when touching partial cachelines.
+ * Feature: caching
+ * Run type: FULL
+ *
+ * SUBTEST: read-writes
+ *
+ * SUBTEST: reads
+ *
+ * SUBTEST: writes
+ */
 
 IGT_TEST_DESCRIPTION("Test snoop consistency when touching partial"
 		     " cachelines.");

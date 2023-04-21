@@ -38,6 +38,63 @@
 
 #include "drm.h"
 #include "i915/gem_create.h"
+/**
+ * TEST: gem mmap
+ * Description: Basic MMAP IOCTL tests for memory regions.
+ * Feature: mapping
+ *
+ * SUBTEST: bad-object
+ * Description: Verify mapping to invalid gem objects won't be created.
+ * Run type: FULL
+ *
+ * SUBTEST: bad-offset
+ * Description: Verify mapping to gem object with invalid offset won't be created.
+ * Run type: FULL
+ *
+ * SUBTEST: bad-size
+ * Description: Verify mapping to gem object with invalid size won't be created.
+ * Run type: FULL
+ *
+ * SUBTEST: basic
+ * Description:
+ *   Test basics of newly mapped gem object like default content, write and read coherency,
+ *   mapping existence after gem_close and unmapping.
+ * Run type: BAT
+ *
+ * SUBTEST: basic-small-bo
+ * Description:
+ *   Test the write read coherency and simultaneous access of different pages of a small buffer
+ *   object.
+ * Run type: FULL
+ *
+ * SUBTEST: big-bo
+ * Description:
+ *   Test the write read coherency and simultaneous access of different pages of a big buffer
+ *   object.
+ * Run type: FULL
+ *
+ * SUBTEST: huge-bo
+ * Description:
+ *   Test the write read coherency and simultaneous access of different pages of a huge buffer
+ *   object.
+ * Run type: FULL
+ *
+ * SUBTEST: pf-nonblock
+ * Description:
+ *   Verify that GTT page faults are asynchronous to GPU rendering and completes within a
+ *   specific time.
+ * Run type: FULL
+ *
+ * SUBTEST: short-mmap
+ * Description: Map small buffer object though direct CPU access, bypassing GPU.
+ * Run type: FULL
+ *
+ * SUBTEST: swap-bo
+ * Description:
+ *   Test the write read coherency and simultaneous access of different pages while swapping
+ *   buffer object.
+ * Run type: FULL
+ */
 
 IGT_TEST_DESCRIPTION("Basic MMAP IOCTL tests for memory regions.");
 

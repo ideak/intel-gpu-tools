@@ -14,6 +14,27 @@
 #include "igt_pci.h"
 #include "igt_sysfs.h"
 #include "igt_kmod.h"
+/**
+ * TEST: device reset
+ * Description: Examine behavior of a driver on device sysfs reset
+ * Run type: FULL
+ *
+ * SUBTEST: cold-reset-bound
+ * Description: Cold Resets device with bound driver
+ * Feature: reset
+ *
+ * SUBTEST: reset-bound
+ * Description: Resets device with bound driver
+ * Feature: reset
+ *
+ * SUBTEST: unbind-cold-reset-rebind
+ * Description: Unbinds driver from device, initiates cold reset then rebinds driver to device
+ * Feature: reset
+ *
+ * SUBTEST: unbind-reset-rebind
+ * Description: Unbinds driver from device, initiates reset then rebinds driver to device
+ * Feature: reset, sriov-reset
+ */
 
 IGT_TEST_DESCRIPTION("Examine behavior of a driver on device sysfs reset");
 

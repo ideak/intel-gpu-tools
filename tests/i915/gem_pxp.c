@@ -7,6 +7,85 @@
 #include "i915/gem.h"
 #include "i915/gem_create.h"
 #include <fcntl.h>
+/**
+ * TEST: gem pxp
+ * Description: Test PXP that manages protected content through arbitrated HW-PXP-session
+ * Run type: FULL
+ *
+ * SUBTEST: create-protected-buffer
+ * Feature: PXP
+ *
+ * SUBTEST: create-regular-buffer
+ * Description: Verify protected buffer on supported hw:
+ * Feature: PXP
+ *
+ * SUBTEST: create-regular-context-1
+ * Description: Verify protected context on supported hw:
+ * Feature: PXP
+ *
+ * SUBTEST: create-regular-context-2
+ * Feature: PXP
+ *
+ * SUBTEST: create-valid-protected-context
+ * Feature: PXP
+ *
+ * SUBTEST: display-protected-crc
+ * Description: Test the display CRC
+ * Feature: PXP
+ *
+ * SUBTEST: dmabuf-shared-protected-dst-is-context-refcounted
+ * Feature: PXP, prime
+ *
+ * SUBTEST: fail-invalid-protected-context
+ * Feature: PXP
+ *
+ * SUBTEST: hw-rejects-pxp-buffer
+ * Description: Verify protected buffer on unsupported hw:
+ * Feature: PXP
+ *
+ * SUBTEST: hw-rejects-pxp-context
+ * Description: Verify protected context on unsupported hw:
+ * Feature: PXP
+ *
+ * SUBTEST: protected-encrypted-src-copy-not-readible
+ * Feature: PXP
+ *
+ * SUBTEST: protected-raw-src-copy-not-readible
+ * Feature: PXP
+ *
+ * SUBTEST: regular-baseline-src-copy-readible
+ * Description: Verify protected render operations:
+ * Feature: PXP
+ *
+ * SUBTEST: reject-modify-context-protection-off-1
+ * Feature: PXP
+ *
+ * SUBTEST: reject-modify-context-protection-off-2
+ * Feature: PXP
+ *
+ * SUBTEST: reject-modify-context-protection-off-3
+ * Feature: PXP
+ *
+ * SUBTEST: reject-modify-context-protection-on
+ * Description: Verify protected context integrity:
+ * Feature: PXP
+ *
+ * SUBTEST: verify-pxp-execution-after-suspend-resume
+ * Feature: PXP
+ *
+ * SUBTEST: verify-pxp-key-change-after-suspend-resume
+ * Description: Verify suspend-resume teardown management:
+ * Feature: PXP
+ *
+ * SUBTEST: verify-pxp-stale-buf-execution
+ * Feature: PXP
+ *
+ * SUBTEST: verify-pxp-stale-buf-optout-execution
+ * Feature: PXP
+ *
+ * SUBTEST: verify-pxp-stale-ctx-execution
+ * Feature: PXP
+ */
 
 IGT_TEST_DESCRIPTION("Test PXP that manages protected content through arbitrated HW-PXP-session");
 /* Note: PXP = "Protected Xe Path" */

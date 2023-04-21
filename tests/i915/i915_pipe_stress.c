@@ -18,6 +18,23 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include "i915/gem.h"
+/**
+ * TEST: i915 pipe stress
+ * Description:
+ *   Stress test how gpu and cpu behaves if maximum amount of planes, cpu and gpu utilization is
+ *   achieved in order to reveal possible bandwidth/watermark and similar problems.
+ * Run type: FULL
+ *
+ * SUBTEST: stress-xrgb8888-untiled
+ * Description:
+ *   Start pipe stress test, utilizing cpu and gpu simultaneously with maximum amount of planes
+ *   and resolution.
+ *
+ * SUBTEST: stress-xrgb8888-ytiled
+ * Description:
+ *   Start pipe stress test, utilizing cpu and gpu simultaneously with maximum amount of planes
+ *   and resolution.
+ */
 
 IGT_TEST_DESCRIPTION("Stress test how gpu and cpu behaves if maximum amount of planes, "
 		     "cpu and gpu utilization is achieved in order to reveal possible "

@@ -38,6 +38,31 @@
 
 #include "drm.h"
 #include "i915/gem_create.h"
+/**
+ * TEST: gem madvise
+ * Description: Checks that the kernel reports EFAULT when trying to use purged bo.
+ * Run type: FULL
+ *
+ * SUBTEST: dontneed-after-mmap
+ * Description:
+ *   Check signal for Segmentation Fault and bus error after obtaining a purgeable object and
+ *   calling for sighandler.
+ * Feature: caching, mapping
+ *
+ * SUBTEST: dontneed-before-exec
+ * Description: Check if EXECBUFFER2 reports EFAULT when trying to submit purged bo for GPU.
+ * Feature: caching, gtt, mapping
+ *
+ * SUBTEST: dontneed-before-mmap
+ * Description:
+ *   Check signal for Segmentation Fault and bus error before obtaining a purgeable object and
+ *   calling for sighandler.
+ * Feature: caching, mapping
+ *
+ * SUBTEST: dontneed-before-pwrite
+ * Description: Check if PWRITE reports EFAULT when trying to use purged bo for write operation.
+ * Feature: caching, gtt, mapping
+ */
 
 IGT_TEST_DESCRIPTION("Checks that the kernel reports EFAULT when trying to use"
 		     " purged bo.");

@@ -23,6 +23,14 @@
 
 #include "igt.h"
 #include "igt_kmod.h"
+/**
+ * TEST: dmabuf
+ * Description: Kernel selftests for the dmabuf API
+ * Feature: mapping, prime
+ * Run type: BAT
+ *
+ * SUBTEST: all-tests
+ */
 
 IGT_TEST_DESCRIPTION("Kernel selftests for the dmabuf API");
 

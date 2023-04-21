@@ -28,6 +28,14 @@
 #include "igt.h"
 #include <string.h>
 #include <sys/ioctl.h>
+/**
+ * TEST: core getversion
+ * Description: Tests the DRM_IOCTL_GET_VERSION ioctl and libdrm's drmGetVersion() interface to it.
+ * Feature: core
+ * Run type: FULL
+ *
+ * SUBTEST:
+ */
 
 IGT_TEST_DESCRIPTION("Tests the DRM_IOCTL_GET_VERSION ioctl and libdrm's "
 		     "drmGetVersion() interface to it.");

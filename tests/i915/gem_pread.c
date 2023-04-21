@@ -45,6 +45,23 @@
 #include "drm.h"
 #include "i915/gem_create.h"
 #include "igt_vgem.h"
+/**
+ * TEST: gem pread
+ * Feature: mapping
+ * Run type: FULL
+ *
+ * SUBTEST: bench
+ *
+ * SUBTEST: display
+ *
+ * SUBTEST: exhaustion
+ *
+ * SUBTEST: self
+ *
+ * SUBTEST: snoop
+ *
+ * SUBTEST: uncached
+ */
 
 #define MiB(x) ((x) * 1024 * 1024)
 

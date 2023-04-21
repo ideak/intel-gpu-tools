@@ -28,6 +28,13 @@
 #include "igt.h"
 #include "igt_x86.h"
 #include "i915/i915_blt.h"
+/**
+ * TEST: gem blits
+ * Feature: blitter
+ * Run type: FULL
+ *
+ * SUBTEST: basic
+ */
 
 #define BCS_SWCTRL 0x22200
 #define BCS_SRC_Y (1 << 0)

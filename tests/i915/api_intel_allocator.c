@@ -9,6 +9,47 @@
 #include "igt.h"
 #include "igt_aux.h"
 #include "intel_allocator.h"
+/**
+ * TEST: api intel allocator
+ * Feature: igt_core
+ * Run type: FULL
+ *
+ * SUBTEST: alloc-simple
+ *
+ * SUBTEST: default-alignment
+ * Description:
+ *   For simple allocator check does default alignment is properly handled in open and alloc
+ *   functions
+ *
+ * SUBTEST: execbuf-with-allocator
+ *
+ * SUBTEST: fork-simple-once
+ *
+ * SUBTEST: fork-simple-stress
+ *
+ * SUBTEST: fork-simple-stress-signal
+ *
+ * SUBTEST: gem-pool
+ * Description: Verifies creating and executing bb from gem pool
+ *
+ * SUBTEST: open-vm
+ *
+ * SUBTEST: reloc-allocator
+ *
+ * SUBTEST: reopen
+ *
+ * SUBTEST: reopen-fork
+ *
+ * SUBTEST: reserve-simple
+ *
+ * SUBTEST: simple-allocator
+ *
+ * SUBTEST: standalone
+ *
+ * SUBTEST: two-level-inception
+ *
+ * SUBTEST: two-level-inception-interruptible
+ */
 
 #define OBJ_SIZE 1024
 

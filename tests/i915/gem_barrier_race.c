@@ -17,6 +17,17 @@
 #include "i915/gem_create.h"
 #include "i915/gem_engine_topology.h"
 #include "i915/perf.h"
+/**
+ * TEST: gem barrier race
+ * Description: Exercise engine barriers and their interaction with other subsystems
+ * Feature: core
+ * Run type: FULL
+ *
+ * SUBTEST: remote-request
+ * Description:
+ *   Race intel_context_prepare_remote_request against
+ *   intel_context_active_acquire/release
+ */
 
 IGT_TEST_DESCRIPTION("Exercise engine barriers and their interaction with other subsystems");
 

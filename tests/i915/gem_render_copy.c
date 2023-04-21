@@ -48,6 +48,126 @@
 #include "igt.h"
 #include "igt_x86.h"
 #include "intel_bufops.h"
+/**
+ * TEST: gem render copy
+ * Description: Basic test for the render_copy() function.
+ * Feature: mapping
+ * Run type: FULL
+ *
+ * SUBTEST: linear
+ * Description: Test render_copy() from a mixed-tiled to a linear buffer.
+ *
+ * SUBTEST: linear-to-vebox-y-tiled
+ * Description: Test vebox_copy() from a linear to a y-tiled buffer.
+ *
+ * SUBTEST: linear-to-vebox-yf-tiled
+ * Description: Test vebox_copy() from a linear to a yf-tiled buffer.
+ *
+ * SUBTEST: mixed-tiled-to-y-tiled-ccs
+ * Description: Test render_copy() from a mixed-tiled to a y-tiled-ccs buffer.
+ *
+ * SUBTEST: mixed-tiled-to-yf-tiled-ccs
+ * Description: Test render_copy() from a mixed-tiled to a yf-tiled-ccs buffer.
+ *
+ * SUBTEST: x-tiled
+ * Description: Test render_copy() from a mixed-tiled to a x-tiled buffer.
+ *
+ * SUBTEST: x-tiled-to-vebox-y-tiled
+ * Description: Test vebox_copy() from a x-tiled to a y-tiled buffer.
+ *
+ * SUBTEST: x-tiled-to-vebox-yf-tiled
+ * Description: Test vebox_copy() from a x-tiled to a yf-tiled buffer.
+ *
+ * SUBTEST: y-tiled
+ * Description: Test render_copy() from a mixed-tiled to a y-tiled buffer.
+ *
+ * SUBTEST: y-tiled-ccs-to-linear
+ * Description: Test render_copy() from a y-tiled-ccs to a linear buffer.
+ *
+ * SUBTEST: y-tiled-ccs-to-x-tiled
+ * Description: Test render_copy() from a y-tiled-ccs to a x-tiled buffer.
+ *
+ * SUBTEST: y-tiled-ccs-to-y-tiled
+ * Description: Test render_copy() from a y-tiled-ccs to a y-tiled buffer.
+ *
+ * SUBTEST: y-tiled-ccs-to-y-tiled-ccs
+ * Description: Test render_copy() from a y-tiled-ccs to a y-tiled-ccs buffer.
+ *
+ * SUBTEST: y-tiled-ccs-to-y-tiled-mc-ccs
+ * Description: Test render_copy() and vebox_copy() from a y-tiled-ccs to a y-tiled-mc-ccs buffer.
+ *
+ * SUBTEST: y-tiled-ccs-to-yf-tiled
+ * Description: Test render_copy() from a y-tiled-ccs to a yf-tiled buffer.
+ *
+ * SUBTEST: y-tiled-ccs-to-yf-tiled-ccs
+ * Description: Test render_copy() from a y-tiled-ccs to a yf-tiled-ccs buffer.
+ *
+ * SUBTEST: y-tiled-ccs-to-yf-tiled-mc-ccs
+ * Description: Test render_copy() and vebox_copy() from a y-tiled-ccs to a yf-tiled-mc-ccs buffer.
+ *
+ * SUBTEST: y-tiled-mc-ccs-to-vebox-y-tiled
+ * Description: Test vebox_copy() from a y-tiled-mc-ccs to a y-tiled buffer.
+ *
+ * SUBTEST: y-tiled-mc-ccs-to-vebox-yf-tiled
+ * Description: Test vebox_copy() from a y-tiled-mc-ccs to a yf-tiled buffer.
+ *
+ * SUBTEST: y-tiled-mc-ccs-to-y-tiled-ccs
+ * Description: Test render_copy() and vebox_copy() from a y-tiled-mc-ccs to a y-tiled-ccs buffer.
+ *
+ * SUBTEST: y-tiled-mc-ccs-to-yf-tiled-ccs
+ * Description: Test render_copy() and vebox_copy() from a y-tiled-mc-ccs to a yf-tiled-ccs buffer.
+ *
+ * SUBTEST: y-tiled-to-vebox-linear
+ * Description: Test vebox_copy() from a y-tiled to a linear buffer.
+ *
+ * SUBTEST: y-tiled-to-vebox-x-tiled
+ * Description: Test vebox_copy() from a y-tiled to a x-tiled buffer.
+ *
+ * SUBTEST: y-tiled-to-vebox-y-tiled
+ * Description: Test vebox_copy() from a y-tiled to a y-tiled buffer.
+ *
+ * SUBTEST: y-tiled-to-vebox-yf-tiled
+ * Description: Test vebox_copy() from a y-tiled to a yf-tiled buffer.
+ *
+ * SUBTEST: yf-tiled
+ * Description: Test render_copy() from a mixed-tiled to a yf-tiled buffer.
+ *
+ * SUBTEST: yf-tiled-ccs-to-linear
+ * Description: Test render_copy() from a yf-tiled-ccs to a linear buffer.
+ *
+ * SUBTEST: yf-tiled-ccs-to-x-tiled
+ * Description: Test render_copy() from a yf-tiled-ccs to a x-tiled buffer.
+ *
+ * SUBTEST: yf-tiled-ccs-to-y-tiled
+ * Description: Test render_copy() from a yf-tiled-ccs to a y-tiled buffer.
+ *
+ * SUBTEST: yf-tiled-ccs-to-y-tiled-ccs
+ * Description: Test render_copy() from a yf-tiled-ccs to a y-tiled-ccs buffer.
+ *
+ * SUBTEST: yf-tiled-ccs-to-yf-tiled
+ * Description: Test render_copy() from a yf-tiled-ccs to a yf-tiled buffer.
+ *
+ * SUBTEST: yf-tiled-ccs-to-yf-tiled-ccs
+ * Description: Test render_copy() from a yf-tiled-ccs to a yf-tiled-ccs buffer.
+ *
+ * SUBTEST: yf-tiled-mc-ccs-to-vebox-y-tiled
+ * Description: Test vebox_copy() from a yf-tiled-mc-ccs to a y-tiled buffer.
+ *
+ * SUBTEST: yf-tiled-mc-ccs-to-vebox-yf-tiled
+ * Description: Test vebox_copy() from a yf-tiled-mc-ccs to a yf-tiled buffer.
+ *
+ * SUBTEST: yf-tiled-to-vebox-linear
+ * Description: Test vebox_copy() from a yf-tiled to a linear buffer.
+ *
+ * SUBTEST: yf-tiled-to-vebox-x-tiled
+ * Description: Test vebox_copy() from a yf-tiled to a x-tiled buffer.
+ *
+ * SUBTEST: yf-tiled-to-vebox-y-tiled
+ * Description: Test vebox_copy() from a yf-tiled to a y-tiled buffer.
+ *
+ * SUBTEST: yf-tiled-to-vebox-yf-tiled
+ * Description: Test vebox_copy() from a yf-tiled to a yf-tiled buffer.
+ */
 
 IGT_TEST_DESCRIPTION("Basic test for the render_copy() function.");
 

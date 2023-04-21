@@ -46,6 +46,32 @@
 
 #include "i915_drm.h"
 #include "i915/intel_memory_region.h"
+/**
+ * TEST: gem exec create
+ * Description:
+ *   This test overloads the driver with transient active objects and checks if we don't kill the
+ *   system under the memory pressure some of the symptoms this test look for include mysterious
+ *   hangs.
+ * Feature: cmd_submission
+ *
+ * SUBTEST: basic
+ * Description: Check if we kill system by overloading it with active objects iterating over all engines.
+ * Run type: BAT
+ *
+ * SUBTEST: forked
+ * Description: Concurrently overloads system with active objects and checks if we kill system.
+ * Run type: FULL
+ *
+ * SUBTEST: legacy
+ * Description:
+ *   Check if we kill the system by overloading it with active objects iterating over legacy
+ *   engines.
+ * Run type: FULL
+ *
+ * SUBTEST: madvise
+ * Description: This test does a forced reclaim, behaving like a bad application leaking its bo cache.
+ * Run type: FULL
+ */
 
 IGT_TEST_DESCRIPTION("This test overloads the driver with transient active objects"
 		     " and checks if we don't kill the system under the memory pressure"

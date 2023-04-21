@@ -54,6 +54,23 @@
 
 #include "i915/gem.h"
 #include "igt.h"
+/**
+ * TEST: gem tiled blits
+ * Description: Test doing many tiled blits, with a working set larger than the aperture size.
+ * Feature: gtt, mapping
+ *
+ * SUBTEST: basic
+ * Description: Check basic functionality.
+ * Run type: BAT
+ *
+ * SUBTEST: interruptible
+ * Description: Check with interrupts in parallel execution.
+ * Run type: FULL
+ *
+ * SUBTEST: normal
+ * Description: Check with parallel execution.
+ * Run type: FULL
+ */
 
 IGT_TEST_DESCRIPTION("Test doing many tiled blits, with a working set larger"
 		     " than the aperture size.");

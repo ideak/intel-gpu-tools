@@ -52,6 +52,14 @@
 #include "i915/gem.h"
 #include "i915/gem_create.h"
 #include "igt.h"
+/**
+ * TEST: gem cs tlb
+ * Description: Check whether we correctly invalidate the cs tlb.
+ * Feature: mapping
+ * Run type: FULL
+ *
+ * SUBTEST: engines
+ */
 
 IGT_TEST_DESCRIPTION("Check whether we correctly invalidate the cs tlb.");
 

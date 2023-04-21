@@ -40,6 +40,19 @@
 #include "igt_sysfs.h"
 #include "intel_allocator.h"
 #include "sw_sync.h"
+/**
+ * TEST: sysfs preempt timeout
+ * Feature: SMI, context
+ * Run type: FULL
+ *
+ * SUBTEST: idempotent
+ *
+ * SUBTEST: invalid
+ *
+ * SUBTEST: off
+ *
+ * SUBTEST: timeout
+ */
 
 #define ATTR "preempt_timeout_ms"
 #define RESET_TIMEOUT 1000 /* milliseconds, at long enough for an error capture */

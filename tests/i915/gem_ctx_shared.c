@@ -47,6 +47,40 @@
 #include "igt_vgem.h"
 #include "sw_sync.h"
 #include "sync_file.h"
+/**
+ * TEST: gem ctx shared
+ * Description: Test shared contexts.
+ * Feature: context
+ * Run type: FULL
+ *
+ * SUBTEST: Q-in-order
+ *
+ * SUBTEST: Q-independent
+ *
+ * SUBTEST: Q-out-order
+ *
+ * SUBTEST: Q-promotion
+ *
+ * SUBTEST: Q-smoketest
+ *
+ * SUBTEST: Q-smoketest-all
+ *
+ * SUBTEST: create-shared-gtt
+ *
+ * SUBTEST: detached-shared-gtt
+ *
+ * SUBTEST: disjoint-timelines
+ *
+ * SUBTEST: exec-shared-gtt
+ *
+ * SUBTEST: exec-single-timeline
+ *
+ * SUBTEST: exhaust-shared-gtt
+ *
+ * SUBTEST: exhaust-shared-gtt-lrc
+ *
+ * SUBTEST: single-timeline
+ */
 
 #define LO 0
 #define HI 1

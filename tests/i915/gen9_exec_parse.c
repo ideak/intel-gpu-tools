@@ -33,6 +33,53 @@
 #include "i915/gem_submission.h"
 #include "igt.h"
 #include "sw_sync.h"
+/**
+ * TEST: gen9 exec parse
+ * Feature: blitter, command_parser
+ * Run type: FULL
+ *
+ * SUBTEST: allowed-all
+ *
+ * SUBTEST: allowed-single
+ *
+ * SUBTEST: basic-rejected
+ *
+ * SUBTEST: basic-rejected-ctx-param
+ *
+ * SUBTEST: batch-invalid-length
+ *
+ * SUBTEST: batch-without-end
+ *
+ * SUBTEST: batch-zero-length
+ *
+ * SUBTEST: bb-chained
+ *
+ * SUBTEST: bb-large
+ *
+ * SUBTEST: bb-oversize
+ *
+ * SUBTEST: bb-secure
+ *
+ * SUBTEST: bb-start-cmd
+ *
+ * SUBTEST: bb-start-far
+ *
+ * SUBTEST: bb-start-out
+ *
+ * SUBTEST: bb-start-param
+ *
+ * SUBTEST: cmd-crossing-page
+ *
+ * SUBTEST: secure-batches
+ *
+ * SUBTEST: shadow-peek
+ *
+ * SUBTEST: unaligned-access
+ *
+ * SUBTEST: unaligned-jump
+ *
+ * SUBTEST: valid-registers
+ */
 
 /* To help craft commands known to be invalid across all engines */
 #define INSTR_CLIENT_SHIFT	29

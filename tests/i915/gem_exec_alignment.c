@@ -45,6 +45,24 @@
 #include "i915/gem_create.h"
 #include "igt.h"
 #include "igt_types.h"
+/**
+ * TEST: gem exec alignment
+ * Description: Exercises the basic execbuffer using object alignments
+ * Feature: cmd_submission
+ * Run type: FULL
+ *
+ * SUBTEST: forked
+ *
+ * SUBTEST: many
+ *
+ * SUBTEST: pi
+ *
+ * SUBTEST: pi-isolated
+ *
+ * SUBTEST: pi-shared
+ *
+ * SUBTEST: single
+ */
 
 IGT_TEST_DESCRIPTION("Exercises the basic execbuffer using object alignments");
 

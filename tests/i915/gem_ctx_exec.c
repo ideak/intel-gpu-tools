@@ -47,6 +47,39 @@
 #include "igt_rand.h"
 #include "igt_sysfs.h"
 #include "sw_sync.h"
+/**
+ * TEST: gem ctx exec
+ * Description: Test context batch buffer execution.
+ * Feature: context
+ *
+ * SUBTEST: basic
+ * Description: Check the basic context batch buffer execution.
+ * Run type: BAT
+ *
+ * SUBTEST: basic-close-race
+ * Description: Race the execution and interrupt handlers along a context, while closing it at a random time.
+ * Run type: FULL
+ *
+ * SUBTEST: basic-invalid-context
+ * Description: Verify that execbuf with invalid context fails.
+ * Run type: FULL
+ *
+ * SUBTEST: basic-nohangcheck
+ * Description: Verify that contexts are automatically shotdown on close, if hangchecking is disabled.
+ * Run type: FULL
+ *
+ * SUBTEST: basic-norecovery
+ * Description: Check the status of context after a hang by setting and unsetting the RECOVERABLE.
+ * Run type: FULL
+ *
+ * SUBTEST: eviction
+ * Description: Check maximum number of buffers it can evict for a context.
+ * Run type: FULL
+ *
+ * SUBTEST: reset-pin-leak
+ * Description: Check if the kernel doesn't leak the vma pin_count for the last context on reset.
+ * Run type: FULL
+ */
 
 IGT_TEST_DESCRIPTION("Test context batch buffer execution.");
 
