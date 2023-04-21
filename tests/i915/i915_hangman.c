@@ -463,8 +463,7 @@ static void do_tests(const char *name, const char *prefix,
 	const struct intel_execution_engine2 *e;
 	char buff[256];
 
-	snprintf(buff, sizeof(buff), "Per engine error capture (%s reset)", name);
-	igt_describe(buff);
+	igt_describe_f("Per engine error capture (%s reset)", name);
 	snprintf(buff, sizeof(buff), "%s-error-state-capture", prefix);
 	igt_subtest_with_dynamic(buff) {
 		for_each_ctx_engine(device, ctx, e) {
@@ -473,8 +472,7 @@ static void do_tests(const char *name, const char *prefix,
 		}
 	}
 
-	snprintf(buff, sizeof(buff), "Per engine hang recovery (spin, %s reset)", name);
-	igt_describe(buff);
+	igt_describe_f("Per engine hang recovery (spin, %s reset)", name);
 	snprintf(buff, sizeof(buff), "%s-engine-hang", prefix);
 	igt_subtest_with_dynamic(buff) {
                 int has_gpu_reset = 0;
@@ -494,8 +492,7 @@ static void do_tests(const char *name, const char *prefix,
 		}
 	}
 
-	snprintf(buff, sizeof(buff), "Per engine hang recovery (invalid CS, %s reset)", name);
-	igt_describe(buff);
+	igt_describe_f("Per engine hang recovery (invalid CS, %s reset)", name);
 	snprintf(buff, sizeof(buff), "%s-engine-error", prefix);
 	igt_subtest_with_dynamic(buff) {
 		int has_gpu_reset = 0;
