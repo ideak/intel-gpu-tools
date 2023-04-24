@@ -715,9 +715,7 @@ __test_planes_scaling_combo(data_t *d, int w1, int h1, int w2, int h2,
 	igt_assert_eq(ret, 0);
 }
 
-static void setup_fb(int fd, int width, int height,
-		     double r, double g, double b,
-		     struct igt_fb *fb)
+static void setup_fb(int fd, int width, int height, struct igt_fb *fb)
 {
 	igt_create_fb(fd, width, height,
 		      DRM_FORMAT_XRGB8888,
@@ -744,20 +742,20 @@ test_planes_scaling_combo(data_t *d, int w1, int h1, int w2, int h2,
 
 	switch (test_type) {
 	case TEST_PLANES_UPSCALE:
-		setup_fb(display->drm_fd, w1, h1, 1.0, 0.0, 0.0, &d->fb[1]);
-		setup_fb(display->drm_fd, w2, h2, 0.0, 1.0, 0.0, &d->fb[2]);
+		setup_fb(display->drm_fd, w1, h1, &d->fb[1]);
+		setup_fb(display->drm_fd, w2, h2, &d->fb[2]);
 		break;
 	case TEST_PLANES_DOWNSCALE:
-		setup_fb(display->drm_fd, mode->hdisplay, mode->vdisplay, 1.0, 0.0, 0.0, &d->fb[1]);
-		setup_fb(display->drm_fd, mode->hdisplay, mode->vdisplay, 0.0, 1.0, 0.0, &d->fb[2]);
+		setup_fb(display->drm_fd, mode->hdisplay, mode->vdisplay, &d->fb[1]);
+		setup_fb(display->drm_fd, mode->hdisplay, mode->vdisplay, &d->fb[2]);
 		break;
 	case TEST_PLANES_UPSCALE_DOWNSCALE:
-		setup_fb(display->drm_fd, w1, h1, 1.0, 0.0, 0.0, &d->fb[1]);
-		setup_fb(display->drm_fd, mode->hdisplay, mode->vdisplay, 0.0, 1.0, 0.0, &d->fb[2]);
+		setup_fb(display->drm_fd, w1, h1, &d->fb[1]);
+		setup_fb(display->drm_fd, mode->hdisplay, mode->vdisplay, &d->fb[2]);
 		break;
 	case TEST_PLANES_DOWNSCALE_UPSCALE:
-		setup_fb(display->drm_fd, mode->hdisplay, mode->vdisplay, 1.0, 0.0, 0.0, &d->fb[1]);
-		setup_fb(display->drm_fd, w2, h2, 0.0, 1.0, 0.0, &d->fb[2]);
+		setup_fb(display->drm_fd, mode->hdisplay, mode->vdisplay, &d->fb[1]);
+		setup_fb(display->drm_fd, w2, h2, &d->fb[2]);
 		break;
 	default:
 		igt_assert(0);
