@@ -838,7 +838,7 @@ test_invalid_num_scalers(data_t *d, enum pipe pipe, igt_output_t *output)
 	 * */
 	ret = igt_display_try_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
 	igt_skip_on_f(ret == 0, "Cannot test handling of too many scaling ops, the device supports a large amount.\n");
-	igt_assert_eq(ret, -EINVAL);
+	igt_assert(ret == -EINVAL || ret == -ERANGE);
 
 	/* cleanup */
 	igt_plane_set_fb(plane[0], NULL);
