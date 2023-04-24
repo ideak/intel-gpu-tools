@@ -926,7 +926,7 @@ static void test_scaler_with_multi_pipe_plane(data_t *d)
 	cleanup_fbs(d);
 
 	igt_skip_on_f(ret1 == -ERANGE || ret1 == -EINVAL ||
-		      ret2 == -ERANGE || ret1 == -EINVAL,
+		      ret2 == -ERANGE || ret2 == -EINVAL,
 		      "Scaling op is not supported by driver\n");
 	igt_assert_eq(ret1 && ret2, 0);
 }
