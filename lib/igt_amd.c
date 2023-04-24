@@ -799,6 +799,8 @@ int igt_amd_trigger_hotplug(int drm_fd, char *connector_name)
         wr_len = write(hpd_fd, enable_hpd, strlen(enable_hpd));
         close(hpd_fd);
         igt_assert_eq(wr_len, strlen(enable_hpd));
+	/* wait for hotplug process complete by kernel and user mode components */
+	sleep(30);
 
         return 0;
 }
