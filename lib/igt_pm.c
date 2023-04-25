@@ -1329,21 +1329,40 @@ void igt_pm_print_pci_card_runtime_status(void)
 	}
 }
 
-bool i915_is_slpc_enabled(int fd)
+/**
+ * i915_is_slpc_enabled_gt:
+ * @drm_fd: DRM file descriptor
+ * @gt: GT id
+ * Check if SLPC is enabled on a GT
+ */
+bool i915_is_slpc_enabled_gt(int drm_fd, int gt)
 {
-	int debugfs_fd = igt_debugfs_dir(fd);
+	int dir, debugfs_fd;
 	char buf[4096] = {};
-	int len;
 
-	igt_require(debugfs_fd != -1);
+	dir = igt_debugfs_gt_dir(drm_fd, gt);
+	igt_require(dir);
 
-	len = igt_debugfs_simple_read(debugfs_fd, "gt/uc/guc_slpc_info", buf, sizeof(buf));
+	debugfs_fd = openat(dir, "uc/guc_slpc_info", O_RDONLY);
+	/* if guc_slpc_info not present then return false */
+	if (debugfs_fd < 0)
+		return false;
+
+	read(debugfs_fd, buf, sizeof(buf)-1);
+
 	close(debugfs_fd);
 
-	if (len < 0)
-		return false;
-	else
-		return strstr(buf, "SLPC state: running");
+	return strstr(buf, "SLPC state: running");
+}
+
+/**
+ * i915_is_slpc_enabled:
+ * @drm_fd: DRM file descriptor
+ * Check if SLPC is enabled for the device
+ */
+bool i915_is_slpc_enabled(int drm_fd)
+{
+	return i915_is_slpc_enabled_gt(drm_fd, 0);
 }
 
 int igt_pm_get_runtime_suspended_time(struct pci_device *pci_dev)
