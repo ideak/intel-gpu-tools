@@ -617,6 +617,7 @@ read_data_file(FILE *file)
 				{ "user", "user", 0 },
 				{ "semaphores", "semaphores", 0 },
 				{ "guc log buffer", "GuC log", 0 },
+				{ "guc ct buffer", "GuC CTB", 0 },
 				{ },
 			}, *b;
 			char *new_ring_name;
