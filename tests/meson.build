@@ -202,6 +202,7 @@ i915_progs = [
 	'gem_workarounds',
 	'i915_fb_tiling',
 	'i915_getparams_basic',
+	'i915_pm_freq_api',
 	'i915_hangman',
 	'i915_hwmon',
 	'i915_module_load',
