@@ -236,7 +236,7 @@ decode_mi(struct intel_decode *ctx)
 		{ 0x08, 0, 1, 1, "MI_ARB_ON_OFF" },
 		{ 0x0a, 0, 1, 1, "MI_BATCH_BUFFER_END" },
 		{ 0x30, 0x3f, 3, 3, "MI_BATCH_BUFFER" },
-		{ 0x31, 0x3f, 2, 2, "MI_BATCH_BUFFER_START" },
+		{ 0x31, 0x3f, 2, 3, "MI_BATCH_BUFFER_START" },
 		{ 0x14, 0x3f, 3, 3, "MI_DISPLAY_BUFFER_INFO" },
 		{ 0x04, 0, 1, 1, "MI_FLUSH" },
 		{ 0x22, 0x1f, 3, 3, "MI_LOAD_REGISTER_IMM" },
@@ -256,6 +256,7 @@ decode_mi(struct intel_decode *ctx)
 		{ 0x28, 0x3f, 3, 3, "MI_REPORT_PERF_COUNT" },
 		{ 0x29, 0xff, 3, 3, "MI_LOAD_REGISTER_MEM" },
 		{ 0x0b, 0, 1, 1, "MI_SUSPEND_FLUSH"},
+		{ 0x05, 0, 1, 1, "MI_ARB_CHECK"},
 	}, *opcode_mi = NULL;
 
 	/* check instruction length */
@@ -3623,7 +3624,17 @@ decode_3d_965(struct intel_decode *ctx)
 		return len;
 
 	case 0x7a00:
-		if (IS_GEN6(devid) || IS_GEN7(devid)) {
+		if (IS_GEN12(devid)) {
+			if (len != 6)
+				fprintf(out, "Bad count in PIPE_CONTROL\n");
+			instr_out(ctx, 0, "PIPE_CONTROL\n");
+			instr_out(ctx, 1, "flags\n");
+			instr_out(ctx, 2, "write address low\n");
+			instr_out(ctx, 3, "write address high\n");
+			instr_out(ctx, 4, "write data low\n");
+			instr_out(ctx, 5, "write data high\n");
+			return len;
+		} else if (IS_GEN6(devid) || IS_GEN7(devid)) {
 			if (len != 4 && len != 5)
 				fprintf(out, "Bad count in PIPE_CONTROL\n");
 
