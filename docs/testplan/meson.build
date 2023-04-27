@@ -11,8 +11,13 @@ xe_test_config = join_paths(source_root, 'tests', 'xe', 'xe_test_config.json')
 check_testlist = []
 if build_tests
 	doc_dependencies = test_executables
-	# Check if documentation matches the actual tests
-	check_testlist = [ '--check-testlist', '--igt-build-path', build_root ]
+	# Check if documentation matches the actual tests and tests can run
+	if not meson.is_cross_build()
+		build_info += 'Will Check if documentation is in sync with testlist'
+		check_testlist = [ '--check-testlist', '--igt-build-path', build_root ]
+	else
+		warning('WARNING: Will not check if documentation is in sync with testlist')
+	endif
 else
 	doc_dependencies = []
 endif
