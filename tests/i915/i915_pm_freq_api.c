@@ -3,6 +3,8 @@
  * Copyright © 2023 Intel Corporation
  */
 
+#include <fcntl.h>
+
 #include "i915/gem.h"
 #include "igt_sysfs.h"
 #include "igt.h"
