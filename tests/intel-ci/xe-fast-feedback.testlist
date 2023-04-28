@@ -141,6 +141,7 @@ igt@xe_query@query-gts
 igt@xe_query@query-config
 igt@xe_query@query-hwconfig
 igt@xe_query@query-topology
+igt@xe_query@query-invalid-extension
 igt@xe_query@query-invalid-query
 igt@xe_query@query-invalid-size
 #igt@xe_vm@bind-once

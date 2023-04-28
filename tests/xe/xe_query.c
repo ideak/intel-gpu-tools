@@ -436,6 +436,23 @@ test_query_invalid_size(int fd)
 	igt_assert_eq(igt_ioctl(fd, DRM_IOCTL_XE_DEVICE_QUERY, &query), -1);
 }
 
+/**
+ * SUBTEST: query-invalid-extension
+ * Description: Check query with invalid extension returns expected error code.
+ */
+static void
+test_query_invalid_extension(int fd)
+{
+	struct drm_xe_device_query query = {
+		.extensions = -1,
+		.query = DRM_XE_DEVICE_QUERY_CONFIG,
+		.size = 0,
+		.data = 0,
+	};
+
+	do_ioctl_err(fd, DRM_IOCTL_XE_DEVICE_QUERY, &query, EINVAL);
+}
+
 igt_main
 {
 	int xe;
@@ -468,6 +485,9 @@ igt_main
 
 	igt_subtest("query-invalid-size")
 		test_query_invalid_size(xe);
+
+	igt_subtest("query-invalid-extension")
+		test_query_invalid_extension(xe);
 
 	igt_fixture {
 		xe_device_put(xe);
