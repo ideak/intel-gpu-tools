@@ -37,6 +37,7 @@
 #include "i915/gem_create.h"
 #include "i915/gem_mman.h"
 #include "i915/intel_mocs.h"
+#include "xe/xe_query.h"
 
 #ifndef PAGE_ALIGN
 #ifndef PAGE_SIZE
@@ -634,17 +635,24 @@ static struct intel_buf *create_buf(int fd, struct buf_ops *bops,
 				    struct buf_data *from, uint32_t tiling)
 {
 	struct intel_buf *buf;
+	enum intel_driver driver = buf_ops_get_driver(bops);
 	uint32_t handle, name, width, height;
+	uint64_t region = driver == INTEL_DRIVER_XE ? vram_if_possible(fd, 0) : -1;
+	uint64_t size = from->size;
 
 	width = from->stride / (from->bpp / 8);
 	height = from->size / from->stride;
+	if (driver == INTEL_DRIVER_XE)
+		size = ALIGN(size, xe_get_default_alignment(fd));
 
 	name = gem_flink(fd, from->handle);
 	handle = gem_open(fd, name);
 
-	buf = intel_buf_create_using_handle(bops, handle,
-					    width, height, from->bpp, 0,
-					    tiling, 0);
+	buf = intel_buf_create_full(bops, handle,
+				    width, height, from->bpp, 0,
+				    tiling, 0,
+				    size, 0,
+				    region);
 
 	/* Make sure we close handle on destroy path */
 	intel_buf_set_ownership(buf, true);
