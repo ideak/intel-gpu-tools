@@ -584,7 +584,7 @@ void close_outputs(int *fds)
 }
 
 /* Returns the number of bytes written to disk, or a negative number on error */
-static long dump_dmesg(int kmsgfd, int outfd, size_t disk_limit)
+static long dump_dmesg(int kmsgfd, int outfd)
 {
 	/*
 	 * Write kernel messages to the log file until we reach
@@ -599,17 +599,11 @@ static long dump_dmesg(int kmsgfd, int outfd, size_t disk_limit)
 	bool underflow_once = false;
 	char cont;
 	char buf[2048];
-	ssize_t r, disk_written;
+	ssize_t r;
 	long written = 0;
 
 	if (kmsgfd < 0)
 		return 0;
-
-	disk_written = lseek(outfd, 0, SEEK_SET);
-	if (disk_written > disk_limit) {
-		errf("Error dumping kmsg: disk limit already exceeded\n");
-		return 0; /* number of written bytes */
-	}
 
 	comparefd = open("/dev/kmsg", O_RDONLY | O_NONBLOCK);
 	if (comparefd < 0) {
@@ -661,13 +655,6 @@ static long dump_dmesg(int kmsgfd, int outfd, size_t disk_limit)
 
 		write(outfd, buf, r);
 		written += r;
-		disk_written += r;
-
-		if (disk_written > disk_limit) {
-			close(comparefd);
-			errf("Error dumping kmsg: disk limit exceeded\n");
-			return written;
-		}
 
 		if (comparefd < 0 && sscanf(buf, "%u,%llu,%llu,%c;",
 					    &flags, &seq, &usec, &cont) == 4) {
@@ -903,7 +890,6 @@ static int monitor_output(pid_t child,
 	unsigned long taints = 0;
 	bool aborting = false;
 	size_t disk_usage = 0;
-	const size_t mon_disk_limit = settings->disk_usage_limit ? : (~(size_t)0);
 	bool socket_comms_used = false; /* whether the test actually uses comms */
 	bool results_received = false; /* whether we already have test results that might need overriding if we detect an abort condition */
 
@@ -1233,7 +1219,7 @@ static int monitor_output(pid_t child,
 
 			time_last_activity = time_now;
 
-			dmesgwritten = dump_dmesg(kmsgfd, outputs[_F_DMESG], mon_disk_limit);
+			dmesgwritten = dump_dmesg(kmsgfd, outputs[_F_DMESG]);
 			if (settings->sync)
 				fdatasync(outputs[_F_DMESG]);
 
@@ -1471,7 +1457,7 @@ static int monitor_output(pid_t child,
 					asprintf(abortreason, "Child refuses to die, tainted 0x%lx.", taints);
 				}
 
-				dump_dmesg(kmsgfd, outputs[_F_DMESG], mon_disk_limit);
+				dump_dmesg(kmsgfd, outputs[_F_DMESG]);
 				if (settings->sync)
 					fdatasync(outputs[_F_DMESG]);
 
@@ -1497,7 +1483,7 @@ static int monitor_output(pid_t child,
 		}
 	}
 
-	dump_dmesg(kmsgfd, outputs[_F_DMESG], mon_disk_limit);
+	dump_dmesg(kmsgfd, outputs[_F_DMESG]);
 	if (settings->sync)
 		fdatasync(outputs[_F_DMESG]);
 
