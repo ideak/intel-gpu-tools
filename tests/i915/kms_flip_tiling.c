@@ -177,7 +177,7 @@ igt_output_t *output;
 igt_main
 {
 	igt_fixture {
-		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
+		data.drm_fd = drm_open_driver_master(DRIVER_INTEL | DRIVER_XE);
 		data.gen = intel_display_ver(intel_get_drm_devid(data.drm_fd));
 
 		data.testformat = DRM_FORMAT_XRGB8888;
@@ -215,6 +215,12 @@ igt_main
 					};
 
 					if (plane->formats[j] != data.testformat)
+						continue;
+
+					/* No tiling support in XE. */
+					if (is_xe_device(data.drm_fd) &&
+					    (plane->modifiers[i] != DRM_FORMAT_MOD_LINEAR ||
+					     plane->modifiers[j] != DRM_FORMAT_MOD_LINEAR))
 						continue;
 
 					igt_dynamic_f("%s-pipe-%s-%s-to-%s",
