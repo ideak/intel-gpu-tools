@@ -592,7 +592,13 @@ igt_main_args("e", NULL, help_str, opt_handler, &data)
 	int i;
 
 	igt_fixture {
-		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
+		/*
+		 * FIXME: As of now, Async flips won't work with linear buffers
+		 * on Intel hardware, hence don't run tests on XE device as XE
+		 * won't support tiling.
+		 * Once Kernel changes got landed, please update this logic.
+		 */
+		data.drm_fd = drm_open_driver_master(DRIVER_ANY & ~DRIVER_XE);
 		kmstest_set_vt_graphics_mode();
 		igt_display_require(&data.display, data.drm_fd);
 		igt_display_require_output(&data.display);
