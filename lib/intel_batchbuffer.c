@@ -1280,8 +1280,9 @@ void intel_bb_reset(struct intel_bb *ibb, bool purge_objects_cache)
 	gem_close(ibb->fd, ibb->handle);
 	ibb->handle = gem_create(ibb->fd, ibb->size);
 
-	/* Keep address for bb in reloc mode and RANDOM allocator */
-	if (ibb->allocator_type == INTEL_ALLOCATOR_SIMPLE)
+	/* Reacquire offset for RELOC and SIMPLE */
+	if (ibb->allocator_type == INTEL_ALLOCATOR_SIMPLE ||
+	    ibb->allocator_type == INTEL_ALLOCATOR_RELOC)
 		ibb->batch_offset = __intel_bb_get_offset(ibb,
 							  ibb->handle,
 							  ibb->size,
