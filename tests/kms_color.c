@@ -499,11 +499,11 @@ static bool test_pipe_ctm(data_t *data,
 	disable_gamma(primary->pipe);
 
 	/*
-	 * Only program LUT's for i915, but not for max CTM as limitation of
+	 * Only program LUT's for intel, but not for max CTM as limitation of
 	 * representing intermediate values between 0 and 1.0 causes
 	 * rounding issues and inaccuracies leading to crc mismatch.
 	 */
-	if (is_i915_device(data->drm_fd) && memcmp(before, after, sizeof(color_t))) {
+	if (is_intel_device(data->drm_fd) && memcmp(before, after, sizeof(color_t))) {
 		igt_require(igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_DEGAMMA_LUT));
 		igt_require(igt_pipe_obj_has_prop(primary->pipe, IGT_CRTC_GAMMA_LUT));
 
@@ -813,7 +813,7 @@ run_deep_color_tests_for_pipe(data_t *data, enum pipe p)
 			 0.0, 1.0, 0.0,
 			 1.0, 0.0, 1.0 };
 
-	if (is_i915_device(data->drm_fd))
+	if (is_intel_device(data->drm_fd))
 		igt_require_f((intel_display_ver(data->devid) >= 11),
 				"At least GEN 11 is required to validate Deep-color.\n");
 
@@ -833,7 +833,7 @@ run_deep_color_tests_for_pipe(data_t *data, enum pipe p)
 		igt_output_set_prop_value(output, IGT_CONNECTOR_MAX_BPC, 10);
 		igt_output_set_pipe(output, p);
 
-		if (is_i915_device(data->drm_fd) &&
+		if (is_intel_device(data->drm_fd) &&
 		    !igt_max_bpc_constraint(&data->display, p, output, 10))
 			continue;
 
@@ -1054,7 +1054,7 @@ igt_main
 
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
-		if (is_i915_device(data.drm_fd))
+		if (is_intel_device(data.drm_fd))
 			data.devid = intel_get_drm_devid(data.drm_fd);
 		kmstest_set_vt_graphics_mode();
 
