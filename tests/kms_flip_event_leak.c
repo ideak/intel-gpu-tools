@@ -29,6 +29,7 @@
 #include <string.h>
 
 #include "igt_device.h"
+#include "xe/xe_query.h"
 
 typedef struct {
 	int drm_fd;
@@ -64,6 +65,8 @@ static void test(data_t *data, enum pipe pipe, igt_output_t *output)
 	igt_device_drop_master(data->drm_fd);
 
 	igt_device_set_master(fd);
+	if (is_xe_device(fd))
+		xe_device_get(fd);
 
 	igt_create_fb(fd, mode->hdisplay, mode->vdisplay,
 		      DRM_FORMAT_XRGB8888,
@@ -74,6 +77,8 @@ static void test(data_t *data, enum pipe pipe, igt_output_t *output)
 			      data);
 	igt_assert_eq(ret, 0);
 
+	if (is_xe_device(fd))
+		xe_device_put(fd);
 	ret = close(fd);
 	igt_assert_eq(ret, 0);
 
