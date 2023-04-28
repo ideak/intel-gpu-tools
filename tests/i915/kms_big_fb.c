@@ -28,6 +28,7 @@
 #include <string.h>
 
 #include "i915/gem_create.h"
+#include "xe/xe_query.h"
 
 IGT_TEST_DESCRIPTION("Test big framebuffers");
 
@@ -62,7 +63,10 @@ static struct intel_buf *init_buf(data_t *data,
 				  const char *buf_name)
 {
 	struct intel_buf *buf;
+	enum intel_driver driver = buf_ops_get_driver(data->bops);
 	uint32_t name, handle, tiling, stride, width, height, bpp, size;
+	uint64_t region = driver == INTEL_DRIVER_XE ?
+				vram_if_possible(data->drm_fd, 0) : -1;
 
 	igt_assert_eq(fb->offsets[0], 0);
 
@@ -75,8 +79,10 @@ static struct intel_buf *init_buf(data_t *data,
 
 	name = gem_flink(data->drm_fd, fb->gem_handle);
 	handle = gem_open(data->drm_fd, name);
-	buf = intel_buf_create_using_handle(data->bops, handle, width, height,
-					    bpp, 0, tiling, 0);
+	buf = intel_buf_create_full(data->bops, handle, width, height,
+				    bpp, 0, tiling, 0, size, 0,
+				    region);
+
 	intel_buf_set_name(buf, buf_name);
 	intel_buf_set_ownership(buf, true);
 
