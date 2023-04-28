@@ -136,7 +136,7 @@ static bool skip_plane(data_t *data, igt_plane_t *plane)
 	if (data->extended)
 		return false;
 
-	if (!is_i915_device(data->drm_fd))
+	if (!is_intel_device(data->drm_fd))
 		return false;
 
 	if (plane->type == DRM_PLANE_TYPE_CURSOR)
@@ -848,7 +848,7 @@ retry:
 		/* count enable pipes to set max iteration */
 		j += 1;
 
-		if (is_i915_device(data->drm_fd))
+		if (is_intel_device(data->drm_fd))
 			data->pipe_crcs[i] = igt_pipe_crc_new(data->drm_fd, i,
 							      IGT_PIPE_CRC_SOURCE_AUTO);
 
@@ -943,7 +943,7 @@ retry:
 			commit_display(data, i, nonblocking);
 			collect_crcs_mask(data->pipe_crcs, i, crcs[4]);
 
-			if (!is_i915_device(data->drm_fd))
+			if (!is_intel_device(data->drm_fd))
 				continue;
 
 			for (int k = 0; k < IGT_MAX_PIPES; k++) {
@@ -996,7 +996,7 @@ static void run_modeset_transition(data_t *data, int requested_outputs, bool non
 	unset_output_pipe(&data->display);
 	igt_display_commit2(&data->display, COMMIT_ATOMIC);
 
-	if (is_i915_device(data->drm_fd)) {
+	if (is_intel_device(data->drm_fd)) {
 		for_each_pipe(&data->display, pipe)
 			igt_pipe_crc_free(data->pipe_crcs[pipe]);
 	}
