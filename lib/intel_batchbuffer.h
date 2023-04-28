@@ -246,6 +246,7 @@ struct intel_bb {
 	uint8_t allocator_type;
 	enum allocator_strategy allocator_strategy;
 
+	enum intel_driver driver;
 	int fd;
 	unsigned int gen;
 	bool debug;
@@ -267,6 +268,11 @@ struct intel_bb {
 	struct igt_pxp pxp;
 	uint32_t ctx;
 	uint32_t vm_id;
+
+	bool xe_bound;
+	uint32_t engine_syncobj;
+	uint32_t engine_id;
+	uint32_t last_engine;
 
 	/* Context configuration */
 	intel_ctx_cfg_t *cfg;
