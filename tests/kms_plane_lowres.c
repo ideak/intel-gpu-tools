@@ -266,8 +266,11 @@ static void run_test(data_t *data, uint64_t modifier)
 	enum pipe pipe;
 	igt_output_t *output;
 
-	igt_skip_on(!igt_display_has_format_mod(&data->display,
-						DRM_FORMAT_XRGB8888, modifier));
+	if(!igt_display_has_format_mod(&data->display, DRM_FORMAT_XRGB8888, modifier))
+		return;
+
+	if (is_xe_device(data->drm_fd) && modifier != DRM_FORMAT_MOD_LINEAR)
+		return;
 
 	for_each_pipe(&data->display, pipe) {
 		for_each_valid_output_on_pipe(&data->display, pipe, output) {
@@ -318,7 +321,7 @@ igt_main
 
 	igt_fixture {
 		data.drm_fd = drm_open_driver_master(DRIVER_ANY);
-		data.devid = is_i915_device(data.drm_fd) ?
+		data.devid = is_intel_device(data.drm_fd) ?
 			intel_get_drm_devid(data.drm_fd) : 0;
 
 		kmstest_set_vt_graphics_mode();
