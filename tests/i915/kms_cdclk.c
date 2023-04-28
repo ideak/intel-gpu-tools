@@ -65,6 +65,9 @@ static int get_current_cdclk_freq(int debugfs_fd)
 	 * Display specific clock frequency info is moved to i915_cdclk_info,
 	 * On older kernels if this debugfs is not found, fallback to read from
 	 * i915_frequency_info.
+	 *
+	 * FIXME: As of now, XE debugfs is still using i915 namespace, once the
+	 * Kernel changes are landed, update this to use the XE specific debugfs.
 	 */
 	res = igt_debugfs_simple_read(debugfs_fd, "i915_cdclk_info",
 				      buf, sizeof(buf));
@@ -368,7 +371,7 @@ igt_main
 	data_t data = {};
 
 	igt_fixture {
-		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
+		data.drm_fd = drm_open_driver_master(DRIVER_INTEL | DRIVER_XE);
 		igt_require(data.drm_fd >= 0);
 		data.debugfs_fd = igt_debugfs_dir(data.drm_fd);
 		igt_require(data.debugfs_fd);
