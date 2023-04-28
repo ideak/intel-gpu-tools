@@ -149,8 +149,8 @@ static void draw_method_subtest(enum igt_draw_method method,
 	 * comparison. Cache the value so we don't recompute it for every single
 	 * subtest. */
 	if (!base_crcs[format_index].set) {
-		get_method_crc(gem_has_mappable_ggtt(drm_fd) ? IGT_DRAW_MMAP_GTT :
-							       IGT_DRAW_MMAP_WC,
+		get_method_crc(igt_draw_supports_method(drm_fd, IGT_DRAW_MMAP_GTT) ?
+			       IGT_DRAW_MMAP_GTT : IGT_DRAW_MMAP_WC,
 			       formats[format_index],
 			       DRM_FORMAT_MOD_LINEAR,
 			       &base_crcs[format_index].crc);
@@ -195,8 +195,8 @@ static void fill_fb_subtest(void)
 	igt_plane_set_fb(primary, &fb);
 
 	igt_draw_rect_fb(drm_fd, bops, 0, &fb,
-			 gem_has_mappable_ggtt(drm_fd) ? IGT_DRAW_MMAP_GTT :
-							 IGT_DRAW_MMAP_WC,
+			 igt_draw_supports_method(drm_fd, IGT_DRAW_MMAP_GTT) ?
+			 IGT_DRAW_MMAP_GTT : IGT_DRAW_MMAP_WC,
 			 0, 0, fb.width, fb.height, 0xFF);
 
 	rc = igt_display_commit2(&display, display.is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
@@ -222,7 +222,7 @@ static void fill_fb_subtest(void)
 
 static void setup_environment(void)
 {
-	drm_fd = drm_open_driver_master(DRIVER_INTEL);
+	drm_fd = drm_open_driver_master(DRIVER_INTEL | DRIVER_XE);
 	igt_require(drm_fd >= 0);
 	igt_display_require(&display, drm_fd);
 	igt_display_require_output(&display);
@@ -289,13 +289,17 @@ igt_main
 			       "method (%s) with different modifiers & DRM formats.",
 			       igt_draw_get_method_name(method));
 		igt_subtest_with_dynamic_f("draw-method-%s", igt_draw_get_method_name(method)) {
-			igt_skip_on(method == IGT_DRAW_MMAP_WC && !gem_mmap__has_wc(drm_fd));
-			igt_skip_on(method == IGT_DRAW_MMAP_GTT && !gem_has_mappable_ggtt(drm_fd));
+			if (!igt_draw_supports_method(drm_fd, method))
+				continue;
 
-			for (format_idx = 0; format_idx < ARRAY_SIZE(formats); format_idx++) {
-				for (modifier_idx = 0; modifier_idx < ARRAY_SIZE(modifiers); modifier_idx++) {
-					modifier = modifiers[modifier_idx];
+			for (modifier_idx = 0; modifier_idx < ARRAY_SIZE(modifiers); modifier_idx++) {
+				modifier = modifiers[modifier_idx];
 
+				/* No tiling support in XE. */
+				if (is_xe_device(drm_fd) && modifier != DRM_FORMAT_MOD_LINEAR)
+					continue;
+
+				for (format_idx = 0; format_idx < ARRAY_SIZE(formats); format_idx++) {
 					if (!igt_display_has_format_mod(&display, formats[format_idx], modifier))
 						continue;
 
