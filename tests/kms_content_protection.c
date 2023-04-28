@@ -392,7 +392,12 @@ static bool sink_hdcp_capable(igt_output_t *output)
 	if (fd < 0)
 		return false;
 
-	if (is_i915_device(data.drm_fd))
+	/*
+	 * FIXME: As of now XE's debugfs is using i915 namespace. Once Kernel
+	 * changes got landed, please update this logic to use XE specific
+	 * debugfs.
+	 */
+	if (is_intel_device(data.drm_fd))
 		debugfs_read(fd, "i915_hdcp_sink_capability", buf);
 	else
 		debugfs_read(fd, "hdcp_sink_capability", buf);
@@ -413,7 +418,8 @@ static bool sink_hdcp2_capable(igt_output_t *output)
 	if (fd < 0)
 		return false;
 
-	if (is_i915_device(data.drm_fd))
+	/* FIXME: XE specific debugfs as mentioned above. */
+	if (is_intel_device(data.drm_fd))
 		debugfs_read(fd, "i915_hdcp_sink_capability", buf);
 	else
 		debugfs_read(fd, "hdcp_sink_capability", buf);
@@ -763,7 +769,7 @@ static const struct {
 	  .content_type = HDCP_CONTENT_TYPE_1,
 	},
 	{ .desc = "Test the teardown and rebuild of the interface between "
-		  "I915 and mei hdcp.",
+		  "Intel and mei hdcp.",
 	  .name = "mei_interface",
 	  .cp_tests = CP_MEI_RELOAD,
 	  .content_type = HDCP_CONTENT_TYPE_1,
