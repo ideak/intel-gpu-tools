@@ -422,6 +422,13 @@ struct drm_xe_engine_class_instance *xe_hw_engine(int fd, int idx)
 	return &xe_dev->hw_engines[idx];
 }
 
+/**
+ * xe_mem_region:
+ * @fd: xe device fd
+ * @region: region mask
+ *
+ * Returns memory region structure for @region mask.
+ */
 struct drm_xe_query_mem_region *xe_mem_region(int fd, uint64_t region)
 {
 	struct xe_device *xe_dev;
@@ -432,6 +439,44 @@ struct drm_xe_query_mem_region *xe_mem_region(int fd, uint64_t region)
 	igt_assert(xe_dev->mem_usage->num_regions > region_idx);
 
 	return &xe_dev->mem_usage->regions[region_idx];
+}
+
+/**
+ * xe_region_name:
+ * @region: region mask
+ *
+ * Returns region string like "system" or "vram-n" where n=0...62.
+ */
+const char *xe_region_name(uint64_t region)
+{
+	static char **vrams;
+	int region_idx = ffs(region) - 1;
+
+	/* Populate the array */
+	if (!vrams) {
+		vrams = calloc(64, sizeof(char *));
+		for (int i = 0; i < 64; i++) {
+			if (i != 0)
+				asprintf(&vrams[i], "vram-%d", i - 1);
+			else
+				asprintf(&vrams[i], "system");
+			igt_assert(vrams[i]);
+		}
+	}
+
+	return vrams[region_idx];
+}
+
+/**
+ * xe_min_page_size:
+ * @fd: xe device fd
+ * @region: region mask
+ *
+ * Returns minimum page size for @region.
+ */
+uint32_t xe_min_page_size(int fd, uint64_t region)
+{
+	return xe_mem_region(fd, region)->min_page_size;
 }
 
 /**
