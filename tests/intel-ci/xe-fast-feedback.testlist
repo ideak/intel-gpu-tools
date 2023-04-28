@@ -100,6 +100,7 @@ igt@xe_exec_threads@threads-mixed-fd-basic
 igt@xe_exec_threads@threads-bal-mixed-basic
 igt@xe_exec_threads@threads-bal-mixed-shared-vm-basic
 igt@xe_exec_threads@threads-bal-mixed-fd-basic
+igt@xe_gpgpu_fill@basic
 igt@xe_guc_pc@freq_basic_api
 igt@xe_guc_pc@freq_fixed_idle
 igt@xe_guc_pc@freq_range_idle
