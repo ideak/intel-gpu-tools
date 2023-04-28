@@ -30,6 +30,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include <math.h>
+#include "xe/xe_query.h"
 
 #define MAX_CONNECTORS  10
 #define MAX_CRTCS       6
@@ -954,6 +955,9 @@ igt_main_args("det:", NULL, help_str, opt_handler, NULL)
 
 		drm_resources = drmModeGetResources(drm_fd);
 		igt_require(drm_resources);
+
+		if (is_xe_device(drm_fd))
+			xe_device_get(drm_fd);
 	}
 
 	for (i = 0; i < ARRAY_SIZE(tests); i++) {
@@ -970,6 +974,9 @@ igt_main_args("det:", NULL, help_str, opt_handler, NULL)
 
 	igt_fixture {
 		drmModeFreeResources(drm_resources);
+
+		if (is_xe_device(drm_fd))
+			xe_device_put(drm_fd);
 
 		close(drm_fd);
 	}
