@@ -623,7 +623,7 @@ igt_main
 	drmModeModeInfoPtr modetoset = NULL;
 
 	igt_fixture {
-		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
+		data.drm_fd = drm_open_driver_master(DRIVER_INTEL | DRIVER_XE);
 		data.gen = intel_display_ver(intel_get_drm_devid(data.drm_fd));
 		igt_require(data.gen >= 9);
 		igt_display_require(&data.display, data.drm_fd);
@@ -644,6 +644,12 @@ igt_main
 	for (int index = 0; index < ARRAY_SIZE(flip_scenario_test); index++) {
 		igt_describe(flip_scenario_test[index].describe);
 		igt_subtest_with_dynamic(flip_scenario_test[index].name) {
+			/* No tiling support in XE. */
+			if (is_xe_device(data.drm_fd) &&
+			    (flip_scenario_test[index].firstmodifier != DRM_FORMAT_MOD_LINEAR ||
+			     flip_scenario_test[index].secondmodifier != DRM_FORMAT_MOD_LINEAR))
+				continue;
+
 			free_fbs(&data);
 			for_each_pipe(&data.display, pipe) {
 				bool found = false;
