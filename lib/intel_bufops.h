@@ -43,6 +43,7 @@ struct intel_buf {
 	} addr;
 
 	uint64_t bo_size;
+	uint64_t region;
 
 	/* Tracking */
 	struct intel_bb *ibb;
@@ -109,6 +110,7 @@ struct buf_ops *buf_ops_create(int fd);
 struct buf_ops *buf_ops_create_with_selftest(int fd);
 void buf_ops_destroy(struct buf_ops *bops);
 int buf_ops_get_fd(struct buf_ops *bops);
+enum intel_driver buf_ops_get_driver(struct buf_ops *bops);
 
 bool buf_ops_set_software_tiling(struct buf_ops *bops,
 				 uint32_t tiling,
@@ -135,7 +137,7 @@ void intel_buf_init_in_region(struct buf_ops *bops,
 			      struct intel_buf *buf,
 			      int width, int height, int bpp, int alignment,
 			      uint32_t tiling, uint32_t compression,
-			      uint32_t region);
+			      uint64_t region);
 void intel_buf_close(struct buf_ops *bops, struct intel_buf *buf);
 
 void intel_buf_init_using_handle(struct buf_ops *bops,
@@ -143,6 +145,16 @@ void intel_buf_init_using_handle(struct buf_ops *bops,
 				 struct intel_buf *buf,
 				 int width, int height, int bpp, int alignment,
 				 uint32_t req_tiling, uint32_t compression);
+void intel_buf_init_full(struct buf_ops *bops,
+			 uint32_t handle,
+			 struct intel_buf *buf,
+			 int width, int height,
+			 int bpp, int alignment,
+			 uint32_t req_tiling,
+			 uint32_t compression,
+			 uint64_t size,
+			 int stride,
+			 uint64_t region);
 
 struct intel_buf *intel_buf_create(struct buf_ops *bops,
 				   int width, int height,
@@ -164,6 +176,16 @@ struct intel_buf *intel_buf_create_using_handle_and_size(struct buf_ops *bops,
 							 uint32_t compression,
 							 uint64_t size,
 							 int stride);
+
+struct intel_buf *intel_buf_create_full(struct buf_ops *bops,
+					uint32_t handle,
+					int width, int height,
+					int bpp, int alignment,
+					uint32_t req_tiling,
+					uint32_t compression,
+					uint64_t size,
+					int stride,
+					uint64_t region);
 void intel_buf_destroy(struct intel_buf *buf);
 
 static inline void intel_buf_set_pxp(struct intel_buf *buf, bool new_pxp_state)
