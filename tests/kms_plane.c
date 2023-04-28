@@ -30,6 +30,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include "xe/xe_query.h"
 
 /*
  * Throw away enough lsbs in pixel formats tests
@@ -397,6 +398,18 @@ test_plane_panning(data_t *data, enum pipe pipe)
 			if (r->ci.memory_class == I915_MEMORY_CLASS_DEVICE)
 				mem_size = r->cpu_size;
 
+	}
+
+	if (is_xe_device(data->drm_fd)) {
+		struct drm_xe_query_mem_region *memregion;
+		uint64_t memreg = all_memory_regions(data->drm_fd), region;
+
+		xe_for_each_mem_region(data->drm_fd, memreg, region) {
+			memregion = xe_mem_region(data->drm_fd, region);
+
+			if (XE_IS_CLASS_VRAM(memregion))
+				mem_size = memregion->total_size;
+		}
 	}
 
 	for_each_connector_mode(output) {
@@ -976,6 +989,10 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 			.modifier = plane->modifiers[i],
 		};
 
+		if (is_xe_device(data->drm_fd) &&
+		    f.modifier != DRM_FORMAT_MOD_LINEAR)
+			continue;
+
 		if (f.format == ref.format &&
 		    f.modifier == ref.modifier)
 			continue;
@@ -1050,7 +1067,7 @@ static bool skip_plane(data_t *data, igt_plane_t *plane)
 	if (data->extended)
 		return false;
 
-	if (!is_i915_device(data->drm_fd))
+	if (!is_intel_device(data->drm_fd))
 		return false;
 
 	if (plane->type == DRM_PLANE_TYPE_CURSOR)
