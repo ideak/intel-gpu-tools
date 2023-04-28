@@ -11,6 +11,7 @@
 #ifndef XE_IOCTL_H
 #define XE_IOCTL_H
 
+#include <stddef.h>
 #include <stdint.h>
 #include <xe_drm.h>
 
