@@ -226,7 +226,7 @@ static void test_bpc_switch(data_t *data, uint32_t flags)
 			if (igt_pipe_connector_valid(pipe, output)) {
 				prepare_test(data, output, pipe);
 
-				if (is_i915_device(data->fd) &&
+				if (is_intel_device(data->fd) &&
 				    !igt_max_bpc_constraint(display, pipe, output, 10)) {
 					test_fini(data);
 					break;
@@ -503,7 +503,7 @@ static void test_static_swap(data_t *data, enum pipe pipe, igt_output_t *output)
 	igt_pipe_crc_collect_crc(data->pipe_crc, &ref_crc);
 
 	/* Change the mastering information, no modeset allowed
-	 * for amd driver, whereas a modeset is required for i915
+	 * for amd driver, whereas a modeset is required for intel
 	 * driver. */
 	hdr.hdmi_metadata_type1.max_display_mastering_luminance = 200;
 	hdr.hdmi_metadata_type1.max_fall = 200;
@@ -517,7 +517,7 @@ static void test_static_swap(data_t *data, enum pipe pipe, igt_output_t *output)
 
 	/* Enter SDR via metadata, no modeset allowed for
 	 * amd driver, whereas a modeset is required for
-	 * i915 driver. */
+	 * intel driver. */
 	fill_hdr_output_metadata_sdr(&hdr);
 	set_hdr_output_metadata(data, &hdr);
 	if (is_amdgpu_device(data->fd))
@@ -590,7 +590,7 @@ static void test_hdr(data_t *data, uint32_t flags)
 			if (igt_pipe_connector_valid(pipe, output)) {
 				prepare_test(data, output, pipe);
 
-				if (is_i915_device(data->fd) &&
+				if (is_intel_device(data->fd) &&
 				    !igt_max_bpc_constraint(display, pipe, output, 10)) {
 					test_fini(data);
 					break;
