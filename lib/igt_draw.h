@@ -50,6 +50,8 @@ enum igt_draw_method {
 
 const char *igt_draw_get_method_name(enum igt_draw_method method);
 
+bool igt_draw_supports_method(int fd, enum igt_draw_method method);
+
 void igt_draw_rect(int fd, struct buf_ops *bops, uint32_t ctx,
 		   uint32_t buf_handle, uint32_t buf_size, uint32_t buf_stride,
 		   uint32_t tiling, enum igt_draw_method method,
