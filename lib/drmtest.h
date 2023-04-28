@@ -62,6 +62,14 @@
  */
 #define DRIVER_ANY 	~(DRIVER_VGEM)
 
+/*
+ * Compile friendly enum for i915/xe.
+ */
+enum intel_driver {
+	INTEL_DRIVER_I915 = 1,
+	INTEL_DRIVER_XE,
+};
+
 void __set_forced_driver(const char *name);
 
 /**
