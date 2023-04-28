@@ -143,7 +143,7 @@ static bool chv_cursor_broken(data_t *data, int x)
 {
 	uint32_t devid;
 
-	if (!is_i915_device(data->drm_fd))
+	if (!is_intel_device(data->drm_fd))
 		return false;
 
 	devid = intel_get_drm_devid(data->drm_fd);
@@ -152,7 +152,7 @@ static bool chv_cursor_broken(data_t *data, int x)
 	 * CHV gets a FIFO underrun on pipe C when cursor x coordinate
 	 * is negative and the cursor visible.
 	 *
-	 * i915 is fixed to return -EINVAL on cursor updates with those
+	 * intel is fixed to return -EINVAL on cursor updates with those
 	 * negative coordinates, so require cursor update to fail with
 	 * -EINVAL in that case.
 	 *
