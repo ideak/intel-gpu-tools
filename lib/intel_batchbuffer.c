@@ -836,7 +836,7 @@ static inline uint64_t __intel_bb_get_offset(struct intel_bb *ibb,
  * @allocator_type: allocator type, must be INTEL_ALLOCATOR_NONE for relocations
  *
  * intel-bb assumes it will work in one of two modes - with relocations or
- * with using allocator (currently RANDOM and SIMPLE are implemented).
+ * with using allocator (currently RELOC and SIMPLE are implemented).
  * Some description is required to describe how they maintain the addresses.
  *
  * Before entering into each scenarios generic rule is intel-bb keeps objects
@@ -854,10 +854,10 @@ static inline uint64_t __intel_bb_get_offset(struct intel_bb *ibb,
  *
  * This mode is valid only for ppgtt. Addresses are acquired from allocator
  * and softpinned. intel-bb cache must be then coherent with allocator
- * (simple is coherent, random is not due to fact we don't keep its state).
+ * (simple is coherent, reloc partially [doesn't support address reservation]).
  * When we do intel-bb reset with purging cache it has to reacquire addresses
  * from allocator (allocator should return same address - what is true for
- * simple allocator and false for random as mentioned before).
+ * simple and reloc allocators).
  *
  * If we do reset without purging caches we use addresses from intel-bb cache
  * during execbuf objects construction.
@@ -967,7 +967,7 @@ __intel_bb_create(int fd, uint32_t ctx, const intel_ctx_cfg_t *cfg,
  * @size: size of the batchbuffer
  * @start: allocator vm start address
  * @end: allocator vm start address
- * @allocator_type: allocator type, SIMPLE, RANDOM, ...
+ * @allocator_type: allocator type, SIMPLE, RELOC, ...
  * @strategy: allocation strategy
  *
  * Creates bb with context passed in @ctx, size in @size and allocator type
