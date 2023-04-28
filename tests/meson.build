@@ -256,6 +256,7 @@ xe_progs = [
 	'xe_exec_threads',
 	'xe_guc_pc',
 	'xe_huc_copy',
+	'xe_intel_bb',
 	'xe_mmap',
 	'xe_mmio',
 	'xe_module_load',
