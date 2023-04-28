@@ -16,6 +16,7 @@
 #include "igt_map.h"
 #include "intel_allocator.h"
 #include "intel_allocator_msgchannel.h"
+#include "xe/xe_query.h"
 
 //#define ALLOCDBG
 #ifdef ALLOCDBG
@@ -910,24 +911,33 @@ static uint64_t __intel_allocator_open_full(int fd, uint32_t ctx,
 	struct alloc_resp resp;
 	uint64_t gtt_size;
 
-	if (!start)
-		req.open.start = gem_detect_safe_start_offset(fd);
+	if (is_i915_device(fd)) {
+		if (!start)
+			req.open.start = gem_detect_safe_start_offset(fd);
 
-	if (!end) {
-		igt_assert_f(can_report_gtt_size(fd), "Invalid fd\n");
-		gtt_size = gem_aperture_size(fd);
-		if (!gem_uses_full_ppgtt(fd))
-			gtt_size /= 2;
-		else
-			gtt_size -= RESERVED;
+		if (!end) {
+			igt_assert_f(can_report_gtt_size(fd), "Invalid fd\n");
+			gtt_size = gem_aperture_size(fd);
+			if (!gem_uses_full_ppgtt(fd))
+				gtt_size /= 2;
+			else
+				gtt_size -= RESERVED;
 
-		req.open.end = gtt_size;
+			req.open.end = gtt_size;
+		}
+
+		if (!default_alignment)
+			req.open.default_alignment = gem_detect_safe_alignment(fd);
+
+		req.open.start = ALIGN(req.open.start, req.open.default_alignment);
+	} else {
+		struct xe_device *xe_dev = xe_device_get(fd);
+
+		igt_assert(xe_dev);
+
+		if (!end)
+			req.open.end = 1ull << xe_dev->va_bits;
 	}
-
-	if (!default_alignment)
-		req.open.default_alignment = gem_detect_safe_alignment(fd);
-
-	req.open.start = ALIGN(req.open.start, req.open.default_alignment);
 
 	/* Get child_tid only once at open() */
 	if (child_tid == -1)
@@ -998,7 +1008,7 @@ uint64_t intel_allocator_open_vm_full(int fd, uint32_t vm,
 
 /**
  * intel_allocator_open:
- * @fd: i915 descriptor
+ * @fd: i915 or xe descriptor
  * @ctx: context
  * @allocator_type: one of INTEL_ALLOCATOR_* define
  *
