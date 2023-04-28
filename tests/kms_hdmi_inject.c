@@ -29,6 +29,7 @@
 #include "igt.h"
 #include "igt_edid.h"
 #include "igt_eld.h"
+#include "xe/xe_query.h"
 
 #define HDISPLAY_4K	3840
 #define VDISPLAY_4K	2160
@@ -83,7 +84,7 @@ hdmi_inject_4k(int drm_fd, drmModeConnector *connector)
 	struct igt_fb fb;
 	uint8_t found_4k_mode = 0;
 
-	if (is_i915_device(drm_fd)) {
+	if (is_intel_device(drm_fd)) {
 		uint32_t devid = intel_get_drm_devid(drm_fd);
 
 		/* 4K requires at least HSW */
@@ -205,6 +206,9 @@ igt_main
 		igt_require(connector);
 
 		kmstest_unset_all_crtcs(drm_fd, res);
+
+		if (is_xe_device(drm_fd))
+			xe_device_get(drm_fd);
 	}
 
 	igt_describe("Make sure that 4K modes exposed by DRM match the "
@@ -219,6 +223,10 @@ igt_main
 
 	igt_fixture {
 		drmModeFreeConnector(connector);
+
+		if (is_xe_device(drm_fd))
+			xe_device_put(drm_fd);
+
 		close(drm_fd);
 	}
 }
