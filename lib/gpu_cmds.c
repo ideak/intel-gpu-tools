@@ -251,7 +251,7 @@ gen7_fill_binding_table(struct intel_bb *ibb,
 {
 	uint32_t binding_table_offset;
 	uint32_t *binding_table;
-	uint32_t devid = intel_get_drm_devid(ibb->i915);
+	uint32_t devid = intel_get_drm_devid(ibb->fd);
 
 	intel_bb_ptr_align(ibb, 64);
 	binding_table_offset = intel_bb_offset(ibb);

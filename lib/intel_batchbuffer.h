@@ -246,7 +246,7 @@ struct intel_bb {
 	uint8_t allocator_type;
 	enum allocator_strategy allocator_strategy;
 
-	int i915;
+	int fd;
 	unsigned int gen;
 	bool debug;
 	bool dump_base64;
@@ -299,21 +299,21 @@ struct intel_bb {
 };
 
 struct intel_bb *
-intel_bb_create_full(int i915, uint32_t ctx, const intel_ctx_cfg_t *cfg,
+intel_bb_create_full(int fd, uint32_t ctx, const intel_ctx_cfg_t *cfg,
 		     uint32_t size, uint64_t start, uint64_t end,
 		     uint8_t allocator_type, enum allocator_strategy strategy);
 struct intel_bb *
-intel_bb_create_with_allocator(int i915, uint32_t ctx, const intel_ctx_cfg_t *cfg,
+intel_bb_create_with_allocator(int fd, uint32_t ctx, const intel_ctx_cfg_t *cfg,
 			       uint32_t size, uint8_t allocator_type);
-struct intel_bb *intel_bb_create(int i915, uint32_t size);
+struct intel_bb *intel_bb_create(int fd, uint32_t size);
 struct intel_bb *
-intel_bb_create_with_context(int i915, uint32_t ctx, const intel_ctx_cfg_t *cfg,
+intel_bb_create_with_context(int fd, uint32_t ctx, const intel_ctx_cfg_t *cfg,
 			     uint32_t size);
-struct intel_bb *intel_bb_create_with_relocs(int i915, uint32_t size);
+struct intel_bb *intel_bb_create_with_relocs(int fd, uint32_t size);
 struct intel_bb *
-intel_bb_create_with_relocs_and_context(int i915, uint32_t ctx,
+intel_bb_create_with_relocs_and_context(int fd, uint32_t ctx,
 					const intel_ctx_cfg_t *cfg, uint32_t size);
-struct intel_bb *intel_bb_create_no_relocs(int i915, uint32_t size);
+struct intel_bb *intel_bb_create_no_relocs(int fd, uint32_t size);
 void intel_bb_destroy(struct intel_bb *ibb);
 
 /* make it safe to use intel_allocator after failed test */

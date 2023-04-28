@@ -83,7 +83,7 @@ copy_bo(struct intel_bb *ibb, struct intel_buf *src, struct intel_buf *dst)
 	intel_bb_add_intel_buf(ibb, src, false);
 	intel_bb_add_intel_buf(ibb, dst, true);
 
-	if (blt_has_xy_src_copy(ibb->i915)) {
+	if (blt_has_xy_src_copy(ibb->fd)) {
 		intel_bb_out(ibb,
 			     XY_SRC_COPY_BLT_CMD |
 			     XY_SRC_COPY_BLT_WRITE_ALPHA |
@@ -93,7 +93,7 @@ copy_bo(struct intel_bb *ibb, struct intel_buf *src, struct intel_buf *dst)
 		intel_bb_out(ibb, (3 << 24) | /* 32 bits */
 			     (0xcc << 16) | /* copy ROP */
 			     4096);
-	} else if (blt_has_fast_copy(ibb->i915)) {
+	} else if (blt_has_fast_copy(ibb->fd)) {
 		intel_bb_out(ibb, XY_FAST_COPY_BLT);
 		intel_bb_out(ibb, XY_FAST_COPY_COLOR_DEPTH_32 | 4096);
 	} else {

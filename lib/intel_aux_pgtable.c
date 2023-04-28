@@ -481,7 +481,7 @@ intel_aux_pgtable_create(struct intel_bb *ibb,
 	intel_bb_add_intel_buf_with_alignment(ibb, pgt->buf,
 					      pgt->max_align, false);
 
-	pgt_map(ibb->i915, pgt);
+	pgt_map(ibb->fd, pgt);
 	pgt_populate_entries(pgt, bufs, buf_count);
 	pgt_unmap(pgt);
 

@@ -809,7 +809,7 @@ static int gem_execbuf_flush_store_dw(int i915, struct intel_bb *ibb, uint32_t c
 	ret = __intel_bb_exec(ibb, intel_bb_offset(ibb),
 				  I915_EXEC_RENDER | I915_EXEC_NO_RELOC, false);
 	if (ret == 0) {
-		gem_sync(ibb->i915, fence->handle);
+		gem_sync(ibb->fd, fence->handle);
 		assert_pipectl_storedw_done(i915, fence->handle);
 	}
 	return ret;
