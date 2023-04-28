@@ -102,7 +102,7 @@ static void test(data_t *data)
 	igt_plane_set_fb(data->primary, &data->fb[0]);
 	igt_display_commit(display);
 
-	if (!gem_has_lmem(data->drm_fd)) {
+	if (is_i915_device(data->drm_fd) && !gem_has_lmem(data->drm_fd)) {
 		uint32_t caching;
 
 		/* make sure caching mode has become UC/WT */
@@ -259,7 +259,7 @@ igt_main_args("n", NULL, NULL, opt_handler, NULL)
 	enum pipe pipe;
 
 	igt_fixture {
-		data.drm_fd = drm_open_driver_master(DRIVER_INTEL);
+		data.drm_fd = drm_open_driver_master(DRIVER_INTEL | DRIVER_XE);
 
 		data.devid = intel_get_drm_devid(data.drm_fd);
 
