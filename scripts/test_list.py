@@ -208,6 +208,7 @@ class TestList:
 
     {
         "files": [ "tests/driver/*.c" ],
+        "exclude_files": [ "tests/driver/*-helper.c" ],
         "fields": {
             "Category": {
                 "Sub-category": {
@@ -302,10 +303,19 @@ class TestList:
             has_implemented = False
             if not self.filenames:
                 self.filenames = []
+                exclude_files = []
                 files = self.config["files"]
+                exclude_file_glob = self.config.get("exclude_files", [])
+                for cfg_file in exclude_file_glob:
+                    cfg_file = os.path.realpath(os.path.dirname(config_fname)) + "/" + cfg_file
+                    for fname in glob.glob(cfg_file):
+                        exclude_files.append(fname)
+
                 for cfg_file in files:
                     cfg_file = os.path.realpath(os.path.dirname(config_fname)) + "/" + cfg_file
                     for fname in glob.glob(cfg_file):
+                        if fname in exclude_files:
+                            continue
                         self.filenames.append(fname)
                         has_implemented = True
             else:
