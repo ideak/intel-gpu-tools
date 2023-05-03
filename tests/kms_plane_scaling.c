@@ -441,7 +441,8 @@ static void check_scaling_pipe_plane_rot(data_t *d, igt_plane_t *plane,
 	else
 		igt_plane_set_size(plane, width, height);
 
-	igt_plane_set_rotation(plane, rot);
+	if (rot != IGT_ROTATION_0)
+		igt_plane_set_rotation(plane, rot);
 	commit_ret = igt_display_try_commit2(display, COMMIT_ATOMIC);
 
 	igt_plane_set_fb(plane, NULL);
