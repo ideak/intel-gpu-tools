@@ -109,7 +109,7 @@ static void test_hotplug_basic(data_t *data, bool suspend)
 	test_init(data);
 
 	/* Setup all outputs */
-	for (i = 0; i < display->n_pipes; i++) {
+	for_each_pipe(&data->display, i) {
 		output = data->output[i];
 		if (!output || !igt_output_is_connected(output))
 			continue;
@@ -122,7 +122,7 @@ static void test_hotplug_basic(data_t *data, bool suspend)
 	igt_display_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, 0);
 
 	/* Collect reference CRCs */
-	for (i = 0; i < display->n_pipes; i++) {
+	for_each_pipe(&data->display, i) {
 		output = data->output[i];
 		if (!output || !igt_output_is_connected(output))
 			continue;
@@ -136,7 +136,7 @@ static void test_hotplug_basic(data_t *data, bool suspend)
 	}
 
 	/* Trigger hotplug and confirm reference image is the same. */
-	for (i = 0; i < display->n_pipes; i++) {
+	for_each_pipe(&data->display, i) {
 		output = data->output[i];
 		if (!output || !igt_output_is_connected(output))
 			continue;
