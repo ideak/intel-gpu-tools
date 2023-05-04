@@ -108,6 +108,12 @@ enum igt_custom_edid_type {
  */
 #define kmstest_port_name(port) ((port) + 'A')
 
+enum dsc_output_format {
+	DSC_FORMAT_RGB = 0,
+	DSC_FORMAT_YCBCR420,
+	DSC_FORMAT_YCBCR444,
+};
+
 const char *kmstest_encoder_type_str(int type);
 const char *kmstest_connector_status_str(int status);
 const char *kmstest_connector_type_str(int type);

@@ -134,3 +134,52 @@ int igt_get_dsc_debugfs_fd(int drmfd, char *connector_name)
 
 	return openat(igt_debugfs_dir(drmfd), file_name, O_WRONLY);
 }
+
+/*
+ * igt_is_dsc_output_format_supported_by_sink:
+ * @drmfd: A drm file descriptor
+ * @connector_name: Name of the libdrm connector we're going to use
+ * @output_format: Output format
+ *
+ * Returns: True if DSC output format is supported for the given connector,
+ * false otherwise.
+ */
+bool igt_is_dsc_output_format_supported_by_sink(int drmfd, char *connector_name,
+						enum dsc_output_format output_format)
+{
+	const char *check_str = "OUTPUTFORMATNOTFOUND";
+
+	switch (output_format) {
+	case DSC_FORMAT_RGB:
+		check_str = "RGB: yes";
+		break;
+	case DSC_FORMAT_YCBCR420:
+		check_str = "YCBCR420: yes";
+		break;
+	case DSC_FORMAT_YCBCR444:
+		check_str = "YCBCR444: yes";
+		break;
+	default:
+		break;
+	}
+
+	return check_dsc_debugfs(drmfd, connector_name, check_str);
+}
+
+/*
+ * igt_force_dsc_output_format:
+ * @drmfd: A drm file descriptor
+ * @connector_name: Name of the libdrm connector we're going to use
+ * @output_format: Output format
+ *
+ * Returns: 0 on success or negative error code, in case of failure.
+ */
+int igt_force_dsc_output_format(int drmfd, char *connector_name,
+				enum dsc_output_format output_format)
+{
+	char buf[20] = {0};
+
+	sprintf(buf, "%d", output_format);
+
+	return write_dsc_debugfs(drmfd, connector_name, "i915_dsc_output_format", buf);
+}
