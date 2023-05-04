@@ -97,3 +97,39 @@ bool check_gen11_bpc_constraint(int drmfd, igt_output_t *output, int input_bpc)
 
 	return true;
 }
+
+void force_dsc_output_format(int drmfd, igt_output_t *output,
+			     enum dsc_output_format output_format)
+{
+	int ret;
+
+	igt_debug("Forcing DSC %s output format on %s\n",
+		  kmstest_dsc_output_format_str(output_format), output->name);
+	ret = igt_force_dsc_output_format(drmfd, output->name, output_format);
+	igt_assert_f(ret == 0, "forcing dsc output format debugfs_write failed\n");
+}
+
+/* YCbCr420 DSC is supported on display version 14+ with DSC1.2a */
+static bool is_dsc_output_format_supported_by_platform(int disp_ver, enum dsc_output_format output_format)
+{
+	if (disp_ver < 14 && output_format == DSC_FORMAT_YCBCR420) {
+		igt_debug("Output format DSC YCBCR420 not supported on D13 and older platforms\n");
+		return false;
+	}
+
+	return true;
+}
+
+bool is_dsc_output_format_supported(int drmfd, int disp_ver, igt_output_t *output,
+				    enum dsc_output_format output_format)
+{
+	if (!(igt_is_dsc_output_format_supported_by_sink(drmfd, output->name, output_format)) &&
+	     (is_dsc_output_format_supported_by_platform(disp_ver, output_format))) {
+		    igt_debug("DSC %s output format not supported on connector %s\n",
+			       kmstest_dsc_output_format_str(output_format),
+			       output->name);
+			return false;
+		}
+
+	return true;
+}

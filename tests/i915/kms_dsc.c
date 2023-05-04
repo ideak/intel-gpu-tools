@@ -36,7 +36,8 @@ IGT_TEST_DESCRIPTION("Test to validate display stream compression");
 
 enum dsc_test_type {
 	TEST_DSC_BASIC,
-	TEST_DSC_BPC
+	TEST_DSC_BPC,
+	TEST_DSC_OUTPUT_FORMAT,
 };
 
 typedef struct {
@@ -44,6 +45,7 @@ typedef struct {
 	uint32_t devid;
 	igt_display_t display;
 	struct igt_fb fb_test_pattern;
+	enum dsc_output_format output_format;
 	unsigned int plane_format;
 	igt_output_t *output;
 	int input_bpc;
@@ -51,7 +53,8 @@ typedef struct {
 	enum pipe pipe;
 } data_t;
 
-static int format_list[] =  {DRM_FORMAT_XYUV8888, DRM_FORMAT_XRGB2101010, DRM_FORMAT_XRGB16161616F, DRM_FORMAT_YUYV};
+static int output_format_list[] = {DSC_FORMAT_YCBCR420, DSC_FORMAT_YCBCR444};
+static int format_list[] = {DRM_FORMAT_XYUV8888, DRM_FORMAT_XRGB2101010, DRM_FORMAT_XRGB16161616F, DRM_FORMAT_YUYV};
 static uint32_t bpc_list[] = {12, 10, 8};
 
 static inline void manual(const char *expected)
@@ -71,24 +74,26 @@ static drmModeModeInfo *get_highres_mode(igt_output_t *output)
 	return highest_mode;
 }
 
-static bool pipe_output_combo_valid(data_t *data)
+static drmModeModeInfo *get_next_mode(igt_output_t *output, int index)
 {
-	igt_output_t *output = data->output;
-	drmModeModeInfo *mode;
-	bool ret = true;
+	drmModeConnector *connector = output->config.connector;
+	drmModeModeInfo *next_mode = NULL;
 
-	igt_display_reset(&data->display);
-	mode = get_highres_mode(output);
+	if (index < connector->count_modes)
+		next_mode = &connector->modes[index];
 
-	igt_output_set_pipe(output, data->pipe);
-	igt_output_override_mode(output, mode);
+	return next_mode;
+}
 
-	if (!i915_pipe_output_combo_valid(&data->display))
-		ret = false;
+static void test_reset(data_t *data)
+{
+	igt_debug("Reset input BPC\n");
+	data->input_bpc = 0;
+	force_dsc_enable_bpc(data->drm_fd, data->output, data->input_bpc);
 
-	igt_output_set_pipe(output, PIPE_NONE);
-
-	return ret;
+	igt_debug("Reset DSC output format\n");
+	data->output_format = DSC_FORMAT_RGB;
+	force_dsc_output_format(data->drm_fd, data->output, data->output_format);
 }
 
 static void test_cleanup(data_t *data)
@@ -106,11 +111,14 @@ static void test_cleanup(data_t *data)
 /* re-probe connectors and do a modeset with DSC */
 static void update_display(data_t *data, enum dsc_test_type test_type)
 {
+	int ret;
 	bool enabled;
+	int index = 0;
 	igt_plane_t *primary;
 	drmModeModeInfo *mode;
 	igt_output_t *output = data->output;
 	igt_display_t *display = &data->display;
+	drmModeConnector *connector = output->config.connector;
 
 	/* sanitize the state before starting the subtest */
 	igt_display_reset(display);
@@ -125,26 +133,57 @@ static void update_display(data_t *data, enum dsc_test_type test_type)
 		force_dsc_enable_bpc(data->drm_fd, data->output, data->input_bpc);
 	}
 
+	if (test_type == TEST_DSC_OUTPUT_FORMAT) {
+		igt_debug("Trying to set DSC %s output format\n",
+			   kmstest_dsc_output_format_str(data->output_format));
+		force_dsc_output_format(data->drm_fd, data->output, data->output_format);
+	}
+
 	igt_output_set_pipe(output, data->pipe);
-
-	mode = get_highres_mode(output);
-	igt_require(mode != NULL);
-	igt_output_override_mode(output, mode);
-
 	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
 
 	igt_skip_on(!igt_plane_has_format_mod(primary, data->plane_format,
 		    DRM_FORMAT_MOD_LINEAR));
 
-	igt_create_pattern_fb(data->drm_fd,
-			      mode->hdisplay,
-			      mode->vdisplay,
-			      data->plane_format,
-			      DRM_FORMAT_MOD_LINEAR,
-			      &data->fb_test_pattern);
+	do {
+		if (data->output_format == DSC_FORMAT_RGB)
+			mode = get_highres_mode(output);
+		else
+			mode = get_next_mode(output, index++);
 
-	igt_plane_set_fb(primary, &data->fb_test_pattern);
-	igt_display_commit(display);
+		if (mode == NULL)
+			goto reset;
+
+		igt_output_override_mode(output, mode);
+
+		if (!i915_pipe_output_combo_valid(display)) {
+			if (data->output_format == DSC_FORMAT_RGB) {
+				igt_info("No valid pipe/output/mode found.\n");
+
+				mode = NULL;
+				goto reset;
+			} else {
+				continue;
+			}
+		}
+
+		igt_create_pattern_fb(data->drm_fd,
+				      mode->hdisplay,
+				      mode->vdisplay,
+				      data->plane_format,
+				      DRM_FORMAT_MOD_LINEAR,
+				      &data->fb_test_pattern);
+		igt_plane_set_fb(primary, &data->fb_test_pattern);
+
+		ret = igt_display_try_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
+		if (data->output_format == DSC_FORMAT_RGB || ret == 0)
+			break;
+
+		igt_remove_fb(data->drm_fd, &data->fb_test_pattern);
+	} while (index < connector->count_modes);
+
+	if (ret != 0)
+		goto reset;
 
 	/* until we have CRC check support, manually check if RGB test
 	 * pattern has no corruption.
@@ -159,20 +198,22 @@ static void update_display(data_t *data, enum dsc_test_type test_type)
 				enabled ? "ON" : "OFF");
 
 	restore_force_dsc_en();
-	igt_debug("Reset compression BPC\n");
-	data->input_bpc = 0;
-	force_dsc_enable_bpc(data->drm_fd, data->output, data->input_bpc);
 
 	igt_assert_f(enabled,
 		     "Default DSC enable failed on connector: %s pipe: %s\n",
 		     output->name,
 		     kmstest_pipe_name(data->pipe));
 
+reset:
+	test_reset(data);
+
 	test_cleanup(data);
+	igt_skip_on(mode == NULL);
+	igt_assert_eq(ret, 0);
 }
 
 static void test_dsc(data_t *data, enum dsc_test_type test_type, int bpc,
-		     unsigned int plane_format)
+		     unsigned int plane_format, enum dsc_output_format output_format)
 {
 	igt_display_t *display = &data->display;
 	igt_output_t *output;
@@ -180,6 +221,7 @@ static void test_dsc(data_t *data, enum dsc_test_type test_type, int bpc,
 	enum pipe pipe;
 
 	for_each_pipe_with_valid_output(display, pipe, output) {
+		data->output_format = output_format;
 		data->plane_format = plane_format;
 		data->input_bpc = bpc;
 		data->output = output;
@@ -188,17 +230,21 @@ static void test_dsc(data_t *data, enum dsc_test_type test_type, int bpc,
 		if (!check_dsc_on_connector(data->drm_fd, data->output))
 			continue;
 
+		if (!is_dsc_output_format_supported(data->drm_fd, data->disp_ver,
+						    data->output, data->output_format))
+			continue;
+
 		if (!check_gen11_dp_constraint(data->drm_fd, data->output, data->pipe))
 			continue;
 
 		if (!check_gen11_bpc_constraint(data->drm_fd, data->output, data->input_bpc))
 			continue;
 
-		if (!pipe_output_combo_valid(data))
-			continue;
-
 		if (test_type == TEST_DSC_BPC)
 			snprintf(name, sizeof(name), "-%dbpc-%s", data->input_bpc, igt_format_str(data->plane_format));
+		else if (test_type == TEST_DSC_OUTPUT_FORMAT)
+			snprintf(name, sizeof(name), "-%s-%s", kmstest_dsc_output_format_str(data->output_format),
+							       igt_format_str(data->plane_format));
 		else
 			snprintf(name, sizeof(name), "-%s", igt_format_str(data->plane_format));
 
@@ -226,14 +272,16 @@ igt_main
 		     "by a connector by forcing DSC on all connectors that support it "
 		     "with default parameters");
 	igt_subtest_with_dynamic("dsc-basic")
-			test_dsc(&data, TEST_DSC_BASIC, 0, DRM_FORMAT_XRGB8888);
+			test_dsc(&data, TEST_DSC_BASIC, 0,
+				 DRM_FORMAT_XRGB8888, DSC_FORMAT_RGB);
 
 	igt_describe("Tests basic display stream compression functionality if supported "
 		     "by a connector by forcing DSC on all connectors that support it "
 		     "with default parameters and creating fb with diff formats");
 	igt_subtest_with_dynamic("dsc-with-formats") {
 		for (int k = 0; k < ARRAY_SIZE(format_list); k++)
-			test_dsc(&data, TEST_DSC_BASIC, 0, format_list[k]);
+			test_dsc(&data, TEST_DSC_BASIC, 0,
+				 format_list[k], DSC_FORMAT_RGB);
 	}
 
 	igt_describe("Tests basic display stream compression functionality if supported "
@@ -241,7 +289,8 @@ igt_main
 		     "with certain input BPC for the connector");
 	igt_subtest_with_dynamic("dsc-with-bpc") {
 		for (int j = 0; j < ARRAY_SIZE(bpc_list); j++)
-			test_dsc(&data, TEST_DSC_BPC, bpc_list[j], DRM_FORMAT_XRGB8888);
+			test_dsc(&data, TEST_DSC_BPC, bpc_list[j],
+				 DRM_FORMAT_XRGB8888, DSC_FORMAT_RGB);
 	}
 
 	igt_describe("Tests basic display stream compression functionality if supported "
@@ -250,9 +299,19 @@ igt_main
 	igt_subtest_with_dynamic("dsc-with-bpc-formats") {
 		for (int j = 0; j < ARRAY_SIZE(bpc_list); j++) {
 			for (int k = 0; k < ARRAY_SIZE(format_list); k++) {
-				test_dsc(&data, TEST_DSC_BPC, bpc_list[j], format_list[k]);
+				test_dsc(&data, TEST_DSC_BPC, bpc_list[j],
+				format_list[k], DSC_FORMAT_RGB);
 			}
 		}
+	}
+
+	igt_describe("Tests basic display stream compression functionality if supported "
+		     "by a connector by forcing DSC and output format on all connectors "
+		     "that support it");
+	igt_subtest_with_dynamic("dsc-with-output-formats") {
+		for (int k = 0; k < ARRAY_SIZE(output_format_list); k++)
+			test_dsc(&data, TEST_DSC_OUTPUT_FORMAT, 0, DRM_FORMAT_XRGB8888,
+				 output_format_list[k]);
 	}
 
 	igt_fixture {

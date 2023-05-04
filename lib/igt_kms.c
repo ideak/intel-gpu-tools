@@ -967,6 +967,24 @@ const char *kmstest_scaling_filter_str(int filter)
 	return find_type_name(scaling_filter_names, filter);
 }
 
+static const struct type_name dsc_output_format_names[] = {
+	{ DSC_FORMAT_RGB, "RGB" },
+	{ DSC_FORMAT_YCBCR420, "YCBCR420" },
+	{ DSC_FORMAT_YCBCR444, "YCBCR444" },
+	{}
+};
+
+/**
+ * kmstest_dsc_output_format_str:
+ * @output_format: DSC_FORMAT_* output format value
+ *
+ * Returns: A string representing the output format @output format.
+ */
+const char *kmstest_dsc_output_format_str(int output_format)
+{
+	return find_type_name(dsc_output_format_names, output_format);
+}
+
 static const struct type_name connector_type_names[] = {
 	{ DRM_MODE_CONNECTOR_Unknown, "Unknown" },
 	{ DRM_MODE_CONNECTOR_VGA, "VGA" },
