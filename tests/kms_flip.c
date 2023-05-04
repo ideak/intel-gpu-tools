@@ -1354,7 +1354,6 @@ restart:
 	/* 256 MB is usually the maximum mappable aperture,
 	 * (make it 4x times that to ensure failure) */
 	if (o->flags & TEST_BO_TOOBIG) {
-		igt_skip_on(!is_intel_device(drm_fd));
 		bo_size = 4*gem_mappable_aperture_size(drm_fd);
 
 		if (is_i915_device(drm_fd))
@@ -1566,6 +1565,9 @@ static void run_test(int duration, int flags)
 	if (is_xe_device(drm_fd) && flags & TEST_FENCE_STRESS)
 		return;
 
+	if (flags & TEST_BO_TOOBIG && !is_intel_device(drm_fd))
+		return;
+
 	igt_require((flags & TEST_HANG) == 0 ||
 		    (is_i915_device(drm_fd) && !is_wedged(drm_fd)));
 	igt_require(!(flags & TEST_FENCE_STRESS) ||
@@ -1637,6 +1639,9 @@ static void run_pair(int duration, int flags)
 
 	/* No tiling support in XE. */
 	if (is_xe_device(drm_fd) && flags & TEST_FENCE_STRESS)
+		return;
+
+	if (flags & TEST_BO_TOOBIG && !is_intel_device(drm_fd))
 		return;
 
 	igt_require((flags & TEST_HANG) == 0 ||
