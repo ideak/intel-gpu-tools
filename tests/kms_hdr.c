@@ -418,7 +418,7 @@ static void test_static_toggle(data_t *data, enum pipe pipe,
 	igt_output_set_prop_value(data->output, IGT_CONNECTOR_MAX_BPC, 10);
 	igt_display_commit_atomic(display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
 	if (flags & TEST_INVALID_HDR) {
-		igt_assert_eq(system("dmesg|tail -n 1000|grep -E \"EOTF Not Supported\""), 0);
+		igt_assert_eq(system("dmesg|tail -n 1000|grep -E \"Unknown EOTF [0-9]+\""), 0);
 		goto cleanup;
 	}
 	igt_assert_output_bpc_equal(data->fd, pipe, output->name, 10);
