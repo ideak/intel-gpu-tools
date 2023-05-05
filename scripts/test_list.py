@@ -1134,6 +1134,9 @@ class TestList:
 
         test_subtests = self.get_subtests(sort_field)
 
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+
         for test in test_subtests.keys():  # pylint: disable=C0201,C0206
             if not test_subtests[test]:
                 continue
