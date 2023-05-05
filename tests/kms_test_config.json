@@ -1,0 +1,36 @@
+{
+    "description": "JSON file to be used to parse KMS documentation",
+    "files": [ "chamelium/kms_*.c", "i915/kms_*.c", "kms_*.c" ],
+    "fields": {
+        "Category": {
+            "_properties_": {
+                "description": "Contains the major group for the tested functionality 'Display'"
+            }
+        },
+        "Mega feature": {
+            "_properties_": {
+                "description": "Contains the mega feature for end to end use case, e.g. the 'PSR' feature."
+            },
+            "Functionality": {
+                "_properties_": {
+                    "description": "Groups tests on buckets containg more detailed functionality"
+                }
+            }
+        },
+        "Run type": {
+            "_properties_": {
+                "description": "Defines what category of testlist it belongs"
+            }
+        },
+        "Test category": {
+            "_properties_": {
+                "description": "Defines the test category. Usually used at subtest level."
+            }
+        },
+        "Description" : {
+            "_properties_": {
+                "description": "Provides a description for the test/subtest."
+            }
+        }
+    }
+}
