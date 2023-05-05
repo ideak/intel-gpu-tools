@@ -24,6 +24,11 @@
  *    Lyude Paul <lyude@redhat.com>
  */
 
+/**
+ * TEST: Tests behaviour of hpd using chamelium
+ * Category: Display
+ */
+
 #include "kms_chamelium_helper.h"
 
 #define HPD_STORM_PULSE_INTERVAL_DP 100 /* ms */
@@ -104,6 +109,31 @@ static void try_suspend_resume_hpd(chamelium_data_t *data,
 	}
 }
 
+/**
+ * SUBTEST: dp-hpd-fast
+ * Description: Check that we get uevents and updated connector status on
+ * 		hotplug and unplug
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: dp_hotplug
+ * Mega feature: DP
+ *
+ * SUBTEST: hdmi-hpd-fast
+ * Description: Check that we get uevents and updated connector status on
+ * 		hotplug and unplug
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: hdmi_hotplug
+ * Mega feature: HDMI
+ *
+ * SUBTEST: vga-hpd-fast
+ * Description: Check that we get uevents and updated connector status on
+ * 		hotplug and unplug
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: vga_hotplug
+ * Mega feature: VGA
+ */
 static const char test_basic_hotplug_desc[] =
 	"Check that we get uevents and updated connector status on "
 	"hotplug and unplug";
@@ -238,6 +268,15 @@ static void test_suspend_resume_hpd(chamelium_data_t *data,
 	igt_cleanup_uevents(mon);
 }
 
+/**
+ * SUBTEST: common-hpd-after-suspend
+ * Description: Toggle HPD during suspend on all connectors, check that uevents
+ * 		are sent and connector status is updated
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: hotplug
+ * Mega feature: General Display Features
+ */
 static const char test_suspend_resume_hpd_common_desc[] =
 	"Toggle HPD during suspend on all connectors, check that uevents are "
 	"sent and connector status is updated";

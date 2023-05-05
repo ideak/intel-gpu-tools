@@ -22,6 +22,11 @@
  *
  */
 
+/**
+ * TEST: Tests behaviour of PSR & PSR2
+ * Category: Display
+ */
+
 #include "igt.h"
 #include "igt_sysfs.h"
 #include "igt_psr.h"
@@ -299,6 +304,32 @@ static void fb_dirty_fb_ioctl(data_t *data, struct igt_fb *fb)
 	ret = drmModeDirtyFB(data->drm_fd, fb->fb_id, &clip, 1);
 	igt_assert(ret == 0 || ret == -ENOSYS);
 }
+
+/**
+ * SUBTEST: cursor_plane_move
+ * Description: Check if psr is detecting the plane operations performed on
+ *		cursor planes
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: psr
+ * Mega feature: PSR
+ *
+ * SUBTEST: primary_page_flip
+ * Description: Check if psr is detecting page-flipping operations performed
+ *		on primary planes
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: psr
+ * Mega feature: PSR
+ *
+ * SUBTEST: sprite_plane_onoff
+ * Description: Check if psr is detecting the plane operations performed on
+ *		sprite planes
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: psr
+ * Mega feature: PSR
+ */
 
 static void run_test(data_t *data)
 {

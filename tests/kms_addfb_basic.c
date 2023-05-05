@@ -25,6 +25,11 @@
  *
  */
 
+/**
+ * TEST: Sanity test for ioctls DRM_IOCTL_MODE_ADDFB2 & DRM_IOCTL_MODE_RMFB.
+ * Category: Display
+ */
+
 #include "igt.h"
 #include <unistd.h>
 #include <stdlib.h>
@@ -60,6 +65,35 @@ static int legacy_addfb(int fd, struct drm_mode_fb_cmd *arg)
 	return err;
 }
 
+/**
+ * SUBTEST: unused-handle
+ * Description: Test that addfb2 call fails correctly for unused handle
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: kms_gem_interop
+ * Mega feature: General Display Features
+ *
+ * SUBTEST: unused-pitches
+ * Description: Test that addfb2 call fails correctly for unused pitches
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: kms_gem_interop
+ * Mega feature: General Display Features
+ *
+ * SUBTEST: unused-offsets
+ * Description: Test that addfb2 call fails correctly for unused offset
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: kms_gem_interop
+ * Mega feature: General Display Features
+ *
+ * SUBTEST: unused-modifier
+ * Description: Test that addfb2 call fails correctly for unused modifier
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: kms_gem_interop
+ * Mega feature: General Display Features
+ */
 static void invalid_tests(int fd)
 {
 	struct drm_mode_fb_cmd2 f = {};
@@ -273,6 +307,30 @@ static void invalid_tests(int fd)
 	}
 }
 
+/**
+ * SUBTEST: no-handle
+ * Description: Test that addfb2 call fails correctly without handle
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: kms_gem_interop
+ * Mega feature: General Display Features
+ *
+ * SUBTEST: basic
+ * Description: Check if addfb2 call works with given handle
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: kms_gem_interop
+ * Mega feature: General Display Features
+ *
+ * SUBTEST: bad-pitch-%i
+ * Description: bad-pitch-%arg[1]: Test that addfb2 call fails correctly for bad-pitches
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: kms_gem_interop
+ * Mega feature: General Display Features
+ *
+ * arg[1].values: 0, 32, 63, 128, 256, 999, 1024, 65536
+ */
 static void pitch_tests(int fd)
 {
 	struct drm_mode_fb_cmd2 f = {};
@@ -399,6 +457,42 @@ static void tiling_tests(int fd)
 	}
 }
 
+/**
+ * SUBTEST: size-max
+ * Description: Check if addfb2 call works with max size of buffer object
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: kms_gem_interop
+ * Mega feature: General Display Features
+ *
+ * SUBTEST: too-wide
+ * Description: Test that addfb2 call fails correctly with increased width of fb
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: kms_gem_interop
+ * Mega feature: General Display Features
+ *
+ * SUBTEST: too-high
+ * Description: Test that addfb2 call fails correctly with increased height of fb
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: kms_gem_interop
+ * Mega feature: General Display Features
+ *
+ * SUBTEST: bo-too-small
+ * Description: Test that addfb2 call fails correctly with small size of buffer object
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: kms_gem_interop
+ * Mega feature: General Display Features
+ *
+ * SUBTEST: small-bo
+ * Description: Check if addfb2 call works for given height
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: kms_gem_interop
+ * Mega feature: General Display Features
+ */
 static void size_tests(int fd)
 {
 	struct drm_mode_fb_cmd2 f = {};
@@ -514,6 +608,21 @@ static void size_tests(int fd)
 	}
 }
 
+/**
+ * SUBTEST: addfb25-modifier-no-flag
+ * Description: Test that addfb2 call fails correctly for x-tiling with given modifier
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: kms_gem_interop
+ * Mega feature: General Display Features
+ *
+ * SUBTEST: addfb25-bad-modifier
+ * Description: Test that addfb2 call fails correctly for irrelevant modifier
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: kms_gem_interop
+ * Mega feature: General Display Features
+ */
 static void addfb25_tests(int fd)
 {
 	struct drm_mode_fb_cmd2 f = {};
@@ -700,6 +809,35 @@ static void addfb25_4tile(int fd)
 		gem_close(fd, gem_bo);
 }
 
+/**
+ * SUBTEST: invalid-get-prop-any
+ * Description: Test that get-properties ioctl call fails correctly for invalid object type
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: kms_gem_interop
+ * Mega feature: General Display Features
+ *
+ * SUBTEST: invalid-get-prop
+ * Description: Test that get-properties ioctl call fails correctly for fb mode object
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: kms_gem_interop
+ * Mega feature: General Display Features
+ *
+ * SUBTEST: invalid-set-prop-any
+ * Description: Test that set-properties ioctl call fails correctly for invalid object type
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: kms_gem_interop
+ * Mega feature: General Display Features
+ *
+ * SUBTEST: invalid-set-prop
+ * Description: Test that get-properties ioctl call fails correctly for fb mode object
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: kms_gem_interop
+ * Mega feature: General Display Features
+ */
 static void prop_tests(int fd)
 {
 	struct drm_mode_fb_cmd2 f = {};

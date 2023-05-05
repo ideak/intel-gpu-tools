@@ -22,6 +22,11 @@
  *
  */
 
+/**
+ * TEST: Tests behaviour of CRC
+ * Category: Display
+ */
+
 #include "igt.h"
 #include "igt_sysfs.h"
 #include <errno.h>
@@ -79,6 +84,50 @@ enum {
 	TEST_SUSPEND = 1 << 2,
 	TEST_HANG = 1 << 3,
 };
+
+/**
+ * SUBTEST: read-crc
+ * Description: Test for pipe CRC reads
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: crc
+ * Mega feature: General Display Features
+ *
+ * SUBTEST: read-crc-frame-sequence
+ * Description: Tests the pipe CRC read and ensure frame sequence
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: crc
+ * Mega feature: General Display Features
+ *
+ * SUBTEST: nonblocking-crc
+ * Description: Test for O_NONBLOCK CRC reads
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: crc
+ * Mega feature: General Display Features
+ *
+ * SUBTEST: nonblocking-crc-frame-sequence
+ * Description: Test for O_NONBLOCK CRC reads and ensure frame sequence
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: crc
+ * Mega feature: General Display Features
+ *
+ * SUBTEST: suspend-read-crc
+ * Description: Suspend test for pipe CRC reads
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: crc
+ * Mega feature: General Display Features
+ *
+ * SUBTEST: hang-read-crc
+ * Description: Hang test for pipe CRC read
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: crc
+ * Mega feature: General Display Features
+ */
 
 static void test_read_crc(data_t *data, enum pipe pipe,
 			  igt_output_t *output, unsigned flags)
@@ -176,6 +225,15 @@ static void test_read_crc(data_t *data, enum pipe pipe,
 	igt_plane_set_fb(primary, NULL);
 	igt_display_commit(display);
 }
+
+/**
+ * SUBTEST: compare-crc-sanitycheck
+ * Description: Basic sanity check for CRC mismatches
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: crc
+ * Mega feature: General Display Features
+ */
 
 /*
  * CRC-sanity test, to make sure there would be no CRC mismatches

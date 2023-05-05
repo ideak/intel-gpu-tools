@@ -24,6 +24,11 @@
  *    Lyude Paul <lyude@redhat.com>
  */
 
+/**
+ * TEST: Tests behaviour of edid & timings using chamelium
+ * Category: Display
+ */
+
 #include <fcntl.h>
 #include <stdint.h>
 #include <string.h>
@@ -139,6 +144,28 @@ static void check_mode(struct chamelium *chamelium, struct chamelium_port *port,
 	igt_assert(video_params.vsync_polarity == mode_vsync_polarity);
 }
 
+/**
+ * SUBTEST: dp-edid-read
+ * Description: Make sure the EDID exposed by KMS is the same as the screen's
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: dp
+ * Mega feature: DP
+ *
+ * SUBTEST: hdmi-edid-read
+ * Description: Make sure the EDID exposed by KMS is the same as the screen's
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: hdmi
+ * Mega feature: HDMI
+ *
+ * SUBTEST: vga-edid-read
+ * Description: Make sure the EDID exposed by KMS is the same as the screen's
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: vga
+ * Mega feature: VGA
+ */
 static const char igt_custom_edid_type_read_desc[] =
 	"Make sure the EDID exposed by KMS is the same as the screen's";
 static void igt_custom_edid_type_read(chamelium_data_t *data,

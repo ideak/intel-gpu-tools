@@ -25,6 +25,10 @@
  *   Daniel Stone <daniels@collabora.com>
  */
 
+/**
+ * TEST: Tests behaviour of mass-data 'blob' properties
+ * Category: Display
+ */
 #include "igt.h"
 #include <errno.h>
 #include <stdbool.h>
@@ -238,6 +242,14 @@ test_core(int fd)
 	igt_assert_eq(validate_prop(fd, 0), ENOENT);
 }
 
+/**
+ * SUBTEST: basic
+ * Description: Test to ensure property support exists
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: kms_core
+ * Mega feature: General Display Features
+ */
 static void
 test_basic(int fd)
 {

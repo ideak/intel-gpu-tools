@@ -24,6 +24,11 @@
  *    Lyude Paul <lyude@redhat.com>
  */
 
+/**
+ * TEST: Tests to capture frames using chamelium
+ * Category: Display
+ */
+
 #include "igt_eld.h"
 #include "igt_infoframe.h"
 #include "kms_chamelium_helper.h"
@@ -534,6 +539,23 @@ static void prepare_randomized_plane(chamelium_data_t *data,
 	igt_remove_fb(data->drm_fd, &pattern_fb);
 }
 
+/**
+ * SUBTEST: dp-crc-fast
+ * Description: Pick the first mode of the IGT base EDID, display and capture
+ * 		a few frames, then check captured frames are correct
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: dp
+ * Mega feature: DP
+ *
+ * SUBTEST: hdmi-crc-fast
+ * Description: Pick the first mode of the IGT base EDID, display and capture
+ * 		a few frames, then check captured frames are correct
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: hdmi
+ * Mega feature: HDMI
+ */
 static const char test_display_one_mode_desc[] =
 	"Pick the first mode of the IGT base EDID, display and capture a few "
 	"frames, then check captured frames are correct";

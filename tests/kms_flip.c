@@ -21,6 +21,11 @@
  * IN THE SOFTWARE.
  */
 
+/**
+ * TEST: Tests for validating modeset, dpms and pageflips
+ * Category: Display
+ */
+
 #include "config.h"
 
 #include "igt.h"
@@ -1555,6 +1560,28 @@ static void run_test_on_crtc_set(struct test_output *o, int *crtc_idxs,
 	igt_dynamic_f("%s", test_name)
 		__run_test_on_crtc_set(o, crtc_idxs, crtc_count, duration_ms);
 }
+
+/**
+ * SUBTEST: basic-flip-vs-%s
+ * Description: Basic test to valide %arg[1]
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: vblank
+ * Mega feature: General Display Features
+ *
+ * arg[1]:
+ *
+ * @dpms:         dpms
+ * @modeset:      modeset
+ * @wf_vblank:    wait for vblank
+ *
+ * SUBTEST: basic-plain-flip
+ * Description: Basic test for validating page flip
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: vblank
+ * Mega feature: General Display Features
+ */
 
 static void run_test(int duration, int flags)
 {

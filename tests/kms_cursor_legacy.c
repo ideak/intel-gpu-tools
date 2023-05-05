@@ -22,6 +22,11 @@
  *
  */
 
+/**
+ * TEST: Stress legacy cursor ioctl
+ * Category: Display
+ */
+
 #include <sched.h>
 #include <sys/poll.h>
 
@@ -536,6 +541,41 @@ enum basic_flip_cursor {
 
 #define BASIC_BUSY 0x1
 
+/**
+ * SUBTEST: basic-busy-flip-before-cursor-%s
+ * Description: Cursor test with %arg[1] mode
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: cursor
+ * Mega feature: General Display Features
+ *
+ * arg[1]:
+ *
+ * @atomic:	atomic
+ * @legacy:	legacy
+ */
+
+/**
+ * SUBTEST: basic-flip-after-cursor-%s
+ * Description: Cursor test with %arg[1]
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: cursor
+ * Mega feature: General Display Features
+ *
+ * SUBTEST: basic-flip-before-cursor-%s
+ * Description: Cursor test with %arg[1]
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: cursor
+ * Mega feature: General Display Features
+ *
+ * arg[1]:
+ *
+ * @atomic:        atomic mode
+ * @legacy:        legacy mode
+ * @varying-size:  varying size
+ */
 static void basic_flip_cursor(igt_display_t *display,
 			      enum flip_test mode,
 			      enum basic_flip_cursor order,

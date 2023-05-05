@@ -22,6 +22,11 @@
  *
  */
 
+/**
+ * TEST: Check the debugfs force connector/edid features work correctly
+ * Category: Display
+ */
+
 #include "igt.h"
 
 IGT_TEST_DESCRIPTION("Check the debugfs force connector/edid features work"
@@ -151,6 +156,14 @@ static void force_load_detect(int drm_fd, drmModeConnectorPtr connector, drmMode
 	}
 }
 
+/**
+ * SUBTEST: force-connector-state
+ * Description: Test to check the forced connector state
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: force_connector
+ * Mega feature: General Display Features
+ */
 static void force_connector_state(int drm_fd, drmModeConnectorPtr connector)
 {
 	igt_display_t display;
@@ -190,6 +203,14 @@ static void force_connector_state(int drm_fd, drmModeConnectorPtr connector)
 	igt_display_fini(&display);
 }
 
+/**
+ * SUBTEST: force-edid
+ * Description: Test to check the values after forcing edid
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: force_connector
+ * Mega feature: General Display Features
+ */
 static void force_edid(int drm_fd, drmModeConnectorPtr connector)
 {
 	drmModeConnector *temp;
@@ -231,6 +252,14 @@ static void force_edid(int drm_fd, drmModeConnectorPtr connector)
 
 }
 
+/**
+ * SUBTEST: prune-stale-modes
+ * Description: Tests pruning of stale modes
+ * Test category: functionality test
+ * Run type: BAT
+ * Functionality: force_connector
+ * Mega feature: General Display Features
+ */
 static void prune_stale_modes(int drm_fd, drmModeConnectorPtr connector)
 {
 	int i;
