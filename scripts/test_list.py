@@ -762,7 +762,7 @@ class TestList:
     # Subtest list methods
     #
 
-    def get_subtests(self, sort_field = None):
+    def get_subtests(self, sort_field = None, expand = None):
 
         """Return an array with all subtests"""
 
@@ -789,10 +789,17 @@ class TestList:
 
                 if sort_field:
                     if sort_field in subtest:
-                        if subtest[sort_field] not in subtests:
-                            subtests[subtest[sort_field]] = []
-
-                        subtests[subtest[sort_field]].append(subtest["Summary"])
+                        if expand:
+                            test_list = subtest[sort_field].split(expand)
+                            for test_elem in test_list:
+                                test_elem = test_elem.strip()
+                                if test_elem not in subtests:
+                                    subtests[test_elem] = []
+                                subtests[test_elem].append(subtest["Summary"])
+                        else:
+                            if subtest[sort_field] not in subtests:
+                                subtests[subtest[sort_field]] = []
+                            subtests[subtest[sort_field]].append(subtest["Summary"])
                     else:
                         subtests[""].append(subtest["Summary"])
 
@@ -1132,7 +1139,8 @@ class TestList:
         test_prefix = os.path.commonprefix(self.get_subtests()[""])
         test_prefix = re.sub(r'^igt@', '', test_prefix)
 
-        test_subtests = self.get_subtests(sort_field)
+        # NOTE: currently, it uses a comma for multi-value delimitter
+        test_subtests = self.get_subtests(sort_field, ",")
 
         if not os.path.exists(directory):
             os.makedirs(directory)
