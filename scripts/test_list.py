@@ -1146,8 +1146,8 @@ class TestList:
             else:
                 fname = testlist
 
+            fname = re.sub(r"[^\w\d]+", "-", fname)
             fname = directory + "/" + test_prefix + fname + ".testlist"
-            fname = re.sub(r"[\s_]+", "-", fname)
 
             with open(fname, 'w', encoding='utf8') as handler:
                 for sub in test_subtests[test]:
