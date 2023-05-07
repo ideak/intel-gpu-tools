@@ -689,7 +689,7 @@ class TestList:
             marker = 0
             for cur_level in range(0, len(fields_order)):  # pylint: disable=C0200
                 field = fields_order[cur_level]
-                if not "level" in self.props[field]["_properties_"]:
+                if "level" not in self.props[field]["_properties_"]:
                     continue
                 if field in fields:
                     if old_fields[cur_level] != fields[field]:
@@ -698,9 +698,9 @@ class TestList:
 
             # print hierarchy
             for i in range(cur_level, len(fields_order)):
-                if not "level" in self.props[fields_order[i]]["_properties_"]:
+                if "level" not in self.props[fields_order[i]]["_properties_"]:
                     continue
-                if not fields_order[i] in fields:
+                if fields_order[i] not in fields:
                     continue
 
                 if marker >= len(level_markers):
@@ -728,7 +728,7 @@ class TestList:
             # Store current values
             for i in range(cur_level, len(fields_order)):
                 field = fields_order[i]
-                if not "level" in self.props[field]["_properties_"]:
+                if "level" not in self.props[field]["_properties_"]:
                     continue
                 if field in fields:
                     old_fields[i] = fields[field]
