@@ -37,6 +37,15 @@ option('tests',
        type : 'feature',
        description : 'Build tests')
 
+# Currently, Xe uAPI is not stable: it may still change while the driver is
+# not merged upstream.
+# So, add an option to enable it, as distros shall not be shipping
+# binaries with Xe tests on it, as they will most certainly fail once
+# drivers get upstreamed.
+option('xe_driver',
+       type : 'feature',
+       description : 'Build tests for Xe driver (experimental)')
+
 option('libdrm_drivers',
        type : 'array',
        value : ['auto'],

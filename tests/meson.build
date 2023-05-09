@@ -317,15 +317,18 @@ foreach prog : i915_progs
 	test_list += prog
 endforeach
 
-foreach prog : xe_progs
-	test_executables += executable(prog,
-		   join_paths('xe', prog + '.c'),
-		   dependencies : test_deps,
-		   install_dir : libexecdir,
-		   install_rpath : libexecdir_rpathdir,
-		   install : true)
-	test_list += prog
-endforeach
+if build_xe
+	foreach prog : xe_progs
+		test_executables += executable(prog,
+			   join_paths('xe', prog + '.c'),
+			   dependencies : test_deps,
+			   install_dir : libexecdir,
+			   install_rpath : libexecdir_rpathdir,
+			   install : true)
+		test_list += prog
+	endforeach
+	build_info += 'Xe **experimental** tests enabled.'
+endif
 
 foreach prog : msm_progs
 	test_executables += executable(prog, join_paths('msm', prog + '.c'),
