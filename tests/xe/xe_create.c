@@ -87,6 +87,26 @@ static void create_invalid_size(int fd)
 	xe_vm_destroy(fd, vm);
 }
 
+/**
+ * SUBTEST: create-massive-size
+ * Description: Verifies xe bo create returns expected error code on massive
+ *              buffer sizes.
+ */
+static void create_massive_size(int fd)
+{
+	uint64_t memreg = all_memory_regions(fd), region;
+	uint32_t vm;
+	uint32_t handle;
+	int ret;
+
+	vm = xe_vm_create(fd, DRM_XE_VM_CREATE_ASYNC_BIND_OPS, 0);
+
+	xe_for_each_mem_region(fd, memreg, region) {
+		ret = __create_bo(fd, vm, -1ULL >> 32, region, &handle);
+		igt_assert_eq(ret, -ENOSPC);
+	}
+}
+
 igt_main
 {
 	int xe;
@@ -99,6 +119,11 @@ igt_main
 	igt_subtest("create-invalid-size") {
 		create_invalid_size(xe);
 	}
+
+	igt_subtest("create-massive-size") {
+		create_massive_size(xe);
+	}
+
 
 	igt_fixture {
 		xe_device_put(xe);
