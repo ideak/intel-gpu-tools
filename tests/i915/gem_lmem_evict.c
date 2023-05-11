@@ -57,7 +57,7 @@ static void test_dontneed_evict_race(int fd,
 	igt_fork(child, 1) {
 		uint32_t handle2;
 
-		fd = gem_reopen_driver(fd);
+		fd = drm_reopen_driver(fd);
 
 		handle2 = gem_create_in_memory_region_list(fd,
 							   size, 0,

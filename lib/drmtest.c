@@ -49,6 +49,7 @@
 #include "drmtest.h"
 #include "i915_drm.h"
 #include "i915/gem.h"
+#include "xe/xe_query.h"
 #include "intel_chipset.h"
 #include "intel_io.h"
 #include "igt_debugfs.h"
@@ -648,6 +649,27 @@ int drm_open_driver_render(int chipset)
 		gem_quiescent_gpu(fd);
 		igt_install_exit_handler(cancel_work_at_exit_render);
 	}
+
+	return fd;
+}
+
+/**
+ * drm_reopen_driver:
+ * @fd: re-open the drm file descriptor
+ *
+ * Re-opens the drm fd which is useful in instances where a clean default
+ * context is needed.
+ */
+int drm_reopen_driver(int fd)
+{
+	char path[256];
+
+	snprintf(path, sizeof(path), "/proc/self/fd/%d", fd);
+	fd = open(path, O_RDWR);
+	igt_assert_fd(fd);
+
+	if (is_xe_device(fd))
+		xe_device_get(fd);
 
 	return fd;
 }

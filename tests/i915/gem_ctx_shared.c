@@ -206,7 +206,7 @@ static void exhaust_shared_gtt(int i915, unsigned int flags)
 		},
 	};
 
-	i915 = gem_reopen_driver(i915);
+	i915 = drm_reopen_driver(i915);
 
 	vm_create_ext.param.value = gem_vm_create(i915);
 

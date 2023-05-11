@@ -306,7 +306,7 @@ static void isolation(int i915)
 	struct drm_i915_gem_context_param arg = {
 		.param = I915_CONTEXT_PARAM_VM,
 	};
-	int other = gem_reopen_driver(i915);
+	int other = drm_reopen_driver(i915);
 	uint32_t ctx[2], vm[2], result;
 	int loops = 4096;
 

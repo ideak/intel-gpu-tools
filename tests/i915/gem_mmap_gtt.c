@@ -41,7 +41,6 @@
 #include <sys/wait.h>
 #include "drm.h"
 
-#include "i915/gem.h"
 #include "i915/gem_create.h"
 #include "igt.h"
 #include "igt_sysfs.h"
@@ -360,8 +359,8 @@ static void
 test_isolation(int i915)
 {
 	struct drm_i915_gem_mmap_gtt mmap_arg;
-	int A = gem_reopen_driver(i915);
-	int B = gem_reopen_driver(i915);
+	int A = drm_reopen_driver(i915);
+	int B = drm_reopen_driver(i915);
 	uint64_t offset_a, offset_b;
 	uint32_t a, b;
 	void *ptr;
@@ -448,7 +447,7 @@ test_flink_race(int i915)
 	igt_assert(handles != MAP_FAILED);
 
 	igt_fork(child, ncpus + 1) {
-		int fd = gem_reopen_driver(i915);
+		int fd = drm_reopen_driver(i915);
 
 		do {
 			struct drm_i915_gem_mmap_gtt mmap_arg = {};

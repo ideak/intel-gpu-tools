@@ -1465,7 +1465,7 @@ static void __run_forked(struct buffers *buffers,
 		int num_buffers;
 
 		/* recreate process local variables */
-		fd = gem_reopen_driver(fd);
+		fd = drm_reopen_driver(fd);
 
 		intel_allocator_init(); /* detach from thread */
 		num_buffers = buffers->num_buffers / num_children;

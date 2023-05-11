@@ -714,7 +714,7 @@ static void prioinv(int fd, int dir, const intel_ctx_t *ctx,
 	igt_fork(child, 1) {
 		const intel_ctx_t *ctx2;
 		int fence_out;
-		fd = gem_reopen_driver(fd);
+		fd = drm_reopen_driver(fd);
 		igt_debug("Submitting large capture [%ld x %dMiB objects]\n",
 			  count, (int)(size >> 20));
 

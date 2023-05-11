@@ -564,7 +564,7 @@ igt_main
 					timeout * 1000);
 		default_timeout_wait_s = timeout * 5;
 
-		i915 = gem_reopen_driver(i915); /* Apply modparam. */
+		i915 = drm_reopen_driver(i915); /* Apply modparam. */
 		ctx = intel_ctx_create_all_physical(i915);
 	}
 

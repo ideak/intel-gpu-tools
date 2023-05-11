@@ -539,7 +539,7 @@ static void test_evict(int i915,
 	fill_params(i915, &params, region, flags, nproc, false);
 
 	if (flags & TEST_PARALLEL) {
-		int fd = gem_reopen_driver(i915);
+		int fd = drm_reopen_driver(i915);
 
 		intel_allocator_multiprocess_start();
 		ctx = intel_ctx_create_all_physical(fd);
@@ -610,7 +610,7 @@ static void test_smem_oom(int i915,
 
 	/* process for testing lmem eviction */
 	igt_fork(child, 1) {
-		int fd = gem_reopen_driver(i915);
+		int fd = drm_reopen_driver(i915);
 		struct params params;
 
 		fill_params(i915, &params, region, 0, 1, true);
@@ -637,7 +637,7 @@ static void test_smem_oom(int i915,
 				}
 			}
 			igt_fork(child, 1) {
-				int fd = gem_reopen_driver(i915);
+				int fd = drm_reopen_driver(i915);
 
 				for (int pass = 0; pass < num_alloc; pass++) {
 					if (READ_ONCE(*lmem_done))

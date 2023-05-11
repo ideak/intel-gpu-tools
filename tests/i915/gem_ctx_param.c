@@ -28,7 +28,6 @@
 #include <limits.h>
 
 #include "igt.h"
-#include "i915/gem.h"
 #include "i915/gem_create.h"
 #include "i915/gem_vm.h"
 
@@ -81,7 +80,7 @@ static void set_priority(int i915)
 	igt_permute_array(values, size, igt_exchange_int64);
 
 	igt_fork(flags, NEW_CTX | USER) {
-		int fd = gem_reopen_driver(i915);
+		int fd = drm_reopen_driver(i915);
 		struct drm_i915_gem_context_param arg = {
 			.param = I915_CONTEXT_PARAM_PRIORITY,
 			.ctx_id = flags & NEW_CTX ? gem_context_create(fd) : 0,

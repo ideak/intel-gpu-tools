@@ -598,7 +598,7 @@ static void test_nonpersistent_file(int i915)
 	 * has been made nonpersistent, in which case it must be terminated.
 	 */
 
-	i915 = gem_reopen_driver(i915);
+	i915 = drm_reopen_driver(i915);
 
 	ahnd = get_reloc_ahnd(i915, 0);
 	gem_context_set_persistence(i915, 0, false);
@@ -742,7 +742,7 @@ static void test_process(int i915)
 		uint64_t ahnd;
 
 		intel_allocator_init();
-		i915 = gem_reopen_driver(i915);
+		i915 = drm_reopen_driver(i915);
 		gem_quiescent_gpu(i915);
 
 		gem_context_set_persistence(i915, 0, false);
@@ -790,7 +790,7 @@ static void test_userptr(int i915)
 		uint64_t ahnd;
 
 		intel_allocator_init();
-		i915 = gem_reopen_driver(i915);
+		i915 = drm_reopen_driver(i915);
 		gem_quiescent_gpu(i915);
 
 		gem_context_set_persistence(i915, 0, false);
@@ -833,7 +833,7 @@ static void test_process_mixed(int pfd, const intel_ctx_cfg_t *cfg,
 	igt_fork(child, 1) {
 		int i915;
 
-		i915 = gem_reopen_driver(pfd);
+		i915 = drm_reopen_driver(pfd);
 		gem_quiescent_gpu(i915);
 
 		for (int persists = 0; persists <= 1; persists++) {
@@ -1000,7 +1000,7 @@ static void test_processes(int i915)
 			uint64_t ahnd;
 
 			intel_allocator_init();
-			i915 = gem_reopen_driver(i915);
+			i915 = drm_reopen_driver(i915);
 			gem_context_set_persistence(i915, 0, i);
 
 			ahnd = get_reloc_ahnd(i915, 0);
@@ -1069,7 +1069,7 @@ static void __smoker(int i915, const intel_ctx_cfg_t *cfg,
 	const intel_ctx_t *ctx;
 	uint64_t ahnd;
 
-	fd = gem_reopen_driver(i915);
+	fd = drm_reopen_driver(i915);
 	ctx = ctx_create_persistence(fd, cfg, expected > 0);
 	ahnd = get_reloc_ahnd(fd, ctx->id);
 	spin = igt_spin_new(fd, .ahnd = ahnd, .ctx = ctx, .engine = engine,

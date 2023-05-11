@@ -608,7 +608,7 @@ static void multiple(int fd, const intel_ctx_t *ctx,
 		int i915;
 		const intel_ctx_t *child_ctx;
 
-		i915 = gem_reopen_driver(fd);
+		i915 = drm_reopen_driver(fd);
 		child_ctx = intel_ctx_create(i915, &ctx->cfg);
 		execbuf.rsvd1 = child_ctx->id;
 

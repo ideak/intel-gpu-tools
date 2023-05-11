@@ -158,7 +158,7 @@ naughty_child(int i915, int link, uint32_t shared, unsigned int flags)
 	uint64_t elapsed;
 
 	if (flags & ISOLATED)
-		i915 = gem_reopen_driver(i915);
+		i915 = drm_reopen_driver(i915);
 
 	if (!(flags & SHARED))
 		shared = 0;
@@ -449,7 +449,7 @@ static void forked(int i915, int timeout)
 	struct drm_i915_gem_exec_object2 *obj;
 	unsigned long count;
 
-	i915 = gem_reopen_driver(i915);
+	i915 = drm_reopen_driver(i915);
 	igt_require(gem_uses_full_ppgtt(i915));
 
 	obj = setup_many(i915, &count);
@@ -457,7 +457,7 @@ static void forked(int i915, int timeout)
 		obj[i].handle = gem_flink(i915, obj[i].handle);
 
 	igt_fork(child, sysconf(_SC_NPROCESSORS_ONLN)) {
-		i915 = gem_reopen_driver(i915);
+		i915 = drm_reopen_driver(i915);
 		for (unsigned long i = 0; i < count; i++)
 			obj[i].handle = gem_open(i915, obj[i].handle);
 		__many(i915, timeout, obj, count);

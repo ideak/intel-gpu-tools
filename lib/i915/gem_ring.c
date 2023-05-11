@@ -149,7 +149,7 @@ gem_measure_ring_inflight(int fd, unsigned int engine, enum measure_ring_flags f
 {
 	unsigned int min = ~0u;
 
-	fd = gem_reopen_driver(fd);
+	fd = drm_reopen_driver(fd);
 
 	/* When available, disable execbuf throttling */
 	fcntl(fd, F_SETFD, fcntl(fd, F_GETFD) | O_NONBLOCK);

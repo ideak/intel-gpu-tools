@@ -170,7 +170,7 @@ static void process(int fd, int child)
 {
 	uint32_t handle;
 
-	fd = gem_reopen_driver(fd);
+	fd = drm_reopen_driver(fd);
 
 	handle = load(fd);
 	if ((child & 63) == 63)
@@ -220,7 +220,7 @@ static void thread(int fd, struct drm_gem_open name,
 
 		memset(history, 0, sizeof(*history) * N_HISTORY);
 
-		crashme.fd = gem_reopen_driver(fd);
+		crashme.fd = drm_reopen_driver(fd);
 
 		memset(&its, 0, sizeof(its));
 		its.it_value.tv_nsec = msec(1) + (rand() % msec(150));

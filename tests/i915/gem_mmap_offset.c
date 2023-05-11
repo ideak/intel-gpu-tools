@@ -33,7 +33,6 @@
 #include <unistd.h>
 #include "drm.h"
 
-#include "i915/gem.h"
 #include "i915/gem_create.h"
 #include "i915/intel_memory_region.h"
 #include "igt.h"
@@ -299,8 +298,8 @@ static void isolation(int i915)
 			struct drm_i915_gem_mmap_offset mmap_arg = {
 				.flags = t->type
 			};
-			int A = gem_reopen_driver(i915);
-			int B = gem_reopen_driver(i915);
+			int A = drm_reopen_driver(i915);
+			int B = drm_reopen_driver(i915);
 			uint64_t offset_a, offset_b;
 			uint32_t a, b;
 			void *ptr;
@@ -622,7 +621,7 @@ static void open_flood(int i915, int timeout)
 			continue;
 
 		igt_fork(child, 1) {
-			i915 = gem_reopen_driver(i915);
+			i915 = drm_reopen_driver(i915);
 			arg.handle = prime_fd_to_handle(i915, dmabuf);
 
 			do {
@@ -636,7 +635,7 @@ static void open_flood(int i915, int timeout)
 	igt_until_timeout(timeout) {
 		int tmp;
 
-		tmp = gem_reopen_driver(i915);
+		tmp = drm_reopen_driver(i915);
 		handle = prime_fd_to_handle(i915, dmabuf);
 
 		for_each_mmap_offset_type(i915, t) {

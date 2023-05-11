@@ -4513,7 +4513,7 @@ gen12_test_single_ctx_render_target_writes_a_counter(const struct intel_executio
 	do {
 		igt_fork_helper(&child) {
 			/* A local device for local resources. */
-			drm_fd = gem_reopen_driver(drm_fd);
+			drm_fd = drm_reopen_driver(drm_fd);
 
 			igt_drop_root();
 			gen12_single_ctx_helper(e);

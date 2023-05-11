@@ -1655,7 +1655,7 @@ static void test_invalid_timeline_fence_array(int fd)
 	uint64_t value;
 	void *ptr;
 
-	fd = gem_reopen_driver(fd);
+	fd = drm_reopen_driver(fd);
 
 	/* create an otherwise valid execbuf */
 	memset(&obj, 0, sizeof(obj));

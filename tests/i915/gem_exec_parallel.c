@@ -86,7 +86,7 @@ static void *thread(void *data)
 	pthread_mutex_unlock(t->mutex);
 
 	if (t->flags & FDS) {
-		fd = gem_reopen_driver(t->fd);
+		fd = drm_reopen_driver(t->fd);
 	} else {
 		fd = t->fd;
 	}

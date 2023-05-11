@@ -498,7 +498,7 @@ static void reopen(int fd)
 
 	igt_require_gem(fd);
 
-	fd2 = gem_reopen_driver(fd);
+	fd2 = drm_reopen_driver(fd);
 
 	__reopen_allocs(fd, fd2, true);
 
@@ -514,7 +514,7 @@ static void reopen_fork(int fd)
 
 	intel_allocator_multiprocess_start();
 
-	fd2 = gem_reopen_driver(fd);
+	fd2 = drm_reopen_driver(fd);
 
 	igt_fork(child, 2) {
 		igt_until_timeout(REOPEN_TIMEOUT)
@@ -681,7 +681,7 @@ static void fork_reopen_allocator(int fd, uint8_t type)
 		igt_assert(!intel_allocator_is_allocated(ctx_ahnd, 1, 123, offset));
 		intel_allocator_alloc(ctx_ahnd, 2, 123, 0);
 
-		fd = gem_reopen_driver(fd);
+		fd = drm_reopen_driver(fd);
 		fd_ahnd = intel_allocator_open(fd, 0, type);
 		igt_assert(!intel_allocator_is_allocated(fd_ahnd, 1, 123, offset));
 		intel_allocator_alloc(fd_ahnd, 2, 123, 0);

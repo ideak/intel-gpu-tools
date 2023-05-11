@@ -201,7 +201,7 @@ single(int gem_fd, const intel_ctx_t *ctx,
 		igt_require(!gem_using_guc_submission(gem_fd));
 
 	if (flags & TEST_ISOLATION) {
-		spin_fd = gem_reopen_driver(gem_fd);
+		spin_fd = drm_reopen_driver(gem_fd);
 		ctx = intel_ctx_create_all_physical(spin_fd);
 	} else {
 		spin_fd = gem_fd;

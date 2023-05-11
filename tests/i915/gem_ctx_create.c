@@ -106,7 +106,7 @@ static void files(int core, const intel_ctx_cfg_t *cfg,
 
 		clock_gettime(CLOCK_MONOTONIC, &start);
 		do {
-			fd = gem_reopen_driver(core);
+			fd = drm_reopen_driver(core);
 
 			ctx = intel_ctx_create(fd, cfg);
 			execbuf.rsvd1 = ctx->id;

@@ -219,7 +219,7 @@ static void run_test(int fd, const intel_ctx_t *ctx, unsigned ring,
 		igt_fork(child, nchild) {
 			const intel_ctx_t *child_ctx = NULL;
 			if (flags & NEWFD) {
-				fd = gem_reopen_driver(fd);
+				fd = drm_reopen_driver(fd);
 				child_ctx = intel_ctx_create(fd, &ctx->cfg);
 
 				setup_execbuf(fd, child_ctx, &execbuf, obj, reloc, ring);

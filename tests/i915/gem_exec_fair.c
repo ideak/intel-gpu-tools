@@ -728,7 +728,7 @@ static void fairness(int i915, const intel_ctx_cfg_t *cfg,
 				if (common)
 					dmabuf = prime_handle_to_fd(i915, common);
 
-				i915 = gem_reopen_driver(i915);
+				i915 = drm_reopen_driver(i915);
 
 				if (dmabuf != -1)
 					common = prime_fd_to_handle(i915, dmabuf);

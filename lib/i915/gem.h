@@ -30,6 +30,4 @@
 void igt_require_gem(int i915);
 void gem_quiescent_gpu(int i915);
 
-int gem_reopen_driver(int i915);
-
 #endif /* I915_GEM_H */

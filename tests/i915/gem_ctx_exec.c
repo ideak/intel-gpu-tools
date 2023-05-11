@@ -282,7 +282,7 @@ static void nohangcheck_hostile(int i915)
 	 * we forcibly terminate that context.
 	 */
 
-	i915 = gem_reopen_driver(i915);
+	i915 = drm_reopen_driver(i915);
 
 	dir = igt_params_open(i915);
 	igt_require(dir != -1);

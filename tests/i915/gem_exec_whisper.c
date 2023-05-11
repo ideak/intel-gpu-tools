@@ -98,7 +98,7 @@ static void init_hang(struct hang *h, int fd, const intel_ctx_cfg_t *cfg)
 	uint32_t *batch;
 	int i, gen;
 
-	h->fd = gem_reopen_driver(fd);
+	h->fd = drm_reopen_driver(fd);
 	igt_allow_hang(h->fd, 0, 0);
 
 	gen = intel_gen(intel_get_drm_devid(h->fd));
@@ -329,7 +329,7 @@ static void whisper(int fd, const intel_ctx_t *ctx,
 
 		if (flags & FDS) {
 			for (n = 0; n < 64; n++) {
-				fds[n] = gem_reopen_driver(fd);
+				fds[n] = drm_reopen_driver(fd);
 			}
 		}
 		if (flags & (CONTEXTS | QUEUES | FDS)) {

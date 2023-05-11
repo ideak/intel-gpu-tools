@@ -30,7 +30,6 @@
 
 #include <i915_drm.h>
 
-#include "i915/gem.h"
 #include "i915/gem_create.h"
 #include "i915/gem_engine_topology.h"
 #include "i915/gem_submission.h"
@@ -42,6 +41,7 @@
 #include "intel_chipset.h"
 #include "intel_reg.h"
 #include "ioctl_wrappers.h"
+#include "drmtest.h"
 
 /**
  * SECTION:gem_submission
@@ -158,7 +158,7 @@ void gem_test_all_engines(int i915)
 	};
 	const intel_ctx_t *ctx;
 
-	i915 = gem_reopen_driver(i915);
+	i915 = drm_reopen_driver(i915);
 	igt_assert(!is_wedged(i915));
 
 	ctx = intel_ctx_create_all_physical(i915);

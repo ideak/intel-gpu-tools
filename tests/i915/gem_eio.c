@@ -450,7 +450,7 @@ static void set_heartbeat(int i915, int interval)
 
 static int reopen_device(int i915)
 {
-	i915 = gem_reopen_driver(i915);
+	i915 = drm_reopen_driver(i915);
 	igt_require_gem(i915);
 	set_heartbeat(i915, 250); /* require gem restores defaults */
 

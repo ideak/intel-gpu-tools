@@ -669,7 +669,7 @@ static void test_nohangcheck_hostile(int i915)
 	 * Even if the user disables hangcheck, we must still recover.
 	 */
 
-	i915 = gem_reopen_driver(i915);
+	i915 = drm_reopen_driver(i915);
 	gem_require_contexts(i915);
 
 	dir = igt_params_open(i915);

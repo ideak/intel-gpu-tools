@@ -1160,7 +1160,7 @@ static void *thread(void *data)
 	uint32_t batch = MI_BATCH_BUFFER_END;
 	int fd, ret, succeeded = 0;
 
-	fd = gem_reopen_driver(t->fd);
+	fd = drm_reopen_driver(t->fd);
 	ctx = intel_ctx_create(fd, &t->ctx->cfg);
 	offset_obj = gem_detect_safe_start_offset(fd);
 	offset_bb = ALIGN(offset_obj + 4096, gem_detect_safe_alignment(fd));

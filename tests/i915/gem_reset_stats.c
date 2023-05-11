@@ -267,7 +267,7 @@ static void test_rs(const struct intel_execution_ring *e,
 	igt_debug("num fds=%d, hang index=%d\n", num_fds, hang_index);
 
 	for (i = 0; i < num_fds; i++) {
-		fd[i] = gem_reopen_driver(device);
+		fd[i] = drm_reopen_driver(device);
 		assert_reset_status(i, fd[i], 0, RS_NO_ERROR);
 	}
 
@@ -318,7 +318,7 @@ static void test_rs_ctx(const struct intel_execution_ring *e,
 	test_rs(e, num_fds, -1, RS_NO_ERROR);
 
 	for (i = 0; i < num_fds; i++) {
-		fd[i] = gem_reopen_driver(device);
+		fd[i] = drm_reopen_driver(device);
 		igt_assert(fd[i]);
 		assert_reset_status(i, fd[i], 0, RS_NO_ERROR);
 
@@ -384,8 +384,8 @@ static void test_ban(const struct intel_execution_ring *e)
 	int ban, retry = 10;
 	int active_count = 0;
 
-	fd_bad = gem_reopen_driver(device);
-	fd_good = gem_reopen_driver(device);
+	fd_bad = drm_reopen_driver(device);
+	fd_good = drm_reopen_driver(device);
 
 	assert_reset_status(fd_bad, fd_bad, 0, RS_NO_ERROR);
 	assert_reset_status(fd_good, fd_good, 0, RS_NO_ERROR);
@@ -438,7 +438,7 @@ static void test_ban_ctx(const struct intel_execution_ring *e)
 	uint32_t ctx_good, ctx_bad;
 	int active_count = 0;
 
-	fd = gem_reopen_driver(device);
+	fd = drm_reopen_driver(device);
 
 	assert_reset_status(fd, fd, 0, RS_NO_ERROR);
 
@@ -494,8 +494,8 @@ static void test_unrelated_ctx(const struct intel_execution_ring *e)
 	int fd1,fd2;
 	int ctx_guilty, ctx_unrelated;
 
-	fd1 = gem_reopen_driver(device);
-	fd2 = gem_reopen_driver(device);
+	fd1 = drm_reopen_driver(device);
+	fd2 = drm_reopen_driver(device);
 	assert_reset_status(0, fd1, 0, RS_NO_ERROR);
 	assert_reset_status(1, fd2, 0, RS_NO_ERROR);
 	ctx_guilty = gem_context_create(fd1);
@@ -530,7 +530,7 @@ static int get_reset_count(int fd, int ctx)
 
 static void test_close_pending_ctx(const struct intel_execution_ring *e)
 {
-	int fd = gem_reopen_driver(device);
+	int fd = drm_reopen_driver(device);
 	uint32_t ctx = gem_context_create(fd);
 
 	assert_reset_status(fd, fd, ctx, RS_NO_ERROR);
@@ -544,7 +544,7 @@ static void test_close_pending_ctx(const struct intel_execution_ring *e)
 
 static void test_close_pending(const struct intel_execution_ring *e)
 {
-	int fd = gem_reopen_driver(device);
+	int fd = drm_reopen_driver(device);
 
 	assert_reset_status(fd, fd, 0, RS_NO_ERROR);
 
@@ -588,7 +588,7 @@ static void noop_on_each_ring(int fd, const bool reverse)
 static void test_close_pending_fork(const struct intel_execution_ring *e,
 				    const bool reverse)
 {
-	int fd = gem_reopen_driver(device);
+	int fd = drm_reopen_driver(device);
 	igt_hang_t hang;
 	int pid;
 
@@ -603,7 +603,7 @@ static void test_close_pending_fork(const struct intel_execution_ring *e,
 	 */
 	pid = fork();
 	if (pid == 0) {
-		const int fd2 = gem_reopen_driver(device);
+		const int fd2 = drm_reopen_driver(device);
 		igt_assert_lte(0, fd2);
 
 		/* The crucial component is that we schedule the same noop batch
@@ -630,7 +630,7 @@ static void test_close_pending_fork(const struct intel_execution_ring *e,
 static void test_reset_count(const struct intel_execution_ring *e,
 			     const bool create_ctx)
 {
-	int fd = gem_reopen_driver(device);
+	int fd = drm_reopen_driver(device);
 	int ctx;
 	long c1, c2;
 
@@ -733,7 +733,7 @@ static void test_params_ctx(void)
 {
 	int fd;
 
-	fd = gem_reopen_driver(device);
+	fd = drm_reopen_driver(device);
 	_test_param(fd, gem_context_create(fd));
 	close(fd);
 }
@@ -742,7 +742,7 @@ static void test_params(void)
 {
 	int fd;
 
-	fd = gem_reopen_driver(device);
+	fd = drm_reopen_driver(device);
 	_test_param(fd, 0);
 	close(fd);
 }
@@ -767,7 +767,7 @@ static void defer_hangcheck(const struct intel_execution_ring *engine)
 	int fd, count_start, count_end;
 	int seconds = 30;
 
-	fd = gem_reopen_driver(device);
+	fd = drm_reopen_driver(device);
 
 	next = next_engine(fd, engine);
 	igt_skip_on(next == engine);

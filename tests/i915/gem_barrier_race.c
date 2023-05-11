@@ -95,7 +95,7 @@ static void intel_context_first_pin_last_unpin_loop(int fd, uint64_t engine, int
 	 */
 	const uint32_t batch[2] = { 0, MI_BATCH_BUFFER_END };
 
-	fd = gem_reopen_driver(fd);
+	fd = drm_reopen_driver(fd);
 
 	do {
 		uint32_t handle = gem_create(fd, 4096);

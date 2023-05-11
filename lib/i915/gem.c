@@ -147,7 +147,7 @@ void igt_require_gem(int i915)
 	 * of a wedged device, not for actually waiting on outstanding
 	 * requests! So create a new drm_file for the device that is clean.
 	 */
-	i915 = gem_reopen_driver(i915);
+	i915 = drm_reopen_driver(i915);
 
 	/*
 	 * Reset the global seqno at the start of each test. This ensures that
@@ -188,22 +188,4 @@ void gem_quiescent_gpu(int i915)
 
 	igt_drop_caches_set(i915,
 			    DROP_ACTIVE | DROP_RETIRE | DROP_IDLE | DROP_FREED);
-}
-
-/**
- * gem_reopen_driver:
- * @i915: re-open the i915 drm file descriptor
- *
- * Re-opens the drm fd which is useful in instances where a clean default
- * context is needed.
- */
-int gem_reopen_driver(int i915)
-{
-	char path[256];
-
-	snprintf(path, sizeof(path), "/proc/self/fd/%d", i915);
-	i915 = open(path, O_RDWR);
-	igt_assert_fd(i915);
-
-	return i915;
 }

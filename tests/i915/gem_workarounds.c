@@ -198,7 +198,7 @@ static void check_workarounds(int fd, enum operation op, unsigned int flags)
 	const intel_ctx_t *ctx;
 
 	if (flags & FD)
-		fd = gem_reopen_driver(fd);
+		fd = drm_reopen_driver(fd);
 
 	ctx = intel_ctx_0(fd);
 	if (flags & CONTEXT) {
