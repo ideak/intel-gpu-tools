@@ -937,7 +937,10 @@ __intel_bb_create(int fd, uint32_t ctx, const intel_ctx_cfg_t *cfg,
 		ibb->alignment = xe_get_default_alignment(fd);
 		size = ALIGN(size, ibb->alignment);
 		ibb->handle = xe_bo_create_flags(fd, 0, size, vram_if_possible(fd, 0));
-		ibb->gtt_size = 1ull << xe_va_bits(fd);
+
+		/* Limit to 48-bit due to MI_* address limitation */
+		ibb->gtt_size = 1ull << min_t(uint32_t, xe_va_bits(fd), 48);
+		end = ibb->gtt_size;
 
 		if (!ctx)
 			ctx = xe_vm_create(fd, DRM_XE_VM_CREATE_ASYNC_BIND_OPS, 0);
