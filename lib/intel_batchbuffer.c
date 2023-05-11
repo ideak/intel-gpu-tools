@@ -1313,6 +1313,9 @@ static void __unbind_xe_objects(struct intel_bb *ibb)
 				 ibb->num_objects, syncs, 2);
 		free(bind_ops);
 	} else {
+		igt_debug("bind: UNMAP\n");
+		igt_debug("  offset: %llx, size: %llx\n",
+			  (long long)ibb->batch_offset, (long long)ibb->size);
 		xe_vm_unbind_async(ibb->fd, ibb->vm_id, 0, 0,
 				   ibb->batch_offset, ibb->size, syncs, 2);
 	}
@@ -2326,6 +2329,10 @@ __xe_bb_exec(struct intel_bb *ibb, uint64_t flags, bool sync)
 				 ibb->num_objects, syncs, 1);
 		free(bind_ops);
 	} else {
+		igt_debug("bind: MAP\n");
+		igt_debug("  handle: %u, offset: %llx, size: %llx\n",
+			  ibb->handle, (long long)ibb->batch_offset,
+			  (long long)ibb->size);
 		xe_vm_bind_async(ibb->fd, ibb->vm_id, 0, ibb->handle, 0,
 				 ibb->batch_offset, ibb->size, syncs, 1);
 	}
