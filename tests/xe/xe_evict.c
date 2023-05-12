@@ -564,7 +564,7 @@ igt_main
 			EXTERNAL_OBJ },
 		{ "beng-small-multi-vm", 16, 256, 1, 128, BIND_ENGINE |
 			MULTI_VM },
-		{ "beng-large", 4, 16, 1, 4, 0 },
+		{ "beng-large", 4, 16, 1, 4, BIND_ENGINE },
 		{ "beng-large-external", 4, 16, 1, 4, BIND_ENGINE |
 			EXTERNAL_OBJ },
 		{ "beng-large-multi-vm", 4, 8, 3, 8, BIND_ENGINE | MULTI_VM },
