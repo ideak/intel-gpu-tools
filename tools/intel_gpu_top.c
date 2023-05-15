@@ -1967,9 +1967,7 @@ print_clients_header(struct igt_drm_clients *clients, int lines,
 			return lines;
 
 		printf("\033[7m");
-		len = printf("%*s %*s ",
-			     clients->max_pid_len, "PID",
-			     clients->max_name_len, "NAME");
+		len = printf("%*s ", clients->max_pid_len, "PID");
 
 		if (lines++ >= con_h || len >= con_w)
 			return lines;
@@ -1983,7 +1981,9 @@ print_clients_header(struct igt_drm_clients *clients, int lines,
 					num_active++;
 			}
 
-			*class_w = width = (con_w - len) / num_active;
+			*class_w = width =
+				(con_w - len - clients->max_name_len - 1) /
+				num_active;
 
 			for (i = 0; i <= iclients->classes.max_engine_id; i++) {
 				const char *name = iclients->classes.names[i];
@@ -2004,8 +2004,7 @@ print_clients_header(struct igt_drm_clients *clients, int lines,
 			}
 		}
 
-		n_spaces(con_w - len);
-		printf("\033[0m\n");
+		printf(" %-*s\033[0m\n", con_w - len - 1, "NAME");
 	} else {
 		if (iclients->classes.num_engines)
 			pops->open_struct("clients");
@@ -2024,6 +2023,7 @@ print_client(struct igt_drm_client *c, struct engines *engines, double t, int li
 	struct igt_drm_clients *clients = c->clients;
 	struct intel_clients *iclients = clients->private_data;
 	unsigned int i;
+	int len;
 
 	if (output_mode == INTERACTIVE) {
 		if (filter_idle && (!c->total_runtime || c->samples < 2))
@@ -2031,9 +2031,7 @@ print_client(struct igt_drm_client *c, struct engines *engines, double t, int li
 
 		lines++;
 
-		printf("%*s %*s ",
-		       clients->max_pid_len, c->pid_str,
-		       clients->max_name_len, c->print_name);
+		len = printf("%*s ", clients->max_pid_len, c->pid_str);
 
 		for (i = 0;
 		     c->samples > 1 && i <= iclients->classes.max_engine_id;
@@ -2056,9 +2054,10 @@ print_client(struct igt_drm_client *c, struct engines *engines, double t, int li
 
 			print_percentage_bar(pct, max, *class_w,
 					     numeric_clients);
+			len += *class_w;
 		}
 
-		putchar('\n');
+		printf(" %-*s\n", con_w - len - 1, c->print_name);
 	} else if (output_mode == JSON) {
 		char buf[64];
 
