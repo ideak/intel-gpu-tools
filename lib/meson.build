@@ -114,7 +114,6 @@ lib_deps = [
 	libdrm,
 	libdw,
 	libkmod,
-	libprocps,
 	libudev,
 	math,
 	pciaccess,
@@ -176,6 +175,12 @@ if chamelium.found()
 	lib_deps += chamelium
 	lib_sources += [ 'igt_chamelium.c', 'igt_chamelium_stream.c' ]
 	lib_sources += 'monitor_edids/monitor_edids_helper.c'
+endif
+
+if libprocps.found()
+	lib_deps += libprocps
+else
+	lib_deps += libproc2
 endif
 
 if get_option('srcdir') != ''

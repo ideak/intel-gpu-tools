@@ -125,7 +125,15 @@ build_info += 'With libdrm: ' + ','.join(libdrm_info)
 
 pciaccess = dependency('pciaccess', version : '>=0.10')
 libkmod = dependency('libkmod')
-libprocps = dependency('libprocps', required : true)
+libprocps = dependency('libprocps', required : false)
+libproc2 = dependency('libproc2', required : false)
+if libprocps.found()
+  config.set('HAVE_LIBPROCPS', 1)
+elif libproc2.found()
+  config.set('HAVE_LIBPROC2', 1)
+else
+  error('Either libprocps or libproc2 is required')
+endif
 
 libunwind = dependency('libunwind', required : get_option('libunwind'))
 build_info += 'With libunwind: @0@'.format(libunwind.found())
