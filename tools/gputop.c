@@ -80,15 +80,15 @@ print_client_header(struct igt_drm_client *c, int lines, int con_w, int con_h,
 		return lines;
 
 	putchar('\n');
-	len = printf("%*s %*s ",
-		     c->clients->max_pid_len, "PID",
-		     c->clients->max_name_len, "NAME");
+	len = printf("%*s ", c->clients->max_pid_len, "PID");
 
 	if (c->engines->num_engines) {
 		unsigned int i;
 		int width;
 
-		*engine_w = width = (con_w - len) / c->engines->num_engines;
+		*engine_w = width =
+			(con_w - len - c->clients->max_name_len - 1) /
+			c->engines->num_engines;
 
 		for (i = 0; i <= c->engines->max_engine_id; i++) {
 			const char *name = c->engines->names[i];
@@ -109,8 +109,7 @@ print_client_header(struct igt_drm_client *c, int lines, int con_w, int con_h,
 		}
 	}
 
-	n_spaces(con_w - len);
-	printf("\033[0m\n");
+	printf(" %-*s\033[0m\n", con_w - len - 1, "NAME");
 
 	return lines;
 }
@@ -128,6 +127,7 @@ print_client(struct igt_drm_client *c, struct igt_drm_client **prevc,
 	     unsigned int period_us, int *engine_w)
 {
 	unsigned int i;
+	int len;
 
 	/* Filter out idle clients. */
 	if (!c->total_runtime || c->samples < 2)
@@ -142,9 +142,7 @@ print_client(struct igt_drm_client *c, struct igt_drm_client **prevc,
 
 	*prevc = c;
 
-	printf("%*s %*s ",
-	       c->clients->max_pid_len, c->pid_str,
-	       c->clients->max_name_len, c->print_name);
+	len = printf("%*s ", c->clients->max_pid_len, c->pid_str);
 	lines++;
 
 	for (i = 0; c->samples > 1 && i <= c->engines->max_engine_id; i++) {
@@ -164,9 +162,10 @@ print_client(struct igt_drm_client *c, struct igt_drm_client **prevc,
 			pct = 100.0;
 
 		print_percentage_bar(pct, *engine_w);
+		len += *engine_w;
 	}
 
-	putchar('\n');
+	printf(" %-*s\n", con_w - len - 1, c->print_name);
 
 	return lines;
 }
