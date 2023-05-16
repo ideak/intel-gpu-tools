@@ -41,7 +41,8 @@
 #define LUT_MASK 0xf800
 
 /* restricted pipe count */
-#define CRTC_RESTRICT_CNT 2
+#define CRTC_RESTRICT_CNT	2
+#define SIM_CRTC_RESTRICT_CNT	1
 
 typedef struct {
 	float red;
@@ -614,7 +615,7 @@ static void capture_crc(data_t *data, unsigned int vblank, igt_crc_t *crc)
 {
 	igt_pipe_crc_get_for_frame(data->drm_fd, data->pipe_crc, vblank, crc);
 
-	igt_fail_on_f(!igt_skip_crc_compare &&
+	igt_fail_on_f(!igt_skip_crc_compare && !igt_run_in_simulation() &&
 		      crc->has_valid_frame && crc->frame != vblank,
 		      "Got CRC for the wrong frame (got %u, expected %u). CRC buffer overflow?\n",
 		      crc->frame, vblank);
@@ -1193,8 +1194,12 @@ static void test_invalid_settings(data_t *data)
 	}
 }
 
-static bool is_pipe_limit_reached(int count) {
-	return count >= CRTC_RESTRICT_CNT && !all_pipes;
+static bool is_pipe_limit_reached(int count)
+{
+	if (igt_run_in_simulation())
+		return count >= SIM_CRTC_RESTRICT_CNT && !all_pipes;
+	else
+		return count >= CRTC_RESTRICT_CNT && !all_pipes;
 }
 
 static void run_test(data_t *data, void (*test)(data_t *, enum pipe))
