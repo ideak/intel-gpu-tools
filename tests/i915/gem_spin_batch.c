@@ -28,42 +28,79 @@
 /**
  * TEST: gem spin batch
  * Run type: FULL
+ * Test category: GEM_Legacy
  *
  * SUBTEST: engines
+ * Category: Infrastructure
  * Feature: context, igt_core
+ * Functionality: dummy workload
+ * Sub-category: IGT Lib
  *
  * SUBTEST: legacy
+ * Category: Infrastructure
  * Feature: context, igt_core
+ * Functionality: dummy workload
+ * Sub-category: IGT Lib
  *
  * SUBTEST: legacy-resubmit
+ * Category: Infrastructure
  * Feature: context, igt_core
+ * Functionality: dummy workload
+ * Sub-category: IGT Lib
  *
  * SUBTEST: legacy-resubmit-new
+ * Category: Infrastructure
  * Feature: context, igt_core, multictx
+ * Functionality: dummy workload
+ * Sub-category: IGT Lib
  *
  * SUBTEST: resubmit
+ * Category: Infrastructure
  * Feature: context, igt_core
+ * Functionality: dummy workload
+ * Sub-category: IGT Lib
  *
  * SUBTEST: resubmit-all
+ * Category: Infrastructure
  * Feature: context, igt_core, multictx
+ * Functionality: dummy workload
+ * Sub-category: IGT Lib
  *
  * SUBTEST: resubmit-new
+ * Category: Infrastructure
  * Feature: context, igt_core, multictx
+ * Functionality: dummy workload
+ * Sub-category: IGT Lib
  *
  * SUBTEST: resubmit-new-all
+ * Category: Infrastructure
  * Feature: context, igt_core, multictx
+ * Functionality: dummy workload
+ * Sub-category: IGT Lib
  *
  * SUBTEST: spin-all
+ * Category: Infrastructure
  * Feature: igt_core, multictx
+ * Functionality: dummy workload
+ * Sub-category: IGT Lib
  *
  * SUBTEST: spin-all-new
+ * Category: Infrastructure
  * Feature: igt_core, multictx
+ * Functionality: dummy workload
+ * Sub-category: IGT Lib
  *
  * SUBTEST: spin-each
+ * Category: Infrastructure
  * Feature: igt_core, multictx
+ * Functionality: dummy workload
+ * Sub-category: IGT Lib
  *
  * SUBTEST: user-each
+ * Category: Infrastructure
  * Feature: igt_core, multictx
+ * Functionality: dummy workload
+ * Sub-category: IGT Lib
  */
 
 #define MAX_ERROR 5 /* % */

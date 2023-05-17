@@ -44,8 +44,11 @@
  * TEST: i915 pm rpm
  *
  * SUBTEST: basic-pci-d3-state
+ * Description: Validate PCI device D3 state enter-exit scenario using runtime PM
  * Feature: pm_rpm
+ * Functionality: D3 state entry-exit
  * Run type: BAT
+ * Test category: pm_rpm
  *
  * SUBTEST: basic-rte
  * Feature: pm_rpm

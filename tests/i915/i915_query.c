@@ -33,28 +33,52 @@
  * Run type: FULL
  *
  * SUBTEST: engine-info
+ * Category: Infrastructure
  * Description: Positive tests for DRM_I915_QUERY_ENGINE_INFO
  * Feature: gem_core
+ * Functionality: device topology
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: engine-info-invalid
+ * Category: Infrastructure
  * Description: Negative tests for DRM_I915_QUERY_ENGINE_INFO
  * Feature: gem_core
+ * Functionality: device topology
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: hwconfig_table
+ * Category: Infrastructure
  * Description: Test DRM_I915_QUERY_HWCONFIG_BLOB query
  * Feature: gem_core
+ * Functionality: device topology
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: query-garbage
+ * Category: Infrastructure
  * Description: Test response to an invalid query call
  * Feature: gem_core
+ * Functionality: device topology
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: query-regions-garbage-items
+ * Category: Infrastructure
  * Description: Dodgy returned data tests for DRM_I915_QUERY_MEMORY_REGIONS
  * Feature: gem_core
+ * Functionality: device topology
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: query-regions-sanity-check
+ * Category: Infrastructure
  * Description: Basic tests for DRM_I915_QUERY_MEMORY_REGIONS
  * Feature: gem_core
+ * Functionality: device topology
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: query-regions-unallocated
  * Description: Sanity check the region unallocated tracking
@@ -65,12 +89,20 @@
  * Feature: gem_core
  *
  * SUBTEST: query-topology-garbage-items
+ * Category: Infrastructure
  * Description: Test response to invalid DRM_I915_QUERY_TOPOLOGY_INFO query
  * Feature: gem_core
+ * Functionality: device topology
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: query-topology-kernel-writes
+ * Category: Infrastructure
  * Description: Guardband test for DRM_I915_QUERY_TOPOLOGY_INFO query
  * Feature: gem_core
+ * Functionality: device topology
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: query-topology-known-pci-ids
  * Description:

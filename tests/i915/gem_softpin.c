@@ -36,113 +36,216 @@
  * Description:
  *   Tests softpin feature with normal usage, invalid inputs scenarios and couple of eviction
  *   tests which copy buffers between CPU and GPU.
- * Feature: mapping
  *
  * SUBTEST: 32b-excludes-last-page
+ * Category: Infrastructure
  * Description: Check the last 32b page is excluded.
+ * Feature: mapping
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: allocator-basic
+ * Category: Infrastructure
  * Description: Check that we can place objects at start/end of the GTT using the allocator.
+ * Feature: mapping
+ * Functionality: command submission
  * Run type: BAT
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: allocator-basic-reserve
+ * Category: Infrastructure
  * Description: Check that if we can reserve a space for an object starting from a given offset.
+ * Feature: mapping
+ * Functionality: command submission
  * Run type: BAT
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: allocator-evict
+ * Category: Infrastructure
  * Description: Exercise eviction with softpinning.
+ * Feature: mapping
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: allocator-fork
+ * Category: Infrastructure
  * Description: Check if multiple processes can use alloctor.
+ * Feature: mapping
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: allocator-nopin
+ * Category: Infrastructure
  * Description: Check that we can combine manual placement with automatic GTT placement.
+ * Feature: mapping
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: allocator-nopin-reserve
+ * Category: Infrastructure
  * Description:
  *   Check that we can combine manual placement with automatic GTT placement and
  *   reserves/unreserves space for objects.
+ * Feature: mapping
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: evict-active
+ * Category: Infrastructure
  * Description: Check eviction with active bo.
+ * Feature: mapping
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: evict-active-interruptible
+ * Category: Infrastructure
  * Description: Check eviction with active bo with interrupts.
+ * Feature: mapping
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: evict-hang
  * Description: Check eviction of softpinned bo with hung batch.
+ * Feature: mapping
  * Run type: FULL
  *
  * SUBTEST: evict-prime
  * Description: Check eviction of vma on importing prime fd in reopened drm fds
+ * Feature: mapping
  * Run type: FULL
+ * Test category: GEM_Legacy
  *
  * SUBTEST: evict-prime-sanity-check
  * Description: Check eviction of vma on importing prime fd in reopened drm fd in single thread
+ * Feature: mapping
  * Run type: FULL
+ * Test category: GEM_Legacy
  *
  * SUBTEST: evict-single-offset
+ * Category: Infrastructure
  * Description: Use same offset for all engines and for different handles.
+ * Feature: mapping
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: evict-snoop
  * Description: Check eviction against snooping.
+ * Feature: mapping
  * Run type: FULL
  *
  * SUBTEST: evict-snoop-interruptible
  * Description: Check eviction against snooping with interrupts.
+ * Feature: mapping
  * Run type: FULL
  *
  * SUBTEST: full
+ * Category: Infrastructure
  * Description: Check the total occupancy by using pad-to-size to fill the entire GTT.
+ * Feature: mapping
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid
+ * Category: Infrastructure
  * Description: Check that invalid inputs are handled correctly.
+ * Feature: mapping
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: noreloc
+ * Category: Infrastructure
  * Description: Check that noreloc support works.
+ * Feature: mapping
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: noreloc-S3
  * Description: Check noreloc survives after suspend to RAM/resume cycle.
+ * Feature: mapping
  * Run type: FULL
  *
  * SUBTEST: noreloc-S4
  * Description: Check noreloc survives after suspend to disk/resume cycle.
+ * Feature: mapping
  * Run type: FULL
  *
  * SUBTEST: noreloc-interruptible
+ * Category: Infrastructure
  * Description: Check noreloc support with interruptible.
+ * Feature: mapping
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: overlap
+ * Category: Infrastructure
  * Description: Check all the possible pages aligned overlaps.
+ * Feature: mapping
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: reverse
+ * Category: Infrastructure
  * Description: Check that if the user demands the vma will be swapped.
+ * Feature: mapping
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: safe-alignment
+ * Category: Infrastructure
  * Description: Check start offset and alignment detection.
+ * Feature: mapping
+ * Functionality: command submission
  * Run type: BAT
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: softpin
+ * Category: Infrastructure
  * Description: Check softpinning of a gem buffer object.
+ * Feature: mapping
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: zero
+ * Category: Infrastructure
  * Description: Check full placement control under full-ppGTT.
+ * Feature: mapping
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  */
 
 IGT_TEST_DESCRIPTION("Tests softpin feature with normal usage, invalid inputs"

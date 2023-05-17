@@ -32,9 +32,13 @@
 #include <i915_drm.h>
 /**
  * TEST: i915 getparams basic
+ * Category: Infrastructure
  * Description: Tests the export of parameters via DRM_IOCTL_I915_GETPARAM
  * Feature: gem_core
+ * Functionality: device topology
  * Run type: BAT
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-eu-total
  * Description: Examine the export of EU_TOTAL parameter

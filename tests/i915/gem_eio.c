@@ -58,92 +58,194 @@
  * Run type: FULL
  *
  * SUBTEST: banned
+ * Category: Infrastructure
  * Feature: reset
+ * Functionality: reset
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: context-create
+ * Category: Infrastructure
  * Feature: reset
+ * Functionality: reset
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: create
+ * Category: Infrastructure
  * Description: Validate i915_gem_create_ioctl, while gpu is wedged for fb scanout.
  * Feature: reset
+ * Functionality: reset
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: create-ext
+ * Category: Infrastructure
  * Description:
  *   Validate i915_gem_create_ext_ioctl and checks if returns clear backing store while gpu is
  *   wedged for fb scanout.
  * Feature: reset
+ * Functionality: reset
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: execbuf
+ * Category: Infrastructure
  * Feature: reset
+ * Functionality: reset
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: hibernate
- * Feature: hibernate, reset
+ * Description: Test that specific ioctls report a wedged GPU (EIO) during suspend
+ * Feature: hibernate, reset, suspend
+ * Test category: suspend
  *
  * SUBTEST: in-flight-10ms
+ * Category: Infrastructure
  * Feature: reset
+ * Functionality: reset
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: in-flight-1us
+ * Category: Infrastructure
  * Feature: reset
+ * Functionality: reset
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: in-flight-contexts-10ms
+ * Category: Infrastructure
  * Feature: reset
+ * Functionality: reset
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: in-flight-contexts-1us
+ * Category: Infrastructure
  * Feature: reset
+ * Functionality: reset
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: in-flight-contexts-immediate
+ * Category: Infrastructure
  * Feature: reset
+ * Functionality: reset
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: in-flight-external
+ * Category: Infrastructure
  * Feature: reset
+ * Functionality: reset
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: in-flight-immediate
+ * Category: Infrastructure
  * Feature: reset
+ * Functionality: reset
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: in-flight-internal-10ms
+ * Category: Infrastructure
  * Feature: reset
+ * Functionality: reset
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: in-flight-internal-1us
+ * Category: Infrastructure
  * Feature: reset
+ * Functionality: reset
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: in-flight-internal-immediate
+ * Category: Infrastructure
  * Feature: reset
+ * Functionality: reset
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: in-flight-suspend
- * Feature: reset
+ * Description: Test that specific ioctls report a wedged GPU (EIO) during suspend
+ * Feature: reset, suspend
+ * Test category: suspend
  *
  * SUBTEST: kms
  * Feature: kms_gem_interop, reset
  *
  * SUBTEST: reset-stress
+ * Category: Infrastructure
  * Feature: reset
+ * Functionality: reset
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: suspend
+ * Description: Test that specific ioctls report a wedged GPU (EIO) during suspend
  * Feature: reset, suspend
+ * Test category: suspend
  *
  * SUBTEST: throttle
+ * Category: Infrastructure
  * Feature: reset
+ * Functionality: reset
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: unwedge-stress
+ * Category: Infrastructure
  * Feature: reset
+ * Functionality: reset
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: wait-10ms
+ * Category: Infrastructure
  * Feature: reset
+ * Functionality: reset
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: wait-1us
+ * Category: Infrastructure
  * Feature: reset
+ * Functionality: reset
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: wait-immediate
+ * Category: Infrastructure
  * Feature: reset
+ * Functionality: reset
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: wait-wedge-10ms
+ * Category: Infrastructure
  * Feature: reset
+ * Functionality: reset
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: wait-wedge-1us
+ * Category: Infrastructure
  * Feature: reset
+ * Functionality: reset
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: wait-wedge-immediate
+ * Category: Infrastructure
  * Feature: reset
+ * Functionality: reset
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  */
 
 IGT_TEST_DESCRIPTION("Test that specific ioctls report a wedged GPU (EIO).");

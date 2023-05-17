@@ -67,50 +67,98 @@
  * Description:
  *   Ensure that basic gem_create and gem_create_ext works and that invalid input combinations
  *   are rejected.
- * Feature: mapping
  * Run type: FULL
  *
  * SUBTEST: busy-create
+ * Category: Infrastructure
  * Description: Create buffer objects while GPU is busy.
+ * Feature: mapping
+ * Functionality: buffer management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: create-clear
+ * Category: Infrastructure
  * Description: Verify that all new objects are clear.
+ * Feature: mapping
+ * Functionality: buffer management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: create-ext-cpu-access-big
  * Description:
  *   Verify the extreme cases with very large objects and.
  *   I915_GEM_CREATE_EXT_FLAG_NEEDS_CPU_ACCESS
+ * Feature: mapping
  *
  * SUBTEST: create-ext-cpu-access-sanity-check
  * Description:
  *   Verify the basic functionally and expected ABI contract around.
  *   I915_GEM_CREATE_EXT_FLAG_NEEDS_CPU_ACCESS
+ * Feature: mapping
  *
  * SUBTEST: create-ext-placement-all
+ * Category: Infrastructure
  * Description: Create objects in every memory region using create_ext.
+ * Feature: mapping
+ * Functionality: buffer management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: create-ext-placement-each
+ * Category: Infrastructure
  * Description: Create one object with memory pieces in each memory region using create_ext.
+ * Feature: mapping
+ * Functionality: buffer management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: create-ext-placement-sanity-check
+ * Category: Infrastructure
  * Description: Exercise create_ext placements extension.
+ * Feature: mapping
+ * Functionality: buffer management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: create-invalid-size
+ * Category: Infrastructure
  * Description: Try to create a gem object of invalid size 0 and check if ioctl returns error.
+ * Feature: mapping
+ * Functionality: buffer management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: create-massive
+ * Category: Infrastructure
  * Description: Exercise creation of buffer object with impossible size and check for the expected error.
+ * Feature: mapping
+ * Functionality: buffer management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: create-size-update
+ * Category: Infrastructure
  * Description: Try to create a gem object with size 15 and check actual created size.
+ * Feature: mapping
+ * Functionality: buffer management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: create-valid-nonaligned
+ * Category: Infrastructure
  * Description:
  *   Try to create an object with non-aligned size, check we got one with size aligned up to page
  *   size and test we can write into the padded extra memory.
+ * Feature: mapping
+ * Functionality: buffer management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: hog-create
  * Description: Create buffer objects while GPU is busy.
+ * Feature: mapping
+ * Test category: GEM_Legacy
  */
 
 IGT_TEST_DESCRIPTION("Ensure that basic gem_create and gem_create_ext works"

@@ -15,12 +15,17 @@
  * Description: Exercise blitter commands
  * Feature: blitter
  * Run type: FULL
+ * Test category: GEM_Legacy
  *
  * SUBTEST: fast-copy
- * Description: Check fast-copy blit
+ * Description:
+ *   Check fast-copy blit
+ *   blitter
  *
  * SUBTEST: fast-copy-emit
- * Description: Check multiple fast-copy in one batch
+ * Description:
+ *   Check multiple fast-copy in one batch
+ *   blitter
  */
 
 IGT_TEST_DESCRIPTION("Exercise blitter commands");

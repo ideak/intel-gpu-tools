@@ -27,90 +27,168 @@
 /**
  * TEST: gem lmem swapping
  * Description: Exercise local memory swapping.
- * Feature: local_memory
  *
  * SUBTEST: basic
+ * Category: Server
  * Description: Exercise local memory swapping to system memory
+ * Feature: local_memory
+ * Functionality: buffer management
  * Run type: BAT
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: heavy-multi
+ * Category: Server
  * Description: Exercise local memory swapping to system memory
+ * Feature: local_memory
+ * Functionality: buffer management
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: heavy-random
+ * Category: Server
  * Description: Exercise local memory swapping to system memory
+ * Feature: local_memory
+ * Functionality: buffer management
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: heavy-verify-multi
+ * Category: Server
  * Description: Exercise local memory swapping to system memory
+ * Feature: local_memory
+ * Functionality: buffer management
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: heavy-verify-multi-ccs
  * Description: Exercise local memory swapping to system memory
+ * Feature: local_memory
  * Run type: FULL
  *
  * SUBTEST: heavy-verify-random
+ * Category: Server
  * Description: Exercise local memory swapping to system memory
+ * Feature: local_memory
+ * Functionality: buffer management
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: heavy-verify-random-ccs
  * Description: Exercise local memory swapping to system memory
+ * Feature: local_memory
  * Run type: FULL
  *
  * SUBTEST: massive
  * Description: Exercise local memory swapping to system memory
+ * Feature: local_memory
  * Run type: FULL
+ * Test category: GEM_Legacy
  *
  * SUBTEST: massive-random
  * Description: Exercise local memory swapping to system memory
+ * Feature: local_memory
  * Run type: FULL
+ * Test category: GEM_Legacy
  *
  * SUBTEST: parallel-multi
+ * Category: Server
  * Description: Exercise local memory swapping to system memory
+ * Feature: local_memory
+ * Functionality: buffer management
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: parallel-random
+ * Category: Server
  * Description: Exercise local memory swapping to system memory
+ * Feature: local_memory
+ * Functionality: buffer management
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: parallel-random-engines
+ * Category: Server
  * Description: Exercise local memory swapping to system memory
+ * Feature: local_memory
+ * Functionality: buffer management
  * Run type: BAT
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: parallel-random-verify
+ * Category: Server
  * Description: Exercise local memory swapping to system memory
+ * Feature: local_memory
+ * Functionality: buffer management
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: parallel-random-verify-ccs
  * Description: Exercise local memory swapping to system memory
+ * Feature: local_memory
  * Run type: FULL
  *
  * SUBTEST: random
+ * Category: Server
  * Description: Exercise local memory swapping to system memory
+ * Feature: local_memory
+ * Functionality: buffer management
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: random-engines
+ * Category: Server
  * Description: Exercise local memory swapping to system memory
+ * Feature: local_memory
+ * Functionality: buffer management
  * Run type: BAT
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: smem-oom
+ * Category: Server
  * Description: Exercise local memory swapping during exhausting system memory
+ * Feature: local_memory
+ * Functionality: buffer management
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: verify
+ * Category: Server
  * Description: Exercise local memory swapping to system memory
+ * Feature: local_memory
+ * Functionality: buffer management
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: verify-ccs
  * Description: Exercise local memory swapping to system memory
+ * Feature: local_memory
  * Run type: FULL
  *
  * SUBTEST: verify-random
+ * Category: Server
  * Description: Exercise local memory swapping to system memory
+ * Feature: local_memory
+ * Functionality: buffer management
  * Run type: BAT
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: verify-random-ccs
  * Description: Exercise local memory swapping to system memory
+ * Feature: local_memory
  * Run type: FULL
  */
 

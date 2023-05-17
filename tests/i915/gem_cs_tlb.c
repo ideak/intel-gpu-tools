@@ -54,9 +54,13 @@
 #include "igt.h"
 /**
  * TEST: gem cs tlb
+ * Category: Infrastructure
  * Description: Check whether we correctly invalidate the cs tlb.
  * Feature: mapping
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: engines
  */

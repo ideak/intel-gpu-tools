@@ -13,6 +13,7 @@
  * Description: Tests for i915 hwmon
  * Feature: hwmon
  * Run type: FULL
+ * Test category: GEM_Legacy
  *
  * SUBTEST: hwmon-read
  * Description: Verify we can read all hwmon attributes

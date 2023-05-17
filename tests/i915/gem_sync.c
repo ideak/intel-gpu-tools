@@ -57,29 +57,47 @@
  * Run type: FULL
  *
  * SUBTEST: basic-all
+ * Category: Infrastructure
  * Description: Basic test to wait upon a batch on all rings.
  * Feature: synchronization
+ * Functionality: semaphore
  * Run type: BAT
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-each
- * Description: Check synchronisation of ring.
+ * Description:
+ *   Check synchronisation of ring.
+ *   Exercise all physical engine selection and legacy rings
  * Feature: multitile, synchronization
+ * Functionality: semaphore
  * Run type: BAT
+ * Test category: MultiTile
  *
  * SUBTEST: basic-many-each
- * Description: Create race condition and see if we can catch interrupts.
+ * Description:
+ *   Create race condition and see if we can catch interrupts.
+ *   Basic check of ring to ring write synchronisation
  * Feature: multitile, synchronization
  * Run type: FULL
+ * Test category: MultiTile
  *
  * SUBTEST: basic-store-all
+ * Category: Infrastructure
  * Description: Basic version of store synchronisation test.
  * Feature: synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-store-each
- * Description: Check that store synchronisation works.
+ * Description:
+ *   Check that store synchronisation works.
+ *   Basic check of ring to ring write, store synchronisation
  * Feature: multitile, synchronization
  * Run type: FULL
+ * Test category: MultiTile
  *
  * SUBTEST: default
  * Description: Check synchronisation of rings on each engine.

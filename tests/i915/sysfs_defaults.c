@@ -35,8 +35,12 @@
 #include "igt_sysfs.h"
 /**
  * TEST: sysfs defaults
+ * Category: Infrastructure
  * Feature: gem_core
+ * Functionality: driver handler
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: readonly
  */

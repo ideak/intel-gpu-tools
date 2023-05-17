@@ -50,10 +50,14 @@
 #include "i915/intel_memory_region.h"
 /**
  * TEST: gem gpgpu fill
- * Feature: compute
+ * Category: Server
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic
+ * Feature: compute
  */
 
 #define WIDTH 64

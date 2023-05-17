@@ -50,16 +50,23 @@
  * SUBTEST: basic-s2idle-without-i915
  * Description: Validate suspend-to-idle without i915 module
  * Feature: suspend
+ * Functionality: s2idle w/o i915
  * Run type: BAT
+ * Test category: suspend
  *
  * SUBTEST: basic-s3-without-i915
- * Description: Validate S3 without i915 module
+ * Description:
+ *   Validate S3 without i915 module.
+ *   Validate S3 state without i915 module
  * Feature: suspend
  * Run type: BAT
+ * Test category: suspend
  *
  * SUBTEST: debugfs-reader
+ * Description: Test debugfs behavior during suspend to idle
  * Feature: suspend
  * Run type: FULL
+ * Test category: suspend
  *
  * SUBTEST: debugfs-reader-hibernate
  * Feature: suspend
@@ -82,8 +89,10 @@
  * Run type: FULL
  *
  * SUBTEST: forcewake
+ * Description: Test to prevent GT from suspend by opening forcewake handle
  * Feature: suspend
  * Run type: FULL
+ * Test category: suspend
  *
  * SUBTEST: forcewake-hibernate
  * Feature: suspend
@@ -94,8 +103,10 @@
  * Run type: FULL
  *
  * SUBTEST: sysfs-reader
+ * Description: Test sysfs behavior during suspend to idle
  * Feature: suspend
  * Run type: FULL
+ * Test category: suspend
  *
  * SUBTEST: sysfs-reader-hibernate
  * Feature: suspend

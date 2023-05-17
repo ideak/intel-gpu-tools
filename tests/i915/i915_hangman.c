@@ -42,43 +42,65 @@
 #include "sw_sync.h"
 /**
  * TEST: i915 hangman
+ * Category: Server
  * Description: Tests for hang detection and recovery
  * Feature: reset
+ * Functionality: error handling
+ * Sub-category: debugger
+ * Test category: GEM_Legacy
  *
  * SUBTEST: detector
- * Description: Check that hang detector works
+ * Description:
+ *   Check that hang detector works
+ *   error detection
  * Run type: FULL
  *
  * SUBTEST: engine-engine-error
- * Description: Per engine hang recovery (invalid CS, engine reset)
+ * Description:
+ *   Per engine hang recovery (invalid CS, engine reset)
+ *   error detection
  * Run type: FULL
  *
  * SUBTEST: engine-engine-hang
- * Description: Per engine hang recovery (spin, engine reset)
+ * Description:
+ *   Per engine hang recovery (spin, engine reset)
+ *   error detection
  * Run type: FULL
  *
  * SUBTEST: engine-error-state-capture
- * Description: Per engine error capture (engine reset)
+ * Description:
+ *   Per engine error capture (engine reset)
+ *   error detection
  * Run type: FULL
  *
  * SUBTEST: error-state-basic
- * Description: Basic error capture
+ * Description:
+ *   Basic error capture
+ *   error detection
  * Run type: BAT
  *
  * SUBTEST: gt-engine-error
- * Description: Per engine hang recovery (invalid CS, GT reset)
+ * Description:
+ *   Per engine hang recovery (invalid CS, GT reset)
+ *   error detection
  * Run type: FULL
  *
  * SUBTEST: gt-engine-hang
- * Description: Per engine hang recovery (spin, GT reset)
+ * Description:
+ *   Per engine hang recovery (spin, GT reset)
+ *   error detection
  * Run type: FULL
  *
  * SUBTEST: gt-error-state-capture
- * Description: Per engine error capture (GT reset)
+ * Description:
+ *   Per engine error capture (GT reset)
+ *   error detection
  * Run type: FULL
  *
  * SUBTEST: hangcheck-unterminated
- * Description: Check that executing unintialised memory causes a hang
+ * Description:
+ *   Check that executing unintialised memory causes a hang
+ *   error detection
  * Run type: FULL
  */
 

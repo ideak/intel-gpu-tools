@@ -35,50 +35,68 @@
  * TEST: gem wait
  * Description: Tests the GEM_WAIT ioctl
  * Feature: synchronization
+ * Run type: FULL
  *
  * SUBTEST: await
+ * Category: Infrastructure
  * Description: Verify GEM_WAIT functionality in await mode.
- * Run type: FULL
+ * Functionality: semaphore
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: busy
+ * Category: Infrastructure
  * Description: Verify GEM_WAIT functionality in busy mode.
- * Run type: FULL
+ * Functionality: semaphore
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: hang-busy
  * Description: Verify GEM_WAIT functionality in busy mode, when hang is allowed.
- * Run type: FULL
  *
  * SUBTEST: hang-busy-write
  * Description: Verify GEM_WAIT functionality in busy-write mode, when hang is allowed.
- * Run type: FULL
  *
  * SUBTEST: hang-wait
  * Description: Verify GEM_WAIT functionality in wait mode, when hang is allowed.
- * Run type: FULL
  *
  * SUBTEST: hang-wait-write
  * Description: Verify GEM_WAIT functionality in wait-write mode, when hang is allowed.
- * Run type: FULL
  *
  * SUBTEST: invalid-buf
+ * Category: Infrastructure
  * Description: Verify that GEM_WAIT called with invalid buffer object will fail.
- * Run type: FULL
+ * Functionality: semaphore
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-flags
+ * Category: Infrastructure
  * Description: Verify that GEM_WAIT called with invalid flag will fail.
- * Run type: FULL
+ * Functionality: semaphore
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: wait
+ * Category: Infrastructure
  * Description: Verify GEM_WAIT functionality in wait mode.
- * Run type: FULL
+ * Functionality: semaphore
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: write-busy
+ * Category: Infrastructure
  * Description: Verify GEM_WAIT functionality in write-busy mode.
- * Run type: FULL
+ * Functionality: semaphore
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: write-wait
+ * Category: Infrastructure
  * Description: Verify GEM_WAIT functionality in write-wait mode.
- * Run type: FULL
+ * Functionality: semaphore
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  */
 
 IGT_TEST_DESCRIPTION("Tests the GEM_WAIT ioctl");

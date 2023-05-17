@@ -46,12 +46,18 @@
  * Run type: FULL
  *
  * SUBTEST: idempotent
+ * Description: Test to check whether the preempt_timeout parameter reports the values set.
+ * Test category: SysMan
  *
  * SUBTEST: invalid
+ * Description: Test to check if preempt_timeout parameter rejects any unrepresentable intervals.
+ * Test category: SysMan
  *
  * SUBTEST: off
  *
  * SUBTEST: timeout
+ * Description: Test to measure the delay from requestion the preemption to its completion. Send down some non-preemptable workloads and then request a switch to a higher priority context. The HW will not be able to respond, so the kernel will be forced to reset the hog.
+ * Test category: SysMan
  */
 
 #define ATTR "preempt_timeout_ms"

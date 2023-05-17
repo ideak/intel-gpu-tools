@@ -47,18 +47,28 @@
  * Run type: FULL
  *
  * SUBTEST: idempotent
+ * Description: Test to check whether the heartbeat parameter reports the values set.
+ * Test category: SysMan
  *
  * SUBTEST: invalid
+ * Description: Test to check if heartbeat parameter rejects any unrepresentable intervals.
+ * Test category: SysMan
  *
  * SUBTEST: long
  *
  * SUBTEST: mixed
+ * Description: Run a mixed workload with non-preemptable hogs that exceed the heartbeat, and quicker innocents. Inspect the fence status of each to verify that only the hogs are reset.
+ * Test category: SysMan
  *
  * SUBTEST: nopreempt
+ * Description: Test heartbeats with forced preemption disabled.
+ * Test category: SysMan
  *
  * SUBTEST: off
  *
  * SUBTEST: precise
+ * Description: Tests the heartbeats with preemption and heartbeat parameter enabled.
+ * Test category: SysMan
  */
 
 #define ATTR "heartbeat_interval_ms"

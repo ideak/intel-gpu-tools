@@ -12,6 +12,7 @@
  * Description: i915 power measurement tests
  * Feature: hwmon
  * Run type: FULL
+ * Test category: GEM_Legacy
  *
  * SUBTEST: sanity
  * Description: Sanity check gpu power measurement

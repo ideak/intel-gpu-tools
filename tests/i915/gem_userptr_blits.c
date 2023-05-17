@@ -81,7 +81,11 @@
  * Feature: userptr
  *
  * SUBTEST: create-destroy-sync
+ * Category: Server
  * Feature: userptr
+ * Functionality: buffer management
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: create-destroy-unsync
  * Feature: userptr
@@ -195,17 +199,29 @@
  * Feature: userptr
  *
  * SUBTEST: huge-split
+ * Category: Server
  * Feature: userptr
+ * Functionality: buffer management
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: input-checking
+ * Category: Server
  * Feature: userptr
+ * Functionality: buffer management
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-mmap-offset-unsync
  * Description: Verify unsynchronized userptr on mmap-offset mappings fails
  * Feature: userptr
  *
  * SUBTEST: invalid-null-pointer
+ * Category: Server
  * Feature: userptr
+ * Functionality: buffer management
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: major-normal-sync
  * Feature: userptr
@@ -260,14 +276,26 @@
  * Feature: userptr
  *
  * SUBTEST: mmap-offset-banned
+ * Category: Server
  * Description: Verify mmap_offset to userptr is banned
  * Feature: userptr
+ * Functionality: buffer management
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: nohangcheck
+ * Category: Server
  * Feature: userptr
+ * Functionality: buffer management
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: probe
+ * Category: Server
  * Feature: userptr
+ * Functionality: buffer management
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: process-exit
  * Feature: userptr
@@ -285,22 +313,46 @@
  * Feature: userptr
  *
  * SUBTEST: sd-probe
+ * Category: Server
  * Feature: userptr
+ * Functionality: buffer management
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: set-cache-level
+ * Category: Server
  * Feature: userptr
+ * Functionality: buffer management
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: stress-mm
+ * Category: Server
  * Feature: userptr
+ * Functionality: buffer management
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: stress-mm-invalidate-close
+ * Category: Server
  * Feature: userptr
+ * Functionality: buffer management
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: stress-mm-invalidate-close-overlap
+ * Category: Server
  * Feature: userptr
+ * Functionality: buffer management
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: stress-purge
+ * Category: Server
  * Feature: userptr
+ * Functionality: buffer management
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: swapping-normal-sync
  * Feature: userptr
@@ -315,16 +367,32 @@
  * Feature: userptr
  *
  * SUBTEST: sync-overlap
+ * Category: Server
  * Feature: userptr
+ * Functionality: buffer management
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: sync-unmap
+ * Category: Server
  * Feature: userptr
+ * Functionality: buffer management
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: sync-unmap-after-close
+ * Category: Server
  * Feature: userptr
+ * Functionality: buffer management
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: sync-unmap-cycles
+ * Category: Server
  * Feature: userptr
+ * Functionality: buffer management
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: unsync-overlap
  * Feature: userptr
@@ -339,13 +407,21 @@
  * Feature: userptr
  *
  * SUBTEST: usage-restrictions
+ * Category: Server
  * Feature: userptr
+ * Functionality: buffer management
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: userfault
  * Feature: userptr
  *
  * SUBTEST: vma-merge
+ * Category: Server
  * Feature: userptr
+ * Functionality: buffer management
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  */
 
 #ifndef PAGE_SIZE

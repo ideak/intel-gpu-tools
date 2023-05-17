@@ -30,8 +30,12 @@
 #include "i915/i915_blt.h"
 /**
  * TEST: gem blits
+ * Category: Infrastructure
  * Feature: blitter
+ * Functionality: command streamer
  * Run type: FULL
+ * Sub-category: HW
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic
  */

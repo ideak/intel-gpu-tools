@@ -22,6 +22,7 @@
  * Description: Exercise engine barriers and their interaction with other subsystems
  * Feature: core
  * Run type: FULL
+ * Test category: GEM_Legacy
  *
  * SUBTEST: remote-request
  * Description:

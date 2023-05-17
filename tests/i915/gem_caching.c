@@ -42,9 +42,13 @@
 #include "i915/i915_blt.h"
 /**
  * TEST: gem caching
+ * Category: Desktop client
  * Description: Test snoop consistency when touching partial cachelines.
  * Feature: caching
+ * Functionality: data coherency
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: read-writes
  *

@@ -41,23 +41,51 @@
 /**
  * TEST: gem flink basic
  * Description: Tests for flink - a way to export a gem object by name
- * Feature: xorg_dri2
- * Run type: BAT
  *
  * SUBTEST: bad-flink
+ * Category: Desktop client
  * Description: Verify that GEM_FLINK ioctl with invalid gem object fails.
+ * Feature: xorg_dri2
+ * Functionality: buffer management
+ * Run type: BAT
+ * Sub-category: DRM
+ * Test category: GEM_Legacy
  *
  * SUBTEST: bad-open
+ * Category: Desktop client
  * Description: Verify that GEM_OPEN ioctl with invalid flink name fails.
+ * Feature: xorg_dri2
+ * Functionality: buffer management
+ * Run type: BAT
+ * Sub-category: DRM
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic
+ * Category: Desktop client
  * Description: Check if gem object can be exported to global namespace and then opened.
+ * Feature: xorg_dri2
+ * Functionality: buffer management
+ * Run type: BAT
+ * Sub-category: DRM
+ * Test category: GEM_Legacy
  *
  * SUBTEST: double-flink
+ * Category: Desktop client
  * Description: Tests that multiple flinks for the same gem object share the same name.
+ * Feature: xorg_dri2
+ * Functionality: buffer management
+ * Run type: BAT
+ * Sub-category: DRM
+ * Test category: GEM_Legacy
  *
  * SUBTEST: flink-lifetime
+ * Category: Desktop client
  * Description: Tests flink lifetime by referencing from multiple descriptors.
+ * Feature: xorg_dri2
+ * Functionality: buffer management
+ * Run type: BAT
+ * Sub-category: DRM
+ * Test category: GEM_Legacy
  */
 
 IGT_TEST_DESCRIPTION("Tests for flink - a way to export a gem object by name");

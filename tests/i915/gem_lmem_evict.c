@@ -12,6 +12,7 @@
  * Description: Force tiny lmem size for easily testing eviction scenarios.
  * Feature: local_memory
  * Run type: FULL
+ * Test category: GEM_Legacy
  *
  * SUBTEST: dontneed-evict-race
  * Description: Regression test to verify that madvise will sync against busy dma-resv object for lmem

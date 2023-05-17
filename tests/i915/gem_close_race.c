@@ -53,16 +53,24 @@
  * Description: Test try to race gem_close against workload submission.
  *
  * SUBTEST: basic-process
+ * Category: Infrastructure
  * Description: Basic workload submission.
  * Feature: synchronization
+ * Functionality: driver handler
  * Run type: BAT
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-threads
+ * Category: Infrastructure
  * Description:
  *   Share buffer handle across different drm fd's and trying to race gem_close against
  *   continuous workload with minimum timeout.
  * Feature: synchronization
+ * Functionality: driver handler
  * Run type: BAT
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: contexts
  * Description:
@@ -82,11 +90,13 @@
  * Description: Basic workload submission on multi-GPU machine.
  * Feature: multigpu, synchronization
  * Run type: FULL
+ * Test category: MultiGPU
  *
  * SUBTEST: multigpu-basic-threads
  * Description: Run basic-threads race on multi-GPU machine.
  * Feature: multigpu, synchronization
  * Run type: FULL
+ * Test category: MultiGPU
  *
  * SUBTEST: process-exit
  * Description: Test try to race gem_close against submission of continuous workload.

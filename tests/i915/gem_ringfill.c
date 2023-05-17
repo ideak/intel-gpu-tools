@@ -48,9 +48,13 @@
  *   properly near full.
  *
  * SUBTEST: basic-all
+ * Category: Infrastructure
  * Description: Basic check to fill the ring upto maximum on all engines simultaneously.
  * Feature: cmd_submission
+ * Functionality: command submission
  * Run type: BAT
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: engines-S3
  * Description: Handle a full ring across suspend cycle.
@@ -63,9 +67,12 @@
  * Run type: FULL
  *
  * SUBTEST: engines-basic
- * Description: Basic check how the driver handles a full ring.
+ * Description:
+ *   Basic check how the driver handles a full ring.
+ *   Test spamming ring with contexts
  * Feature: cmd_submission, multitile
  * Run type: FULL
+ * Test category: MultiTile
  *
  * SUBTEST: engines-bomb
  * Description:
@@ -112,9 +119,12 @@
  * Run type: FULL
  *
  * SUBTEST: legacy-basic
- * Description: Basic check how the driver handles a full ring - on legacy ring.
+ * Description:
+ *   Basic check how the driver handles a full ring - on legacy ring.
+ *   Test spamming ring with contexts - legacy path
  * Feature: cmd_submission, multitile
  * Run type: FULL
+ * Test category: MultiTile
  *
  * SUBTEST: legacy-bomb
  * Description:

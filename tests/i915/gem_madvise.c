@@ -44,20 +44,28 @@
  * Run type: FULL
  *
  * SUBTEST: dontneed-after-mmap
+ * Category: Desktop client
  * Description:
  *   Check signal for Segmentation Fault and bus error after obtaining a purgeable object and
  *   calling for sighandler.
  * Feature: caching, mapping
+ * Functionality: buffer management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: dontneed-before-exec
  * Description: Check if EXECBUFFER2 reports EFAULT when trying to submit purged bo for GPU.
  * Feature: caching, gtt, mapping
  *
  * SUBTEST: dontneed-before-mmap
+ * Category: Desktop client
  * Description:
  *   Check signal for Segmentation Fault and bus error before obtaining a purgeable object and
  *   calling for sighandler.
  * Feature: caching, mapping
+ * Functionality: buffer management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: dontneed-before-pwrite
  * Description: Check if PWRITE reports EFAULT when trying to use purged bo for write operation.

@@ -27,8 +27,12 @@
 #include "igt_types.h"
 /**
  * TEST: gem close
+ * Category: Infrastructure
  * Feature: mapping
+ * Functionality: driver handler
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic
  *

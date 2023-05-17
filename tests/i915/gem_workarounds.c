@@ -37,13 +37,25 @@
  * Run type: FULL
  *
  * SUBTEST: basic-read
+ * Category: Infrastructure
  * Feature: workarounds
+ * Functionality: context management
+ * Sub-category: HW
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-read-context
+ * Category: Infrastructure
  * Feature: workarounds
+ * Functionality: context management
+ * Sub-category: HW
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-read-fd
+ * Category: Infrastructure
  * Feature: workarounds
+ * Functionality: context management
+ * Sub-category: HW
+ * Test category: GEM_Legacy
  *
  * SUBTEST: hibernate-resume
  * Feature: hibernate, workarounds
@@ -55,22 +67,40 @@
  * Feature: hibernate, workarounds
  *
  * SUBTEST: reset
+ * Category: Infrastructure
  * Feature: workarounds
+ * Functionality: context management
+ * Sub-category: HW
+ * Test category: GEM_Legacy
  *
  * SUBTEST: reset-context
+ * Category: Infrastructure
  * Feature: workarounds
+ * Functionality: context management
+ * Sub-category: HW
+ * Test category: GEM_Legacy
  *
  * SUBTEST: reset-fd
+ * Category: Infrastructure
  * Feature: workarounds
+ * Functionality: context management
+ * Sub-category: HW
+ * Test category: GEM_Legacy
  *
  * SUBTEST: suspend-resume
+ * Description: Test to verify gem WA registers during suspend-resume
  * Feature: suspend, workarounds
+ * Test category: suspend
  *
  * SUBTEST: suspend-resume-context
+ * Description: Test to verify gem WA registers during suspend-resume
  * Feature: suspend, workarounds
+ * Test category: suspend
  *
  * SUBTEST: suspend-resume-fd
+ * Description: Test to verify gem WA registers during suspend-resume
  * Feature: suspend, workarounds
+ * Test category: suspend
  */
 
 #define PAGE_SIZE 4096

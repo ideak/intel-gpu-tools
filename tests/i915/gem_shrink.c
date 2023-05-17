@@ -139,6 +139,10 @@
  * SUBTEST: pwrite-userptr-dirty
  *
  * SUBTEST: reclaim
+ * Category: Desktop client
+ * Functionality: buffer management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  */
 
 #ifndef MADV_FREE

@@ -45,9 +45,13 @@
 #include "igt.h"
 /**
  * TEST: gem pipe control store loop
+ * Category: Desktop client
  * Description: Test (TLB-)Coherency of pipe_control QW writes.
  * Feature: cmd_submission
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: fresh-buffer
  * Description: Checks tlb consistency of the pipe_control with fresh buffer.

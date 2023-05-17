@@ -28,14 +28,22 @@
  * Description: Tests the i915 module loading.
  *
  * SUBTEST: load
+ * Category: Infrastructure
  * Description: Check if i915 and friends are not yet loaded, then load them.
  * Feature: core
+ * Functionality: driver handler
  * Run type: BAT
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: reload
+ * Category: Infrastructure
  * Description: Verify the basic functionality of i915 driver after it's reloaded.
  * Feature: core, sriov-core
+ * Functionality: driver handler
  * Run type: BAT
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: reload-no-display
  * Description: Verify that i915 driver can be successfully loaded with disabled display.
@@ -43,9 +51,13 @@
  * Run type: FULL
  *
  * SUBTEST: reload-with-fault-injection
+ * Category: Infrastructure
  * Description: Verify that i915 driver can be successfully reloaded at least once with fault injection.
  * Feature: core, sriov-core
+ * Functionality: driver handler
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: resize-bar
  * Description: Check whether lmem bar size can be resized to only supported sizes.

@@ -29,7 +29,11 @@
 #include "igt_dummyload.h"
 /**
  * TEST: gem vm create
+ * Category: Server
+ * Functionality: context management
  * Run type: FULL
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: create-ext
  * Feature: mapping

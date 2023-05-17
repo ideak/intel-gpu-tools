@@ -50,15 +50,21 @@
  * Feature: mapping
  *
  * SUBTEST: flink-and-close-vma-leak
+ * Category: Desktop client
  * Feature: mapping, xorg_dri2
+ * Functionality: buffer management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: shrink-vs-evict-any
  * Description: Regression test to verify GTT eviction can't randomly fail due to object lock contention
  * Feature: mapping
+ * Test category: GEM_Legacy
  *
  * SUBTEST: shrink-vs-evict-pinned
  * Description: Regression test to verify GTT eviction can't randomly fail due to object lock contention
  * Feature: mapping
+ * Test category: GEM_Legacy
  */
 
 #define WIDTH 512

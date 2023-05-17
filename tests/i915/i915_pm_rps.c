@@ -51,14 +51,20 @@
  * Run type: BAT
  *
  * SUBTEST: engine-order
- * Description: Check if context reuse does not affect waitboosting
+ * Description:
+ *   Check if context reuse does not affect waitboosting.
+ *   Render P-States tests - verify GPU frequency changes
  * Feature: pm_rps
  * Run type: FULL
+ * Test category: pm_rps
  *
  * SUBTEST: fence-order
- * Description: Check if the order of fences does not affect waitboosting
+ * Description:
+ *   Check if the order of fences does not affect waitboosting.
+ *   Render P-States tests - verify GPU frequency changes
  * Feature: pm_rps, synchronization
  * Run type: FULL
+ * Test category: pm_rps
  *
  * SUBTEST: min-max-config-idle
  * Feature: pm_rps

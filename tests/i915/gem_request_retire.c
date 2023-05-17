@@ -51,9 +51,13 @@
 #include "igt_types.h"
 /**
  * TEST: gem request retire
+ * Category: Infrastructure
  * Description: Collection of tests targeting request retirement code paths.
  * Feature: cmd_submission
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: retire-vma-not-inactive
  */
