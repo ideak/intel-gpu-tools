@@ -55,22 +55,46 @@
  * Feature: cmd_submission
  *
  * SUBTEST: batch-first
+ * Category: Desktop client
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: cliprects-invalid
+ * Category: Desktop client
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: cliprects_ptr-dirt
+ * Category: Desktop client
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-batch-start-offset
+ * Category: Desktop client
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-bsd-ring
+ * Category: Desktop client
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-bsd1-flag-on-blt
+ * Category: Desktop client
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-bsd1-flag-on-render
  * Feature: cmd_submission
@@ -79,7 +103,11 @@
  * Feature: cmd_submission
  *
  * SUBTEST: invalid-bsd2-flag-on-blt
+ * Category: Desktop client
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-bsd2-flag-on-render
  * Feature: cmd_submission
@@ -88,25 +116,53 @@
  * Feature: cmd_submission
  *
  * SUBTEST: invalid-fence-in
+ * Category: Desktop client
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-fence-in-submit
+ * Category: Desktop client
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-flag
+ * Category: Desktop client
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-ring
+ * Category: Desktop client
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-ring2
+ * Category: Desktop client
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: larger-than-life-batch
+ * Category: Desktop client
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: mmapped
+ * Category: Desktop client
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: no-blt
  * Feature: cmd_submission
@@ -118,19 +174,35 @@
  * Feature: cmd_submission
  *
  * SUBTEST: readonly
+ * Category: Desktop client
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: rel-constants-invalid
+ * Category: Desktop client
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: rel-constants-invalid-rel-gen5
+ * Category: Desktop client
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: rel-constants-invalid-ring
  * Feature: cmd_submission
  *
  * SUBTEST: rs-invalid
+ * Category: Desktop client
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: rsvd2-dirt
  * Feature: cmd_submission
@@ -145,7 +217,11 @@
  * Feature: cmd_submission
  *
  * SUBTEST: sol-reset-not-gen7
+ * Category: Desktop client
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  */
 
 #define ALIGNMENT (1 << 22)

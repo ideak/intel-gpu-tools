@@ -52,25 +52,44 @@
  *   This test overloads the driver with transient active objects and checks if we don't kill the
  *   system under the memory pressure some of the symptoms this test look for include mysterious
  *   hangs.
- * Feature: cmd_submission
  *
  * SUBTEST: basic
+ * Category: Infrastructure
  * Description: Check if we kill system by overloading it with active objects iterating over all engines.
+ * Feature: cmd_submission
+ * Functionality: buffer management
  * Run type: BAT
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: forked
+ * Category: Infrastructure
  * Description: Concurrently overloads system with active objects and checks if we kill system.
+ * Feature: cmd_submission
+ * Functionality: buffer management
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: legacy
+ * Category: Infrastructure
  * Description:
  *   Check if we kill the system by overloading it with active objects iterating over legacy
  *   engines.
+ * Feature: cmd_submission
+ * Functionality: buffer management
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: madvise
+ * Category: Infrastructure
  * Description: This test does a forced reclaim, behaving like a bad application leaking its bo cache.
+ * Feature: cmd_submission
+ * Functionality: buffer management
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  */
 
 IGT_TEST_DESCRIPTION("This test overloads the driver with transient active objects"

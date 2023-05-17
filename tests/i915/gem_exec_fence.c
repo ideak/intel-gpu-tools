@@ -47,27 +47,37 @@
  * SUBTEST: basic-await
  * Description: Basic check for explicit fence with async wait on each engine.
  * Feature: cmd_submission, multitile, synchronization
+ * Functionality: semaphore
  * Run type: BAT
+ * Test category: MultiTile
  *
  * SUBTEST: basic-busy
  * Description: Basic check for explicit fence on each busy engine.
  * Feature: cmd_submission, multitile, synchronization
+ * Functionality: semaphore
  * Run type: BAT
+ * Test category: MultiTile
  *
  * SUBTEST: basic-busy-all
  * Description: Basic check for composite fence on all busy engines.
  * Feature: cmd_submission, multitile, synchronization
  * Run type: FULL
+ * Test category: MultiTile
  *
  * SUBTEST: basic-wait
- * Description: Basic check for explicit fence with additinal wait time on each busy engine.
+ * Description: Basic check for explicit fence with additional wait time on each busy engine.
  * Feature: cmd_submission, multitile, synchronization
+ * Functionality: semaphore
  * Run type: BAT
+ * Test category: MultiTile
  *
  * SUBTEST: basic-wait-all
- * Description: Basic check for composite fence with additional wait on all busy engines.
+ * Description:
+ *   Basic check for composite fence with additional wait on all busy engines.
+ *   Execute the same batch on each engine and check that the composite fence across all engines completes only after the batch is completed on every engine.
  * Feature: cmd_submission, multitile, synchronization
  * Run type: FULL
+ * Test category: MultiTile
  *
  * SUBTEST: busy-hang
  * Description: Check for explicit fence on each busy engine with a pending gpu hang.
@@ -85,36 +95,55 @@
  * Run type: FULL
  *
  * SUBTEST: expired-history
+ * Category: Infrastructure
  * Description: Verifies long history of fences are expired.
  * Feature: cmd_submission, synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-fence-array
+ * Category: Infrastructure
  * Description: Verifies invalid fence-array pointers are rejected.
  * Feature: cmd_submission, synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-timeline-fence-array
+ * Category: Infrastructure
  * Description:
  *   Verifies invalid execbuf parameters in drm_i915_gem_execbuffer_ext_timeline_fences
  *   are rejected
  * Feature: cmd_submission, synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: keep-in-fence
  * Description: Check in-fence is not overwritten with out-fence on each engine.
  * Feature: cmd_submission, multitile, synchronization
  * Run type: FULL
+ * Test category: MultiTile
  *
  * SUBTEST: long-history
+ * Category: Infrastructure
  * Description: Verifies accumulation of long history of fences.
  * Feature: cmd_submission, synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: nb-await
  * Description: Check for explicit fence with non-blocking wait on each engine.
  * Feature: cmd_submission, multitile, synchronization
+ * Functionality: semaphore
  * Run type: BAT
+ * Test category: MultiTile
  *
  * SUBTEST: nb-await-hang
  * Description: Check for explicit fence with non-blocking async wait on each engine with a pending gpu hang.
@@ -125,6 +154,7 @@
  * Description: Check for EXEC_FENCE_SUBMIT in parallel execution scenarios on each engine.
  * Feature: cmd_submission, multitile, synchronization
  * Run type: FULL
+ * Test category: MultiTile
  *
  * SUBTEST: submit
  * Description: Check timeslicing on submit-fence.
@@ -149,117 +179,197 @@
  * Run type: FULL
  *
  * SUBTEST: syncobj-backward-timeline-chain-engines
+ * Category: Infrastructure
  * Description:
  *   Engine chaining tests to verify ordering of timeline syncobjs with backward timeline
  *   points.
  * Feature: cmd_submission, synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: syncobj-channel
+ * Category: Infrastructure
  * Description: Verifies two clients racing for syncobj using channel.
  * Feature: cmd_submission, synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: syncobj-export
+ * Category: Infrastructure
  * Description: Verify exporting of fence-array syncobj signaled by i915.
  * Feature: cmd_submission, synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: syncobj-import
+ * Category: Infrastructure
  * Description: Verifies creating of a syncobj from explicit fence.
  * Feature: cmd_submission, synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: syncobj-invalid-flags
+ * Category: Infrastructure
  * Description: Verifies that invalid fence flags in fence-array are rejected.
  * Feature: cmd_submission, synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: syncobj-invalid-wait
+ * Category: Infrastructure
  * Description: Verifies that submitting an execbuf with a wait on a syncobj that doesn't exists is rejected.
  * Feature: cmd_submission, synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: syncobj-repeat
+ * Category: Infrastructure
  * Description: Verifies that waiting & signaling a same fence-array syncobj within the same execbuf works.
  * Feature: cmd_submission, synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: syncobj-signal
+ * Category: Infrastructure
  * Description: Verifies proper signaling of a fence-array syncobj through execbuf.
  * Feature: cmd_submission, synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: syncobj-stationary-timeline-chain-engines
+ * Category: Infrastructure
  * Description:
  *   Engine chaining tests to verify ordering of timeline syncobj with stationary timeline
  *   points.
  * Feature: cmd_submission, synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: syncobj-timeline-chain-engines
+ * Category: Infrastructure
  * Description: Engine chaining tests to verify ordering of timeline syncobjs through execbuf.
  * Feature: cmd_submission, synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: syncobj-timeline-export
+ * Category: Infrastructure
  * Description: Verify exporting of timeline syncobj signaled by i915
  * Feature: cmd_submission, synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: syncobj-timeline-invalid-flags
+ * Category: Infrastructure
  * Description:
  *   Verifies that invalid fence flags in drm_i915_gem_execbuffer_ext_timeline_fences are
  *   rejected
  * Feature: cmd_submission, synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: syncobj-timeline-invalid-wait
+ * Category: Infrastructure
  * Description:
  *   Verifies that submitting an execbuf with a wait on a timeline syncobj point that does not
  *   exists is rejected
  * Feature: cmd_submission, synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: syncobj-timeline-multiple-ext-nodes
+ * Category: Infrastructure
  * Description: Verify that passing multiple execbuffer_ext nodes works
  * Feature: cmd_submission, synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: syncobj-timeline-repeat
+ * Category: Infrastructure
  * Description:
  *   Verifies that waiting & signaling a same timeline syncobj point within the same execbuf
  *   fworks
  * Feature: cmd_submission, synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: syncobj-timeline-signal
+ * Category: Infrastructure
  * Description: Verifies proper signaling of a timeline syncobj through execbuf
  * Feature: cmd_submission, synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: syncobj-timeline-unused-fence
+ * Category: Infrastructure
  * Description:
  *   Verifies that a timeline syncobj passed into
  *   drm_i915_gem_execbuffer_ext_timeline_fences but with no signal/wait flag is left
  *   untouched
  * Feature: cmd_submission, synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: syncobj-timeline-wait
+ * Category: Infrastructure
  * Description: Verifies that waiting on a timeline syncobj point between engines works
  * Feature: cmd_submission, synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: syncobj-unused-fence
+ * Category: Infrastructure
  * Description: Verifies that a syncobj passed into execbuf but with no signal/wait flag is left untouched.
  * Feature: cmd_submission, synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: syncobj-wait
+ * Category: Infrastructure
  * Description: Verifies that waiting on a timeline syncobj point between engines works.
  * Feature: cmd_submission, synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: wait-hang
  * Description:

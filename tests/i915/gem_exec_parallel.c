@@ -36,27 +36,51 @@
 /**
  * TEST: gem exec parallel
  * Description: Exercise filling buffers by many clients working in parallel.
- * Feature: cmd_submission
  *
  * SUBTEST: basic
+ * Category: Infrastructure
  * Description: Check basic functionality per engine.
+ * Feature: cmd_submission
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: contexts
+ * Category: Infrastructure
  * Description: Check with many contexts.
+ * Feature: cmd_submission
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: engines
+ * Category: Infrastructure
  * Description: Check with engines working in parallel.
+ * Feature: cmd_submission
+ * Functionality: command submission
  * Run type: BAT
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: fds
+ * Category: Infrastructure
  * Description: Check with many fds.
+ * Feature: cmd_submission
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: userptr
+ * Category: Infrastructure
  * Description: Check basic userptr thrashing.
+ * Feature: cmd_submission
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  */
 
 IGT_TEST_DESCRIPTION("Exercise filling buffers by many clients working in parallel.");

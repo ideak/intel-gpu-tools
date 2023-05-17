@@ -53,13 +53,25 @@
  * Run type: FULL
  *
  * SUBTEST: basic-parallel
+ * Category: Infrastructure
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-sequential
+ * Category: Infrastructure
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-series
+ * Category: Infrastructure
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: context-sequential
  * Feature: cmd_submission

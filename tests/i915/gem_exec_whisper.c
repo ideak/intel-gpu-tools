@@ -43,52 +43,142 @@
  * Run type: FULL
  *
  * SUBTEST: basic-contexts
+ * Category: Infrastructure
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-contexts-all
+ * Category: Infrastructure
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-contexts-forked
+ * Category: Infrastructure
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-contexts-forked-all
+ * Category: Infrastructure
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-contexts-priority
+ * Category: Infrastructure
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-contexts-priority-all
+ * Category: Infrastructure
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-fds
+ * Category: Infrastructure
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-fds-all
+ * Category: Infrastructure
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-fds-forked
+ * Category: Infrastructure
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-fds-forked-all
+ * Category: Infrastructure
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-fds-priority
+ * Category: Infrastructure
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-fds-priority-all
+ * Category: Infrastructure
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-forked
+ * Category: Infrastructure
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-forked-all
+ * Category: Infrastructure
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-normal
+ * Category: Infrastructure
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-normal-all
+ * Category: Infrastructure
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-queues
+ * Category: Infrastructure
+ * Functionality: command submission
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-queues-all
+ * Category: Infrastructure
+ * Functionality: command submission
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-queues-forked
+ * Category: Infrastructure
+ * Functionality: command submission
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-queues-forked-all
+ * Category: Infrastructure
+ * Functionality: command submission
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-queues-priority
+ * Category: Infrastructure
+ * Functionality: command submission
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-queues-priority-all
+ * Category: Infrastructure
+ * Functionality: command submission
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-sync
+ * Category: Infrastructure
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-sync-all
+ * Category: Infrastructure
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: chain
  *

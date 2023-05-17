@@ -32,8 +32,12 @@
 #include "sw_sync.h"
 /**
  * TEST: gem exec endless
+ * Category: Server
  * Feature: cmd_submission
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: dispatch
  */

@@ -33,8 +33,12 @@
 #include "igt_vgem.h"
 /**
  * TEST: gem exec await
+ * Category: Infrastructure
  * Feature: cmd_submission
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: wide-all
  *

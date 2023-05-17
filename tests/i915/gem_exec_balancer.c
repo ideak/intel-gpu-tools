@@ -65,95 +65,195 @@
  * Feature: cmd_submission, media_scalability
  *
  * SUBTEST: busy
+ * Category: Desktop \ Server
  * Feature: cmd_submission, media_scalability
+ * Functionality: load balancing
+ * Sub-category: Media & Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: fairslice
  * Feature: cmd_submission, media_scalability
  *
  * SUBTEST: full
+ * Category: Desktop \ Server
  * Feature: cmd_submission, media_scalability, multictx
+ * Functionality: load balancing
+ * Sub-category: Media & Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: full-late
+ * Category: Desktop \ Server
  * Feature: cmd_submission, media_scalability, multictx
+ * Functionality: load balancing
+ * Sub-category: Media & Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: full-late-pulse
+ * Category: Desktop \ Server
  * Feature: cmd_submission, media_scalability, multictx
+ * Functionality: load balancing
+ * Sub-category: Media & Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: full-pulse
+ * Category: Desktop \ Server
  * Feature: cmd_submission, media_scalability, multictx
+ * Functionality: load balancing
+ * Sub-category: Media & Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: hang
+ * Category: Desktop \ Server
  * Feature: cmd_submission, media_scalability
+ * Functionality: load balancing
+ * Sub-category: Media & Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: hog
  * Feature: cmd_submission, media_scalability
  *
  * SUBTEST: indices
+ * Category: Desktop \ Server
  * Feature: cmd_submission, media_scalability, multictx
+ * Functionality: load balancing
+ * Sub-category: Media & Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: individual
+ * Category: Desktop \ Server
  * Feature: cmd_submission, media_scalability
+ * Functionality: load balancing
+ * Sub-category: Media & Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-balancer
+ * Category: Desktop \ Server
  * Feature: cmd_submission, media_scalability
+ * Functionality: load balancing
+ * Sub-category: Media & Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-bonds
  * Feature: cmd_submission, media_scalability
  *
  * SUBTEST: nohangcheck
+ * Category: Desktop \ Server
  * Feature: cmd_submission, media_scalability
+ * Functionality: load balancing
+ * Sub-category: Media & Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: noheartbeat
+ * Category: Desktop \ Server
  * Feature: cmd_submission, media_scalability
+ * Functionality: load balancing
+ * Sub-category: Media & Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: nop
+ * Category: Desktop \ Server
  * Feature: cmd_submission, media_scalability
+ * Functionality: load balancing
+ * Sub-category: Media & Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: parallel
+ * Category: Desktop client
  * Feature: cmd_submission, media_scalability
+ * Functionality: command submission
+ * Sub-category: Media
+ * Test category: GEM_Legacy
  *
  * SUBTEST: parallel-balancer
+ * Category: Desktop client
  * Feature: cmd_submission, media_scalability
+ * Functionality: command submission
+ * Sub-category: Media
+ * Test category: GEM_Legacy
  *
  * SUBTEST: parallel-bb-first
+ * Category: Desktop client
  * Feature: cmd_submission, media_scalability
+ * Functionality: command submission
+ * Sub-category: Media
+ * Test category: GEM_Legacy
  *
  * SUBTEST: parallel-contexts
+ * Category: Desktop client
  * Feature: cmd_submission, media_scalability
+ * Functionality: command submission
+ * Sub-category: Media
+ * Test category: GEM_Legacy
  *
  * SUBTEST: parallel-dmabuf-import-out-fence
  * Description: Regression test to check that dmabuf imported sync file can handle fence array
  * Feature: cmd_submission, media_scalability
  *
  * SUBTEST: parallel-keep-in-fence
+ * Category: Desktop client
  * Feature: cmd_submission, media_scalability
+ * Functionality: command submission
+ * Sub-category: Media
+ * Test category: GEM_Legacy
  *
  * SUBTEST: parallel-keep-submit-fence
+ * Category: Desktop client
  * Feature: cmd_submission, media_scalability
+ * Functionality: command submission
+ * Sub-category: Media
+ * Test category: GEM_Legacy
  *
  * SUBTEST: parallel-ordering
+ * Category: Desktop client
  * Feature: cmd_submission, media_scalability
+ * Functionality: command submission
+ * Sub-category: Media
+ * Test category: GEM_Legacy
  *
  * SUBTEST: parallel-out-fence
+ * Category: Desktop client
  * Feature: cmd_submission, media_scalability
+ * Functionality: command submission
+ * Sub-category: Media
+ * Test category: GEM_Legacy
  *
  * SUBTEST: persistence
+ * Category: Desktop \ Server
  * Feature: cmd_submission, media_scalability
+ * Functionality: load balancing
+ * Sub-category: Media & Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: semaphore
+ * Category: Desktop \ Server
  * Feature: cmd_submission, media_scalability, multictx
+ * Functionality: load balancing
+ * Sub-category: Media & Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: sequential
+ * Category: Desktop \ Server
  * Feature: cmd_submission, media_scalability
+ * Functionality: load balancing
+ * Sub-category: Media & Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: sliced
  * Feature: cmd_submission, media_scalability
  *
  * SUBTEST: smoke
+ * Category: Desktop \ Server
  * Feature: cmd_submission, media_scalability
+ * Functionality: load balancing
+ * Sub-category: Media & Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: waits
+ * Category: Desktop \ Server
  * Feature: cmd_submission, media_scalability
+ * Functionality: load balancing
+ * Sub-category: Media & Compute
+ * Test category: GEM_Legacy
  */
 
 IGT_TEST_DESCRIPTION("Exercise in-kernel load-balancing");

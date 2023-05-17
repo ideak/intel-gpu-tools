@@ -38,6 +38,10 @@
  * Run type: FULL
  *
  * SUBTEST: capture
+ * Category: Server
+ * Functionality: offline debugging
+ * Sub-category: debugger
+ * Test category: GEM_Legacy
  *
  * SUBTEST: capture-invisible
  * Description:
@@ -58,8 +62,16 @@
  * SUBTEST: many-4K-zero
  *
  * SUBTEST: pi
+ * Category: Server
+ * Functionality: offline debugging
+ * Sub-category: debugger
+ * Test category: GEM_Legacy
  *
  * SUBTEST: userptr
+ * Category: Server
+ * Functionality: offline debugging
+ * Sub-category: debugger
+ * Test category: GEM_Legacy
  */
 
 #define MAX_RESET_TIME	600

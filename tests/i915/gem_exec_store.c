@@ -36,8 +36,12 @@
 #include "igt_gt.h"
 /**
  * TEST: gem exec store
+ * Category: Infrastructure
  * Description: Exercise store dword functionality using execbuf-ioctl
  * Feature: cmd_submission
+ * Functionality: coherency
+ * Sub-category: HW
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic
  * Description: Verify that all capable engines can store dwords to a common buffer object

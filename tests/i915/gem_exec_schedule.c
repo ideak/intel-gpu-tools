@@ -50,82 +50,178 @@
  * Run type: FULL
  *
  * SUBTEST: deep
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: fairslice
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: fairslice-all
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: fifo
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: implicit-boths
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: implicit-read-write
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: implicit-write-read
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: in-order
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: independent
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: lateslice
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: manyslice
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: noreorder
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: noreorder-corked
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: noreorder-priority
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: out-order
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: pi-common
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: pi-distinct-iova
  * Feature: cmd_submission
  *
  * SUBTEST: pi-ringfull
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: pi-shared-iova
  * Feature: cmd_submission
  *
  * SUBTEST: pi-userfault
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: preempt
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: preempt-contexts
+ * Category: Desktop \ Server
  * Feature: cmd_submission, multictx
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: preempt-engines
+ * Category: Desktop \ Server
  * Feature: cmd_submission, multictx
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: preempt-hang
+ * Category: Desktop \ Server
  * Feature: cmd_submission, multictx
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: preempt-other
+ * Category: Desktop \ Server
  * Feature: cmd_submission, multictx
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: preempt-other-chain
+ * Category: Desktop \ Server
  * Feature: cmd_submission, multictx
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: preempt-queue
  * Feature: cmd_submission, multictx
@@ -140,91 +236,199 @@
  * Feature: cmd_submission, multictx
  *
  * SUBTEST: preempt-self
+ * Category: Desktop \ Server
  * Feature: cmd_submission, multictx
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: preempt-user
+ * Category: Desktop \ Server
  * Feature: cmd_submission, multictx
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: preemptive-hang
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: promotion
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: reorder-wide
  * Feature: cmd_submission
  *
  * SUBTEST: semaphore-codependency
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: semaphore-noskip
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: semaphore-power
  * Feature: cmd_submission
  *
  * SUBTEST: semaphore-resolve
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: semaphore-user
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: smoketest
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: smoketest-all
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: submit-early-slice
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: submit-golden-slice
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: submit-late-slice
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: thriceslice
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: timeslicing
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: u-fairslice
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: u-fairslice-all
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: u-independent
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: u-lateslice
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: u-semaphore-codependency
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: u-semaphore-noskip
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: u-semaphore-resolve
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: u-semaphore-user
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: u-submit-early-slice
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: u-submit-golden-slice
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: u-submit-late-slice
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: wide
+ * Category: Desktop \ Server
  * Feature: cmd_submission
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  */
 
 #define LO 0

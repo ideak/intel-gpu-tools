@@ -57,6 +57,10 @@
  * SUBTEST: exhaustive
  *
  * SUBTEST: single
+ * Category: Infrastructure
+ * Functionality: command submission
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  */
 
 IGT_TEST_DESCRIPTION("Run a large nop batch to stress test the error capture"

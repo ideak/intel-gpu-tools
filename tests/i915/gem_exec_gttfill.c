@@ -31,23 +31,35 @@
  * Description: Fill the GTT with batches.
  *
  * SUBTEST: all-engines
+ * Category: Infrastructure
  * Description: Stress test check behaviour/correctness of handling batches to fill gtt
  * Feature: cmd_submission, gtt
+ * Functionality: command submission
  * Run type: FULL
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic
+ * Category: Infrastructure
  * Description: Checks if it can handle enough batches to fill gtt
  * Feature: cmd_submission, gtt
+ * Functionality: command submission
  * Run type: BAT
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: engines
+ * Category: Infrastructure
  * Description: Checks the correctness of handling enough batches to fill gtt for each engine
  * Feature: cmd_submission, gtt
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: multigpu-basic
  * Feature: cmd_submission, gtt, multigpu
  * Run type: FULL
+ * Test category: MultiGPU
  */
 
 IGT_TEST_DESCRIPTION("Fill the GTT with batches.");

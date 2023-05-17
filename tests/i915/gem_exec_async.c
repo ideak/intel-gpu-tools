@@ -26,9 +26,13 @@
 #include "igt.h"
 /**
  * TEST: gem exec async
+ * Category: Infrastructure
  * Description: Check that we can issue concurrent writes across the engines.
  * Feature: cmd_submission
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: concurrent-writes
  *
