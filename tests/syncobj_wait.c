@@ -32,9 +32,13 @@
 #include "drm.h"
 /**
  * TEST: syncobj wait
+ * Category: Infrastructure
  * Description: Tests for the drm sync object wait API
  * Feature: synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: DRM
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-multi-wait-all-unsubmitted
  *

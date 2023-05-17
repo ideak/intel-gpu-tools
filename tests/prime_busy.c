@@ -28,9 +28,13 @@
 #include "igt.h"
 /**
  * TEST: prime busy
+ * Category: Infrastructure
  * Description: Basic check of polling for prime fences.
  * Feature: prime
+ * Functionality: buffer management
  * Run type: FULL
+ * Sub-category: DRM
+ * Test category: GEM_Legacy
  *
  * SUBTEST: after
  *

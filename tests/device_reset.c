@@ -32,8 +32,14 @@
  * Feature: reset
  *
  * SUBTEST: unbind-reset-rebind
- * Description: Unbinds driver from device, initiates reset then rebinds driver to device
+ * Category: Server
+ * Description:
+ *   Unbinds driver from device, initiates reset then rebinds driver to device
+ *   validating device resets
  * Feature: reset, sriov-reset
+ * Functionality: reset
+ * Sub-category: sysman
+ * Test category: GEM_Legacy
  */
 
 IGT_TEST_DESCRIPTION("Examine behavior of a driver on device sysfs reset");

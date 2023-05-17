@@ -52,8 +52,12 @@
 #include "i915/intel_memory_region.h"
 /**
  * TEST: prime mmap
+ * Category: Infrastructure
  * Feature: prime
+ * Functionality: memory management
  * Run type: FULL
+ * Sub-category: DRM
+ * Test category: GEM_Legacy
  *
  * SUBTEST: test_aperture_limit
  *

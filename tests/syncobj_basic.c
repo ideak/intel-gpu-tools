@@ -28,9 +28,13 @@
 #include "drm.h"
 /**
  * TEST: syncobj basic
+ * Category: Infrastructure
  * Description: Basic check for drm sync objects.
  * Feature: synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: DRM
+ * Test category: GEM_Legacy
  *
  * SUBTEST: bad-create-flags
  *

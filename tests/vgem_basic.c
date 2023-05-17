@@ -33,7 +33,10 @@
 #include <dirent.h>
 /**
  * TEST: vgem basic
+ * Category: Infrastructure
  * Description: Basic sanity check of Virtual GEM module (vGEM).
+ * Functionality: mock device
+ * Test category: GEM_Legacy
  *
  * SUBTEST: bad-fence
  * Description: Make sure a non-existent fence cannot be signaled.
@@ -64,56 +67,67 @@
  * Description: Check the basic working of vgem_create ioctl.
  * Feature: vgem
  * Run type: BAT
+ * Sub-category: DRM
  *
  * SUBTEST: debugfs
  * Description: Check the basic access to debugfs and also try to read entries in the directory.
  * Feature: vgem
  * Run type: BAT
+ * Sub-category: DRM
  *
  * SUBTEST: dmabuf-export
  * Description: Check whether it can export/import the vgem handle using prime.
  * Feature: prime, vgem
  * Run type: BAT
+ * Sub-category: DRM
  *
  * SUBTEST: dmabuf-fence
  * Description: Check the working of dma-buf fence interop.
  * Feature: prime, vgem
  * Run type: BAT
+ * Sub-category: DRM
  *
  * SUBTEST: dmabuf-fence-before
  * Description: Attach a fence before exporting a vgem handle and check the working of fence.
  * Feature: prime, vgem
  * Run type: BAT
+ * Sub-category: DRM
  *
  * SUBTEST: dmabuf-mmap
  * Description: Export the vgem handle along with RDWR capabilities using prime and check if it can be mmaped.
  * Feature: prime, vgem
  * Run type: BAT
+ * Sub-category: DRM
  *
  * SUBTEST: mmap
  * Description: Create a vgem handle and check if it can be mmaped.
  * Feature: vgem
  * Run type: BAT
+ * Sub-category: DRM
  *
  * SUBTEST: second-client
  * Description: Check whether it can open multiple clients.
  * Feature: vgem
  * Run type: BAT
+ * Sub-category: DRM
  *
  * SUBTEST: setversion
  * Description: Check the working of SET_VERSION ioctl.
  * Feature: vgem
  * Run type: BAT
+ * Sub-category: DRM
  *
  * SUBTEST: sysfs
  * Description: Check the basic access to sysfs and also try to read entries in the directory.
  * Feature: vgem
  * Run type: BAT
+ * Sub-category: DRM
  *
  * SUBTEST: unload
  * Description: Basic test for handling of module unload.
  * Feature: vgem
  * Run type: BAT
+ * Sub-category: DRM
  */
 
 IGT_TEST_DESCRIPTION("Basic sanity check of Virtual GEM module (vGEM).");

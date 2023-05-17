@@ -35,12 +35,23 @@
  * Feature: core
  *
  * SUBTEST: basic-hwmon
- * Description: Read all entries from hwmon path
+ * Category: Infrastructure
+ * Description:
+ *   Read all entries from hwmon path
+ *   validating debugfs entries
+ * Functionality: debugfs entries
  * Run type: BAT
+ * Test category: GEM_Legacy
  *
  * SUBTEST: read_all_entries
- * Description: Read all entries from debugfs path.
+ * Category: Infrastructure
+ * Description:
+ *   Read all entries from debugfs path.
+ *   validating debugfs entries
+ * Functionality: debugfs entries
  * Run type: BAT
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: read_all_entries_display_off
  * Description: Read all debugfs entries with display on/off.
@@ -51,8 +62,14 @@
  * Run type: FULL
  *
  * SUBTEST: sysfs
- * Description: Read all entries from sysfs path.
+ * Category: Infrastructure
+ * Description:
+ *   Read all entries from sysfs path.
+ *   validating debugfs entries
+ * Functionality: debugfs entries
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  */
 
 IGT_TEST_DESCRIPTION("Read entries from debugfs, hwmon and sysfs paths.");

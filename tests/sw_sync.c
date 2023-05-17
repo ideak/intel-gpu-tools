@@ -40,9 +40,13 @@
 
 /**
  * TEST: sw sync
+ * Category: Infrastructure
  * Description: Test SW Sync Framework
  * Feature: synchronization
+ * Functionality: semaphore
  * Run type: FULL
+ * Sub-category: DRM
+ * Test category: GEM_Legacy
  *
  * SUBTEST: alloc_fence
  *

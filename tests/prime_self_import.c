@@ -47,8 +47,12 @@
 #include "i915/gem_create.h"
 /**
  * TEST: prime self import
+ * Category: Infrastructure
  * Description: Check whether prime import/export works on the same device... but with different fds.
  * Feature: prime
+ * Functionality: buffer management
+ * Sub-category: DRM
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-llseek-bad
  * Description: Check dmabuf llseek support with invalid values.

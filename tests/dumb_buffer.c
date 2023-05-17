@@ -51,9 +51,13 @@
 #include "ioctl_wrappers.h"
 /**
  * TEST: dumb buffer
+ * Category: Desktop client
  * Description: This is a test for the generic dumb buffer interface.
  * Feature: prime
+ * Functionality: IOCTL check for buffer management
  * Run type: FULL
+ * Sub-category: Compositor
+ * Test category: GEM_Legacy
  *
  * SUBTEST: create-clear
  *
