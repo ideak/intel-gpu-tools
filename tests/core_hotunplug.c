@@ -48,11 +48,15 @@
  * Description:
  *   Check if the driver can be cleanly rebound to a device with a still open hot unbound driver
  *   instance
+ * Functionality: device hotplug
  * Run type: FULL
+ * Test category: SysMan
  *
  * SUBTEST: hotrebind-lateclose
  * Description: Check if a hot unbound driver instance still open after hot rebind can be cleanly released
+ * Functionality: device hotplug
  * Run type: FULL
+ * Test category: SysMan
  *
  * SUBTEST: hotreplug
  * Description: Check if a hot unplugged and still open device can be cleanly restored
@@ -64,7 +68,9 @@
  *
  * SUBTEST: hotunbind-rebind
  * Description: Check if the driver can be cleanly unbound from an open device, then released and rebound
+ * Functionality: device hotplug
  * Run type: FULL
+ * Test category: SysMan
  *
  * SUBTEST: hotunplug-rescan
  * Description: Check if an open device can be cleanly unplugged, then released and restored
@@ -72,7 +78,9 @@
  *
  * SUBTEST: unbind-rebind
  * Description: Check if the driver can be cleanly unbound from a device believed to be closed, then rebound
+ * Functionality: device hotplug
  * Run type: BAT
+ * Test category: SysMan
  *
  * SUBTEST: unplug-rescan
  * Description: Check if a device believed to be closed can be cleanly unplugged, then restored

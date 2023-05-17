@@ -40,9 +40,13 @@
 #include <sys/stat.h>
 /**
  * TEST: core setmaster
+ * Category: Desktop client
  * Description: Check that Drop/SetMaster behaves correctly wrt root/user access
  * Feature: core
+ * Functionality: permission management for clients
  * Run type: FULL
+ * Sub-category: DRM
+ * Test category: GEM_Legacy
  *
  * SUBTEST: master-drop-set-root
  * Description: Ensure that root can Set/DropMaster

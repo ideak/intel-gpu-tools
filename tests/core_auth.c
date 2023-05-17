@@ -44,8 +44,12 @@
 #include "drm.h"
 /**
  * TEST: core auth
+ * Category: Desktop client
  * Description: Call drmGetMagic() and drmAuthMagic() and see if it behaves.
  * Feature: core
+ * Functionality: permission management for clients
+ * Sub-category: DRM
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-auth
  * Description: Test magic numbers for master and slave.

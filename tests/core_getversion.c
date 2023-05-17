@@ -30,9 +30,13 @@
 #include <sys/ioctl.h>
 /**
  * TEST: core getversion
+ * Category: Desktop client
  * Description: Tests the DRM_IOCTL_GET_VERSION ioctl and libdrm's drmGetVersion() interface to it.
  * Feature: core
+ * Functionality: permission management for clients
  * Run type: FULL
+ * Sub-category: DRM
+ * Test category: GEM_Legacy
  *
  * SUBTEST:
  */
