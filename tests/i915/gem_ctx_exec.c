@@ -50,34 +50,60 @@
 /**
  * TEST: gem ctx exec
  * Description: Test context batch buffer execution.
- * Feature: context
  *
  * SUBTEST: basic
+ * Category: Infrastructure
  * Description: Check the basic context batch buffer execution.
+ * Feature: context
+ * Functionality: command submission
  * Run type: BAT
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-close-race
+ * Category: Infrastructure
  * Description: Race the execution and interrupt handlers along a context, while closing it at a random time.
+ * Feature: context
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-invalid-context
+ * Category: Infrastructure
  * Description: Verify that execbuf with invalid context fails.
+ * Feature: context
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-nohangcheck
+ * Category: Server
  * Description: Verify that contexts are automatically shotdown on close, if hangchecking is disabled.
+ * Feature: context
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-norecovery
+ * Category: Server
  * Description: Check the status of context after a hang by setting and unsetting the RECOVERABLE.
+ * Feature: context
+ * Functionality: command submission
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: eviction
  * Description: Check maximum number of buffers it can evict for a context.
+ * Feature: context
  * Run type: FULL
  *
  * SUBTEST: reset-pin-leak
  * Description: Check if the kernel doesn't leak the vma pin_count for the last context on reset.
+ * Feature: context
  * Run type: FULL
  */
 

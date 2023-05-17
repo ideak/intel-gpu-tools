@@ -36,71 +36,139 @@
  * Run type: FULL
  *
  * SUBTEST: basic
+ * Category: Infrastructure
  * Description: Basic test for context get/set param ioctls using valid context
  * Feature: context
+ * Functionality: context management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: basic-default
+ * Category: Infrastructure
  * Description: Basic test for context get/set param ioctls using default context
  * Feature: context
+ * Functionality: context management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: get-priority-new-ctx
+ * Category: Infrastructure
  * Description:
  *   Test performed with context param set to priority.
  *   Verify that priority is default for newly created context
  * Feature: context
+ * Functionality: context management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-ctx-get
+ * Category: Infrastructure
  * Description: Verify that context get param ioctl using invalid context returns relevant error
  * Feature: context
+ * Functionality: context management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-ctx-set
+ * Category: Infrastructure
  * Description: Verify that context set param ioctl using invalid context returns relevant error
  * Feature: context
+ * Functionality: context management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-get-engines
+ * Category: Infrastructure
  * Feature: context
+ * Functionality: context management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-get-no-zeromap
+ * Category: Infrastructure
  * Feature: context
+ * Functionality: context management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-get-ringsize
+ * Category: Infrastructure
  * Feature: context
+ * Functionality: context management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-param-get
+ * Category: Infrastructure
  * Description: Checks that fetching context parameters using an unused param value is erroneous
  * Feature: context
+ * Functionality: context management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-param-set
+ * Category: Infrastructure
  * Description: Checks that setting context parameters using an unused param value is erroneous
  * Feature: context
+ * Functionality: context management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-set-no-zeromap
+ * Category: Infrastructure
  * Feature: context
+ * Functionality: context management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-set-ringsize
+ * Category: Infrastructure
  * Feature: context
+ * Functionality: context management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-size-get
+ * Category: Infrastructure
  * Description: Verify that context get param ioctl returns valid size for valid context
  * Feature: context
+ * Functionality: context management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: invalid-size-set
+ * Category: Infrastructure
  * Description: Verify that context set param ioctl using invalid size returns relevant error
  * Feature: context
+ * Functionality: context management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: non-root-set
+ * Category: Infrastructure
  * Description: Verify that context set param ioctl returns relevant error in non root mode
  * Feature: context
+ * Functionality: context management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: root-set
+ * Category: Infrastructure
  * Description: Verify that context set param ioctl works fine in root mode
  * Feature: context
+ * Functionality: context management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: set-priority-invalid-size
+ * Category: Infrastructure
  * Description:
  *   Test performed with context param set to priority.
  *   Verify that relevant error is returned on setting invalid ctx size with default priority
  * Feature: context
+ * Functionality: context management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: set-priority-not-supported
  * Description:
@@ -109,14 +177,22 @@
  * Feature: context, no-set-priority
  *
  * SUBTEST: set-priority-range
+ * Category: Infrastructure
  * Description:
  *   Test performed with context param set to priority.
  *   Change priority range to test value overflow
  * Feature: context
+ * Functionality: context management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: vm
+ * Category: Infrastructure
  * Description: Tests that multiple contexts can share the same VMA
  * Feature: context
+ * Functionality: context management
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  */
 
 IGT_TEST_DESCRIPTION("Basic test for context set/get param input validation.");

@@ -51,68 +51,180 @@
  * Run type: FULL
  *
  * SUBTEST: engines-cleanup
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: engines-hang
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: engines-hostile
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: engines-hostile-preempt
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: engines-mixed
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: engines-mixed-process
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: engines-persistence
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: engines-queued
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: file
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: hang
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: heartbeat-close
  *
  * SUBTEST: heartbeat-hang
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: heartbeat-hostile
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: heartbeat-many
  *
  * SUBTEST: heartbeat-stop
  *
  * SUBTEST: hostile
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: idempotent
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: legacy-engines-cleanup
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: legacy-engines-hang
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: legacy-engines-hostile
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: legacy-engines-hostile-preempt
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: legacy-engines-mixed
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: legacy-engines-mixed-process
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: legacy-engines-persistence
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: legacy-engines-queued
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: many-contexts
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: process
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: processes
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: saturated-hostile
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: saturated-hostile-nopreempt
  *
  * SUBTEST: smoketest
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  *
  * SUBTEST: userptr
+ * Category: Server
+ * Functionality: security
+ * Sub-category: Compute
+ * Test category: GEM_Legacy
  */
 
 #define RESET_TIMEOUT_MS 2 * MSEC_PER_SEC; /* default: 640ms */

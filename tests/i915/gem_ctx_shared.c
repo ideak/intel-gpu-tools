@@ -50,36 +50,71 @@
 /**
  * TEST: gem ctx shared
  * Description: Test shared contexts.
- * Feature: context
  * Run type: FULL
  *
  * SUBTEST: Q-in-order
+ * Feature: context
  *
  * SUBTEST: Q-independent
+ * Feature: context
  *
  * SUBTEST: Q-out-order
+ * Feature: context
  *
  * SUBTEST: Q-promotion
+ * Feature: context
  *
  * SUBTEST: Q-smoketest
+ * Feature: context
  *
  * SUBTEST: Q-smoketest-all
+ * Feature: context
  *
  * SUBTEST: create-shared-gtt
+ * Category: Desktop client
+ * Feature: context
+ * Functionality: context management
+ * Sub-category: Media
+ * Test category: GEM_Legacy
  *
  * SUBTEST: detached-shared-gtt
+ * Category: Desktop client
+ * Feature: context
+ * Functionality: context management
+ * Sub-category: Media
+ * Test category: GEM_Legacy
  *
  * SUBTEST: disjoint-timelines
+ * Category: Desktop client
+ * Feature: context
+ * Functionality: context management
+ * Sub-category: Media
+ * Test category: GEM_Legacy
  *
  * SUBTEST: exec-shared-gtt
+ * Category: Desktop client
+ * Feature: context
+ * Functionality: context management
+ * Sub-category: Media
+ * Test category: GEM_Legacy
  *
  * SUBTEST: exec-single-timeline
+ * Category: Desktop client
+ * Feature: context
+ * Functionality: context management
+ * Test category: GEM_Legacy
  *
  * SUBTEST: exhaust-shared-gtt
+ * Feature: context
  *
  * SUBTEST: exhaust-shared-gtt-lrc
+ * Feature: context
  *
  * SUBTEST: single-timeline
+ * Category: Desktop client
+ * Feature: context
+ * Functionality: context management
+ * Test category: GEM_Legacy
  */
 
 #define LO 0

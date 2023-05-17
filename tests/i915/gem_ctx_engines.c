@@ -45,8 +45,12 @@
 #include "sw_sync.h"
 /**
  * TEST: gem ctx engines
+ * Category: Infrastructure
  * Feature: context
+ * Functionality: context management
  * Run type: FULL
+ * Sub-category: i915
+ * Test category: GEM_Legacy
  *
  * SUBTEST: execute-allforone
  *

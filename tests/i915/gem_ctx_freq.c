@@ -36,8 +36,12 @@
 #include "sw_sync.h"
 /**
  * TEST: gem ctx freq
+ * Category: Server
  * Feature: context
+ * Functionality: frequency management
  * Run type: FULL
+ * Sub-category: Performance
+ * Test category: GEM_Legacy
  *
  * SUBTEST: sysfs
  */
