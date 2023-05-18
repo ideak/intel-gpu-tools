@@ -1,0 +1,37 @@
+##################################################################
+#Pipe E, F, G and H
+##################################################################
+igt@.*@.*pipe-(e|f|g|h).*
+##################################################################
+# Multidisplay
+##################################################################
+igt@kms_bw@.*-(5|6|7|8)-displays-.*
+##################################################################
+igt@kms_draw_crc@draw-method-(mmap-cpu|mmap-gtt|pwrite)
+igt@kms_draw_crc@fill-fb
+igt@kms_pipe_b_c_ivb@.*
+igt@kms_pwrite_crc
+igt@kms_ccs@.*
+igt@kms_frontbuffer_tracking@.*
+igt@kms_fbcon_fbt@(fbc|psr)(-suspend)
+igt@kms_fence_pin_leak
+igt@kms_busy@.*
+igt@kms_psr@.*_mmap_(cpu|gtt)
+igt@kms_legacy_colorkey@basic
+igt@kms_legacy_colorkey@invalid-plane
+igt@kms_flip_scaled_crc@flip-(32|64)bpp-(4|x|y|yf)tile-.*
+igt@kms_big_fb@(4|x|y|yf)-tiled-.*
+igt@kms_flip@2x-flip-vs-fences
+igt@kms_flip@flip-vs-fences(-interruptible)
+igt@kms_addfb_basic@clobberred-modifier
+igt@kms_addfb_basic@.*-tiling
+igt@kms_addfb_basic@.*-(4|x|y|yf)-.*
+igt@kms_async_flips@.*
+igt@kms_plane_multiple@tiling-(4|x|y|yf)
+igt@kms_cursor_legacy@flip-vs-cursor-busy-crc-(atomic|legacy)
+igt@kms_rotation_crc@primary-(4|x|y|yf)-tiled-.*
+igt@kms_rotation_crc@exhaust-fences
+igt@kms_force_connector_basic@force-load-detect
+igt@kms_getfb@.*-ccs
+igt@kms_plane_lowres@tiling-(4|x|y|yf)
+##################################################################
