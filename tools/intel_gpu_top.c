@@ -135,6 +135,7 @@ struct intel_clients {
 };
 
 static struct termios termios_orig;
+static bool class_view;
 
 __attribute__((format(scanf,3,4)))
 static int igt_sysfs_scanf(int dir, const char *attr, const char *fmt, ...)
@@ -1635,8 +1636,6 @@ print_imc(struct engines *engines, double t, int lines, int con_w, int con_h)
 
 	return lines;
 }
-
-static bool class_view;
 
 static int
 print_engines_header(struct engines *engines, double t,
