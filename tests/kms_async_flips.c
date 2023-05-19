@@ -58,7 +58,6 @@ typedef struct {
 	int flip_count;
 	int frame_count;
 	bool flip_pending;
-	bool extended;
 	enum pipe pipe;
 	bool alternate_sync_async;
 } data_t;
@@ -548,49 +547,23 @@ static void test_crc(data_t *data)
 
 static void run_test(data_t *data, void (*test)(data_t *))
 {
-	igt_output_t *output;
-	enum pipe pipe;
 	igt_display_t *display = &data->display;
 
-	for_each_pipe(display, pipe) {
-		for_each_valid_output_on_pipe(display, pipe, output) {
-			igt_display_reset(display);
+	for_each_pipe_with_valid_output(display, data->pipe, data->output) {
+		igt_display_reset(display);
 
-			igt_output_set_pipe(output, pipe);
-			if (!i915_pipe_output_combo_valid(display))
-				continue;
+		igt_output_set_pipe(data->output, data->pipe);
+		if (!i915_pipe_output_combo_valid(display))
+			continue;
 
-			igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(pipe), output->name) {
-				data->output = output;
-				data->pipe = pipe;
-				test(data);
-			}
-
-			if (!data->extended)
-				break;
-		}
+		igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(data->pipe), data->output->name)
+			test(data);
 	}
 }
-
-static int opt_handler(int opt, int opt_index, void *_data)
-{
-	data_t *data = _data;
-
-	switch (opt) {
-	case 'e':
-		data->extended = true;
-		break;
-	}
-
-	return IGT_OPT_HANDLER_SUCCESS;
-}
-
-static const char help_str[] =
-	"  --e \t\tRun the extended tests\n";
 
 static data_t data;
 
-igt_main_args("e", NULL, help_str, opt_handler, &data)
+igt_main
 {
 	int i;
 
