@@ -1436,6 +1436,30 @@ print_header(const struct igt_device_card *card,
 		.display_name = "Freq MHz",
 		.items = freq_items,
 	};
+	struct cnt_item freq_items_gt[] = {
+		{ &engines->freq_req_gt[0], 6, 0, 1.0, t, 1, "requested", "req" },
+		{ &engines->freq_act_gt[0], 6, 0, 1.0, t, 1, "actual", "act" },
+		{ NULL, 0, 0, 0.0, 0.0, 0.0, "unit", "MHz" },
+		{ },
+		{ &engines->freq_req_gt[1], 6, 0, 1.0, t, 1, "requested", "req" },
+		{ &engines->freq_act_gt[1], 6, 0, 1.0, t, 1, "actual", "act" },
+		{ NULL, 0, 0, 0.0, 0.0, 0.0, "unit", "MHz" },
+		{ },
+		{ &engines->freq_req_gt[2], 6, 0, 1.0, t, 1, "requested", "req" },
+		{ &engines->freq_act_gt[2], 6, 0, 1.0, t, 1, "actual", "act" },
+		{ NULL, 0, 0, 0.0, 0.0, 0.0, "unit", "MHz" },
+		{ },
+		{ &engines->freq_req_gt[3], 6, 0, 1.0, t, 1, "requested", "req" },
+		{ &engines->freq_act_gt[3], 6, 0, 1.0, t, 1, "actual", "act" },
+		{ NULL, 0, 0, 0.0, 0.0, 0.0, "unit", "MHz" },
+		{ },
+	};
+	struct cnt_group freq_group_gt[MAX_GTS] = {
+		{ .name = "frequency-gt0", .display_name = "Freq GT0 MHz", .items = &freq_items_gt[0] },
+		{ .name = "frequency-gt1", .display_name = "Freq GT1 MHz", .items = &freq_items_gt[4] },
+		{ .name = "frequency-gt2", .display_name = "Freq GT2 MHz", .items = &freq_items_gt[8] },
+		{ .name = "frequency-gt3", .display_name = "Freq GT3 MHz", .items = &freq_items_gt[12] },
+	};
 	struct cnt_item irq_items[] = {
 		{ &engines->irq, 8, 0, 1.0, t, 1, "count", "/s" },
 		{ NULL, 0, 0, 0.0, 0.0, 0.0, "unit", "irq/s" },
@@ -1455,6 +1479,26 @@ print_header(const struct igt_device_card *card,
 		.name = "rc6",
 		.display_name = "RC6",
 		.items = rc6_items,
+	};
+	struct cnt_item rc6_items_gt[] = {
+		{ &engines->rc6_gt[0], 8, 0, 1e9, t, 100, "value", "%" },
+		{ NULL, 0, 0, 0.0, 0.0, 0.0, "unit", "%" },
+		{ },
+		{ &engines->rc6_gt[1], 8, 0, 1e9, t, 100, "value", "%" },
+		{ NULL, 0, 0, 0.0, 0.0, 0.0, "unit", "%" },
+		{ },
+		{ &engines->rc6_gt[2], 8, 0, 1e9, t, 100, "value", "%" },
+		{ NULL, 0, 0, 0.0, 0.0, 0.0, "unit", "%" },
+		{ },
+		{ &engines->rc6_gt[3], 8, 0, 1e9, t, 100, "value", "%" },
+		{ NULL, 0, 0, 0.0, 0.0, 0.0, "unit", "%" },
+		{ },
+	};
+	struct cnt_group rc6_group_gt[MAX_GTS] = {
+		{ .name = "rc6-gt0", .display_name = "RC6 GT0", .items = &rc6_items_gt[0] },
+		{ .name = "rc6-gt1", .display_name = "RC6 GT1", .items = &rc6_items_gt[3] },
+		{ .name = "rc6-gt2", .display_name = "RC6 GT2", .items = &rc6_items_gt[6] },
+		{ .name = "rc6-gt3", .display_name = "RC6 GT3", .items = &rc6_items_gt[9] },
 	};
 	struct cnt_item power_items[] = {
 		{ &engines->r_gpu, 4, 2, 1.0, t, engines->r_gpu.scale, "GPU", "gpu" },
