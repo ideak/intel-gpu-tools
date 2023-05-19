@@ -118,6 +118,8 @@ struct engines {
 	bool discrete;
 	char *device;
 
+	int num_gts;
+
 	/* Do not edit below this line.
 	 * This structure is reallocated every time a new engine is
 	 * found and size is increased by sizeof (engine).
@@ -539,6 +541,25 @@ static void imc_reads_open(struct pmu_counter *pmu, struct engines *engines)
 	imc_open(pmu, "data_reads", engines);
 }
 
+static int get_num_gts(uint64_t type)
+{
+	int fd, cnt;
+
+	errno = 0;
+	for (cnt = 0; cnt < MAX_GTS; cnt++) {
+		fd = igt_perf_open(type, __I915_PMU_REQUESTED_FREQUENCY(cnt));
+		if (fd < 0)
+			break;
+
+		close(fd);
+	}
+	assert(!errno || errno == ENOENT);
+	assert(cnt > 0);
+	errno = 0;
+
+	return cnt;
+}
+
 static int pmu_init(struct engines *engines)
 {
 	unsigned int i;
@@ -547,6 +568,7 @@ static int pmu_init(struct engines *engines)
 
 	engines->fd = -1;
 	engines->num_counters = 0;
+	engines->num_gts = get_num_gts(type);
 
 	engines->irq.config = I915_PMU_INTERRUPTS;
 	fd = _open_pmu(type, engines->num_counters, &engines->irq, engines->fd);
