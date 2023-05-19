@@ -147,23 +147,31 @@ static void require_monotonic_timestamp(int fd)
 
 static void test_init(data_t *data)
 {
-	int i;
-	uint32_t width, height;
-	igt_plane_t *plane;
-	static uint32_t prev_output_id;
 	drmModeModeInfo *mode;
 
 	igt_display_reset(&data->display);
 	igt_display_commit(&data->display);
 
 	mode = igt_output_get_mode(data->output);
-	width = mode->hdisplay;
-	height = mode->vdisplay;
 
 	data->crtc_id = data->display.pipes[data->pipe].crtc_id;
 	data->refresh_rate = mode->vrefresh;
 
 	igt_output_set_pipe(data->output, data->pipe);
+}
+
+static void test_init_fbs(data_t *data)
+{
+	int i;
+	uint32_t width, height;
+	igt_plane_t *plane;
+	static uint32_t prev_output_id;
+	drmModeModeInfo *mode;
+
+	mode = igt_output_get_mode(data->output);
+	width = mode->hdisplay;
+	height = mode->vdisplay;
+
 	plane = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_PRIMARY);
 
 	if (prev_output_id != data->output->id) {
@@ -189,8 +197,6 @@ static void test_async_flip(data_t *data)
 	int ret, frame;
 	long long int fps;
 	struct timeval start, end, diff;
-
-	test_init(data);
 
 	gettimeofday(&start, NULL);
 	frame = 1;
@@ -286,8 +292,6 @@ static void test_timestamp(data_t *data)
 	unsigned int seq, seq1;
 	int ret;
 
-	test_init(data);
-
 	/*
 	 * In older platforms(<= gen10), async address update bit is double buffered.
 	 * So flip timestamp can be verified only from the second flip.
@@ -345,8 +349,6 @@ static void test_cursor(data_t *data)
 	do_or_die(drmGetCap(data->drm_fd, DRM_CAP_CURSOR_WIDTH, &width));
 	do_or_die(drmGetCap(data->drm_fd, DRM_CAP_CURSOR_WIDTH, &height));
 
-	test_init(data);
-
 	igt_create_color_fb(data->drm_fd, width, height, DRM_FORMAT_ARGB8888,
 			    DRM_FORMAT_MOD_LINEAR, 1., 1., 1., &cursor_fb);
 
@@ -386,8 +388,6 @@ static void test_invalid(data_t *data)
 	mode = igt_output_get_mode(data->output);
 	width = mode->hdisplay;
 	height = mode->vdisplay;
-
-	test_init(data);
 
 	igt_create_fb(data->drm_fd, width, height, DRM_FORMAT_XRGB8888,
 		      I915_FORMAT_MOD_Y_TILED, &fb);
@@ -492,8 +492,6 @@ static void test_crc(data_t *data)
 	data->frame_count = 0;
 	data->flip_pending = false;
 
-	test_init(data);
-
 	cr = igt_get_cairo_ctx(data->drm_fd, &data->bufs[frame]);
 	igt_paint_color(cr, 0, 0, data->bufs[frame].width, data->bufs[frame].height, 1.0, 0.0, 0.0);
 	igt_put_cairo_ctx(cr);
@@ -556,8 +554,11 @@ static void run_test(data_t *data, void (*test)(data_t *))
 		if (!i915_pipe_output_combo_valid(display))
 			continue;
 
-		igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(data->pipe), data->output->name)
+		test_init(data);
+		igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(data->pipe), data->output->name) {
+			test_init_fbs(data);
 			test(data);
+		}
 	}
 }
 
