@@ -115,6 +115,15 @@ static void wait_flip_event(data_t *data)
 	}
 }
 
+static uint64_t default_modifier(data_t *data)
+{
+	if (igt_display_has_format_mod(&data->display, DRM_FORMAT_XRGB8888,
+				       I915_FORMAT_MOD_X_TILED))
+		return I915_FORMAT_MOD_X_TILED;
+	else
+		return DRM_FORMAT_MOD_LINEAR;
+}
+
 static void make_fb(data_t *data, struct igt_fb *fb,
 		    uint32_t width, uint32_t height, int index)
 {
@@ -123,14 +132,8 @@ static void make_fb(data_t *data, struct igt_fb *fb,
 
 	rec_width = width / (ARRAY_SIZE(data->bufs) * 2);
 
-	if (is_i915_device(data->drm_fd)) {
-		igt_create_fb(data->drm_fd, width, height, DRM_FORMAT_XRGB8888,
-			      I915_FORMAT_MOD_X_TILED, fb);
-		igt_draw_fill_fb(data->drm_fd, fb, 0x88);
-	} else {
-		igt_create_color_fb(data->drm_fd, width, height, DRM_FORMAT_XRGB8888,
-				    DRM_FORMAT_MOD_LINEAR, 0.0, 0.0, 0.5, fb);
-	}
+	igt_create_color_fb(data->drm_fd, width, height, DRM_FORMAT_XRGB8888,
+			    default_modifier(data), 0.0, 0.0, 0.5, fb);
 
 	cr = igt_get_cairo_ctx(data->drm_fd, fb);
 	igt_paint_color_rand(cr, rec_width * 2 + rec_width * index, 0, rec_width, height);
