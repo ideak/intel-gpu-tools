@@ -88,6 +88,7 @@ struct engine {
 	struct pmu_counter sema;
 };
 
+#define MAX_GTS 4
 struct engines {
 	unsigned int num_engines;
 	unsigned int num_classes;
@@ -107,9 +108,12 @@ struct engines {
 	unsigned int num_imc;
 
 	struct pmu_counter freq_req;
+	struct pmu_counter freq_req_gt[MAX_GTS];
 	struct pmu_counter freq_act;
+	struct pmu_counter freq_act_gt[MAX_GTS];
 	struct pmu_counter irq;
 	struct pmu_counter rc6;
+	struct pmu_counter rc6_gt[MAX_GTS];
 
 	bool discrete;
 	char *device;
