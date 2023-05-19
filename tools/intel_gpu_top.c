@@ -1511,7 +1511,13 @@ print_header(const struct igt_device_card *card,
 		.display_name = "Power W",
 		.items = power_items,
 	};
-	struct cnt_group *groups[] = {
+	/*
+	 * Array size calculation:
+	 * One group each for period, irq, power, NULL = 4
+	 * One group per gt for freq = MAX_GTS
+	 * One group per gt for rc6  = MAX_GTS
+	 */
+	struct cnt_group *groups[4 + MAX_GTS + MAX_GTS] = {
 		&period_group,
 		&freq_group,
 		&irq_group,
