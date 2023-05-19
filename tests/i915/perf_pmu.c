@@ -1845,8 +1845,16 @@ static bool wait_for_suspended(int gem_fd)
 	return suspended;
 }
 
+static int open_forcewake_handle(int fd, unsigned int gt)
+{
+	if (getenv("IGT_NO_FORCEWAKE"))
+		return -1;
+
+	return igt_debugfs_gt_open(fd, gt, "forcewake_user", O_WRONLY);
+}
+
 static void
-test_rc6(int gem_fd, unsigned int flags)
+test_rc6(int gem_fd, unsigned int gt, unsigned int flags)
 {
 	int64_t duration_ns = 2e9;
 	uint64_t idle, busy, prev, ts[2];
@@ -1855,7 +1863,7 @@ test_rc6(int gem_fd, unsigned int flags)
 
 	gem_quiescent_gpu(gem_fd);
 
-	fd = open_pmu(gem_fd, I915_PMU_RC6_RESIDENCY);
+	fd = open_pmu(gem_fd, __I915_PMU_RC6_RESIDENCY(gt));
 
 	if (flags & TEST_RUNTIME_PM) {
 		drmModeRes *res;
@@ -1922,7 +1930,7 @@ test_rc6(int gem_fd, unsigned int flags)
 	assert_within_epsilon(idle - prev, ts[1] - ts[0], tolerance);
 
 	/* Wake up device and check no RC6. */
-	fw = igt_open_forcewake_handle(gem_fd);
+	fw = open_forcewake_handle(gem_fd, gt);
 	igt_assert(fw >= 0);
 	usleep(1e3); /* wait for the rc6 cycle counter to stop ticking */
 
@@ -2317,7 +2325,7 @@ igt_main
 	const struct intel_execution_engine2 *e;
 	unsigned int num_engines = 0;
 	const intel_ctx_t *ctx = NULL;
-	int fd = -1;
+	int gt, tmp, fd = -1;
 
 	/**
 	 * All PMU should be accompanied by a test.
@@ -2534,17 +2542,21 @@ igt_main
 	/**
 	 * Test RC6 residency reporting.
 	 */
-	igt_subtest("rc6")
-		test_rc6(fd, 0);
+	igt_subtest_with_dynamic("rc6") {
+		i915_for_each_gt(fd, tmp, gt) {
+			igt_dynamic_f("gt%u", gt)
+				test_rc6(fd, gt, 0);
 
-	igt_subtest("rc6-runtime-pm")
-		test_rc6(fd, TEST_RUNTIME_PM);
+			igt_dynamic_f("runtime-pm-gt%u", gt)
+				test_rc6(fd, gt, TEST_RUNTIME_PM);
 
-	igt_subtest("rc6-runtime-pm-long")
-		test_rc6(fd, TEST_RUNTIME_PM | FLAG_LONG);
+			igt_dynamic_f("runtime-pm-long-gt%u", gt)
+				test_rc6(fd, gt, TEST_RUNTIME_PM | FLAG_LONG);
+		}
+	}
 
 	igt_subtest("rc6-suspend")
-		test_rc6(fd, TEST_S3);
+		test_rc6(fd, 0, TEST_S3);
 
 	/**
 	 * Test GT wakeref tracking (similar to RC0, opposite of RC6)
