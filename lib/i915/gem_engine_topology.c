@@ -372,8 +372,12 @@ mtl_engine_to_gt_map(const struct i915_engine_class_instance *e)
 
 static int gem_engine_to_gt_map(int i915, const struct i915_engine_class_instance *engine)
 {
-	igt_require(IS_METEORLAKE(intel_get_drm_devid(i915)));
-	return mtl_engine_to_gt_map(engine);
+	uint32_t devid = intel_get_drm_devid(i915);
+
+	/* Only MTL multi-gt supported at present */
+	igt_require(intel_graphics_ver(devid) <= IP_VER(12, 70));
+
+	return IS_METEORLAKE(devid) ? mtl_engine_to_gt_map(engine) : 0;
 }
 
 /**
