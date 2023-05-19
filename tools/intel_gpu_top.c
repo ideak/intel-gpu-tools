@@ -1526,7 +1526,7 @@ print_header(const struct igt_device_card *card,
 		&power_group,
 		NULL
 	};
-	int i;
+	int rem, i;
 
 	/*
 	 * If we have multi-gt and the user has specified -p options, show gt
@@ -1553,51 +1553,53 @@ print_header(const struct igt_device_card *card,
 
 	*consumed = print_groups(groups);
 
-	if (output_mode == INTERACTIVE) {
-		int rem = con_w;
+	if (output_mode != INTERACTIVE)
+		return lines;
 
-		printf("\033[H\033[J");
+	/* INTERACTIVE MODE */
+	rem = con_w;
 
-		lines = print_header_token(NULL, lines, con_w, con_h, &rem,
-					   "intel-gpu-top:");
+	printf("\033[H\033[J");
 
-		lines = print_header_token(" ", lines, con_w, con_h, &rem,
-					   "%s", codename);
+	lines = print_header_token(NULL, lines, con_w, con_h, &rem,
+				   "intel-gpu-top:");
 
-		lines = print_header_token(" @ ", lines, con_w, con_h, &rem,
-					   "%s", card->card);
+	lines = print_header_token(" ", lines, con_w, con_h, &rem,
+				   "%s", codename);
 
-		lines = print_header_token(" - ", lines, con_w, con_h, &rem,
-					   "%s/%s MHz",
-					   freq_items[1].buf,
-					   freq_items[0].buf);
+	lines = print_header_token(" @ ", lines, con_w, con_h, &rem,
+				   "%s", card->card);
 
-		lines = print_header_token("; ", lines, con_w, con_h, &rem,
-					   "%s%% RC6",
-					   rc6_items[0].buf);
+	lines = print_header_token(" - ", lines, con_w, con_h, &rem,
+				   "%s/%s MHz",
+				   freq_items[1].buf,
+				   freq_items[0].buf);
 
-		if (engines->r_gpu.present) {
-			lines = print_header_token("; ", lines, con_w, con_h,
-						   &rem,
-						   "%s/%s W",
-						   power_items[0].buf,
-						   power_items[1].buf);
-		}
+	lines = print_header_token("; ", lines, con_w, con_h, &rem,
+				   "%s%% RC6",
+				   rc6_items[0].buf);
 
-		lines = print_header_token("; ", lines, con_w, con_h, &rem,
-					   "%s irqs/s",
-					   irq_items[0].buf);
+	if (engines->r_gpu.present) {
+		lines = print_header_token("; ", lines, con_w, con_h,
+					   &rem,
+					   "%s/%s W",
+					   power_items[0].buf,
+					   power_items[1].buf);
+	}
 
-		if (lines++ < con_h)
+	lines = print_header_token("; ", lines, con_w, con_h, &rem,
+				   "%s irqs/s",
+				   irq_items[0].buf);
+
+	if (lines++ < con_h)
+		printf("\n");
+
+	if (lines++ < con_h) {
+		if (header_msg) {
+			printf(" >>> %s\n", header_msg);
+			header_msg = NULL;
+		} else {
 			printf("\n");
-
-		if (lines++ < con_h) {
-			if (header_msg) {
-				printf(" >>> %s\n", header_msg);
-				header_msg = NULL;
-			} else {
-				printf("\n");
-			}
 		}
 	}
 
