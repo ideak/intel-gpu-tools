@@ -53,6 +53,8 @@ typedef struct {
 	igt_output_t *output;
 	unsigned long flip_timestamp_us;
 	double flip_interval;
+	uint64_t modifier;
+	igt_plane_t *plane;
 	igt_pipe_crc_t *pipe_crc;
 	igt_crc_t ref_crc;
 	int flip_count;
@@ -60,6 +62,7 @@ typedef struct {
 	bool flip_pending;
 	enum pipe pipe;
 	bool alternate_sync_async;
+	bool allow_fail;
 } data_t;
 
 static void flip_handler(int fd_, unsigned int sequence, unsigned int tv_sec,
@@ -132,7 +135,7 @@ static void make_fb(data_t *data, struct igt_fb *fb,
 	rec_width = width / (ARRAY_SIZE(data->bufs) * 2);
 
 	igt_create_color_fb(data->drm_fd, width, height, DRM_FORMAT_XRGB8888,
-			    default_modifier(data), 0.0, 0.0, 0.5, fb);
+			    data->modifier, 0.0, 0.0, 0.5, fb);
 
 	cr = igt_get_cairo_ctx(data->drm_fd, fb);
 	igt_paint_color_rand(cr, rec_width * 2 + rec_width * index, 0, rec_width, height);
@@ -158,24 +161,26 @@ static void test_init(data_t *data)
 	data->refresh_rate = mode->vrefresh;
 
 	igt_output_set_pipe(data->output, data->pipe);
+
+	data->plane = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_PRIMARY);
 }
 
 static void test_init_fbs(data_t *data)
 {
 	int i;
 	uint32_t width, height;
-	igt_plane_t *plane;
 	static uint32_t prev_output_id;
+	static uint64_t prev_modifier;
 	drmModeModeInfo *mode;
 
 	mode = igt_output_get_mode(data->output);
 	width = mode->hdisplay;
 	height = mode->vdisplay;
 
-	plane = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_PRIMARY);
-
-	if (prev_output_id != data->output->id) {
+	if (prev_output_id != data->output->id ||
+	    prev_modifier != data->modifier) {
 		prev_output_id = data->output->id;
+		prev_modifier = data->modifier;
 
 		if (data->bufs[0].fb_id) {
 			for (i = 0; i < ARRAY_SIZE(data->bufs); i++)
@@ -186,8 +191,8 @@ static void test_init_fbs(data_t *data)
 			make_fb(data, &data->bufs[i], width, height, i);
 	}
 
-	igt_plane_set_fb(plane, &data->bufs[0]);
-	igt_plane_set_size(plane, width, height);
+	igt_plane_set_fb(data->plane, &data->bufs[0]);
+	igt_plane_set_size(data->plane, width, height);
 
 	igt_display_commit2(&data->display, data->display.is_atomic ? COMMIT_ATOMIC : COMMIT_LEGACY);
 }
@@ -242,8 +247,10 @@ static void test_async_flip(data_t *data)
 		ret = drmModePageFlip(data->drm_fd, data->crtc_id,
 				      data->bufs[frame % 4].fb_id,
 				      flags, data);
-
-		igt_assert(ret == 0);
+		if (frame == 1 && data->allow_fail)
+			igt_skip_on(ret == -EINVAL);
+		else
+			igt_assert(ret == 0);
 
 		wait_flip_event(data);
 
@@ -555,9 +562,33 @@ static void run_test(data_t *data, void (*test)(data_t *))
 			continue;
 
 		test_init(data);
+		data->allow_fail = false;
+		data->modifier = default_modifier(data);
 		igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(data->pipe), data->output->name) {
 			test_init_fbs(data);
 			test(data);
+		}
+	}
+}
+
+static void run_test_with_modifiers(data_t *data, void (*test)(data_t *))
+{
+	for_each_pipe_with_valid_output(&data->display, data->pipe, data->output) {
+		test_init(data);
+
+		for (int i = 0; i < data->plane->format_mod_count; i++) {
+			if (data->plane->formats[i] != DRM_FORMAT_XRGB8888)
+				continue;
+
+			data->allow_fail = true;
+			data->modifier = data->plane->modifiers[i];
+
+			igt_dynamic_f("pipe-%s-%s-%s", kmstest_pipe_name(data->pipe),
+				      data->output->name,
+				      igt_fb_modifier_name(data->modifier)) {
+				test_init_fbs(data);
+				test(data);
+			}
 		}
 	}
 }
@@ -592,7 +623,7 @@ igt_main
 		igt_describe("Wait for page flip events in between successive asynchronous flips");
 		igt_subtest_with_dynamic("async-flip-with-page-flip-events") {
 			data.alternate_sync_async = false;
-			run_test(&data, test_async_flip);
+			run_test_with_modifiers(&data, test_async_flip);
 		}
 
 		igt_describe("Alternate between sync and async flips");
