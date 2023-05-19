@@ -417,6 +417,7 @@ single(int gem_fd, const intel_ctx_t *ctx,
 	int fd;
 	uint64_t ahnd = get_reloc_ahnd(gem_fd, ctx->id);
 
+	gem_quiescent_gpu(gem_fd);
 	fd = open_pmu(gem_fd, I915_PMU_ENGINE_BUSY(e->class, e->instance));
 
 	if (flags & TEST_BUSY)
@@ -777,6 +778,7 @@ no_sema(int gem_fd, const intel_ctx_t *ctx,
 	int fd[2];
 	uint64_t ahnd = get_reloc_ahnd(gem_fd, ctx->id);
 
+	gem_quiescent_gpu(gem_fd);
 	fd[0] = open_group(gem_fd, I915_PMU_ENGINE_SEMA(e->class, e->instance),
 			   -1);
 	fd[1] = open_group(gem_fd, I915_PMU_ENGINE_WAIT(e->class, e->instance),
