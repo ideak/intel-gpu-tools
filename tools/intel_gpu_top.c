@@ -1570,14 +1570,31 @@ print_header(const struct igt_device_card *card,
 	lines = print_header_token(" @ ", lines, con_w, con_h, &rem,
 				   "%s", card->card);
 
-	lines = print_header_token(" - ", lines, con_w, con_h, &rem,
-				   "%s/%s MHz",
-				   freq_items[1].buf,
-				   freq_items[0].buf);
+	if (class_view || engines->num_gts == 1) {
+		lines = print_header_token(" - ", lines, con_w, con_h, &rem,
+					   "%s/%s MHz",
+					   freq_items[1].buf,
+					   freq_items[0].buf);
 
-	lines = print_header_token("; ", lines, con_w, con_h, &rem,
-				   "%s%% RC6",
-				   rc6_items[0].buf);
+		lines = print_header_token("; ", lines, con_w, con_h, &rem,
+					   "%s%% RC6",
+					   rc6_items[0].buf);
+	} else {
+		for (i = 0; i < engines->num_gts; i++) {
+			const char *cont = !i ? " - ": "; ";
+
+			lines = print_header_token(cont, lines, con_w, con_h, &rem,
+						   "%s/%s MHz GT%d",
+						   freq_items_gt[i * 4 + 1].buf,
+						   freq_items_gt[i * 4 + 0].buf,
+						   i);
+
+			lines = print_header_token("; ", lines, con_w, con_h, &rem,
+						   "%s%% RC6 GT%d",
+						   rc6_items_gt[i * 3].buf,
+						   i);
+		}
+	}
 
 	if (engines->r_gpu.present) {
 		lines = print_header_token("; ", lines, con_w, con_h,
