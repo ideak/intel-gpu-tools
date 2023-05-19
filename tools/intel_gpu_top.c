@@ -584,6 +584,17 @@ static int pmu_init(struct engines *engines)
 	engines->rc6.config = I915_PMU_RC6_RESIDENCY;
 	_open_pmu(type, engines->num_counters, &engines->rc6, engines->fd);
 
+	for (i = 0; i < engines->num_gts; i++) {
+		engines->freq_req_gt[i].config = __I915_PMU_REQUESTED_FREQUENCY(i);
+		_open_pmu(type, engines->num_counters, &engines->freq_req_gt[i], engines->fd);
+
+		engines->freq_act_gt[i].config = __I915_PMU_ACTUAL_FREQUENCY(i);
+		_open_pmu(type, engines->num_counters, &engines->freq_act_gt[i], engines->fd);
+
+		engines->rc6_gt[i].config = __I915_PMU_RC6_RESIDENCY(i);
+		_open_pmu(type, engines->num_counters, &engines->rc6_gt[i], engines->fd);
+	}
+
 	for (i = 0; i < engines->num_engines; i++) {
 		struct engine *engine = engine_ptr(engines, i);
 		struct {
@@ -684,6 +695,12 @@ static void pmu_sample(struct engines *engines)
 
 	engines->ts.prev = engines->ts.cur;
 	engines->ts.cur = pmu_read_multi(engines->fd, num_val, val);
+
+	for (i = 0; i < engines->num_gts; i++) {
+		update_sample(&engines->freq_req_gt[i], val);
+		update_sample(&engines->freq_act_gt[i], val);
+		update_sample(&engines->rc6_gt[i], val);
+	}
 
 	update_sample(&engines->freq_req, val);
 	update_sample(&engines->freq_act, val);
