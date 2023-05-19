@@ -1526,6 +1526,26 @@ print_header(const struct igt_device_card *card,
 		&power_group,
 		NULL
 	};
+	int i;
+
+	/*
+	 * If we have multi-gt and the user has specified -p options, show gt
+	 * specific values.
+	 */
+	if (!class_view && engines->num_gts > 1) {
+		int j = 0;
+
+		groups[j++] = &period_group;
+		for (i = 0; i < engines->num_gts; i++)
+			groups[j++] = &freq_group_gt[i];
+
+		groups[j++] = &irq_group;
+		for (i = 0; i < engines->num_gts; i++)
+			groups[j++] = &rc6_group_gt[i];
+
+		groups[j++] = &power_group;
+		groups[j++] = NULL;
+	}
 
 	if (output_mode != JSON)
 		memmove(&groups[0], &groups[1],
