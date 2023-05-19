@@ -560,6 +560,26 @@ static int get_num_gts(uint64_t type)
 	return cnt;
 }
 
+static void init_aggregate_counters(struct engines *engines)
+{
+	struct pmu_counter *pmu;
+
+	pmu = &engines->freq_req;
+	pmu->type = igt_perf_type_id(engines->device);
+	pmu->config = I915_PMU_REQUESTED_FREQUENCY;
+	pmu->present = true;
+
+	pmu = &engines->freq_act;
+	pmu->type = igt_perf_type_id(engines->device);
+	pmu->config = I915_PMU_ACTUAL_FREQUENCY;
+	pmu->present = true;
+
+	pmu = &engines->rc6;
+	pmu->type = igt_perf_type_id(engines->device);
+	pmu->config = I915_PMU_RC6_RESIDENCY;
+	pmu->present = true;
+}
+
 static int pmu_init(struct engines *engines)
 {
 	unsigned int i;
@@ -575,14 +595,7 @@ static int pmu_init(struct engines *engines)
 	if (fd < 0)
 		return -1;
 
-	engines->freq_req.config = I915_PMU_REQUESTED_FREQUENCY;
-	_open_pmu(type, engines->num_counters, &engines->freq_req, engines->fd);
-
-	engines->freq_act.config = I915_PMU_ACTUAL_FREQUENCY;
-	_open_pmu(type, engines->num_counters, &engines->freq_act, engines->fd);
-
-	engines->rc6.config = I915_PMU_RC6_RESIDENCY;
-	_open_pmu(type, engines->num_counters, &engines->rc6, engines->fd);
+	init_aggregate_counters(engines);
 
 	for (i = 0; i < engines->num_gts; i++) {
 		engines->freq_req_gt[i].config = __I915_PMU_REQUESTED_FREQUENCY(i);
@@ -698,14 +711,28 @@ static void pmu_sample(struct engines *engines)
 
 	for (i = 0; i < engines->num_gts; i++) {
 		update_sample(&engines->freq_req_gt[i], val);
+		engines->freq_req.val.cur += engines->freq_req_gt[i].val.cur;
+		engines->freq_req.val.prev += engines->freq_req_gt[i].val.prev;
+
 		update_sample(&engines->freq_act_gt[i], val);
+		engines->freq_act.val.cur += engines->freq_act_gt[i].val.cur;
+		engines->freq_act.val.prev += engines->freq_act_gt[i].val.prev;
+
 		update_sample(&engines->rc6_gt[i], val);
+		engines->rc6.val.cur += engines->rc6_gt[i].val.cur;
+		engines->rc6.val.prev += engines->rc6_gt[i].val.prev;
 	}
 
-	update_sample(&engines->freq_req, val);
-	update_sample(&engines->freq_act, val);
+	engines->freq_req.val.cur /= engines->num_gts;
+	engines->freq_req.val.prev /= engines->num_gts;
+
+	engines->freq_act.val.cur /= engines->num_gts;
+	engines->freq_act.val.prev /= engines->num_gts;
+
+	engines->rc6.val.cur /= engines->num_gts;
+	engines->rc6.val.prev /= engines->num_gts;
+
 	update_sample(&engines->irq, val);
-	update_sample(&engines->rc6, val);
 
 	for (i = 0; i < engines->num_engines; i++) {
 		struct engine *engine = engine_ptr(engines, i);
