@@ -1739,8 +1739,8 @@ test_frequency(int gem_fd, unsigned int gt)
 	igt_require(max_freq > min_freq);
 	igt_require(boost_freq > min_freq);
 
-	fd[0] = open_group(gem_fd, I915_PMU_REQUESTED_FREQUENCY, -1);
-	fd[1] = open_group(gem_fd, I915_PMU_ACTUAL_FREQUENCY, fd[0]);
+	fd[0] = open_group(gem_fd, __I915_PMU_REQUESTED_FREQUENCY(gt), -1);
+	fd[1] = open_group(gem_fd, __I915_PMU_ACTUAL_FREQUENCY(gt), fd[0]);
 
 	/*
 	 * Set GPU to min frequency and read PMU counters.
@@ -1833,8 +1833,8 @@ test_frequency_idle(int gem_fd, unsigned int gt)
 
 	/* While parked, our convention is to report the GPU at 0Hz */
 
-	fd[0] = open_group(gem_fd, I915_PMU_REQUESTED_FREQUENCY, -1);
-	fd[1] = open_group(gem_fd, I915_PMU_ACTUAL_FREQUENCY, fd[0]);
+	fd[0] = open_group(gem_fd, __I915_PMU_REQUESTED_FREQUENCY(gt), -1);
+	fd[1] = open_group(gem_fd, __I915_PMU_ACTUAL_FREQUENCY(gt), fd[0]);
 
 	gem_quiescent_gpu(gem_fd); /* Be idle! */
 	measured_usleep(2000); /* Wait for timers to cease */
