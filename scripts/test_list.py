@@ -337,16 +337,16 @@ class TestList:
         if has_implemented:
             if has_planned:
                 planned_class = "Planned"
-                self.title = "Planned and implemented tests for "
+                self.title = "Planned and implemented "
             else:
-                self.title = "Implemented tests for "
+                self.title = "Implemented "
         else:
             if has_planned:
-                self.title = "Planned tests for "
+                self.title = "Planned "
             else:
                 sys.exit("Need file names to be processed")
 
-        self.title += driver_name + " driver"
+        self.title += self.config.get("name", "tests for " + driver_name + " driver")
 
         # Parse files, expanding wildcards
         field_re = re.compile(r"(" + '|'.join(self.field_list.keys()) + r'):\s*(.*)', re.I)
