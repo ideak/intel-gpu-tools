@@ -1,5 +1,6 @@
 {
     "description": "JSON file to be used to parse Xe documentation",
+    "name": "Tests for Xe Driver",
     "files": [ "xe_*.c" ],
     "fields": {
         "Category": {
