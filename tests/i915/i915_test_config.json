@@ -1,5 +1,6 @@
 {
     "description": "JSON file to be used to parse i915 documentation",
+    "name": "Tests for i915 Driver",
     "files": [ "*.c", "../core_auth.c", "../core_getclient.c",
                "../core_getstats.c", "../core_getversion.c",
                "../core_hotunplug.c", "../core_setmaster.c",
