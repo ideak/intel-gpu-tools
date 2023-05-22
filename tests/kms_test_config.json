@@ -1,5 +1,6 @@
 {
     "description": "JSON file to be used to parse KMS documentation",
+    "name": "Display and KMS Tests for Intel i915 and Xe Drivers",
     "files": [ "chamelium/kms_*.c", "i915/kms_*.c", "kms_*.c" ],
     "fields": {
         "Category": {
