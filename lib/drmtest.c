@@ -205,6 +205,35 @@ static const struct module {
 	{}
 };
 
+struct _opened_device_path {
+	char *path;
+	struct igt_list_head link;
+};
+
+/*
+ * Logs path of opened device. Device path opened for the first time is logged at info level,
+ * subsequent opens (if any) are logged at debug level.
+ */
+static void log_opened_device_path(const char *device_path)
+{
+	static IGT_LIST_HEAD(opened_paths);
+	struct _opened_device_path *item;
+
+	igt_list_for_each_entry(item, &opened_paths, link) {
+		if (!strcmp(item->path, device_path)) {
+			igt_debug("Opened previously opened device: %s\n", device_path);
+			return;
+		}
+	}
+
+	item = calloc(1, sizeof(struct _opened_device_path));
+	igt_assert(item);
+	item->path = strdup(device_path);
+	igt_assert(item->path);
+	igt_list_add(&item->link, &opened_paths);
+	igt_info("Opened device: %s\n", item->path);
+}
+
 static int open_device(const char *name, unsigned int chipset)
 {
 	const char *forced;
@@ -235,8 +264,11 @@ static int open_device(const char *name, unsigned int chipset)
 			break;
 		}
 	}
-	if ((chipset & chip) == chip)
+
+	if ((chipset & chip) == chip) {
+		log_opened_device_path(name);
 		return fd;
+	}
 
 err:
 	close(fd);
