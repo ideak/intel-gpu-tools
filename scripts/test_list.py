@@ -651,6 +651,48 @@ class TestList:
             handler.close()
             sys.stdout = original_stdout
 
+    def get_spreadsheet(self):
+
+        """
+        Return a bidimentional array with the test contents.
+
+        Its output is similar to a spreadsheet, so it can be used by a
+        separate python file that would create a workbook's sheet.
+        """
+
+        sheet = []
+        row = 0
+        sheet.append([])
+        sheet[row].append('Test name')
+
+        subtest_dict = self.expand_dictionary(True)
+
+                # Identify the sort order for the fields
+        fields_order = []
+        fields = sorted(self.props.items(), key = _sort_per_level)
+        for item in fields:
+            fields_order.append(item[0])
+            sheet[row].append(item[0])
+
+        # Receives a flat subtest dictionary, with wildcards expanded
+        subtest_dict = self.expand_dictionary(True)
+
+        subtests = sorted(subtest_dict.items(),
+                          key = lambda x: _sort_using_array(x, fields_order))
+
+        for subtest, fields in subtests:
+            row += 1
+            sheet.append([])
+
+            sheet[row].append(subtest)
+
+            for field in fields_order:
+                if field in fields:
+                    sheet[row].append(fields[field])
+                else:
+                    sheet[row].append('')
+        return sheet
+
     def print_nested_rest(self, filename):
 
         """Print tests and subtests ordered by tests"""
