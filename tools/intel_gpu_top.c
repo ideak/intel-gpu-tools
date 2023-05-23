@@ -710,6 +710,10 @@ static void pmu_sample(struct engines *engines)
 	engines->ts.prev = engines->ts.cur;
 	engines->ts.cur = pmu_read_multi(engines->fd, num_val, val);
 
+	engines->freq_req.val.cur = engines->freq_req.val.prev = 0;
+	engines->freq_act.val.cur = engines->freq_act.val.prev = 0;
+	engines->rc6.val.cur = engines->rc6.val.prev = 0;
+
 	for (i = 0; i < engines->num_gts; i++) {
 		update_sample(&engines->freq_req_gt[i], val);
 		engines->freq_req.val.cur += engines->freq_req_gt[i].val.cur;
