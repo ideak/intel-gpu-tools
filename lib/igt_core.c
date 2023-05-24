@@ -3367,6 +3367,22 @@ err:
 	return -1;
 }
 
+/**
+ * igt_srandom:
+ *
+ * It initializes seed for random number generator.
+ * If specific value is needed it can be set with IGT_SRANDOM environment
+ * variable.
+ */
+void igt_srandom(void)
+{
+	const char *param = getenv("IGT_SRANDOM");
+	int seed = param ? atoi(param) : time(NULL);
+
+	srandom(seed);
+	igt_info("Using IGT_SRANDOM=%d for randomisation\n", seed);
+}
+
 /* IGT wrappers around libpciaccess init/cleanup functions */
 
 static void pci_system_exit_handler(int sig)

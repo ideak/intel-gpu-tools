@@ -1448,6 +1448,8 @@ int igt_system_quiet(const char *command);
 		free(buf); \
 	} while (0)
 
+void igt_srandom(void);
+
 /**
  * igt_trace:
  * @format: printf-style format string with optional args
