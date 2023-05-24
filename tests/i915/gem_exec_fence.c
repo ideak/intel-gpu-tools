@@ -3284,7 +3284,7 @@ igt_main
 				}
 			}
 
-			igt_describe("Basic check for explicit fence with additinal wait time on"
+			igt_describe("Basic check for explicit fence with additional wait time on"
 				     " each busy engine.");
 			igt_subtest_with_dynamic("basic-wait") {
 				for_each_ctx_engine(i915, ctx, e) {
