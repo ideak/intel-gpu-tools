@@ -30,13 +30,13 @@ xe_test_dict = {
 
 if build_xe
 	test_dict = {
-		'i915_tests': { 'input': i915_test_config, 'extra_args': [] },
+		'i915_tests': { 'input': i915_test_config, 'extra_args': check_testlist },
 		'kms_tests': { 'input': kms_test_config, 'extra_args': [] },
 		'xe_tests': { 'input': xe_test_config, 'extra_args': check_testlist }
 	    }
 else
 	test_dict = {
-	      'i915_tests': { 'input': i915_test_config, 'extra_args': [] },
+	      'i915_tests': { 'input': i915_test_config, 'extra_args': check_testlist },
 	      'kms_tests': { 'input': kms_test_config, 'extra_args': [] }
 	    }
 endif
