@@ -30,6 +30,126 @@
  * Run type: FULL
  *
  * SUBTEST: all-tests
+ *
+ * SUBTEST: all-tests@align
+ * Category: Infrastructure
+ * Description: drm_mm range manager SW validation
+ * Functionality: DRM memory mangemnt
+ * Test category: GEM_Legacy
+ *
+ * SUBTEST: all-tests@align32
+ * Category: Infrastructure
+ * Description: drm_mm range manager SW validation
+ * Functionality: DRM memory mangemnt
+ * Test category: GEM_Legacy
+ *
+ * SUBTEST: all-tests@align64
+ * Category: Infrastructure
+ * Description: drm_mm range manager SW validation
+ * Functionality: DRM memory mangemnt
+ * Test category: GEM_Legacy
+ *
+ * SUBTEST: all-tests@bottomup
+ * Category: Infrastructure
+ * Description: drm_mm range manager SW validation
+ * Functionality: DRM memory mangemnt
+ * Test category: GEM_Legacy
+ *
+ * SUBTEST: all-tests@color
+ * Category: Infrastructure
+ * Description: drm_mm range manager SW validation
+ * Functionality: DRM memory mangemnt
+ * Test category: GEM_Legacy
+ *
+ * SUBTEST: all-tests@color_evict
+ * Category: Infrastructure
+ * Description: drm_mm range manager SW validation
+ * Functionality: DRM memory mangemnt
+ * Test category: GEM_Legacy
+ *
+ * SUBTEST: all-tests@color_evict_range
+ * Category: Infrastructure
+ * Description: drm_mm range manager SW validation
+ * Functionality: DRM memory mangemnt
+ * Test category: GEM_Legacy
+ *
+ * SUBTEST: all-tests@debug
+ * Category: Infrastructure
+ * Description: drm_mm range manager SW validation
+ * Functionality: DRM memory mangemnt
+ * Test category: GEM_Legacy
+ *
+ * SUBTEST: all-tests@evict
+ * Category: Infrastructure
+ * Description: drm_mm range manager SW validation
+ * Functionality: DRM memory mangemnt
+ * Test category: GEM_Legacy
+ *
+ * SUBTEST: all-tests@evict_range
+ * Category: Infrastructure
+ * Description: drm_mm range manager SW validation
+ * Functionality: DRM memory mangemnt
+ * Test category: GEM_Legacy
+ *
+ * SUBTEST: all-tests@frag
+ * Category: Infrastructure
+ * Description: drm_mm range manager SW validation
+ * Functionality: DRM memory mangemnt
+ * Test category: GEM_Legacy
+ *
+ * SUBTEST: all-tests@highest
+ * Category: Infrastructure
+ * Description: drm_mm range manager SW validation
+ * Functionality: DRM memory mangemnt
+ * Test category: GEM_Legacy
+ *
+ * SUBTEST: all-tests@init
+ * Category: Infrastructure
+ * Description: drm_mm range manager SW validation
+ * Functionality: DRM memory mangemnt
+ * Test category: GEM_Legacy
+ *
+ * SUBTEST: all-tests@insert
+ * Category: Infrastructure
+ * Description: drm_mm range manager SW validation
+ * Functionality: DRM memory mangemnt
+ * Test category: GEM_Legacy
+ *
+ * SUBTEST: all-tests@insert_range
+ * Category: Infrastructure
+ * Description: drm_mm range manager SW validation
+ * Functionality: DRM memory mangemnt
+ * Test category: GEM_Legacy
+ *
+ * SUBTEST: all-tests@lowest
+ * Category: Infrastructure
+ * Description: drm_mm range manager SW validation
+ * Functionality: DRM memory mangemnt
+ * Test category: GEM_Legacy
+ *
+ * SUBTEST: all-tests@replace
+ * Category: Infrastructure
+ * Description: drm_mm range manager SW validation
+ * Functionality: DRM memory mangemnt
+ * Test category: GEM_Legacy
+ *
+ * SUBTEST: all-tests@reserve
+ * Category: Infrastructure
+ * Description: drm_mm range manager SW validation
+ * Functionality: DRM memory mangemnt
+ * Test category: GEM_Legacy
+ *
+ * SUBTEST: all-tests@sanitycheck
+ * Category: Infrastructure
+ * Description: drm_mm range manager SW validation
+ * Functionality: DRM memory mangemnt
+ * Test category: GEM_Legacy
+ *
+ * SUBTEST: all-tests@topdown
+ * Category: Infrastructure
+ * Description: drm_mm range manager SW validation
+ * Functionality: DRM memory mangemnt
+ * Test category: GEM_Legacy
  */
 
 IGT_TEST_DESCRIPTION("Basic sanity check of DRM's range manager (struct drm_mm)");

@@ -43,6 +43,12 @@
  * Sub-category: i915
  * Test category: GEM_Legacy
  *
+ * SUBTEST: busy@all
+ * Functionality: Semaphore
+ *
+ * SUBTEST: busy@all-engines
+ * Run type: BAT
+ *
  * SUBTEST: close-race
  * Category: Desktop client
  * Description: Test to check race condition by randomly closing the handle using gem_close.

@@ -51,6 +51,12 @@
  * Sub-category: i915
  * Test category: GEM_Legacy
  *
+ * SUBTEST: busy@all
+ * Functionality: semaphore
+ *
+ * SUBTEST: busy@all-engines
+ * Run type: BAT
+ *
  * SUBTEST: hang-busy
  * Description: Verify GEM_WAIT functionality in busy mode, when hang is allowed.
  *
@@ -83,6 +89,12 @@
  * Functionality: semaphore
  * Sub-category: i915
  * Test category: GEM_Legacy
+ *
+ * SUBTEST: wait@all
+ * Functionality: semaphore
+ *
+ * SUBTEST: wait@all-engines
+ * Run type: BAT
  *
  * SUBTEST: write-busy
  * Category: Infrastructure
