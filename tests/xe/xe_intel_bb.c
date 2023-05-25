@@ -1168,6 +1168,8 @@ igt_main_args("dpib", NULL, help_str, opt_handler, NULL)
 		full_batch(bops);
 
 	igt_subtest_with_dynamic("render") {
+		igt_require(xe_has_engine_class(xe, DRM_XE_ENGINE_CLASS_RENDER));
+
 		for (i = 0; i < ARRAY_SIZE(tests); i++) {
 			const struct test *t = &tests[i];
 
