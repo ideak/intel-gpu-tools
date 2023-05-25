@@ -11,7 +11,7 @@
                "../prime_vgem.c", "../sw_sync.c", "../syncobj_basic.c",
                "../syncobj_timeline.c", "../syncobj_wait.c",
                "../vgem_basic.c", "../vgem_slow.c" ],
-    "exclude_files": [ "kms_*", "gem_concurrent_all.c" ],
+    "exclude_files": [ "kms_*", "gem_concurrent_all.c", "gem_concurrent_blit.c" ],
     "fields": {
 	"Mega feature": {
                 "_properties_": {
