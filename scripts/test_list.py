@@ -863,10 +863,14 @@ class TestList:
         if self.filters:
             print("NOTE: test checks are affected by filters")
 
-        doc_subtests = sorted(self.get_subtests()[""])
+        doc_subtests = set()
 
-        for i in range(0, len(doc_subtests)): # pylint: disable=C0200
-            doc_subtests[i] = re.sub(r'\<[^\>]+\>', r'\\d+', doc_subtests[i])
+        for subtest in self.get_subtests()[""]:
+            subtest = "@".join(subtest.split("@")[:3])
+            subtest = re.sub(r'\<[^\>]+\>', r'\\d+', subtest)
+            doc_subtests.add(subtest)
+
+        doc_subtests = list(sorted(doc_subtests))
 
         # Get a list of tests from
         run_subtests = self.get_testlist()
