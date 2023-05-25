@@ -94,6 +94,7 @@ uint32_t xe_va_bits(int fd);
 uint16_t xe_dev_id(int fd);
 bool xe_supports_faults(int fd);
 const char *xe_engine_class_string(uint32_t engine_class);
+bool xe_has_engine_class(int fd, uint16_t engine_class);
 
 struct xe_device *xe_device_get(int fd);
 void xe_device_put(int fd);

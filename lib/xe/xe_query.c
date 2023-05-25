@@ -536,6 +536,27 @@ xe_dev_FN(xe_va_bits, va_bits, uint32_t);
  */
 xe_dev_FN(xe_dev_id, dev_id, uint16_t);
 
+/**
+ * xe_has_engine_class:
+ * @fd: xe device fd
+ * @engine_class: engine class
+ *
+ * Returns true if device @fd has hardware engine @class otherwise false.
+ */
+bool xe_has_engine_class(int fd, uint16_t engine_class)
+{
+	struct xe_device *xe_dev;
+
+	xe_dev = find_in_cache(fd);
+	igt_assert(xe_dev);
+
+	for (int i = 0; i < xe_dev->number_hw_engines; i++)
+		if (xe_dev->hw_engines[i].engine_class == engine_class)
+			return true;
+
+	return false;
+}
+
 igt_constructor
 {
 	xe_device_cache_init();
