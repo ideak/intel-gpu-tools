@@ -728,6 +728,10 @@ static bool execution_constraint(enum pipe pipe)
 	    pipe != active_pipes[last_pipe])
 		return true;
 
+	if (!extended && igt_run_in_simulation() &&
+	    pipe != active_pipes[0])
+		return true;
+
 	return false;
 }
 
