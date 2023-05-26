@@ -635,6 +635,66 @@ static void create_ext_placement_each(int fd)
 	free(regions);
 }
 
+/**
+  * TEST: GEM create uAPI
+  * Category: Infrastructure
+  * Description: Tests the DRM_IOCTL_I915_GEM_CREATE_EXT ioctl.
+  * Feature: core
+  * Functionality: Create GEM object with specific PAT index
+  * Run type: BAT
+  * Sub-category: i915
+  * Test category: GEM_Legacy
+  *
+  * SUBTEST: create-ext-set-pat
+  */
+static void create_ext_set_pat(int fd)
+{
+	struct drm_i915_gem_create_ext_set_pat setparam_pat = {
+		.base = { .name = I915_GEM_CREATE_EXT_SET_PAT },
+		.pat_index = 0,
+	};
+	struct drm_i915_gem_create_ext_set_pat setparam_inv_pat = {
+		.base = { .name = I915_GEM_CREATE_EXT_SET_PAT },
+		.pat_index = 65,
+	};
+	struct drm_i915_gem_caching arg;
+	uint64_t size;
+	uint32_t handle;
+	int ret;
+
+	size = PAGE_SIZE;
+
+	ret = __gem_create_ext(fd, &size, 0, &handle, &setparam_pat.base);
+
+	/*
+	 * With a valid PAT index specified, returning -EINVAL here
+	 * indicates set_pat extension is not supported
+	 */
+	if (ret == -EINVAL)
+		igt_skip("I915_GEM_CREATE_EXT_SET_PAT is not supported\n");
+	igt_assert(ret == 0);
+
+	/*
+	 * {set|get}_caching ioctl should fail for objects created with set_pat
+	 * Also note, dGPU doesn't support {set|get}_caching ioctl, so checking
+	 * this for iGPU only.
+	 */
+	if (!gem_has_lmem(fd)) {
+		igt_assert_eq(__gem_set_caching(fd, handle, 1), -EOPNOTSUPP);
+
+		memset(&arg, 0, sizeof(arg));
+		arg.handle = handle;
+		igt_assert(ioctl(fd, DRM_IOCTL_I915_GEM_GET_CACHING, &arg) < 0 &&
+			   errno == EOPNOTSUPP);
+	}
+
+	/* gem_create should fail with -EINVAL if invalid pat index specified */
+	igt_assert_eq(__gem_create_ext(fd, &size, 0, &handle, &setparam_inv_pat.base),
+		      -EINVAL);
+
+	gem_close(fd, handle);
+}
+
 static bool supports_needs_cpu_access(int fd)
 {
 	struct drm_i915_gem_memory_class_instance regions[] = {
@@ -994,6 +1054,10 @@ igt_main
 		     " create_ext.");
 	igt_subtest("create-ext-placement-all")
 		create_ext_placement_all(fd);
+
+	igt_describe("Validate basic creation of objects with PAT cache setting.");
+	igt_subtest("create-ext-set-pat")
+		create_ext_set_pat(fd);
 
 	igt_describe("Verify the basic functionally and expected ABI contract around I915_GEM_CREATE_EXT_FLAG_NEEDS_CPU_ACCESS");
 	igt_subtest("create-ext-cpu-access-sanity-check") {
