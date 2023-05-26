@@ -57,6 +57,23 @@ test_mmap(int fd, uint32_t flags)
 	gem_close(fd, bo);
 }
 
+/**
+ * SUBTEST: bad-flags
+ * Description: Test mmap offset with bad flags.
+ *
+ */
+static void test_bad_flags(int fd)
+{
+	uint64_t size = xe_get_default_alignment(fd);
+	struct drm_xe_gem_mmap_offset mmo = {
+		.handle = xe_bo_create(fd, 0, 0, size),
+		.flags = -1u,
+	};
+
+	do_ioctl_err(fd, DRM_IOCTL_XE_GEM_MMAP_OFFSET, &mmo, EINVAL);
+	gem_close(fd, mmo.handle);
+}
+
 igt_main
 {
 	int fd;
@@ -74,6 +91,9 @@ igt_main
 
 	igt_subtest("vram-system")
 		test_mmap(fd, vram_memory(fd, 0) | system_memory(fd));
+
+	igt_subtest("bad-flags")
+		test_bad_flags(fd);
 
 	igt_fixture {
 		xe_device_put(fd);
