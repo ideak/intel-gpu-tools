@@ -145,9 +145,6 @@
  * Feature: i915 pmu perf interface, pmu
  * Test category: Perf
  *
- * SUBTEST: frequency-idle
- * Feature: pmu
- *
  * SUBTEST: gt-awake
  * Description: Setup workload on all engines,measure gt awake time via pmu
  * Feature: i915 pmu perf interface, pmu
@@ -226,10 +223,7 @@
  * SUBTEST: rc6
  * Feature: pmu
  *
- * SUBTEST: rc6-runtime-pm
- * Feature: pmu
- *
- * SUBTEST: rc6-runtime-pm-long
+ * SUBTEST: rc6-all-gts
  * Feature: pmu
  *
  * SUBTEST: rc6-suspend
