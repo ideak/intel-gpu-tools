@@ -94,6 +94,22 @@ static void test_bad_extensions(int fd)
 	gem_close(fd, mmo.handle);
 }
 
+/**
+ * SUBTEST: bad-object
+ * Description: Test mmap offset with bad object.
+ *
+ */
+static void test_bad_object(int fd)
+{
+	uint64_t size = xe_get_default_alignment(fd);
+	struct drm_xe_gem_mmap_offset mmo = {
+		.handle = xe_bo_create(fd, 0, 0, size),
+	};
+
+	mmo.handle = 0xdeadbeef;
+	do_ioctl_err(fd, DRM_IOCTL_XE_GEM_MMAP_OFFSET, &mmo, ENOENT);
+}
+
 igt_main
 {
 	int fd;
@@ -117,6 +133,9 @@ igt_main
 
 	igt_subtest("bad-extensions")
 		test_bad_extensions(fd);
+
+	igt_subtest("bad-object")
+		test_bad_object(fd);
 
 	igt_fixture {
 		xe_device_put(fd);
