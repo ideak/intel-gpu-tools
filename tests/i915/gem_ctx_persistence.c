@@ -661,6 +661,8 @@ static void test_noheartbeat_many(int i915, int count, unsigned int flags)
 {
 	unsigned long checked = 0;
 
+	igt_require(!gem_using_guc_submission(i915));
+
 	cleanup(i915);
 	enable_hangcheck(i915);
 
@@ -720,6 +722,8 @@ static void test_noheartbeat_many(int i915, int count, unsigned int flags)
 static void test_noheartbeat_close(int i915, unsigned int flags)
 {
 	unsigned long checked = 0;
+
+	igt_require(!gem_using_guc_submission(i915));
 
 	cleanup(i915);
 	enable_hangcheck(i915);
