@@ -29,7 +29,6 @@
 #include <stdio.h>
 #include <string.h>
 
-
 IGT_TEST_DESCRIPTION(
    "Use the display CRC support to validate cursor plane functionality. "
    "The test will position the cursor plane either fully onscreen, "
@@ -86,7 +85,6 @@ typedef struct {
 static bool extended;
 static enum pipe active_pipes[IGT_MAX_PIPES];
 static uint32_t last_pipe;
-
 
 #define TEST_DPMS (1<<0)
 #define TEST_SUSPEND (1<<1)
