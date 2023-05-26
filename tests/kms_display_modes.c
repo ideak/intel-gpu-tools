@@ -169,6 +169,12 @@ static void run_extendedmode_test(data_t *data) {
 								pipe2, output2);
 				}
 			}
+			/*
+			 * For simulation env, no need to run
+			 * test with each valid output on pipe.
+			 */
+			if (igt_run_in_simulation())
+				break;
 		}
 	}
 }
