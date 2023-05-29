@@ -2938,6 +2938,8 @@ static void noheartbeat(int i915)
 {
 	const struct intel_execution_engine2 *e;
 
+	igt_require(!gem_using_guc_submission(i915));
+
 	/*
 	 * Check that non-persistent contexts are also cleaned up if we
 	 * close the context while they are active, but the engine's
