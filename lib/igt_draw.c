@@ -807,7 +807,7 @@ static void draw_rect_render(int fd, struct cmd_data *cmd_data,
 
 	src = create_buf(fd, cmd_data->bops, &tmp, I915_TILING_NONE);
 	dst = create_buf(fd, cmd_data->bops, buf, tiling);
-	ibb = intel_bb_create_with_context(fd, cmd_data->ctx, NULL, PAGE_SIZE);
+	ibb = intel_bb_create_with_context(fd, cmd_data->ctx, 0, NULL, PAGE_SIZE);
 
 	rendercopy(ibb, src, 0, 0, rect->w, rect->h, dst, rect->x, rect->y);
 

@@ -837,7 +837,8 @@ static inline uint64_t __intel_bb_get_offset(struct intel_bb *ibb,
 /**
  * __intel_bb_create:
  * @fd: drm fd - i915 or xe
- * @ctx: context id
+ * @ctx: for i915 context id, for xe engine id
+ * @vm: for xe vm_id, unused for i915
  * @cfg: for i915 intel_ctx configuration, NULL for default context or legacy mode,
  *       unused for xe
  * @size: size of the batchbuffer
@@ -883,7 +884,7 @@ static inline uint64_t __intel_bb_get_offset(struct intel_bb *ibb,
  * Pointer the intel_bb, asserts on failure.
  */
 static struct intel_bb *
-__intel_bb_create(int fd, uint32_t ctx, const intel_ctx_cfg_t *cfg,
+__intel_bb_create(int fd, uint32_t ctx, uint32_t vm, const intel_ctx_cfg_t *cfg,
 		  uint32_t size, bool do_relocs,
 		  uint64_t start, uint64_t end,
 		  uint8_t allocator_type, enum allocator_strategy strategy)
@@ -946,15 +947,17 @@ __intel_bb_create(int fd, uint32_t ctx, const intel_ctx_cfg_t *cfg,
 		ibb->gtt_size = 1ull << min_t(uint32_t, xe_va_bits(fd), 48);
 		end = ibb->gtt_size;
 
-		if (!ctx)
-			ctx = xe_vm_create(fd, DRM_XE_VM_CREATE_ASYNC_BIND_OPS, 0);
+		if (!vm) {
+			igt_assert_f(!ctx, "No vm provided for engine");
+			vm = xe_vm_create(fd, DRM_XE_VM_CREATE_ASYNC_BIND_OPS, 0);
+		}
 
 		ibb->uses_full_ppgtt = true;
 		ibb->allocator_handle =
-			intel_allocator_open_full(fd, ctx, start, end,
+			intel_allocator_open_full(fd, vm, start, end,
 						  allocator_type, strategy,
 						  ibb->alignment);
-		ibb->vm_id = ctx;
+		ibb->vm_id = vm;
 		ibb->last_engine = ~0U;
 	}
 
@@ -1001,7 +1004,8 @@ __intel_bb_create(int fd, uint32_t ctx, const intel_ctx_cfg_t *cfg,
 /**
  * intel_bb_create_full:
  * @fd: drm fd - i915 or xe
- * @ctx: context
+ * @ctx: for i915 context id, for xe engine id
+ * @vm: for xe vm_id, unused for i915
  * @cfg: intel_ctx configuration, NULL for default context or legacy mode
  * @size: size of the batchbuffer
  * @start: allocator vm start address
@@ -1019,20 +1023,21 @@ __intel_bb_create(int fd, uint32_t ctx, const intel_ctx_cfg_t *cfg,
  *
  * Pointer the intel_bb, asserts on failure.
  */
-struct intel_bb *intel_bb_create_full(int fd, uint32_t ctx,
+struct intel_bb *intel_bb_create_full(int fd, uint32_t ctx, uint32_t vm,
 				      const intel_ctx_cfg_t *cfg, uint32_t size,
 				      uint64_t start, uint64_t end,
 				      uint8_t allocator_type,
 				      enum allocator_strategy strategy)
 {
-	return __intel_bb_create(fd, ctx, cfg, size, false, start, end,
+	return __intel_bb_create(fd, ctx, vm, cfg, size, false, start, end,
 				 allocator_type, strategy);
 }
 
 /**
  * intel_bb_create_with_allocator:
  * @fd: drm fd - i915 or xe
- * @ctx: context
+ * @ctx: for i915 context id, for xe engine id
+ * @vm: for xe vm_id, unused for i915
  * @cfg: intel_ctx configuration, NULL for default context or legacy mode
  * @size: size of the batchbuffer
  * @allocator_type: allocator type, SIMPLE, RANDOM, ...
@@ -1045,12 +1050,12 @@ struct intel_bb *intel_bb_create_full(int fd, uint32_t ctx,
  *
  * Pointer the intel_bb, asserts on failure.
  */
-struct intel_bb *intel_bb_create_with_allocator(int fd, uint32_t ctx,
+struct intel_bb *intel_bb_create_with_allocator(int fd, uint32_t ctx, uint32_t vm,
 						const intel_ctx_cfg_t *cfg,
 						uint32_t size,
 						uint8_t allocator_type)
 {
-	return __intel_bb_create(fd, ctx, cfg, size, false, 0, 0,
+	return __intel_bb_create(fd, ctx, vm, cfg, size, false, 0, 0,
 				 allocator_type, ALLOC_STRATEGY_HIGH_TO_LOW);
 }
 
@@ -1088,7 +1093,7 @@ struct intel_bb *intel_bb_create(int fd, uint32_t size)
 {
 	bool relocs = is_i915_device(fd) && gem_has_relocations(fd);
 
-	return __intel_bb_create(fd, 0, NULL, size,
+	return __intel_bb_create(fd, 0, 0, NULL, size,
 				 relocs && !aux_needs_softpin(fd), 0, 0,
 				 INTEL_ALLOCATOR_SIMPLE,
 				 ALLOC_STRATEGY_HIGH_TO_LOW);
@@ -1097,7 +1102,8 @@ struct intel_bb *intel_bb_create(int fd, uint32_t size)
 /**
  * intel_bb_create_with_context:
  * @fd: drm fd - i915 or xe
- * @ctx: context id
+ * @ctx: for i915 context id, for xe engine id
+ * @vm: for xe vm_id, unused for i915
  * @cfg: intel_ctx configuration, NULL for default context or legacy mode
  * @size: size of the batchbuffer
  *
@@ -1109,12 +1115,12 @@ struct intel_bb *intel_bb_create(int fd, uint32_t size)
  * Pointer the intel_bb, asserts on failure.
  */
 struct intel_bb *
-intel_bb_create_with_context(int fd, uint32_t ctx,
+intel_bb_create_with_context(int fd, uint32_t ctx, uint32_t vm,
 			     const intel_ctx_cfg_t *cfg, uint32_t size)
 {
 	bool relocs = is_i915_device(fd) && gem_has_relocations(fd);
 
-	return __intel_bb_create(fd, ctx, cfg, size,
+	return __intel_bb_create(fd, ctx, vm, cfg, size,
 				 relocs && !aux_needs_softpin(fd), 0, 0,
 				 INTEL_ALLOCATOR_SIMPLE,
 				 ALLOC_STRATEGY_HIGH_TO_LOW);
@@ -1136,7 +1142,7 @@ struct intel_bb *intel_bb_create_with_relocs(int fd, uint32_t size)
 {
 	igt_require(is_i915_device(fd) && gem_has_relocations(fd));
 
-	return __intel_bb_create(fd, 0, NULL, size, true, 0, 0,
+	return __intel_bb_create(fd, 0, 0, NULL, size, true, 0, 0,
 				 INTEL_ALLOCATOR_NONE, ALLOC_STRATEGY_NONE);
 }
 
@@ -1161,7 +1167,7 @@ intel_bb_create_with_relocs_and_context(int fd, uint32_t ctx,
 {
 	igt_require(is_i915_device(fd) && gem_has_relocations(fd));
 
-	return __intel_bb_create(fd, ctx, cfg, size, true, 0, 0,
+	return __intel_bb_create(fd, ctx, 0, cfg, size, true, 0, 0,
 				 INTEL_ALLOCATOR_NONE, ALLOC_STRATEGY_NONE);
 }
 
@@ -1181,7 +1187,7 @@ struct intel_bb *intel_bb_create_no_relocs(int fd, uint32_t size)
 {
 	igt_require(gem_uses_full_ppgtt(fd));
 
-	return __intel_bb_create(fd, 0, NULL, size, false, 0, 0,
+	return __intel_bb_create(fd, 0, 0, NULL, size, false, 0, 0,
 				 INTEL_ALLOCATOR_SIMPLE,
 				 ALLOC_STRATEGY_HIGH_TO_LOW);
 }
@@ -2298,7 +2304,9 @@ __xe_bb_exec(struct intel_bb *ibb, uint64_t flags, bool sync)
 	igt_assert_eq(ibb->num_relocs, 0);
 	igt_assert_eq(ibb->xe_bound, false);
 
-	if (ibb->last_engine != engine) {
+	if (ibb->ctx) {
+		engine_id = ibb->ctx;
+	} else if (ibb->last_engine != engine) {
 		struct drm_xe_engine_class_instance inst = { };
 
 		inst.engine_instance =
@@ -2322,6 +2330,9 @@ __xe_bb_exec(struct intel_bb *ibb, uint64_t flags, bool sync)
 			igt_assert_f(false, "Unknown engine: %x", (uint32_t) flags);
 		}
 		igt_debug("Run on %s\n", xe_engine_class_string(inst.engine_class));
+
+		if (ibb->engine_id)
+			xe_engine_destroy(ibb->fd, ibb->engine_id);
 
 		ibb->engine_id = engine_id =
 			xe_engine_create(ibb->fd, ibb->vm_id, &inst, 0);

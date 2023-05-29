@@ -139,7 +139,7 @@ static void fork_rcs_copy(int timeout, uint32_t final,
 			ctx = gem_context_create(buf_ops_get_fd(dst[child]->bops));
 
 		ibb = intel_bb_create_with_context(buf_ops_get_fd(dst[child]->bops),
-						   ctx, NULL, 4096);
+						   ctx, 0, NULL, 4096);
 		i = 0;
 		igt_until_timeout(timeout) {
 			src = create_bo(dst[child]->bops,

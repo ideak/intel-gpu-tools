@@ -541,7 +541,7 @@ static void test_render_baseline(int i915)
 	/* Perform a regular 3d copy as a control checkpoint */
 	ret = create_ctx_with_params(i915, false, false, false, false, &ctx);
 	igt_assert_eq(ret, 0);
-	ibb = intel_bb_create_with_context(i915, ctx, NULL, 4096);
+	ibb = intel_bb_create_with_context(i915, ctx, 0, NULL, 4096);
 	igt_assert(ibb);
 
 	dstbo = alloc_and_fill_dest_buff(i915, false, TSTSURF_SIZE, TSTSURF_INITCOLOR1);
@@ -590,7 +590,7 @@ static void __test_render_pxp_src_to_protdest(int i915, uint32_t *outpixels, int
 	ret = create_ctx_with_params(i915, true, true, true, false, &ctx);
 	igt_assert_eq(ret, 0);
 	igt_assert_eq(get_ctx_protected_param(i915, ctx), 1);
-	ibb = intel_bb_create_with_context(i915, ctx, NULL, 4096);
+	ibb = intel_bb_create_with_context(i915, ctx, 0, NULL, 4096);
 	igt_assert(ibb);
 	intel_bb_set_pxp(ibb, true, DISPLAY_APPTYPE, I915_PROTECTED_CONTENT_DEFAULT_SESSION);
 
@@ -651,7 +651,7 @@ static void test_render_pxp_protsrc_to_protdest(int i915)
 	ret = create_ctx_with_params(i915, true, true, true, false, &ctx);
 	igt_assert_eq(ret, 0);
 	igt_assert_eq(get_ctx_protected_param(i915, ctx), 1);
-	ibb = intel_bb_create_with_context(i915, ctx, NULL, 4096);
+	ibb = intel_bb_create_with_context(i915, ctx, 0, NULL, 4096);
 	igt_assert(ibb);
 	intel_bb_set_pxp(ibb, true, DISPLAY_APPTYPE, I915_PROTECTED_CONTENT_DEFAULT_SESSION);
 
@@ -743,7 +743,7 @@ static void test_pxp_dmabuffshare_refcnt(int i915)
 		ret = create_ctx_with_params(fd[n], true, true, true, false, &ctx[n]);
 		igt_assert_eq(ret, 0);
 		igt_assert_eq(get_ctx_protected_param(fd[n], ctx[n]), 1);
-		ibb[n] = intel_bb_create_with_context(fd[n], ctx[n], NULL, 4096);
+		ibb[n] = intel_bb_create_with_context(fd[n], ctx[n], 0, NULL, 4096);
 		intel_bb_set_pxp(ibb[n], true, DISPLAY_APPTYPE,
 				 I915_PROTECTED_CONTENT_DEFAULT_SESSION);
 
@@ -905,7 +905,7 @@ static void prepare_exec_assets(int i915, struct simple_exec_assets *data, bool 
 		ret = create_ctx_with_params(i915, false, false, false, false, &(data->ctx));
 	igt_assert_eq(ret, 0);
 	igt_assert_eq(get_ctx_protected_param(i915, data->ctx), ctx_pxp);
-	data->ibb = intel_bb_create_with_context(i915, data->ctx, NULL, 4096);
+	data->ibb = intel_bb_create_with_context(i915, data->ctx, 0, NULL, 4096);
 	igt_assert(data->ibb);
 
 	data->fencebo = alloc_and_fill_dest_buff(i915, buf_pxp, 4096, 0);
@@ -993,7 +993,7 @@ static void test_pxp_stale_buf_execution(int i915)
 	ret = create_ctx_with_params(i915, true, true, true, false, &ctx2);
 	igt_assert_eq(ret, 0);
 	igt_assert_eq(get_ctx_protected_param(i915, ctx2), 1);
-	ibb2 = intel_bb_create_with_context(i915, ctx2, NULL, 4096);
+	ibb2 = intel_bb_create_with_context(i915, ctx2, 0, NULL, 4096);
 	igt_assert(ibb2);
 	intel_bb_remove_intel_buf(data.ibb, data.fencebuf);
 	intel_bb_add_intel_buf(ibb2, data.fencebuf, true);
@@ -1094,7 +1094,7 @@ static void test_pxp_pwrcycle_staleasset_execution(int i915, struct powermgt_dat
 	ret = create_ctx_with_params(i915, true, true, true, false, &ctx2);
 	igt_assert_eq(ret, 0);
 	igt_assert_eq(get_ctx_protected_param(i915, ctx2), 1);
-	ibb2 = intel_bb_create_with_context(i915, ctx2, NULL, 4096);
+	ibb2 = intel_bb_create_with_context(i915, ctx2, 0, NULL, 4096);
 	igt_assert(ibb2);
 	intel_bb_remove_intel_buf(data[1].ibb, data[1].fencebuf);
 	intel_bb_add_intel_buf(ibb2, data[1].fencebuf, true);
@@ -1154,7 +1154,7 @@ static void setup_protected_fb(int i915, int width, int height, igt_fb_t *fb, ui
 					       fb->plane_bpp[0], 0,
 					       igt_fb_mod_to_tiling(fb->modifier), 0);
 
-	ibb = intel_bb_create_with_context(i915, ctx, NULL, 4096);
+	ibb = intel_bb_create_with_context(i915, ctx, 0, NULL, 4096);
 	igt_assert(ibb);
 
 	ibb->pxp.enabled = true;

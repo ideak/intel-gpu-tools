@@ -176,9 +176,9 @@ static void simple_bb(struct buf_ops *bops, bool new_context)
 {
 	int xe = buf_ops_get_fd(bops);
 	struct intel_bb *ibb;
-	uint32_t ctx = 0;
+	uint32_t ctx = 0, vm = 0;
 
-	ibb = intel_bb_create_with_allocator(xe, ctx, NULL, PAGE_SIZE,
+	ibb = intel_bb_create_with_allocator(xe, 0, 0, NULL, PAGE_SIZE,
 					     INTEL_ALLOCATOR_SIMPLE);
 	if (debug_bb)
 		intel_bb_set_debug(ibb, true);
@@ -195,15 +195,17 @@ static void simple_bb(struct buf_ops *bops, bool new_context)
 	intel_bb_reset(ibb, true);
 
 	if (new_context) {
-		ctx = xe_vm_create(xe, DRM_XE_VM_CREATE_ASYNC_BIND_OPS, 0);
+		vm = xe_vm_create(xe, DRM_XE_VM_CREATE_ASYNC_BIND_OPS, 0);
+		ctx = xe_engine_create(xe, vm, xe_hw_engine(xe, 0), 0);
 		intel_bb_destroy(ibb);
-		ibb = intel_bb_create_with_context(xe, ctx, NULL, PAGE_SIZE);
+		ibb = intel_bb_create_with_context(xe, ctx, vm, NULL, PAGE_SIZE);
 		intel_bb_out(ibb, MI_BATCH_BUFFER_END);
 		intel_bb_ptr_align(ibb, 8);
 		intel_bb_exec(ibb, intel_bb_offset(ibb),
 			      I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC,
 			      true);
-		xe_vm_destroy(xe, ctx);
+		xe_engine_destroy(xe, ctx);
+		xe_vm_destroy(xe, vm);
 	}
 
 	intel_bb_destroy(ibb);
@@ -220,9 +222,8 @@ static void bb_with_allocator(struct buf_ops *bops)
 	int xe = buf_ops_get_fd(bops);
 	struct intel_bb *ibb;
 	struct intel_buf *src, *dst;
-	uint32_t ctx = 0;
 
-	ibb = intel_bb_create_with_allocator(xe, ctx, NULL, PAGE_SIZE,
+	ibb = intel_bb_create_with_allocator(xe, 0, 0, NULL, PAGE_SIZE,
 					     INTEL_ALLOCATOR_SIMPLE);
 	if (debug_bb)
 		intel_bb_set_debug(ibb, true);
@@ -455,7 +456,7 @@ static void blit(struct buf_ops *bops, uint8_t allocator_type)
 	uint64_t poff_src, poff_dst;
 	uint64_t flags = 0;
 
-	ibb = intel_bb_create_with_allocator(xe, 0, NULL, PAGE_SIZE,
+	ibb = intel_bb_create_with_allocator(xe, 0, 0, NULL, PAGE_SIZE,
 					     allocator_type);
 	flags |= I915_EXEC_NO_RELOC;
 
@@ -892,7 +893,7 @@ static void delta_check(struct buf_ops *bops)
 	uint64_t obj_offset = (1ULL << 32) - xe_get_default_alignment(xe);
 	uint64_t delta = xe_get_default_alignment(xe) + 0x1000;
 
-	ibb = intel_bb_create_with_allocator(xe, 0, NULL, PAGE_SIZE,
+	ibb = intel_bb_create_with_allocator(xe, 0, 0, NULL, PAGE_SIZE,
 					     INTEL_ALLOCATOR_SIMPLE);
 	if (debug_bb)
 		intel_bb_set_debug(ibb, true);

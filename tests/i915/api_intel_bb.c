@@ -394,7 +394,7 @@ static void simple_bb(struct buf_ops *bops, bool use_context)
 	if (use_context)
 		gem_require_contexts(i915);
 
-	ibb = intel_bb_create_with_allocator(i915, ctx, NULL, PAGE_SIZE,
+	ibb = intel_bb_create_with_allocator(i915, ctx, 0, NULL, PAGE_SIZE,
 					     INTEL_ALLOCATOR_SIMPLE);
 	if (debug_bb)
 		intel_bb_set_debug(ibb, true);
@@ -413,7 +413,7 @@ static void simple_bb(struct buf_ops *bops, bool use_context)
 	if (use_context) {
 		ctx = gem_context_create(i915);
 		intel_bb_destroy(ibb);
-		ibb = intel_bb_create_with_context(i915, ctx, NULL, PAGE_SIZE);
+		ibb = intel_bb_create_with_context(i915, ctx, 0, NULL, PAGE_SIZE);
 		intel_bb_out(ibb, MI_BATCH_BUFFER_END);
 		intel_bb_ptr_align(ibb, 8);
 		intel_bb_exec(ibb, intel_bb_offset(ibb),
@@ -434,7 +434,7 @@ static void bb_with_allocator(struct buf_ops *bops)
 
 	igt_require(gem_uses_full_ppgtt(i915));
 
-	ibb = intel_bb_create_with_allocator(i915, ctx, NULL, PAGE_SIZE,
+	ibb = intel_bb_create_with_allocator(i915, ctx, 0, NULL, PAGE_SIZE,
 					     INTEL_ALLOCATOR_SIMPLE);
 	if (debug_bb)
 		intel_bb_set_debug(ibb, true);
@@ -768,7 +768,7 @@ static void object_noreloc(struct buf_ops *bops, enum obj_cache_ops cache_op,
 
 	igt_require(gem_uses_full_ppgtt(i915));
 
-	ibb = intel_bb_create_with_allocator(i915, 0, NULL, PAGE_SIZE, allocator_type);
+	ibb = intel_bb_create_with_allocator(i915, 0, 0, NULL, PAGE_SIZE, allocator_type);
 	if (debug_bb)
 		intel_bb_set_debug(ibb, true);
 
@@ -882,7 +882,7 @@ static void blit(struct buf_ops *bops,
 	if (do_relocs) {
 		ibb = intel_bb_create_with_relocs(i915, PAGE_SIZE);
 	} else {
-		ibb = intel_bb_create_with_allocator(i915, 0, NULL, PAGE_SIZE,
+		ibb = intel_bb_create_with_allocator(i915, 0, 0, NULL, PAGE_SIZE,
 						     allocator_type);
 		flags |= I915_EXEC_NO_RELOC;
 	}
@@ -1346,7 +1346,7 @@ static void delta_check(struct buf_ops *bops)
 	uint64_t delta = gem_detect_safe_alignment(i915) + 0x1000;
 	bool supports_48bit;
 
-	ibb = intel_bb_create_with_allocator(i915, 0, NULL, PAGE_SIZE,
+	ibb = intel_bb_create_with_allocator(i915, 0, 0, NULL, PAGE_SIZE,
 					     INTEL_ALLOCATOR_SIMPLE);
 	supports_48bit = ibb->supports_48b_address;
 	if (!supports_48bit)
@@ -1466,7 +1466,7 @@ static void misplaced_blitter(struct buf_ops *bops)
 	err = __intel_ctx_create(i915, &cfg, &ctx);
 	igt_assert_eq(err, 0);
 
-	ibb = intel_bb_create_with_context(i915, ctx->id, &ctx->cfg, PAGE_SIZE);
+	ibb = intel_bb_create_with_context(i915, ctx->id, 0, &ctx->cfg, PAGE_SIZE);
 
 	/* Prepare for blitter copy, done to verify we found the blitter engine */
 	src = intel_buf_create(bops, WIDTH, HEIGHT, 32, 0, I915_TILING_NONE,

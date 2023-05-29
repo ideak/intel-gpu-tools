@@ -62,7 +62,7 @@ static void exec_nop(data_t *data, struct igt_fb *fb, uint32_t ctx)
 	intel_buf_set_ownership(dst, true);
 
 	ibb = intel_bb_create_with_context(buf_ops_get_fd(data->bops),
-					   ctx, NULL, 4096);
+					   ctx, 0, NULL, 4096);
 
 	/* add the reloc to make sure the kernel will think we write to dst */
 	intel_bb_add_intel_buf(ibb, dst, true);
