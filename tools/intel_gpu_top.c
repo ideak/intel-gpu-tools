@@ -837,6 +837,9 @@ static struct igt_drm_clients *display_clients(struct igt_drm_clients *clients)
 	struct igt_drm_clients *aggregated;
 	int tmp, num = 0;
 
+	if (!clients)
+		return NULL;
+
 	if (!aggregate_pids)
 		goto out;
 
