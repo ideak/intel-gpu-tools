@@ -264,6 +264,7 @@ test_compute_mode(int fd, uint32_t vm, uint64_t addr, uint64_t userptr,
 		.num_syncs = 1,
 		.syncs = to_user_pointer(sync),
 	};
+	int64_t fence_timeout;
 	uint32_t engines[MAX_N_ENGINES];
 	size_t bo_size;
 	uint32_t bo = 0;
@@ -335,7 +336,11 @@ test_compute_mode(int fd, uint32_t vm, uint64_t addr, uint64_t userptr,
 		xe_vm_bind_userptr_async(fd, vm, 0, to_user_pointer(data), addr,
 					 bo_size, sync, 1);
 #define THREE_SEC	3000
-	xe_wait_ufence(fd, &data[0].vm_sync, USER_FENCE_VALUE, NULL, THREE_SEC);
+#define THIRTY_SEC	30000
+
+	fence_timeout = igt_run_in_simulation() ? THIRTY_SEC : THREE_SEC;
+
+	xe_wait_ufence(fd, &data[0].vm_sync, USER_FENCE_VALUE, NULL, fence_timeout);
 	data[0].vm_sync = 0;
 
 	for (i = 0; i < n_execs; i++) {
@@ -363,7 +368,7 @@ test_compute_mode(int fd, uint32_t vm, uint64_t addr, uint64_t userptr,
 			for (j = i - 0x20; j <= i; ++j)
 				xe_wait_ufence(fd, &data[j].exec_sync,
 					       USER_FENCE_VALUE,
-					       NULL, THREE_SEC);
+					       NULL, fence_timeout);
 			xe_vm_unbind_async(fd, vm, 0, 0, addr, bo_size,
 					   NULL, 0);
 
@@ -378,7 +383,7 @@ test_compute_mode(int fd, uint32_t vm, uint64_t addr, uint64_t userptr,
 							 addr, bo_size, sync,
 							 1);
 			xe_wait_ufence(fd, &data[0].vm_sync, USER_FENCE_VALUE,
-				       NULL, THREE_SEC);
+				       NULL, fence_timeout);
 			data[0].vm_sync = 0;
 		}
 
@@ -393,7 +398,7 @@ test_compute_mode(int fd, uint32_t vm, uint64_t addr, uint64_t userptr,
 				for (j = i == 0x20 ? 0 : i - 0x1f; j <= i; ++j)
 					xe_wait_ufence(fd, &data[j].exec_sync,
 						       USER_FENCE_VALUE,
-						       NULL, THREE_SEC);
+						       NULL, fence_timeout);
 				igt_assert_eq(data[i].data, 0xc0ffee);
 			} else if (i * 2 != n_execs) {
 				/*
@@ -426,7 +431,7 @@ test_compute_mode(int fd, uint32_t vm, uint64_t addr, uint64_t userptr,
 		(flags & RACE ? n_execs / 2 + 1 : n_execs - 1) : 0;
 	for (i = j; i < n_execs; i++)
 		xe_wait_ufence(fd, &data[i].exec_sync, USER_FENCE_VALUE, NULL,
-			       THREE_SEC);
+			       fence_timeout);
 
 	/* Wait for all execs to complete */
 	if (flags & INVALIDATE)
@@ -434,7 +439,7 @@ test_compute_mode(int fd, uint32_t vm, uint64_t addr, uint64_t userptr,
 
 	sync[0].addr = to_user_pointer(&data[0].vm_sync);
 	xe_vm_unbind_async(fd, vm, 0, 0, addr, bo_size, sync, 1);
-	xe_wait_ufence(fd, &data[0].vm_sync, USER_FENCE_VALUE, NULL, THREE_SEC);
+	xe_wait_ufence(fd, &data[0].vm_sync, USER_FENCE_VALUE, NULL, fence_timeout);
 
 	for (i = j; i < n_execs; i++)
 		igt_assert_eq(data[i].data, 0xc0ffee);
