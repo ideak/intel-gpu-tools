@@ -719,6 +719,16 @@ static bool multiplaneskiproundcheck(data_t *data, planeinfos p[2])
 	if (!igt_plane_has_rotation(p[1].plane, p[1].fbinfo->rotation))
 		return false;
 
+	if (igt_run_in_simulation() &&
+	   (multiplaneformatlist[p[0].formatindex] == DRM_FORMAT_P010 ||
+	    multiplaneformatlist[p[0].formatindex] == DRM_FORMAT_RGB565))
+		return false;
+
+	if (igt_run_in_simulation() &&
+	   (multiplaneformatlist[p[1].formatindex] == DRM_FORMAT_P010 ||
+	    multiplaneformatlist[p[1].formatindex] == DRM_FORMAT_RGB565))
+		return false;
+
 	return true;
 }
 
@@ -765,6 +775,9 @@ static bool reusecrcfromlastround(planeinfos p[2], int lastroundp1format,
 				  int lastroundp0rotation,
 				  int lastroundp1rotation)
 {
+	if (igt_run_in_simulation())
+		return false;
+
 	if (planarcheck != 1)
 		return false;
 
