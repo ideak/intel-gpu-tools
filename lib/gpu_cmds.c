@@ -975,7 +975,8 @@ xehp_emit_compute_walk(struct intel_bb *ibb,
 	intel_bb_out(ibb, 0); /* indirect data offset */	//dw3
 
 	/* SIMD size */
-	intel_bb_out(ibb, 1 << 30 | 1 << 25); /* SIMD16 | enable inline */ //dw4
+	/* SIMD16 | enable inline | Message SIMD16 */
+	intel_bb_out(ibb, 1 << 30 | 1 << 25 | 1 << 17);		//dw4
 
 	/* Execution mask */
 	intel_bb_out(ibb, 0xffffffff);				//dw5
