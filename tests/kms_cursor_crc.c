@@ -251,6 +251,10 @@ static void do_single_test(data_t *data, int x, int y, bool hw_test,
 			igt_assert_crc_equal(hwcrc, &crc_after);
 		}
 	} else {
+		/* If on broken situation on CHV match what hw round did */
+		if (chv_cursor_broken(data, x) && cursor_visible(data, x, y))
+			return;
+
 		/* Now render the same in software and collect crc */
 		swbufidx = (data->primary->drm_plane->fb_id ==
 			    data->primary_fb[SWCOMPARISONBUFFER1].fb_id) ?
