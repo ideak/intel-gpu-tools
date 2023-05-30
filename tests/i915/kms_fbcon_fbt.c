@@ -39,7 +39,7 @@ IGT_TEST_DESCRIPTION("Test the relationship between fbcon and the frontbuffer "
 #define MAX_CONNECTORS 32
 
 struct drm_info {
-	int fd, debugfs_fd;
+	int fd, debugfs_fd, crtc_id;
 	struct igt_fb fb;
 	drmModeResPtr res;
 	drmModeConnectorPtr connectors[MAX_CONNECTORS];
@@ -117,9 +117,10 @@ static bool fbc_check_cursor_blinking(struct drm_info *drm)
 	igt_pipe_crc_t *pipe_crc;
 	igt_crc_t crc[2];
 	bool ret;
-	int i;
+	int i, pipe;
 
-	pipe_crc = igt_pipe_crc_new(drm->fd, PIPE_A, IGT_PIPE_CRC_SOURCE_AUTO);
+	pipe = kmstest_get_pipe_from_crtc_id(drm->fd, drm->crtc_id);
+	pipe_crc = igt_pipe_crc_new(drm->fd, pipe, IGT_PIPE_CRC_SOURCE_AUTO);
 
 	igt_pipe_crc_start(pipe_crc);
 	igt_pipe_crc_drain(pipe_crc);
@@ -165,7 +166,6 @@ static void set_mode_for_one_screen(struct drm_info *drm,
 				    connector_possible_fn connector_possible)
 {
 	int i, rc;
-	uint32_t crtc_id;
 	drmModeModeInfoPtr mode;
 	uint32_t buffer_id;
 	drmModeConnectorPtr c = NULL;
@@ -182,7 +182,7 @@ static void set_mode_for_one_screen(struct drm_info *drm,
 	igt_require_f(i < drm->res->count_connectors,
 		      "No connector available\n");
 
-	crtc_id = kmstest_find_crtc_for_connector(drm->fd, drm->res, c, 0);
+	drm->crtc_id = kmstest_find_crtc_for_connector(drm->fd, drm->res, c, 0);
 
 	buffer_id = igt_create_fb(drm->fd, mode->hdisplay, mode->vdisplay,
 				  DRM_FORMAT_XRGB8888,
@@ -193,7 +193,7 @@ static void set_mode_for_one_screen(struct drm_info *drm,
 		 mode->hdisplay, mode->vdisplay,
 		 kmstest_connector_type_str(c->connector_type));
 
-	rc = drmModeSetCrtc(drm->fd, crtc_id, buffer_id, 0, 0,
+	rc = drmModeSetCrtc(drm->fd, drm->crtc_id, buffer_id, 0, 0,
 			    &c->connector_id, 1, mode);
 	igt_assert_eq(rc, 0);
 }
