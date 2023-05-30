@@ -312,7 +312,7 @@ const struct {
 	},
 	{
 		"Tests downscaling (scaling factor 0.25) and upscaling (scaling factor 0.25) of 2 planes.",
-		"planes-downscale-factor-0-25-upscale-0-25",
+		"planes-downscale-factor-0-25-upscale-factor-0-25",
 		0.25,
 		0.25,
 		TEST_PLANES_DOWNSCALE_UPSCALE,
@@ -333,7 +333,7 @@ const struct {
 	},
 	{
 		"Tests downscaling (scaling factor 0.5) and upscaling (scaling factor 0.25) of 2 planes.",
-		"planes-downscale-factor-0-5-upscale-0-25",
+		"planes-downscale-factor-0-5-upscale-factor-0-25",
 		0.5,
 		0.25,
 		TEST_PLANES_DOWNSCALE_UPSCALE,
@@ -354,7 +354,7 @@ const struct {
 	},
 	{
 		"Tests downscaling (scaling factor 0.75) and upscaling (scaling factor 0.25) of 2 planes.",
-		"planes-downscale-factor-0-75-upscale-0-25",
+		"planes-downscale-factor-0-75-upscale-factor-0-25",
 		0.75,
 		0.25,
 		TEST_PLANES_DOWNSCALE_UPSCALE,
