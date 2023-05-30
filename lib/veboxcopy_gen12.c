@@ -30,6 +30,7 @@
 #define PLANAR_420_8	4
 #define PACKED_444A_8	5
 #define R8G8B8A8_UNORM	8
+#define PACKED_444_16	9
 #define PLANAR_420_16	12
 
 struct vebox_surface_state {
@@ -341,6 +342,10 @@ void gen12_vebox_copyfunc(struct intel_bb *ibb,
 		igt_assert(!src->format_is_yuv_semiplanar);
 		format = src->format_is_yuv ? PACKED_444A_8 :
 					      R8G8B8A8_UNORM;
+		break;
+	case 64:
+		igt_assert(!src->format_is_yuv_semiplanar && src->format_is_yuv);
+		format = PACKED_444_16;
 		break;
 	default:
 		igt_assert_f(0, "Unsupported bpp: %u\n", src->bpp);
