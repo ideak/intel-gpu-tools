@@ -48,6 +48,7 @@
 #define MAX_SUPPORTED_ILR 8
 #define DEBUGFS_EDP_PSR_CAP	"psr_capability"
 #define DEBUGFS_EDP_PSR_STATE	"psr_state"
+#define DEBUGFS_ALLOW_EDP_HOTPLUG_DETECT "allow_edp_hotplug_detection"
 
 /* amdgpu DM interface entries */
 #define DEBUGFS_DM_VISUAL_CONFIRM "amdgpu_dm_visual_confirm"
@@ -187,6 +188,7 @@ bool igt_amd_psr_support_sink(int drm_fd, char *connector_name, enum psr_mode mo
 bool igt_amd_psr_support_drv(int drm_fd, char *connector_name, enum psr_mode mode);
 bool igt_amd_output_has_psr_state(int drm_fd, char *connector_name);
 int  igt_amd_read_psr_state(int drm_fd, char *connector_name);
+void igt_amd_allow_edp_hotplug_detect(int drm_fd, char *connector_name, bool enable);
 
 /* DM interface helpers */
 bool igt_amd_has_visual_confirm(int drm_fd);

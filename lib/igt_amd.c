@@ -1112,6 +1112,37 @@ int igt_amd_read_psr_state(int drm_fd, char *connector_name)
 }
 
 /**
+ * igt_amd_allow_edp_hotplug_detect: notify kernel read edp edid all the time
+ * @drm_fd: DRM file descriptor
+ * @connector_name: The connector's name
+ * @enable: allow or disable kernel read eDP EDID for each display detection
+ * example usage: echo 0x1 >
+ * /sys/kernel/debug/dri/0/eDP-1/allow_edp_hotplug_detection
+ */
+void igt_amd_allow_edp_hotplug_detect(int drm_fd, char *connector_name, bool enable)
+{
+	int fd, hpd_fd, wr_len;
+	const char *allow_hotplug_detect = "1";
+	const char *dis_allow_hotplug_detect = "0";
+
+	fd = igt_debugfs_connector_dir(drm_fd, connector_name, O_RDONLY);
+	igt_assert(fd >= 0);
+	hpd_fd = openat(fd, DEBUGFS_ALLOW_EDP_HOTPLUG_DETECT, O_WRONLY);
+	close(fd);
+	igt_assert(hpd_fd >= 0);
+
+	if (enable) {
+		wr_len = write(hpd_fd, allow_hotplug_detect, strlen(allow_hotplug_detect));
+		igt_assert_eq(wr_len, strlen(allow_hotplug_detect));
+	} else {
+		wr_len = write(hpd_fd, dis_allow_hotplug_detect, strlen(dis_allow_hotplug_detect));
+		igt_assert_eq(wr_len, strlen(dis_allow_hotplug_detect));
+	}
+
+	close(hpd_fd);
+}
+
+/**
  * @brief check if AMDGPU DM visual confirm debugfs interface entry exist and defined
  *
  * @param drm_fd DRM file descriptor
