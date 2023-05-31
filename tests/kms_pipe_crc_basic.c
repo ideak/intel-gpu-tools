@@ -227,25 +227,31 @@ static void test_read_crc(data_t *data, enum pipe pipe,
 }
 
 /**
- * SUBTEST: compare-crc-sanitycheck
- * Description: Basic sanity check for CRC mismatches
+ * SUBTEST: compare-crc-sanitycheck-%s
+ * Description: Basic sanity check for CRC mismatches with %arg[1]
  * Test category: functionality test
  * Run type: BAT
  * Functionality: crc
  * Mega feature: General Display Features
+ *
+ * arg[1]:
+ *
+ * @xr24:	XR24 format
+ * @nv12:	NV12 format
  */
 
 /*
  * CRC-sanity test, to make sure there would be no CRC mismatches
  *
- * - Create two framebuffers (FB0 & FB1) with same color info
- * - Flip FB0 with the Primary plane & collect the CRC as ref CRC.
- * - Flip FB1 with the Primary plane, collect the CRC & compare with
+ * - Create two framebuffers (FB0 & FB1).
+ * - Flip FB0 with the primary plane & collect the CRC as ref CRC.
+ * - Flip FB1 with the primary plane, collect the CRC & compare with
  *   the ref CRC.
  *
  *   No CRC mismatch should happen
  */
-static void test_compare_crc(data_t *data, enum pipe pipe, igt_output_t *output)
+static void test_compare_crc(data_t *data, enum pipe pipe, igt_output_t *output,
+			     uint32_t plane_format)
 {
 	igt_display_t *display = &data->display;
 	igt_plane_t *primary;
@@ -259,7 +265,9 @@ static void test_compare_crc(data_t *data, enum pipe pipe, igt_output_t *output)
 
 	mode = igt_output_get_mode(output);
 
-	/* Create two framebuffers with the same color info. */
+	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+	igt_skip_on(!igt_plane_has_format_mod(primary, plane_format, DRM_FORMAT_MOD_LINEAR));
+
 	igt_create_color_fb(data->drm_fd,
 			mode->hdisplay, mode->vdisplay,
 			DRM_FORMAT_XRGB8888,
@@ -267,14 +275,12 @@ static void test_compare_crc(data_t *data, enum pipe pipe, igt_output_t *output)
 			1.0, 1.0, 1.0,
 			&fb0);
 	igt_create_color_fb(data->drm_fd,
-			mode->hdisplay, mode->vdisplay,
-			DRM_FORMAT_XRGB8888,
+			mode->hdisplay, mode->vdisplay, plane_format,
 			DRM_FORMAT_MOD_LINEAR,
 			1.0, 1.0, 1.0,
 			&fb1);
 
-	/* Flip FB0 with the Primary plane & collect the CRC as ref CRC. */
-	primary = igt_output_get_plane_type(output, DRM_PLANE_TYPE_PRIMARY);
+	/* Flip FB0 with the primary plane & collect the CRC as ref CRC. */
 	igt_plane_set_fb(primary, &fb0);
 	igt_display_commit(display);
 
@@ -282,7 +288,7 @@ static void test_compare_crc(data_t *data, enum pipe pipe, igt_output_t *output)
 				    IGT_PIPE_CRC_SOURCE_AUTO);
 	igt_pipe_crc_collect_crc(pipe_crc, &ref_crc);
 
-	/* Flip FB1 with the Primary plane & compare the CRC with ref CRC. */
+	/* Flip FB1 with the primary plane & compare the CRC with ref CRC. */
 	igt_plane_set_fb(primary, &fb1);
 	igt_display_commit(display);
 
@@ -475,8 +481,8 @@ igt_main_args("e", NULL, help_str, opt_handler, NULL)
 		}
 	}
 
-	igt_describe("Basic sanity check for CRC mismatches");
-	igt_subtest_with_dynamic("compare-crc-sanitycheck") {
+	igt_describe("Basic sanity check for CRC mismatches with XR24 format");
+	igt_subtest_with_dynamic("compare-crc-sanitycheck-xr24") {
 		for_each_pipe_with_single_output(&data.display, pipe, output) {
 			if (simulation_constraint(pipe))
 				continue;
@@ -485,7 +491,21 @@ igt_main_args("e", NULL, help_str, opt_handler, NULL)
 				continue;
 
 			igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(pipe), output->name)
-				test_compare_crc(&data, pipe, output);
+				test_compare_crc(&data, pipe, output, DRM_FORMAT_XRGB8888);
+		}
+	}
+
+	igt_describe("Basic sanity check for CRC mismatches with NV12 format");
+	igt_subtest_with_dynamic("compare-crc-sanitycheck-nv12") {
+		for_each_pipe_with_single_output(&data.display, pipe, output) {
+			if (simulation_constraint(pipe))
+				continue;
+
+			if(!pipe_output_combo_valid(&data.display, pipe, output))
+				continue;
+
+			igt_dynamic_f("pipe-%s-%s", kmstest_pipe_name(pipe), output->name)
+				test_compare_crc(&data, pipe, output, DRM_FORMAT_NV12);
 		}
 	}
 
