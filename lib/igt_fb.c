@@ -3064,9 +3064,14 @@ static void igt_fb_destroy_cairo_shadow_buffer(struct igt_fb *shadow,
 	munmap(ptr, shadow->size);
 }
 
-static uint8_t clamprgb(float val)
+static uint8_t clamp8(float val)
 {
 	return clamp((int)(val + 0.5f), 0, 255);
+}
+
+static uint8_t clamp16(float val)
+{
+	return clamp((int)(val + 0.5f), 0, 65535);
 }
 
 static void read_rgb(struct igt_vec4 *rgb, const uint8_t *rgb24)
@@ -3079,9 +3084,9 @@ static void read_rgb(struct igt_vec4 *rgb, const uint8_t *rgb24)
 
 static void write_rgb(uint8_t *rgb24, const struct igt_vec4 *rgb)
 {
-	rgb24[2] = clamprgb(rgb->d[0]);
-	rgb24[1] = clamprgb(rgb->d[1]);
-	rgb24[0] = clamprgb(rgb->d[2]);
+	rgb24[2] = clamp8(rgb->d[0]);
+	rgb24[1] = clamp8(rgb->d[1]);
+	rgb24[0] = clamp8(rgb->d[2]);
 }
 
 struct fb_convert_buf {
@@ -3401,7 +3406,7 @@ static void convert_rgb24_to_yuv(struct fb_convert *cvt)
 
 			rgb_tmp += bpp;
 
-			*y_tmp = yuv.d[0];
+			*y_tmp = clamp8(yuv.d[0]);
 			y_tmp += params.ay_inc;
 
 			if ((i % dst_fmt->vsub) || (j % dst_fmt->hsub))
@@ -3431,8 +3436,8 @@ static void convert_rgb24_to_yuv(struct fb_convert *cvt)
 			read_rgb(&pair_rgb, pair_rgb24);
 			pair_yuv = igt_matrix_transform(&m, &pair_rgb);
 
-			*u_tmp = (yuv.d[1] + pair_yuv.d[1]) / 2.0f;
-			*v_tmp = (yuv.d[2] + pair_yuv.d[2]) / 2.0f;
+			*u_tmp = clamp8((yuv.d[1] + pair_yuv.d[1]) / 2.0f);
+			*v_tmp = clamp8((yuv.d[2] + pair_yuv.d[2]) / 2.0f);
 
 			u_tmp += params.uv_inc;
 			v_tmp += params.uv_inc;
@@ -3590,7 +3595,7 @@ static void convert_float_to_yuv16(struct fb_convert *cvt, bool alpha)
 
 			rgb_tmp += fpp;
 
-			*y_tmp = yuv.d[0];
+			*y_tmp = clamp16(yuv.d[0]);
 			y_tmp += params.ay_inc;
 
 			if ((i % dst_fmt->vsub) || (j % dst_fmt->hsub))
@@ -3620,8 +3625,8 @@ static void convert_float_to_yuv16(struct fb_convert *cvt, bool alpha)
 			read_rgbf(&pair_rgb, pair_float);
 			pair_yuv = igt_matrix_transform(&m, &pair_rgb);
 
-			*u_tmp = (yuv.d[1] + pair_yuv.d[1]) / 2.0f;
-			*v_tmp = (yuv.d[2] + pair_yuv.d[2]) / 2.0f;
+			*u_tmp = clamp16((yuv.d[1] + pair_yuv.d[1]) / 2.0f);
+			*v_tmp = clamp16((yuv.d[2] + pair_yuv.d[2]) / 2.0f);
 
 			u_tmp += params.uv_inc;
 			v_tmp += params.uv_inc;
