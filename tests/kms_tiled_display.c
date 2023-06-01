@@ -70,9 +70,6 @@ typedef struct {
 
 } data_t;
 
-void basic_test(data_t *data, drmEventContext *drm_event, struct pollfd *pfd,
-		igt_display_t *display);
-
 #ifdef HAVE_CHAMELIUM
 static void test_with_chamelium(data_t *data, igt_display_t *display);
 #endif
@@ -422,8 +419,8 @@ static void test_with_chamelium(data_t *data, igt_display_t *display)
 }
 #endif
 
-void basic_test(data_t *data, drmEventContext *drm_event, struct pollfd *pfd,
-		igt_display_t *display)
+static void basic_test(data_t *data, drmEventContext *drm_event, struct pollfd *pfd,
+		       igt_display_t *display)
 {
 		int ret;
 
