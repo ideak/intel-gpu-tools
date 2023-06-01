@@ -61,18 +61,13 @@ typedef struct {
 	enum igt_commit_style commit;
 	struct timeval first_ts;
 
-	#ifdef HAVE_CHAMELIUM
+#ifdef HAVE_CHAMELIUM
 	struct chamelium *chamelium;
 	struct chamelium_port **ports;
 	int port_count;
 	struct chamelium_edid *edids[IGT_CUSTOM_EDID_COUNT];
-	#endif
-
-} data_t;
-
-#ifdef HAVE_CHAMELIUM
-static void test_with_chamelium(data_t *data, igt_display_t *display);
 #endif
+} data_t;
 
 static int drm_property_is_tile(drmModePropertyPtr prop)
 {
@@ -473,9 +468,9 @@ igt_main
 		test_cleanup(&data);
 	}
 
-	#ifdef HAVE_CHAMELIUM
-        igt_describe("Make sure the Tiled CRTCs are synchronized and we get "
-                     "page flips for all tiled CRTCs in one vblank (executes on chamelium).");
+#ifdef HAVE_CHAMELIUM
+	igt_describe("Make sure the Tiled CRTCs are synchronized and we get "
+		     "page flips for all tiled CRTCs in one vblank (executes on chamelium).");
 	igt_subtest_f("basic-test-pattern-with-chamelium") {
 		int i;
 
@@ -487,7 +482,8 @@ igt_main
 					      data.ports[i], data.ports,
 					      data.port_count);
 	}
-	#endif
+#endif
+
 	igt_fixture {
 		free(data.conns);
 		kmstest_restore_vt_mode();
