@@ -1525,6 +1525,7 @@ bonded_runner(int i915,
 	 * submission across multiple engines.
 	 */
 	igt_require(gem_scheduler_has_preemption(i915));
+	igt_require(!gem_using_guc_submission(i915));
 
 	cycles = mmap(0, 4096, PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0);
 
@@ -1996,6 +1997,7 @@ static void sliced(int i915)
 
 	igt_require(gem_scheduler_has_preemption(i915));
 	igt_require(gem_scheduler_has_semaphores(i915));
+	igt_require(!gem_using_guc_submission(i915));
 
 	for (int class = 0; class < 32; class++) {
 		struct i915_engine_class_instance *ci;
@@ -3605,7 +3607,6 @@ igt_main
 
 	igt_subtest_group {
 		igt_fixture {
-			igt_require(!gem_using_guc_submission(i915));
 			intel_allocator_multiprocess_start();
 		}
 
