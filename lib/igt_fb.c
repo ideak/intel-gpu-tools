@@ -3069,7 +3069,7 @@ static uint8_t clamp8(float val)
 	return clamp((int)(val + 0.5f), 0, 255);
 }
 
-static uint8_t clamp16(float val)
+static uint16_t clamp16(float val)
 {
 	return clamp((int)(val + 0.5f), 0, 65535);
 }
