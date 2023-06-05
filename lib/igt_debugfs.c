@@ -208,13 +208,16 @@ char *igt_debugfs_path(int device, char *path, int pathlen)
  */
 int igt_debugfs_dir(int device)
 {
+	int debugfs_dir_fd;
 	char path[200];
 
-	if (!igt_debugfs_path(device, path, sizeof(path)))
+	if (igt_debug_on(!igt_debugfs_path(device, path, sizeof(path))))
 		return -1;
 
-	igt_debug("Opening debugfs directory '%s'\n", path);
-	return open(path, O_RDONLY);
+	debugfs_dir_fd = open(path, O_RDONLY);
+	igt_debug_on_f(debugfs_dir_fd < 0, "path: %s\n", path);
+
+	return debugfs_dir_fd;
 }
 
 /**
