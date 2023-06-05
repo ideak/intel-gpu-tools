@@ -1451,16 +1451,18 @@ igt_show_stat(const pid_t tid, const char *cmd, int *state, const char *fn)
 static void
 __igt_lsof_fds(const pid_t tid, const char *cmd, int *state, char *proc_path, const char *dir)
 {
+	/* default fds or kernel threads */
+	static const char *default_fds[] = { "/dev/pts", "/dev/null" };
 	struct dirent *d;
 	struct stat st;
 	char path[PATH_MAX];
 	char *fd_lnk;
+	DIR *dp;
 
-	/* default fds or kernel threads */
-	const char *default_fds[] = { "/dev/pts", "/dev/null" };
+	dp = opendir(proc_path);
+	if (!dp)
+		return;
 
-	DIR *dp = opendir(proc_path);
-	igt_assert(dp);
 again:
 	while ((d = readdir(dp))) {
 		char *copy_fd_lnk;
@@ -1780,7 +1782,8 @@ __igt_lsof_audio_and_kill_proc(const pid_t tid, const char *cmd, const uid_t eui
 	dp = opendir(proc_path);
 	if (!dp && errno == ENOENT)
 		return 0;
-	igt_assert(dp);
+	if (!dp)
+		return 1;
 
 	while ((d = readdir(dp))) {
 		if (*d->d_name == '.')
