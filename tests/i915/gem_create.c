@@ -657,6 +657,7 @@ static void create_ext_set_pat(int fd)
 		.base = { .name = I915_GEM_CREATE_EXT_SET_PAT },
 		.pat_index = 65,
 	};
+	uint32_t devid = intel_get_drm_devid(fd);
 	struct drm_i915_gem_caching arg;
 	uint64_t size;
 	uint32_t handle;
@@ -672,6 +673,9 @@ static void create_ext_set_pat(int fd)
 	 */
 	if (ret == -EINVAL)
 		igt_skip("I915_GEM_CREATE_EXT_SET_PAT is not supported\n");
+	else if (!IS_METEORLAKE(devid))
+		igt_assert_eq(ret, -ENODEV);
+
 	igt_assert(ret == 0);
 
 	/*
