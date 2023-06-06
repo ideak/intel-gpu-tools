@@ -17,6 +17,7 @@
  * TEST: Check if waitfences work
  * Category: Software building block
  * Sub-category: waitfence
+ * Functionality: waitfence
  * Test category: functionality test
  * Run type: BAT
  * Description: Test waitfences functionality

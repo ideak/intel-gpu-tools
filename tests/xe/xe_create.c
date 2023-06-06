@@ -7,6 +7,7 @@
  * TEST: Check bo create ioctl
  * Category: Software building block
  * Sub-category: uapi
+ * Functionality: device
  * Test category: functionality test
  * Run type: BAT
  */

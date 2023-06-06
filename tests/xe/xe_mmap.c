@@ -7,6 +7,7 @@
  * TEST: Test if the driver is capable of doing mmap on different memory regions
  * Category: Software building block
  * Sub-category: mmap
+ * Functionality: mmap
  * Test category: functionality test
  * Run type: BAT
  */

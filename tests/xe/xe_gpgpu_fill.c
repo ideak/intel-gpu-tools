@@ -7,6 +7,7 @@
  * TEST: Basic tests for gpgpu functionality
  * Category: Software building block
  * Sub-category: gpgpu
+ * Functionality: gpgpu
  * Test category: functionality test
  */
 

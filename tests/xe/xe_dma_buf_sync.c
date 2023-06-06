@@ -7,6 +7,7 @@
  * TEST: Check dmabuf functionality
  * Category: Software building block
  * Sub-category: dmabuf
+ * Functionality: dma_buf
  * Test category: functionality test
  */
 

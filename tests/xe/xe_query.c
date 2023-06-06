@@ -7,6 +7,7 @@
  * TEST: Check device configuration query
  * Category: Software building block
  * Sub-category: ioctl
+ * Functionality: device
  * Test category: functionality test
  * Run type: BAT
  * Description: Acquire configuration data for xe device

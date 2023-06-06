@@ -7,6 +7,7 @@
  * TEST: Basic tests for execbuf functionality
  * Category: Hardware building block
  * Sub-category: execbuf
+ * Functionality: engines
  * Test category: functionality test
  */
 

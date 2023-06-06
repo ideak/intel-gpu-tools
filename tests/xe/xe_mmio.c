@@ -7,6 +7,7 @@
  * TEST: Test if mmio feature
  * Category: Software building block
  * Sub-category: mmio
+ * Functionality: mmap
  * Test category: functionality test
  * Run type: BAT
  */

@@ -7,6 +7,7 @@
  * TEST: Check debugfs userspace API
  * Category: Software building block
  * Sub-category: debugfs
+ * Functionality: debugfs
  * Test category: functionality test
  * Run type: BAT
  * Description: Validate debugfs entries

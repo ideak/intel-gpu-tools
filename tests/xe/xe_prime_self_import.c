@@ -29,6 +29,7 @@
  * TEST: Check whether prime import/export works on the same device
  * Category: Software building block
  * Sub-category: drm prime
+ * Functionality: prime import/export
  * Test category: functionality test
  *
  * Description:

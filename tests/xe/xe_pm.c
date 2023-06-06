@@ -153,14 +153,17 @@ static bool out_of_d3(device_t device, enum igt_acpi_d_state state)
 /**
  * SUBTEST: %s-basic
  * Description: set GPU state to %arg[1] and test suspend/autoresume
+ * Functionality: pm - %arg[1]
  * GPU requirements: D3 feature should be supported
  *
  * SUBTEST: %s-basic-exec
  * Description: test exec on %arg[1] state once without RPM
+ * Functionality: pm - %arg[1]
  * GPU requirements: D3 feature should be supported
  *
  * SUBTEST: %s-multiple-execs
  * Description: test exec on %arg[1] state multiple times without RPM
+ * Functionality: pm - %arg[1]
  * GPU requirements: D3 feature should be supported
  *
  * arg[1]:
@@ -175,6 +178,7 @@ static bool out_of_d3(device_t device, enum igt_acpi_d_state state)
 /**
  * SUBTEST: %s-exec-after
  * Description: suspend/autoresume on %arg[1] state and exec after RPM
+ * Functionality: pm - %arg[1]
  *
  * arg[1]:
  *
@@ -188,6 +192,7 @@ static bool out_of_d3(device_t device, enum igt_acpi_d_state state)
  * Description:
  *	Setup GPU on %arg[2] state then test exec on %arg[1] state
  * 	without RPM
+ * Functionality: pm - %arg[1]
  * GPU requirements: D3 feature should be supported
  *
  * arg[1]:

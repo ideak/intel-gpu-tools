@@ -23,6 +23,7 @@
  * Description:
  *	Run an openCL Kernel that returns output[i] = input[i] * input[i],
  *	for an input dataset..
+ * Functionality: compute openCL kernel
  * TODO: extend test to cover other platforms
  */
 static void
