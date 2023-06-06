@@ -935,6 +935,9 @@ static uint64_t __intel_allocator_open_full(int fd, uint32_t ctx,
 
 		igt_assert(xe_dev);
 
+		if (!default_alignment)
+			req.open.default_alignment = xe_get_default_alignment(fd);
+
 		if (!end)
 			req.open.end = 1ull << xe_dev->va_bits;
 	}
