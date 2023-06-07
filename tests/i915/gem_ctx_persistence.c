@@ -577,6 +577,8 @@ static void test_nohangcheck_hang(int i915, const intel_ctx_cfg_t *cfg)
 	int testable_engines = 0;
 	int dir;
 
+	igt_require(!gem_using_guc_submission(i915));
+
 	cleanup(i915);
 
 	/*
