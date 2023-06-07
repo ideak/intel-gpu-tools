@@ -627,9 +627,8 @@ int drm_open_driver(int chipset)
 	 */
 	if (is_i915_device(fd)) {
 		if (__sync_fetch_and_add(&open_count, 1) == 0) {
-			gem_quiescent_gpu(fd);
-
-			at_exit_drm_fd = __drm_open_driver(chipset);
+			__cancel_work_at_exit(fd);
+			at_exit_drm_fd = drm_reopen_driver(fd);
 			igt_install_exit_handler(cancel_work_at_exit);
 		}
 	}
@@ -676,9 +675,9 @@ int drm_open_driver_render(int chipset)
 	if (__sync_fetch_and_add(&open_count, 1))
 		return fd;
 
-	at_exit_drm_render_fd = __drm_open_driver(chipset);
-	if(chipset & DRIVER_INTEL){
-		gem_quiescent_gpu(fd);
+	at_exit_drm_render_fd = drm_reopen_driver(fd);
+	if (chipset & DRIVER_INTEL) {
+		__cancel_work_at_exit(fd);
 		igt_install_exit_handler(cancel_work_at_exit_render);
 	}
 
