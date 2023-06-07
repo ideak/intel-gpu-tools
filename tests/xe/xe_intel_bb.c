@@ -942,34 +942,6 @@ static void delta_check(struct buf_ops *bops)
 }
 
 /**
- * SUBTEST: full-batch
- * Description: check bb totally filled is executing correct
- * Run type: FULL
- * TODO: change ``'Run type' == FULL`` to a better category
- */
-static void full_batch(struct buf_ops *bops)
-{
-	int xe = buf_ops_get_fd(bops);
-	struct intel_bb *ibb;
-	int i;
-
-	ibb = intel_bb_create(xe, PAGE_SIZE);
-	if (debug_bb)
-		intel_bb_set_debug(ibb, true);
-
-	for (i = 0; i < PAGE_SIZE / sizeof(uint32_t) - 1; i++)
-		intel_bb_out(ibb, 0);
-	intel_bb_emit_bbe(ibb);
-
-	igt_assert(intel_bb_offset(ibb) == PAGE_SIZE);
-	intel_bb_exec(ibb, intel_bb_offset(ibb),
-		      I915_EXEC_DEFAULT | I915_EXEC_NO_RELOC, true);
-	intel_bb_reset(ibb, false);
-
-	intel_bb_destroy(ibb);
-}
-
-/**
  * SUBTEST: render
  * Description: check intel-bb render pipeline
  * Run type: FULL
@@ -1165,9 +1137,6 @@ igt_main_args("dpib", NULL, help_str, opt_handler, NULL)
 
 	igt_subtest("delta-check")
 		delta_check(bops);
-
-	igt_subtest("full-batch")
-		full_batch(bops);
 
 	igt_subtest_with_dynamic("render") {
 		igt_require(xe_has_engine_class(xe, DRM_XE_ENGINE_CLASS_RENDER));

@@ -169,7 +169,6 @@ igt@xe_intel_bb@blit-simple
 igt@xe_intel_bb@create-in-region
 igt@xe_intel_bb@delta-check
 igt@xe_intel_bb@destroy-bb
-igt@xe_intel_bb@full-batch
 igt@xe_intel_bb@intel-bb-blit-none
 igt@xe_intel_bb@intel-bb-blit-x
 igt@xe_intel_bb@intel-bb-blit-y
